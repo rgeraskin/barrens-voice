@@ -208,7 +208,9 @@ class DictionaryInCompanion(unittest.TestCase):
         self.assertEqual(plain("общаемся через Discord и в дискорде"), "общаемся через диск+орд и в диск+орде")
         # a stem keeps the ending typed in chat and is not marked for declension; a whole word is
         self.assertEqual(d.apply_words("встречаемся на перекрестке"), "встречаемся на перекр+ёстке")
-        self.assertEqual(d.apply_words("идём в ОП"), "идём в \x02Огненная пропасть\x03")
+        self.assertEqual(d.apply_words("идём в ОП"), "идём в \x02Огненная пр+опасть\x03")
+        # the name typed in full: its stress (not the verb "пропасть"), and its case after a preposition
+        self.assertEqual(d.apply_words("в Огненная Пропасть"), "в \x02Огненная пр+опасть\x03")
         self.assertEqual(d.apply_words("схожу в ПС"), "схожу в \x02Пещеры стенаний\x03")
         self.assertEqual(d.apply_words("продам поножи и поножей"), "продам п+оножи и п+оножей")
         self.assertEqual(d.apply_words("че там, в пве или пвп?"), "\x02чё\x03 там, в \x02пэ-вэ-й+е\x03 или \x02пэвэп+э\x03?")
