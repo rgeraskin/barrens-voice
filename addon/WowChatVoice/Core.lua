@@ -135,7 +135,14 @@ local held, holdTicker = {}, nil
 local function CatQuestSpeaking()
     local core = rawget(_G, "CatQuestCore")
     local st = type(core) == "table" and type(core.state) == "table" and core.state
-    return st and (st.playing == true or st.pending ~= nil) or false
+    if not st then return false end
+    if st.playing == true then
+        -- a track it says plays far past its own length: its "playing" is stuck (CatQuest's own
+        -- comments warn of that) - do not hold the chat for it
+        local started, length = tonumber(st.startedAt), tonumber(st.duration)
+        return not (started and length and length > 0 and GetTime() > started + length + 3)
+    end
+    return st.pending ~= nil
 end
 
 --- Send the waiting chat lines once CatQuest is silent; drop those that waited too long.

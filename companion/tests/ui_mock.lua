@@ -150,9 +150,18 @@ assert(#diag == 1 and diag[1]:find("CatQuest"), "the dropped one is reported to 
 sent = { chat[1] }
 ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "третья")
 assert(#sent == 2, "CatQuest silent: straight to the strip")
+CatQuestCore.state = { playing = true, startedAt = 200, duration = 10 }
+clock = 205
+ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "пока трек")
+assert(#sent == 2, "held while the track plays")
+clock = 214                                   -- 4 s past its 10 s: "playing" is stuck, the chat goes on
+ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "после трека")
+ns.ReleaseHeld()
+assert(#sent == 4, "a stuck CatQuest does not hold the chat: " .. #sent)
+CatQuestCore.state = { playing = false }
 CatQuestCore = nil
 ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "без CatQuest")
-assert(#sent == 3, "no CatQuest: straight to the strip")
+assert(#sent == 5, "no CatQuest: straight to the strip")
 GetTime = function() return 0 end
 print("catquest ok")
 
