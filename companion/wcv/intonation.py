@@ -1,8 +1,9 @@
 """Question intonation on top of F5 (Praat PSOLA through parselmouth: the pitch and the timing change,
 the voice does not).
 
-F5 says "Идёшь с нами?" as often as not like a statement, and question references did not help (the
-CatQuest voices are F5 output themselves). So:
+F5 says "Идёшь с нами?" as often as not like a statement, and question references did not help (not
+even real actors' questions from the game client: the Russian F5 does not carry that intonation
+over from a reference). So:
 - a yes/no question ("Идёшь с нами?") gets its end lifted: the last `span` seconds of voice rise to
   `yes_no_rise_st` semitones above the line's median pitch. F5 also lets the last syllable of a line
   die away like a statement's ("Есть хил в гр+уппу?": "-пу", after the "пп" pause, is 15-20 dB below
@@ -95,6 +96,19 @@ def _ease(a: float, b: float, x: float) -> float:
     return a + (b - a) * (0.5 - 0.5 * np.cos(np.pi * x))
 
 
+def pitch_range(snd) -> tuple[float, float]:
+    """Floor and ceiling (Hz) for analysing this voice's pitch: around its own median, measured over
+    40..1200 Hz first. A fixed 60..500 Hz cut both ends: gnome women speak at 450-500 Hz (half their
+    speech above the ceiling), the orc character at 55-70 Hz (a probe from 75 Hz took the octave
+    above it for the voice). Where the analysis loses the periods, the resynthesised voice rasps."""
+    import numpy as np
+
+    probe = snd.to_pitch(0.01, 40, 1200).selected_array["frequency"]
+    voiced = probe[probe > 0]
+    median = float(np.median(voiced)) if len(voiced) else 200.0
+    return max(40.0, median / 2.5), min(1200.0, max(500.0, median * 2.2))
+
+
 def shape(samples, rate: int, text: str, settings: dict | None = None):
     """`samples` (the voice of `text`) with question intonation, or unchanged when `text` is not a
     question, the setting for its kind is 0, parselmouth is missing or there is too little voice."""
@@ -109,7 +123,8 @@ def shape(samples, rate: int, text: str, settings: dict | None = None):
     except ImportError:
         return samples
     snd = parselmouth.Sound(np.asarray(samples, dtype="float64"), sampling_frequency=rate)
-    manip = call(snd, "To Manipulation", 0.01, 60, 500)
+    floor, ceiling = pitch_range(snd)
+    manip = call(snd, "To Manipulation", 0.01, floor, ceiling)
     tier = call(manip, "Extract pitch tier")
     n = call(tier, "Get number of points")
     if n < 5:

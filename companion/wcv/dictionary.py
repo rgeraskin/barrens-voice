@@ -52,6 +52,16 @@ def find_saved(config: dict) -> Path | None:
     return max(found, key=lambda p: p.stat().st_mtime) if found else None
 
 
+def saved_voices(config: dict) -> str | None:
+    """The voices last chosen in the addon ("f5" or "sapi") as its saved variables keep them; None
+    when there are none yet."""
+    path = find_saved(config)
+    if path is None:
+        return None
+    match = re.search(r'\["voices"\]\s*=\s*"(\w+)"', path.read_text(encoding="utf-8", errors="replace"))
+    return match.group(1) if match else None
+
+
 PLURAL = re.compile(r"(\d+)(\s*)\[([^\[\]|]+)\|([^\[\]|]+)\|([^\[\]|]+)\]")
 
 

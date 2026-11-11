@@ -104,3 +104,47 @@ end
 ns.db.onlyVisible = false
 assert(fire("CHAT_MSG_YELL", "кричу"), "everything when the option is off")
 print("visible ok")
+
+-- quest and item links read as their names; a bracket pair inside a word is a masked "х"
+assert(ns.Clean("помочь с |cffff2020|Hquest:92706:0|h[РАЗЫСКИВАЕТСЯ: Брууз]|h|r ?") == "помочь с РАЗЫСКИВАЕТСЯ: Брууз?",
+    ns.Clean("помочь с |cffff2020|Hquest:92706:0|h[РАЗЫСКИВАЕТСЯ: Брууз]|h|r ?"))
+assert(ns.Clean("продам |cff0070dd|Hitem:2589::::::::|h[Льняной мешок]|h|r") == "продам Льняной мешок")
+assert(ns.Clean("на)(уя") == "нахуя", ns.Clean("на)(уя"))
+assert(ns.Clean(")(орошо") == "хорошо" and ns.Clean("ну }{ватит") == "ну хватит")
+assert(ns.Clean("привет))") == "привет." and ns.Clean("ок )(") == "ок.", ns.Clean("ок )("))
+print("clean ok")
+local spoken = ns.Dictionary.Apply("общаемся через Discord и в дискорде"):gsub("[\2\3]", "")
+assert(spoken == "общаемся через диск+орд и в диск+орде", spoken)
+print("discord ok")
+-- a stem keeps the ending typed in chat and is not marked for declension (its case is right already);
+-- a whole-word replacement is marked, so the program can decline it after a preposition
+assert(ns.Dictionary.Apply("встречаемся на перекрестке") == "встречаемся на перекр+ёстке", ns.Dictionary.Apply("встречаемся на перекрестке"))
+assert(ns.Dictionary.Apply("идём в ОП") == "идём в \2Огненная пропасть\3", ns.Dictionary.Apply("идём в ОП"))
+assert(ns.Dictionary.Apply("схожу в ПС") == "схожу в \2Пещеры стенаний\3", ns.Dictionary.Apply("схожу в ПС"))
+assert(ns.Dictionary.Apply("продам поножи и поножей") == "продам п+оножи и п+оножей", ns.Dictionary.Apply("продам поножи и поножей"))
+print("stems ok")
+
+-- while CatQuest reads a quest, chat lines wait; they go when it is done; stale ones are dropped
+local clock = 100
+GetTime = function() return clock end
+CatQuestCore = { state = { playing = true } }
+sent = {}
+ns.Strip.Push = function(p) sent[#sent + 1] = p end
+ns.db.waitForCatQuest = true
+ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "первая")
+assert(#sent == 0, "held while CatQuest speaks")
+clock = 105
+ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "вторая")
+ns.ReleaseHeld()
+assert(#sent == 0, "still held")
+CatQuestCore.state.playing = false
+clock = 142                                   -- the first waited 42 s: dropped; the second 37 s: sent
+ns.ReleaseHeld()
+assert(#sent == 1 and sent[1]:find("вторая"), "only the fresh one goes: " .. #sent)
+ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "третья")
+assert(#sent == 2, "CatQuest silent: straight to the strip")
+CatQuestCore = nil
+ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "без CatQuest")
+assert(#sent == 3, "no CatQuest: straight to the strip")
+GetTime = function() return 0 end
+print("catquest ok")

@@ -18,6 +18,7 @@ ns.DEFAULTS = {
     emote = false,     -- /e emotes
     self = false,      -- your own lines
     onlyVisible = true, -- only lines a chat window of yours shows (its message types and channels, chat filters)
+    waitForCatQuest = true, -- hold chat lines while CatQuest reads a quest; send them when it is done
     cell = 2,          -- strip cell size, physical pixels
     rows = 1,          -- strip rows of cells
     -- the strip's cells start at the "left" edge or the "right"; not "right" by default: a minimap at
@@ -63,7 +64,7 @@ local PREFIX = "|cff66ccffWoW Chat Voice|r: "
 --- atlases and raid target icons ({rt1}, {череп}).
 function ns.Clean(text)
     text = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
-    text = text:gsub("|H.-|h(.-)|h", "%1")
+    text = text:gsub("|H.-|h%[?(.-)%]?|h", "%1")       -- a quest or item link: its name, without the brackets
     text = text:gsub("|T.-|t", ""):gsub("|A.-|a", "")
     text = text:gsub("{.-}", ""):gsub("||", "|")
     -- A "+" typed in chat is the word; every "+" after this point is a dictionary stress mark.
@@ -76,6 +77,9 @@ end
 --- Brackets used for feelings, not as brackets, read as a full stop: ")" "))" "(((" ":)" ":D" ";P".
 --- A bracket with its pair in the line stays: "(через 5 мин)".
 function ns.Emoticons(text)
+    -- ")(" "}{" "><" next to letters is an "х" in disguise (past the swear filter): "на)(уя"
+    text = text:gsub("([\128-\191])[%)}>][%({<]([\208\209])", "%1х%2")
+    text = text:gsub("^[%)}>][%({<]([\208\209])", "х%1"):gsub("(%s)[%)}>][%({<]([\208\209])", "%1х%2")
     text = text:gsub("[:;=]%-?[%)%(DdPpРр]+", ".")          -- :) :( :D ;) :-P (Р — русская)
     text = text:gsub("[%(%)][%(%)]+", ".")                  -- )) ((( )(
     local opens = select(2, text:gsub("%(", ""))
@@ -108,7 +112,53 @@ function ns.Send(kind, sender, race, sex, class, channel, text)
     -- what gets cut, not the text to say
     local payload = table.concat({ kind, sender or "", race or "", tostring(sex or ""), class or "",
         channel or "", options, text, raw }, SEP)
-    ns.Strip.Push(payload)
+    ns.Deliver(payload)
+end
+
+-- CatQuest (a quest voice-over addon) and the chat must not talk over each other: while it reads a
+-- quest - a quest the player asked for - chat lines wait here and go to the strip once it is done
+-- (the client cannot pause a sound and resume it in the middle, so pausing the quest would restart
+-- it after every chat line). A line older than HOLD_MAX by then is dropped: stale chat. CatQuest has
+-- no official interface for this; it puts its namespace into the global CatQuestCore, and
+-- CatQuestCore.state.playing / .pending tell whether it speaks or is about to - read with care, so
+-- that a CatQuest without them simply counts as silent.
+local HOLD_MAX = 40
+local held, holdTicker = {}, nil
+
+local function CatQuestSpeaking()
+    local core = rawget(_G, "CatQuestCore")
+    local st = type(core) == "table" and type(core.state) == "table" and core.state
+    return st and (st.playing == true or st.pending ~= nil) or false
+end
+
+--- Send the waiting chat lines once CatQuest is silent; drop those that waited too long.
+function ns.ReleaseHeld()
+    if CatQuestSpeaking() and ns.db.waitForCatQuest ~= false then
+        local now, kept = GetTime(), {}
+        for _, h in ipairs(held) do
+            if now - h.at <= HOLD_MAX then kept[#kept + 1] = h end
+        end
+        held = kept
+        return
+    end
+    local now = GetTime()
+    for _, h in ipairs(held) do
+        if now - h.at <= HOLD_MAX then ns.Strip.Push(h.payload) end
+    end
+    held = {}
+    if holdTicker then holdTicker:Cancel(); holdTicker = nil end
+end
+
+--- A chat line to the strip - now, or after CatQuest has finished speaking.
+function ns.Deliver(payload)
+    if ns.db.waitForCatQuest == false or (#held == 0 and not CatQuestSpeaking()) then
+        ns.Strip.Push(payload)
+        return
+    end
+    held[#held + 1] = { payload = payload, at = GetTime() }
+    if not holdTicker and C_Timer and C_Timer.NewTicker then
+        holdTicker = C_Timer.NewTicker(0.25, ns.ReleaseHeld)
+    end
 end
 
 --- The options every line carries: speed, loudness and engine ("f5" or "sapi"; `voice` overrides).

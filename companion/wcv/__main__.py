@@ -22,7 +22,7 @@ DEFAULT_CONFIG = {
     "_help": "rate -10..10, volume 0..100. exclude: voices left out (part of the name). "
              "gender_overrides: voices whose gender SAPI does not know. players: {\"Name\": \"part of a voice name\"}. "
              "stress: how each engine gets the dictionary's stress marks (plus, acute or strip). "
-             "engine: f5 (CatQuest race voices on an NVIDIA GPU) or sapi (Windows voices). "
+             "engine: f5 (race voices from the game client, on an NVIDIA GPU) or sapi (Windows voices). "
              "voice_shifts: semitones of the extra copies of each race voice. players: also takes F5 voice ids (orc-male#60).",
     "engine": "f5",
     "rate": 0,
@@ -37,13 +37,16 @@ DEFAULT_CONFIG = {
     "nfe_step": 16,
     "f5_margin": 1.25,
     "f5_tail": 0.5,
-    "f5_question_refs": False,
+    # slow voices drawn toward the bank's faster quarter (quantile) by this share, at most this many
+    # times faster; each character's own tempo within this share either way (f5engine.line_seconds)
+    "voice_pace_quantile": 0.25,
+    "voice_pace_blend": 0.85,
+    "voice_pace_limit": 1.8,
+    "character_tempo": 0.08,
     # F5 only; 0 turns a part off. See wcv/intonation.py.
     "question_intonation": {"yes_no_rise_st": 7, "yes_no_end_db": 8, "wh_peak_st": 6},
-    "check_refs": True,
     "kind_gain_db": {"yell": 3, "whisper": -4},
     "voice_shifts": [-1.5, 1.5],
-    "catquest_dir": "",
     "wow_dir": "",
     "hf_home": "",
     "launch_wow": True,
@@ -173,12 +176,16 @@ def main() -> int:
     prune_logs(config["log_keep_days"])
     from . import launch
     if config["launch_wow"] and not launch.wow_running():
+        # the race voices come from the client's files: (re)made before the game, after an update
+        from .f5engine import prepare_voices
+        prepare_voices(config, APP_DIR, log)
         launch.launch(config, log)   # the game starts while the voices load
     from .dictionary import Regexes
     regexes = Regexes(config, log)
     regexes.refresh()
     regexes_checked = time.monotonic()
-    from .text import Accentor
+    from .text import Accentor, plain
+    from .unmask import unmask
     accentor = Accentor(log, config.get("ruaccent", True))
     log("загружаю RUAccent ..." + (" (модели из кэша, без сети)" if offline else ""))
     try:
@@ -204,7 +211,10 @@ def main() -> int:
     engines = Engines(config, log, APP_DIR, sapi, accentor, player)
     engines.on_ready = lambda: MODELS_READY.touch()
     engines.on_error = (lambda error: restart_online(log)) if offline else None
-    if "--f5" in sys.argv:
+    # The race voices load while the game starts, not when its first chat line comes - unless the
+    # addon was last set to Windows voices (then F5 is loaded only if the addon asks for it).
+    from .dictionary import saved_voices
+    if "--f5" in sys.argv or (saved_voices(config) or config["engine"]) == "f5":
         engines.want("f5")
 
     seen = None
@@ -296,12 +306,13 @@ def main() -> int:
                             unknown_kinds.add(line.kind)
                             log(f"строки типа «{line.kind}» не озвучиваю (аддон новее программы?)")
                     elif line and line.text and not first:
-                        text = MARKUP.sub("", line.text)
+                        text = unmask(MARKUP.sub("", line.text))   # "xyйня", "п0шел", "бл*ть"
                         # the addon's replacements, then the regexes' (whose own patterns want plain
                         # text): each declined after its preposition when that is on
                         text = inflector.apply(text) if line.declension else strip_marks(text)
                         text = regexes.apply(text, mark=line.declension)
                         text = inflector.apply(text) if line.declension else strip_marks(text)
+                        text = plain(text)
                         line = dataclasses.replace(line, text=text)
                         speaker = engines.for_line(line)
                         label = LABELS.get(line.kind, line.kind) + (f" {line.channel}" if line.channel else "")

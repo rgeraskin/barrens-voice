@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from wcv.assign import Assigner  # noqa: E402
 from wcv.dictionary import parse as parse_rules, unescape  # noqa: E402
-from wcv.catquest import Slot  # noqa: E402
+from wcv.gamevoices import Slot  # noqa: E402
 from wcv.protocol import parse  # noqa: E402
 from wcv.speech import sapi_rate  # noqa: E402
 from wcv.text import apply_stress, merge_marks  # noqa: E402
@@ -20,8 +20,8 @@ class Text(unittest.TestCase):
         accented = "Н+ужен дамаг+ер в М+ёртвые к+опи"   # RUAccent's guess for the slang word
         self.assertEqual(merge_marks(original, accented), "Н+ужен дам+агер в М+ёртвые к+опи")
 
-    def test_misaligned_keeps_original(self):
-        self.assertEqual(merge_marks("один два", "од+ин"), "один два")
+    def test_misaligned_marks_what_matches(self):
+        self.assertEqual(merge_marks("один два", "од+ин"), "од+ин два")       # unmatched words: as they were
 
     def test_stress_modes(self):
         self.assertEqual(apply_stress("дам+агер", "acute"), "дама́гер")
@@ -65,6 +65,7 @@ class Assign(unittest.TestCase):
         a = Assigner(slots(), self.path)
         first = a.slot_for("Громмаш-Степи", "Orc", "2", now=1).id
         self.assertEqual(a.slot_for("Громмаш-Степи", "Orc", "2", now=2).id, first)
+        a.flush()                                                # as on exit
         b = Assigner(slots(), self.path)
         self.assertEqual(b.slot_for("Громмаш-Степи", "Orc", "2", now=3).id, first)
 
@@ -270,23 +271,6 @@ class RefCheck(unittest.TestCase):
         self.assertLess(similarity(text, leaked), 0.85)
 
 
-class BankCache(unittest.TestCase):
-    def test_checked_bank_is_reused_and_never_downgraded(self):
-        import json
-        import tempfile
-        from wcv import catquest
-        with tempfile.TemporaryDirectory() as d:
-            pack, out = Path(d) / "pack", Path(d) / "voices"
-            pack.mkdir(); out.mkdir()
-            (pack / "Index.lua").write_text("x", encoding="utf-8")
-            stamp = {"version": catquest.BANK_VERSION, "pack": str(pack), "index_size": 1, "shifts": [], "checked": True}
-            (out / "bank.json").write_text(json.dumps({"stamp": stamp, "slots": []}), encoding="utf-8")
-            made = []
-            self.assertEqual(catquest.build(pack, out, [], print, lambda: made.append(1)), [])
-            self.assertEqual(catquest.build(pack, out, [], print, None), [])
-            self.assertEqual(made, [])                       # no Whisper for a bank already checked
-
-
 class Questions(unittest.TestCase):
     def test_kind(self):
         from wcv.intonation import kind, question_word, stressed_vowel
@@ -392,3 +376,177 @@ class NumberAgreement(unittest.TestCase):
         }
         for text, spoken in cases.items():
             self.assertEqual(say(text), spoken, text)
+
+
+class SavedVoices(unittest.TestCase):
+    def test_reads_the_addons_choice(self):
+        import tempfile
+        from wcv.dictionary import saved_voices
+        with tempfile.TemporaryDirectory() as d:
+            sv = Path(d) / "_forever_" / "WTF" / "Account" / "X" / "SavedVariables"
+            sv.mkdir(parents=True)
+            config = {"wow_dir": str(Path(d) / "_forever_")}
+            self.assertIsNone(saved_voices(config))
+            (sv / "WowChatVoice.lua").write_text('WowChatVoiceDB = {\n["voices"] = "sapi",\n}\n', encoding="utf-8")
+            self.assertEqual(saved_voices(config), "sapi")
+
+
+class Unmasking(unittest.TestCase):
+    def test_disguised_letters(self):
+        from wcv.unmask import unmask
+        self.assertEqual(unmask("xyйня какая-то"), "хуйня какая-то")          # Latin twins
+        self.assertEqual(unmask("пuздец"), "пиздец")
+        self.assertEqual(unmask("п0шел ты"), "пошел ты")                      # a digit inside a word
+        self.assertEqual(unmask("нужно 4дд и 3 хила"), "нужно 4дд и 3 хила")  # digits at the edge stay numbers
+        self.assertEqual(unmask("PvPшник WTS"), "PvPшник WTS")              # Latin without twins stays
+        self.assertEqual(unmask("х*й знает"), "хуй знает")                    # asterisks
+        self.assertEqual(unmask("бл**ь опять"), "блядь опять")
+        self.assertEqual(unmask("на*уй"), "нахуй")
+        self.assertEqual(unmask("с*ка"), "сука")
+        self.assertEqual(unmask("бл*дь"), "блядь")
+        self.assertEqual(unmask("бл@дь и с@ка"), "блядь и сука")              # other masking signs
+        self.assertEqual(unmask("бл#ть"), "блять")
+        self.assertEqual(unmask("д@вай"), "давай")                             # "@" fitting no word: an "а"
+        self.assertEqual(unmask("на$уй"), "нахуй")
+        self.assertEqual(unmask("50% скидка"), "50% скидка")
+        self.assertEqual(unmask("с*ыр"), "с*ыр")                              # nothing fits: as it was
+        self.assertEqual(unmask("5*10"), "5*10")
+
+    def test_plain(self):
+        from wcv.text import plain
+        self.assertEqual(plain("кто м+ожет пом+очь с[РАЗЫСКИВАЕТСЯ: Бр+ууз]?"), "кто м+ожет пом+очь с разыскивается: Бр+ууз?")
+        self.assertEqual(plain("[24] Миссия: выполнима"), "Миссия: выполнима")
+        self.assertEqual(plain("идём в ОП"), "идём в оп")                    # the dictionary expands it first; else a word
+        self.assertEqual(plain("ППС типо?"), "пэ-пэ-+эс типо?")              # capital consonants: letter by letter
+        self.assertEqual(plain("в МВД и РЛ"), "в эм-вэ-+дэ и эр-+эл")
+        self.assertEqual(plain("хм, тсс"), "хм, тсс")                        # lower case: interjections stay
+        try:
+            import pymorphy3  # noqa: F401
+        except ImportError:
+            return
+        self.assertEqual(plain("ЦРУ, МГУ и США"), "цэ-эр-+у, эм-гэ-+у и эс-ша-+а")   # vowels, but not syllables
+        self.assertEqual(plain("в ГИБДД"), "в ги-бэ-дэ-+дэ")                 # a syllable, then letters
+        self.assertEqual(plain("ОМОН и ВУЗ"), "омон и ВУЗ")                  # said as words
+        self.assertEqual(plain("ВСЁ, СТОЙ!"), "всё, стой!")                   # shouted words, not abbreviations
+
+
+class HighVoices(unittest.TestCase):
+    """PSOLA on a voice above the old 500 Hz analysis ceiling (gnome women speak at 450-500 Hz)."""
+
+    def voice(self, f0, seconds=1.6, rate=24000):
+        import numpy as np
+        t = np.arange(int(seconds * rate)) / rate
+        wave = sum(np.sin(2 * np.pi * f0 * k * t) / k for k in range(1, 8))      # a buzz with harmonics
+        return (0.2 * wave * np.minimum(1, np.minimum(t, seconds - t) / 0.05)).astype("float32"), rate
+
+    def f0(self, x, rate, start, end):
+        import numpy as np
+        import parselmouth
+        p = parselmouth.Sound(x[int(start * rate):int(end * rate)].astype("float64"), sampling_frequency=rate)
+        f = p.to_pitch(0.01, 40, 1500).selected_array["frequency"]
+        return float(np.median(f[f > 0]))
+
+    def setUp(self):
+        try:
+            import parselmouth  # noqa: F401
+        except ImportError:
+            self.skipTest("parselmouth")
+
+    def test_range_follows_the_voice(self):
+        import parselmouth
+        from wcv.intonation import pitch_range
+        high = parselmouth.Sound(self.voice(520)[0].astype("float64"), sampling_frequency=24000)
+        low = parselmouth.Sound(self.voice(120)[0].astype("float64"), sampling_frequency=24000)
+        bass = parselmouth.Sound(self.voice(52)[0].astype("float64"), sampling_frequency=24000)
+        self.assertGreater(pitch_range(high)[1], 1000)
+        self.assertEqual(pitch_range(low)[1], 500.0)
+        self.assertLess(pitch_range(bass)[0], 50)                                   # the orc character dips to 52-55 Hz
+
+    def test_high_and_low_voices_still_rise(self):
+        from wcv.intonation import shape
+        for f0 in (520, 52):
+            x, rate = self.voice(f0)
+            y = shape(x, rate, "Идёшь с н+ами?", {"yes_no_end_db": None})
+            self.assertAlmostEqual(self.f0(y, rate, 0.2, 0.6), f0, delta=f0 * 0.06)   # the body as it was
+            self.assertGreater(self.f0(y, rate, 1.4, 1.55), f0 * 2 ** (5 / 12))        # the end well up
+
+
+class Tempo(unittest.TestCase):
+    CONFIG = {"f5_margin": 1.0, "f5_tail": 0.0, "voice_pace_blend": 0.85, "voice_pace_limit": 1.8,
+              "character_tempo": 0.08}
+
+    def seconds(self, pace, character="", **over):
+        from wcv.f5engine import line_seconds
+        return line_seconds(pace, 0.04, 100, 100, character, {**self.CONFIG, **over})
+
+    def test_slow_voices_drawn_toward_the_faster_quarter(self):
+        slow = self.seconds(0.06)
+        self.assertLess(slow, 0.06 * 100)                        # a slow voice speeds up
+        self.assertGreater(slow, 0.04 * 100)                     # but stays a little slower
+        self.assertAlmostEqual(self.seconds(0.02), 2.0)          # a fast one is left as it is
+        self.assertAlmostEqual(self.seconds(0.04), 4.0)          # at the target: as it was
+        self.assertAlmostEqual(self.seconds(0.06, voice_pace_blend=0), 6.0)
+        self.assertAlmostEqual(self.seconds(0.2), 0.2 * 100 / 1.8)   # at most 1.8 times faster
+
+    def test_each_character_has_a_tempo_of_their_own(self):
+        a, b = self.seconds(0.04, "Громмаш"), self.seconds(0.04, "Тралл")
+        self.assertEqual(a, self.seconds(0.04, "громмаш"))       # stable for a name
+        self.assertNotEqual(a, b)
+        for name in ("Громмаш", "Тралл", "Джайна", "Брэнн", "Вол'джин"):
+            self.assertLessEqual(abs(self.seconds(0.04, name) / 4.0 - 1), 0.08 + 1e-9)
+
+    def test_rate_and_margin_on_top(self):
+        from wcv.f5engine import line_seconds
+        self.assertAlmostEqual(line_seconds(0.04, 0.04, 100, 200, "", self.CONFIG), 2.0)   # 200 % speed
+        self.assertAlmostEqual(line_seconds(0.04, 0.04, 100, 100, "", {**self.CONFIG, "f5_tail": 0.5}), 4.5)
+
+    def test_silence_after(self):
+        try:
+            import numpy as np
+        except ImportError:
+            self.skipTest("numpy")
+        from wcv.f5engine import silence_after
+        rate = 24000
+        speech = np.sin(np.arange(rate) / rate * 2 * np.pi * 150).astype("float32")
+        self.assertLess(silence_after(speech, rate), 0.02)                              # runs to the end
+        padded = np.concatenate([speech, np.zeros(rate // 2, dtype="float32")])
+        self.assertAlmostEqual(silence_after(padded, rate), 0.5, delta=0.02)
+
+
+class AssignmentsFile(unittest.TestCase):
+    def test_old_characters_forgotten_and_writes_batched(self):
+        import json
+        import tempfile
+        import time
+        from wcv import assign
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "assignments.json"
+            now = time.time()
+            path.write_text(json.dumps({"давний": {"slot": "orc-male", "seen": now - assign.FORGET - 60},
+                                        "недавний": {"slot": "orc-male", "seen": now - 3600}}), encoding="utf-8")
+            a = Assigner(slots(), path)
+            self.assertEqual(set(a.known), {"недавний"})               # not heard for 60 days: dropped
+            a.flush()
+            self.assertEqual(set(json.loads(path.read_text(encoding="utf-8"))), {"недавний"})
+            a.slot_for("Новенький", "Orc", "2")
+            self.assertNotIn("новенький", json.loads(path.read_text(encoding="utf-8")))   # not written yet
+            a.flush()
+            self.assertIn("новенький", json.loads(path.read_text(encoding="utf-8")))      # written on exit
+            self.assertFalse(path.with_suffix(".tmp").exists())
+
+
+class MergeMarks(unittest.TestCase):
+    def test_a_different_split_loses_only_those_words(self):
+        original = "Полуказуальная RU/UA гильдия <MIR> ищет игроков!"
+        accented = "Полуказ+уальная RU / UA г+ильдия < MIR > +ищет игрок+ов!"     # RUAccent split it otherwise
+        merged = merge_marks(original, accented)
+        self.assertIn("игрок+ов", merged)
+        self.assertIn("г+ильдия", merged)
+        self.assertIn("RU/UA", merged)                                          # the text is the original's
+        self.assertIn("<MIR>", merged)
+
+    def test_dictionary_marks_win_and_case_is_kept(self):
+        self.assertEqual(merge_marks("Идём в М+ёртвые КОПИ", "Ид+ём в Мёртв+ые к+опи"), "Ид+ём в М+ёртвые К+ОПИ")
+
+    def test_spacing_from_the_original(self):
+        self.assertEqual(merge_marks("помочь с[Брууз]?", "пом+очь с [Бр+ууз] ?"), "пом+очь с[Бр+ууз]?")

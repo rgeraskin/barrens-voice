@@ -9,3 +9,6 @@ assignments.json
 
 __pycache__/
 .DS_Store
+
+# tools/game_voices.py keeps the downloaded listfile here
+tools/.cache/

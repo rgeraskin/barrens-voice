@@ -79,6 +79,8 @@ gg=гуд гейм
 afk=отошёл
 афк=отошёл
 brb=сейчас вернусь
+discord=диск+орд
+дискорд*=диск+орд*
 oom=нет маны
 оом=нет маны
 кд=кулд+аун
@@ -205,10 +207,13 @@ wtf=что за чёрт
 ОП=Огненная пропасть
 RFC=Огненная пропасть
 WC=Пещеры стенаний
+ПС=Пещеры стенаний
 дедмайнс=Мёртвые копи
 КТК=Крепость Тёмного Клыка
 SFK=Крепость Тёмного Клыка
 стокады=Тюрьма Штормграда
+перекрест*=перекр+ёст*
+понож*=п+онож*
 подгород*=П+одгород*
 ПВП=пэвэп+э
 PvP=пэвэп+э
@@ -404,22 +409,24 @@ function D.Apply(text)
     local out, last, i = {}, 1, 1
     while i <= #tokens do
         local t = tokens[i]
-        local value, span
+        local value, span, inflected
         for _, e in ipairs(phrases[t.norm] or {}) do
             local suffix = Match(e, tokens, i)
-            if suffix then value, span = WithSuffix(e.value, suffix), #e.words break end
+            if suffix then value, span, inflected = WithSuffix(e.value, suffix), #e.words, e.star break end
         end
         if not value and exact[t.norm] then value, span = exact[t.norm], 1 end
         if not value then
             for _, e in ipairs(stems) do
                 local suffix = Match(e, tokens, i)
-                if suffix then value, span = WithSuffix(e.value, suffix), 1 break end
+                if suffix then value, span, inflected = WithSuffix(e.value, suffix), 1, true break end
             end
         end
         if value then
             out[#out + 1] = text:sub(last, t.s - 1)
-            -- marked (\2 ... \3) so the program can decline the replacement after a preposition
-            out[#out + 1] = value ~= "" and ("\2" .. value .. "\3") or ""
+            -- marked (\2 ... \3) so the program can decline the replacement after a preposition - but
+            -- not a stem's: it took the ending typed in chat ("на перекрёстке"), its case is right
+            -- already, and "на" would make it accusative ("на перекрёсток")
+            out[#out + 1] = value == "" and "" or inflected and value or ("\2" .. value .. "\3")
             last = tokens[i + span - 1].e + 1
             i = i + span
         else

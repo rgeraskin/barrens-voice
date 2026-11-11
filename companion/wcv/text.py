@@ -22,20 +22,96 @@ def apply_stress(text: str, mode: str) -> str:
 
 
 def merge_marks(original: str, accented: str) -> str:
-    """`accented` (RUAccent's output for `original` without its "+") with the words that already
-    had a "+" in `original` put back as they were: the dictionary's marks win. When the words do
-    not line up one to one, `original` is returned unchanged."""
-    words = WORD.findall(original)
-    spans = list(WORD.finditer(accented))
-    if len(words) != len(spans):
-        return original
+    """`original` with the stress marks RUAccent put in `accented` (its output for `original`
+    without the "+"), word by word; the words that already had a "+" in `original` keep theirs
+    (the dictionary's marks win). The words are matched by their letters, like a diff, so a
+    different split ("RU/UA", "<MIR>", a hyphen) loses the marks of those words only - it used to
+    lose the whole line's, and F5 then guessed every stress ("игр+оков"). The text itself comes
+    from `original`: RUAccent's spacing changes (it glued "с[") never reach the speech."""
+    import difflib
+
+    words = list(WORD.finditer(original))
+    marked = WORD.findall(accented)
+    plain = [w.group().replace("+", "").lower() for w in words]
+    heard = [w.replace("+", "").lower() for w in marked]
     out, last = [], 0
-    for word, span in zip(words, spans):
-        out.append(accented[last:span.start()])
-        out.append(word if "+" in word else span.group())
-        last = span.end()
-    out.append(accented[last:])
+    matcher = difflib.SequenceMatcher(None, plain, heard, autojunk=False)
+    pairs = {i: j for a, b, n in matcher.get_matching_blocks() for i, j in zip(range(a, a + n), range(b, b + n))}
+    for i, w in enumerate(words):
+        out.append(original[last:w.start()])
+        word = w.group()
+        if "+" not in word and i in pairs:
+            word = _with_marks(word, marked[pairs[i]])
+        out.append(word)
+        last = w.end()
+    out.append(original[last:])
     return "".join(out)
+
+
+def _with_marks(word: str, marked: str) -> str:
+    """`word` with a "+" where `marked` (the same letters) has one - `word`'s own letter case kept."""
+    out, k = [], 0
+    for ch in marked:
+        if ch == "+":
+            out.append("+")
+        else:
+            out.append(word[k])
+            k += 1
+    return "".join(out)
+
+
+LEVEL_TAG = re.compile(r"\[\d+[^\]\s]{0,3}\]")   # "[24]", "[60+]", "[23D]" before a quest name (Questie & co)
+BRACKETS = re.compile(r"[\[\]{}]")
+SHOUTED = re.compile(r"\b[А-ЯЁ]{4,}\b")
+# A word in capitals of 2-5 letters the dictionary did not expand: a word shouted ("ВСЁ", "СТОЙ")
+# when pymorphy knows it as one, else an abbreviation - spelt when it cannot be said as syllables
+# ("ППС" - "пэ-пэ-+эс", "МВД", "ЦРУ", "США"; a syllable to begin with is said as one: "ГИБДД" -
+# "ги-бэ-дэ-+дэ"), read as a word when it can ("ОМОН", "ВУЗ").
+CAPITALS = re.compile(r"\b[А-ЯЁ]{2,5}\b")
+VOWELS = set("АЕЁИОУЫЭЮЯ")
+LETTERS = {"Б": "бэ", "В": "вэ", "Г": "гэ", "Д": "дэ", "Ж": "жэ", "З": "зэ", "Й": "йот", "К": "ка", "Л": "эл",
+           "М": "эм", "Н": "эн", "П": "пэ", "Р": "эр", "С": "эс", "Т": "тэ", "Ф": "эф", "Х": "ха", "Ц": "цэ",
+           "Ч": "чэ", "Ш": "ша", "Щ": "ща", "Ъ": "твёрдый знак", "Ь": "мягкий знак"}
+
+
+def spell(abbreviation: str) -> str:
+    names = [LETTERS.get(ch, ch.lower()) for ch in abbreviation]
+    names[-1] = "+" + names[-1]
+    return "-".join(names)
+
+
+def unpronounceable(word: str) -> bool:
+    """Capitals that cannot be said as syllables: no vowel, two consonants to begin with, three in a
+    row anywhere, or two at the end of a short one ("АХК") - read letter by letter in Russian."""
+    consonant = [ch not in VOWELS for ch in word]
+    runs = "".join("c" if c else "v" for c in consonant)
+    return ("v" not in runs or runs.startswith("cc") or "ccc" in runs
+            or (len(word) <= 3 and runs.endswith("cc")))
+
+
+def _capitals(match) -> str:
+    word = match.group()
+    morph = _analyzer()
+    if morph is not None and morph.word_is_known(word.lower()) and \
+            not any("Abbr" in p.tag for p in morph.parse(word.lower())):
+        return word.lower()                            # a word written in capitals
+    if not unpronounceable(word):
+        return word
+    vowel = [ch in VOWELS for ch in word]
+    if len(word) > 2 and not vowel[0] and vowel[1]:
+        return word[:2].lower() + "-" + spell(word[2:])   # a syllable to begin with: "ГИБДД" - "ги-бэ-дэ-+дэ"
+    return spell(word)
+
+
+def plain(text: str) -> str:
+    """Text as it is said: a quest level tag ("[24]" before a quest name) goes, other brackets left
+    over become spaces - they also glued the word before them to the next ("с[Разыскивается"); a word in capitals of 4
+    letters or more is lowered, or RUAccent stresses it as an abbreviation ("РАЗ+ЫСКИВАЕТСЯ"); an
+    abbreviation the dictionary did not expand is spelt when it cannot be said as syllables ("ППС" -
+    "пэ-пэ-+эс", "США"), see `_capitals`."""
+    text = BRACKETS.sub(" ", LEVEL_TAG.sub(" ", text))
+    text = SHOUTED.sub(lambda m: m.group().lower(), CAPITALS.sub(_capitals, text))
+    return re.sub(r"\s+([,.!?:;…])", r"\1", re.sub(r"\s{2,}", " ", text)).strip()
 
 
 NEXT_WORD = re.compile(r"\s+([а-яёА-ЯЁ+]+)")

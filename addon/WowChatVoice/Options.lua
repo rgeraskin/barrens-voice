@@ -113,7 +113,11 @@ local function Build()
     checks[#checks + 1] = UI.Check(window, 18, y - 72, "Склонять замены после предлогов", "Программа ставит замены "
         .. "словаря в нужный падеж по предлогу перед ними: «в ОП» — «в Огненную пропасть», «для дд» — «для "
         .. "дамагера» (pymorphy3).", get, set)
-    y = y - 102
+    get, set = Setting("waitForCatQuest")
+    checks[#checks + 1] = UI.Check(window, 18, y - 96, "Ждать, пока говорит CatQuest", "Пока аддон CatQuest читает "
+        .. "квест, строки чата ждут и звучат, как только он закончит; ждавшие дольше 40 секунд пропускаются. "
+        .. "Без CatQuest ничего не меняет.", get, set)
+    y = y - 126
 
     local voicesLabel = window:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     voicesLabel:SetPoint("TOPLEFT", 22, y - 4)

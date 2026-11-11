@@ -9,4 +9,5 @@ dev = [
     "pymorphy3-dicts-ru==2.4.417150.4580142",
     "num2words==0.5.14",
     "pillow==12.3.0",
+    "praat-parselmouth==0.4.7",
 ]
