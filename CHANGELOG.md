@@ -10,7 +10,7 @@
 - Very high and very low voices no longer rasp in questions: the pitch analysis behind the question intonation had a fixed 60–500 Hz range, and gnome women speak at 450–500 Hz, the orc character at 55–70 Hz; outside the range it lost the voice's periods. It now follows the voice.
 - Numbers get their stress like other words ("шестн+адцать", not "ш+естнадцать"): they are turned into words before the stress marks are put, not after.
 - A line with a word the stress model splits its own way ("RU/UA", "<MIR>") no longer loses the stress marks of all its words ("игр+оков" for "игрок+ов"): only that word goes without.
-- The dictionary reads Discord as «диск+орд», the Crossroads as «перекр+ёсток» and greaves as «п+оножи» in every case, and «ПС» as «Пещеры стенаний».
+- The dictionary reads Discord as «диск+орд», the Crossroads as «перекр+ёсток» and greaves as «п+оножи» in every case, «ПС» as «Пещеры стенаний», «че» as «чё», «серега» as «серёга», «пикабу» as «пикаб+у», PvE as «пэ-вэ-йе».
 - A dictionary stem (an entry with `*`) keeps the case typed in chat: «на перекрёстке» was turned into «на перекрёсток», as the declension after a preposition is meant for abbreviations («в ОП») that have no ending of their own.
 - The chat no longer talks over CatQuest: while CatQuest reads a quest, chat lines wait and are read once it is done (lines that waited over 40 seconds are skipped); a setting, on by default. The quest is not paused for the chat instead: the game cannot resume a sound in the middle, so the quest would start over after every chat line.
 - Quest and item links read as their names: no brackets, no quest level tag ("[24]"), and the word before a link no longer runs into it.

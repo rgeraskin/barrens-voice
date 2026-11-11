@@ -148,3 +148,9 @@ ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "без CatQues
 assert(#sent == 3, "no CatQuest: straight to the strip")
 GetTime = function() return 0 end
 print("catquest ok")
+
+-- dictionary entries
+assert(ns.Dictionary.Apply("че там, в пве или пвп?") == "\2чё\3 там, в \2пэ-вэ-й+е\3 или \2пэвэп+э\3?", ns.Dictionary.Apply("че там, в пве или пвп?"))
+assert(ns.Dictionary.Apply("серега, сереге") == "серёга, серёге", ns.Dictionary.Apply("серега, сереге"))
+assert(ns.Dictionary.Apply("на пикабу") == "на \2пикаб+у\3", ns.Dictionary.Apply("на пикабу"))
+print("entries ok")
