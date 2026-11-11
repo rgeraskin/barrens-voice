@@ -145,15 +145,24 @@ function ns.ReleaseHeld()
         for _, h in ipairs(held) do
             if now - h.at <= HOLD_MAX then kept[#kept + 1] = h end
         end
+        if #kept < #held then
+            ns.Diag(("пропущено строк: %d — ждали CatQuest дольше %d с"):format(#held - #kept, HOLD_MAX))
+        end
         held = kept
         return
     end
-    local now = GetTime()
+    local now, dropped = GetTime(), 0
     for _, h in ipairs(held) do
-        if now - h.at <= HOLD_MAX then ns.Strip.Push(h.payload) end
+        if now - h.at <= HOLD_MAX then ns.Strip.Push(h.payload) else dropped = dropped + 1 end
     end
     held = {}
+    if dropped > 0 then ns.Diag(("пропущено строк: %d — ждали CatQuest дольше %d с"):format(dropped, HOLD_MAX)) end
     if holdTicker then holdTicker:Cancel(); holdTicker = nil end
+end
+
+--- A note for the program's log (kind "diag": logged, never spoken) - what the addon dropped.
+function ns.Diag(text)
+    ns.Strip.Push(table.concat({ "diag", "", "", "", "", "", ns.LineOptions(), text }, SEP))
 end
 
 --- A chat line to the strip - now, or after CatQuest has finished speaking.

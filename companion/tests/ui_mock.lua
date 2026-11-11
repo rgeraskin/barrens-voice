@@ -141,7 +141,13 @@ assert(#sent == 0, "still held")
 CatQuestCore.state.playing = false
 clock = 142                                   -- the first waited 42 s: dropped; the second 37 s: sent
 ns.ReleaseHeld()
-assert(#sent == 1 and sent[1]:find("вторая"), "only the fresh one goes: " .. #sent)
+local chat, diag = {}, {}
+for _, p in ipairs(sent) do
+    if p:find("^diag\31") then diag[#diag + 1] = p else chat[#chat + 1] = p end
+end
+assert(#chat == 1 and chat[1]:find("вторая"), "only the fresh one goes: " .. #chat)
+assert(#diag == 1 and diag[1]:find("CatQuest"), "the dropped one is reported to the program's log")
+sent = { chat[1] }
 ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "третья")
 assert(#sent == 2, "CatQuest silent: straight to the strip")
 CatQuestCore = nil
