@@ -116,6 +116,15 @@ def plain(text: str) -> str:
 
 NEXT_WORD = re.compile(r"\s+([а-яёА-ЯЁ+]+)")
 GENDERS = {"masc", "femn", "neut"}
+# words that number rather than count: "15 уровня" is the fifteenth (a count is "15 уровней")
+NUMBERED = {"уровень", "этаж", "место", "ранг", "фаза", "сезон", "глава", "акт", "волна", "слот", "босс"}
+PREV_WORD = re.compile(r"([а-яёА-ЯЁ]+)\s+$")
+# the cases a preposition asks of the word after it (only those a count never takes in the singular)
+GOVERNS = {**dict.fromkeys(("с", "со"), {"gent", "ablt"}),
+           **dict.fromkeys(("до", "от", "из", "для", "без", "после", "около", "у", "кроме"), {"gent"}),
+           **dict.fromkeys(("к", "ко", "по"), {"datv"}),
+           **dict.fromkeys(("в", "во", "на", "о", "об", "при"), {"loct"}),
+           **dict.fromkeys(("за", "под", "над", "перед"), {"ablt"})}
 OBLIQUE = {"gent", "datv", "ablt", "loct"}
 _morph = None
 _morph_lock = threading.Lock()
@@ -177,6 +186,46 @@ def agree(n: int, spoken: str, following: str, morph) -> str:
     return " ".join(parts)
 
 
+def ordinal(n: int, before: str, following: str, morph) -> str | None:
+    """`n` as an ordinal agreeing with the word after it, when only an ordinal fits the phrase:
+    "с 15 уровня" -> "пятнадцатого", "на 2 этаже" -> "втором", "15 уровень" -> "пятнадцатый"
+    (a count wants a plural there: "15 уровней"); None when a count may be meant ("200 опыта" -
+    "сколько", "за 2 часа", "5 раз", slang pymorphy does not know).
+    A word that numbers rather than counts (NUMBERED) settles what the grammar leaves open: after
+    a number ending in 1 ("с 21 уровня" - "двадцать первого", where "по 1 золотому" stays "одному")
+    and in the genitive without a preposition ("хил 15 уровня", where "200 опыта" stays "двести")."""
+    from num2words import num2words
+    word = following.replace("+", "").lower()
+    if not morph.word_is_known(word):
+        return None
+    parses = [p for p in morph.parse(word) if p.tag.POS == "NOUN"]
+    numbered = any(p.normal_form in NUMBERED for p in parses)
+    if numbered:
+        parses = [p for p in parses if p.tag.number == "sing"]   # "с 3 фазы", not "3 фазы" (plural)
+    elif any(p.tag.number != "sing" for p in parses):
+        return None
+    if not parses:
+        return None
+    if n % 10 == 1 and n % 100 != 11 and not numbered:
+        return None                                    # "по 1 золотому", "без 1 руки": a count reads so too
+    asked = GOVERNS.get(before.lower(), set())
+    few = 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14
+    if any(p.tag.case == "nomn" for p in parses):
+        tag = next(p.tag for p in parses if p.tag.case == "nomn")
+    elif any(p.tag.case in asked for p in parses):     # the case the preposition asks for
+        tag = next(p.tag for p in parses if p.tag.case in asked)
+    elif numbered and not few:                         # "на 2 уровня выше" is still two of them
+        tag = parses[0].tag
+    else:
+        return None
+    parts = num2words(n, lang="ru", to="ordinal").split()
+    form = morph.parse(parts[-1])[0].inflect({tag.case, tag.gender or "masc", "sing"})
+    if not form:
+        return None
+    parts[-1] = form.word
+    return " ".join(parts)
+
+
 def numbers_to_words(text: str) -> str:
     """Digits as Russian words, agreeing with the word after them where pymorphy3 can tell how."""
     try:
@@ -192,7 +241,11 @@ def numbers_to_words(text: str) -> str:
         spoken = num2words(n, lang="ru")
         following = NEXT_WORD.match(m.string, m.end())
         if morph is not None and following:
+            before = PREV_WORD.search(m.string, 0, m.start())
             try:
+                as_ordinal = ordinal(n, before.group(1) if before else "", following.group(1), morph)
+                if as_ordinal:
+                    return as_ordinal
                 spoken = agree(n, spoken, following.group(1), morph)
             except Exception:  # noqa: BLE001 - a number read in the nominative is still a number
                 pass
