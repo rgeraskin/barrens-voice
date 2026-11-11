@@ -32,7 +32,7 @@ assert(has(fresh, "кд=кулд+аун") and has(fresh, GOLD))
 D.SetText(fresh)
 assert(empty(ns.db.dictionaryEdits), "unchanged text: no edits")
 assert(D.Text() == fresh, "stable")
-assert(has(ns.db.regexes, GOLD) and not has(ns.db.regexes, "кд="), "regexes for the companion")
+assert(ns.db.dictionaryUser == "-", "no edits: an empty layer for the program")
 
 -- the player deletes, changes, changes a regex's reading, adds
 local mine = fresh:gsub("\nимба=имб%+а", ""):gsub("\nлок=чернокнижник", "\nлок=лок")
@@ -43,6 +43,9 @@ assert(e.removed["имба"] and e.lines["лок"] == "лок=лок" and e.line
 assert(e.lines[GOLD_KEY] and has(e.lines[GOLD_KEY], "голды"), "regex reading changed: same key")
 assert(not e.removed[GOLD_KEY], "not a delete")
 assert(count(D.Text(), GOLD_KEY .. "=") == 1, "one gold rule")
+local layer = D.UserLayer()
+assert(has(layer, "лок=лок") and has(layer, "абв=где") and has(layer, "!имба=имб+а"), "the layer for the program: " .. layer)
+assert(has(layer, GOLD_KEY .. "=\\1 голды") and ns.db.dictionaryUser == layer, "kept for the program too")
 
 -- a new default: changed entries, a new one, the player's edits kept, deletes kept
 local saved = D.DEFAULT

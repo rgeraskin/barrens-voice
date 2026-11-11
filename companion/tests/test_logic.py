@@ -189,38 +189,81 @@ class ResetAssignments(unittest.TestCase):
             self.assertEqual(Assigner(slots(), path).known, {})
 
 
-class RegexOverStrip(unittest.TestCase):
-    def test_parts_assembled_once_complete(self):
-        from wcv.dictionary import Regexes
-        r = Regexes({}, lambda *a: None)
-        r.receive({"id": "ab12", "part": "2", "of": "2"}, "~(\\d+)\\s*к\\b=\\g<1>000")
-        self.assertEqual(r.rules, [])                      # part 1 still missing
-        r.receive({"id": "ab12", "part": "1", "of": "2"}, "~го+=го")
-        self.assertEqual(len(r.rules), 2)
-        self.assertEqual(r.apply("гоооо за 5к"), "го за 5000")
-        r.refresh()                                         # the saved variables are no longer read
-        self.assertEqual(r.from_addon, "ab12")
+class DictionaryInCompanion(unittest.TestCase):
+    """The addon's dictionary applied by the program: the default from Dictionary.lua, the player's
+    layer from the strip or the saved variables."""
+    ADDON = Path(__file__).resolve().parents[2] / "addon" / "WowChatVoice"
 
-    def test_saved_variables(self):
-        # without the game: the merged regexes the addon keeps in its saved variables
+    def book(self, addon=None):
+        from wcv.dictionary import Dictionary
+        d = Dictionary({}, lambda *a: None, addon or self.ADDON)
+        d.user_path = Path("/nonexistent")                 # no saved variables in the tests
+        d.from_addon = "test"
+        d.refresh()
+        return d
+
+    def test_default_entries(self):
+        d = self.book()
+        plain = lambda text: d.apply_words(text).replace("\x02", "").replace("\x03", "")
+        self.assertEqual(plain("общаемся через Discord и в дискорде"), "общаемся через диск+орд и в диск+орде")
+        # a stem keeps the ending typed in chat and is not marked for declension; a whole word is
+        self.assertEqual(d.apply_words("встречаемся на перекрестке"), "встречаемся на перекр+ёстке")
+        self.assertEqual(d.apply_words("идём в ОП"), "идём в \x02Огненная пропасть\x03")
+        self.assertEqual(d.apply_words("схожу в ПС"), "схожу в \x02Пещеры стенаний\x03")
+        self.assertEqual(d.apply_words("продам поножи и поножей"), "продам п+оножи и п+оножей")
+        self.assertEqual(d.apply_words("че там, в пве или пвп?"), "\x02чё\x03 там, в \x02пэ-вэ-й+е\x03 или \x02пэвэп+э\x03?")
+        self.assertEqual(d.apply_words("серега, сереге"), "серёга, серёге")
+        self.assertEqual(plain("на пикабу"), "на пикаб+у")
+        self.assertEqual(d.apply("за 5к"), "за 5000")                                           # a default regex
+
+    def test_the_players_layer(self):
+        d = self.book()
+        d.from_addon = None
+        d.receive({"id": "a1", "part": "2", "of": "2"}, "абв=где\n~го+=го\nмертвые копи=м+ёртвые к+опи")
+        self.assertNotIn("абв", d.exact)                                      # part 1 still missing
+        d.receive({"id": "a1", "part": "1", "of": "2"}, "!ОП=Огненная пропасть\nлок=варлок")
+        self.assertEqual(d.apply_words("лок в оп"), "\x02варлок\x03 в оп")      # changed; deleted
+        self.assertEqual(d.apply_words("абв"), "\x02где\x03")                   # added
+        self.assertEqual(d.apply("гоооо"), "го")                                 # an own regex
+        self.assertEqual(d.apply_words("идём в Мёртвые копи"), "идём в \x02м+ёртвые к+опи\x03")   # a phrase
+        d.receive({"id": "b2", "part": "1", "of": "1"}, "-")                     # back to the default
+        self.assertEqual(d.apply_words("лок"), "\x02чернокнижник\x03")
+
+    def test_saved_variables_until_the_addon_sends(self):
         import tempfile
-        from wcv.dictionary import Regexes
-        text = ('WowChatVoiceDB = {\n["dictionaryEdits"] = {["lines"] = {["лок"] = "лок=лок"}},\n'
-                '["regexes"] = "~(\\\\d+)\\\\s*к\\\\b=\\\\g<1>000\\n~го+=го",\n}\n')
-        with tempfile.TemporaryDirectory() as d:
-            path = Path(d) / "WowChatVoice.lua"
-            path.write_text(text, encoding="utf-8")
-            r = Regexes({}, lambda *a: None)
-            r.path = path
-            r.refresh()
-            self.assertEqual(len(r.rules), 2)
-        self.assertEqual(r.apply("гооо за 5к"), "го за 5000")
+        from wcv.dictionary import Dictionary
+        with tempfile.TemporaryDirectory() as dd:
+            path = Path(dd) / "WowChatVoice.lua"
+            path.write_text('WowChatVoiceDB = {\n["dictionaryUser"] = "лок=лок\\n!ОП=Огненная пропасть",\n}\n',
+                            encoding="utf-8")
+            d = Dictionary({}, lambda *a: None, self.ADDON)
+            d.user_path = path
+            d.refresh()
+            self.assertEqual(d.apply_words("лок в оп"), "\x02лок\x03 в оп")
 
-    def test_empty_set(self):
-        from wcv.dictionary import Regexes
-        r = Regexes({}, lambda *a: None)
-        r.receive({"id": "0001", "part": "1", "of": "1"}, "-")
-        self.assertEqual((r.rules, r.from_addon), ([], "0001"))
+    def test_a_changed_default_works_at_once(self):
+        import os
+        import shutil
+        import tempfile
+        with tempfile.TemporaryDirectory() as dd:
+            addon = Path(dd) / "WowChatVoice"
+            addon.mkdir()
+            shutil.copy(self.ADDON / "Dictionary.lua", addon / "Dictionary.lua")
+            d = self.book(addon)
+            self.assertEqual(d.apply_words("ыыы"), "ыыы")
+            lua = addon / "Dictionary.lua"
+            lua.write_text(lua.read_text(encoding="utf-8").replace("D.DEFAULT = [[\n", "D.DEFAULT = [[\nыыы=смех\n", 1),
+                           encoding="utf-8")
+            os.utime(lua, (lua.stat().st_atime, lua.stat().st_mtime + 5))
+            d.refresh()
+            self.assertEqual(d.apply_words("ыыы"), "\x02смех\x03")
+
+    def test_names_kept_out(self):
+        from wcv.protocol import split_name, without_repeated_name
+        self.assertEqual(split_name("Лок пишет:\x04 привет"), ("Лок пишет:", " привет", True))
+        self.assertEqual(split_name("Лок\x05 смеётся"), ("Лок", " смеётся", False))
+        self.assertEqual(split_name("привет"), ("", "привет", False))
+        self.assertEqual(without_repeated_name("Лок\x05 смеётся", True), "Лок смеётся")   # an emote keeps it
 
 
 class PlayerStop(unittest.TestCase):

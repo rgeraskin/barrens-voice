@@ -176,15 +176,25 @@ class Line:
 
 
 NAME_MARK = "\x04"   # the addon puts it after the speaker's name ("Вася пишет:\x04 привет")
+KEPT_NAME_MARK = "\x05"   # the same after a name that is never dropped (an emote: "Вася\x05 смеётся")
+
+
+def split_name(text: str) -> tuple[str, str, bool]:
+    """(the speaker's name the addon put before the line, the line itself, whether the name may be
+    dropped). The dictionary and the other rules work on the line alone - a character named "Лок"
+    stays "Лок"."""
+    for mark, droppable in ((NAME_MARK, True), (KEPT_NAME_MARK, False)):
+        if mark in text:
+            name, rest = text.split(mark, 1)
+            return name, rest, droppable
+    return "", text, False
 
 
 def without_repeated_name(text: str, continuing: bool) -> str:
     """The line to say: the name the addon put before it dropped when the same character goes on
     (their previous line still being said, or just said), else kept; the mark removed either way."""
-    if NAME_MARK not in text:
-        return text
-    name, rest = text.split(NAME_MARK, 1)
-    return rest.lstrip() if continuing else name + rest
+    name, rest, droppable = split_name(text)
+    return rest.lstrip() if continuing and droppable else name + rest
 
 
 def parse(payload: bytes) -> Line | None:

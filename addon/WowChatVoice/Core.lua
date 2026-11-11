@@ -93,19 +93,21 @@ end
 
 -- The name before a line is followed by a mark (\4): the program drops it when the same character
 -- goes on while their previous line is still being said or was just said (it knows when a line
--- ends; the addon does not) - several lines in a row heard as one speech.
-local NAME_MARK = "\4"
+-- ends; the addon does not) - several lines in a row heard as one speech. After an emote's name the
+-- mark is \5: never dropped. Either way the program applies the dictionary to the line alone, not
+-- to the name ("Лок" stays a name).
+local NAME_MARK, KEPT_NAME_MARK = "\4", "\5"
 
 function ns.Send(kind, sender, race, sex, class, channel, text)
     local raw = (text or ""):gsub(SEP, " ")
-    text = ns.Dictionary.Apply(ns.Clean(text or ""))
+    text = ns.Clean(text or "")          -- the dictionary is the program's (it reads Dictionary.lua itself)
     text = text:gsub("%s+", " "):gsub("^ ", ""):gsub(" $", "")
     if text == "" then return end
     if ns.db.sayNames and sender and sender ~= "" then
         local name = Ambiguate and Ambiguate(sender, "none") or sender:match("^[^-]+")
         if not ns.db.sayLastNames then name = name:match("^%S+") or name end
         if kind == "emote" then
-            text = name .. " " .. text                     -- "Вася смеётся"
+            text = name .. KEPT_NAME_MARK .. " " .. text   -- "Вася смеётся"
         elseif ns.db.sayVerb then
             text = name .. " " .. (VERBS[kind] or "пишет") .. ":" .. NAME_MARK .. " " .. text
         else
@@ -184,31 +186,31 @@ function ns.SendControl()
     ns.Strip.Push(table.concat({ "control", "", "", "", "", "", options, "-" }, SEP))
 end
 
--- The dictionary's regular expressions go to the program over the strip, in parts of at most
--- REGEX_PART bytes (cut at line ends), tagged with a checksum of the whole set: "id=..;part=i;of=n".
--- Sent when they change (2 s after the last edit), at login, and every 2 minutes for a program
--- started after the game. Before this the program read them from the saved variables, which the
--- game writes only on /reload and logout.
-local REGEX_PART = 480
-local lastRegexes
+-- The player's dictionary layer (their edits of the default: Dictionary.D.UserLayer) goes to the
+-- program over the strip, in parts of at most DICT_PART bytes (cut at line ends), tagged with a
+-- checksum of the whole layer: "id=..;part=i;of=n". Sent when it changes (2 s after the last edit),
+-- at login, and every 2 minutes when it changed in this session (else a program started after the
+-- game reads the same layer from the saved variables, which the game writes on /reload and logout).
+-- The default itself the program reads from Dictionary.lua.
+local DICT_PART = 480
+local lastLayer
 
---- The regex set as sent (one per line, "-" for none) and its id (CRC-16, hex).
-local function RegexSet()
-    local text = table.concat(ns.Dictionary.Regexes(), "\n")
-    if text == "" then text = "-" end
+--- The layer as sent and its id (CRC-16, hex).
+local function LayerSet()
+    local text = ns.Dictionary.UserLayer()
     local bytes = {}
     for i = 1, #text do bytes[i] = text:byte(i) end
     return text, ("%04x"):format(ns.Protocol.CRC16(bytes))
 end
 
-function ns.SendRegexes(force)
-    local text, id = RegexSet()
-    if not force and id == lastRegexes then return end
-    lastRegexes = id
+function ns.SendDictionary(force)
+    local text, id = LayerSet()
+    if not force and id == lastLayer then return end
+    lastLayer = id
     local parts, current = {}, ""
     for line in (text .. "\n"):gmatch("(.-)\n") do
-        line = ns.Protocol.TrimUTF8(line, REGEX_PART)
-        if current ~= "" and #current + 1 + #line > REGEX_PART then
+        line = ns.Protocol.TrimUTF8(line, DICT_PART)
+        if current ~= "" and #current + 1 + #line > DICT_PART then
             parts[#parts + 1] = current
             current = line
         else
@@ -218,15 +220,15 @@ function ns.SendRegexes(force)
     parts[#parts + 1] = current
     for i, part in ipairs(parts) do
         local options = ("id=%s;part=%d;of=%d"):format(id, i, #parts)
-        ns.Strip.Push(table.concat({ "regex", "", "", "", "", "", options, part }, SEP))
+        ns.Strip.Push(table.concat({ "dict", "", "", "", "", "", options, part }, SEP))
     end
 end
 
-local regexTimer
-function ns.RegexesChanged()
+local layerTimer
+function ns.DictionaryChanged()
     if not (C_Timer and ns.Strip and ns.db) then return end
-    if regexTimer then regexTimer:Cancel() end
-    regexTimer = C_Timer.NewTimer(2, function() regexTimer = nil; ns.SendRegexes(false) end)
+    if layerTimer then layerTimer:Cancel() end
+    layerTimer = C_Timer.NewTimer(2, function() layerTimer = nil; ns.SendDictionary(false) end)
 end
 
 --- Ask the program to forget which race voice each character had and hand them out afresh.
@@ -395,17 +397,17 @@ loader:SetScript("OnEvent", function(self, event, name, ...)
     end
     if event == "PLAYER_LOGIN" then
         ns.SendControl()   -- the companion loads the voices chosen here
-        ns.SendRegexes(true)
-        -- the set the saved variables hold now (they are written at login and /reload)
-        local _, saved = RegexSet()
+        ns.SendDictionary(true)
+        -- the layer the saved variables hold now (they are written at login and /reload)
+        local _, saved = LayerSet()
         if C_Timer and C_Timer.NewTicker then
             -- For a program started after the game: the settings (a short frame) every 2 minutes.
-            -- The regexes - several frames half a screen long - only when they changed in this
-            -- session: otherwise the program reads the very same set from the saved variables.
+            -- The dictionary layer - frames up to half a screen long - only when it changed in this
+            -- session: otherwise the program reads the very same layer from the saved variables.
             C_Timer.NewTicker(120, function()
                 ns.SendControl()
-                local _, now = RegexSet()
-                if now ~= saved then ns.SendRegexes(true) end
+                local _, now = LayerSet()
+                if now ~= saved then ns.SendDictionary(true) end
             end)
         end
         return

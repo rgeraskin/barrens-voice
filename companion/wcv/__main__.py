@@ -183,10 +183,11 @@ def main() -> int:
         from .f5engine import prepare_voices
         prepare_voices(config, APP_DIR, log)
         launch.launch(config, log)   # the game starts while the voices load
-    from .dictionary import Regexes
-    regexes = Regexes(config, log)
-    regexes.refresh()
-    regexes_checked = time.monotonic()
+    from .dictionary import Dictionary
+    from .voicelist import find_addon
+    dictionary = Dictionary(config, log, find_addon(config))
+    dictionary.refresh()
+    dictionary_checked = time.monotonic()
     from .text import Accentor, plain
     from .unmask import unmask
     accentor = Accentor(log, config.get("ruaccent", True))
@@ -234,9 +235,9 @@ def main() -> int:
     with contextlib.nullcontext():
         while True:
             now = time.monotonic()
-            if now - regexes_checked > 5:
-                regexes.refresh()
-                regexes_checked = now
+            if now - dictionary_checked > 2:
+                dictionary.refresh()               # a changed Dictionary.lua works within seconds
+                dictionary_checked = now
             if config["exit_with_wow"] and now - wow_checked > 2:
                 wow_checked = now
                 if launch.wow_running():
@@ -294,8 +295,8 @@ def main() -> int:
                         engines.want(line.voice)
                     if line and line.kind == "control":
                         pass                                       # settings: applied above
-                    elif line and line.kind == "regex":
-                        regexes.receive(line.options, line.text)     # state, not speech: even if first
+                    elif line and line.kind == "dict":
+                        dictionary.receive(line.options, line.text)  # state, not speech: even if first
                     elif line and line.kind == "stop":
                         if not first:
                             engines.stop()
@@ -314,14 +315,18 @@ def main() -> int:
                         continuing = (speaker_key == last_speaker
                                       and engines.quiet_for() <= config["same_speaker_gap"])
                         last_speaker = speaker_key
-                        text = protocol.without_repeated_name(line.text, continuing)
+                        name, text, droppable = protocol.split_name(line.text)
+                        if continuing and droppable:
+                            name, text = "", text.lstrip()
                         text = unmask(MARKUP.sub("", text))   # "xyйня", "п0шел", "бл*ть"
-                        # the addon's replacements, then the regexes' (whose own patterns want plain
-                        # text): each declined after its preposition when that is on
+                        # the dictionary's words, then its regexes (whose own patterns want plain
+                        # text): each replacement declined after its preposition when that is on;
+                        # the name is left as it is
+                        text = dictionary.apply_words(text)
                         text = inflector.apply(text) if line.declension else strip_marks(text)
-                        text = regexes.apply(text, mark=line.declension)
+                        text = dictionary.apply(text, mark=line.declension)
                         text = inflector.apply(text) if line.declension else strip_marks(text)
-                        text = plain(text)
+                        text = name + plain(text)
                         line = dataclasses.replace(line, text=text)
                         speaker = engines.for_line(line)
                         label = LABELS.get(line.kind, line.kind) + (f" {line.channel}" if line.channel else "")

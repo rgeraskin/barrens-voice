@@ -113,16 +113,17 @@ assert(ns.Clean("на)(уя") == "нахуя", ns.Clean("на)(уя"))
 assert(ns.Clean(")(орошо") == "хорошо" and ns.Clean("ну }{ватит") == "ну хватит")
 assert(ns.Clean("привет))") == "привет." and ns.Clean("ок )(") == "ок.", ns.Clean("ок )("))
 print("clean ok")
-local spoken = ns.Dictionary.Apply("общаемся через Discord и в дискорде"):gsub("[\2\3]", "")
-assert(spoken == "общаемся через диск+орд и в диск+орде", spoken)
-print("discord ok")
--- a stem keeps the ending typed in chat and is not marked for declension (its case is right already);
--- a whole-word replacement is marked, so the program can decline it after a preposition
-assert(ns.Dictionary.Apply("встречаемся на перекрестке") == "встречаемся на перекр+ёстке", ns.Dictionary.Apply("встречаемся на перекрестке"))
-assert(ns.Dictionary.Apply("идём в ОП") == "идём в \2Огненная пропасть\3", ns.Dictionary.Apply("идём в ОП"))
-assert(ns.Dictionary.Apply("схожу в ПС") == "схожу в \2Пещеры стенаний\3", ns.Dictionary.Apply("схожу в ПС"))
-assert(ns.Dictionary.Apply("продам поножи и поножей") == "продам п+оножи и п+оножей", ns.Dictionary.Apply("продам поножи и поножей"))
-print("stems ok")
+-- the dictionary is the program's now: the addon sends the line as typed (cleaned) and the player's
+-- layer of the dictionary as "dict" frames
+sent = {}
+ns.Strip.Push = function(p) sent[#sent + 1] = p end
+ns.db.sayNames = false
+ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "кто в ОП")
+assert(sent[1]:find("\31кто в ОП\31", 1, true), sent[1])
+sent = {}
+ns.SendDictionary(true)
+assert(#sent >= 1 and sent[1]:find("^dict\31"), sent[1] or "nothing sent")
+print("dictionary to the program ok")
 
 -- while CatQuest reads a quest, chat lines wait; they go when it is done; stale ones are dropped
 local clock = 100
@@ -161,8 +162,5 @@ end
 ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "привет")
 ns.Send("emote", "Вася-Степи", "Orc", 2, "WARRIOR", "", "смеётся")
 assert(said(1) == "Вася пишет:\4 привет", said(1))
-assert(said(2) == "Вася смеётся", said(2))                                 -- an emote keeps its name, no mark
-assert(ns.Dictionary.Apply("че там, в пве или пвп?") == "\2чё\3 там, в \2пэ-вэ-й+е\3 или \2пэвэп+э\3?", ns.Dictionary.Apply("че там, в пве или пвп?"))
-assert(ns.Dictionary.Apply("серега, сереге") == "серёга, серёге", ns.Dictionary.Apply("серега, сереге"))
-assert(ns.Dictionary.Apply("на пикабу") == "на \2пикаб+у\3", ns.Dictionary.Apply("на пикабу"))
+assert(said(2) == "Вася\5 смеётся", said(2))                               -- an emote: a name never dropped
 print("continue ok")

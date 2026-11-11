@@ -265,7 +265,6 @@ AB=Низина Арати
 WSG=Ущелье Песни Войны
 ]]
 
-local exact, stems, phrases = {}, {}, {}
 
 -- Sorting: Russian keys first, then Latin, then digits and other symbols, regexes (~) last;
 -- within a group alphabetically (case and ё/е ignored). Comments travel with the entry below them;
@@ -346,105 +345,14 @@ function D.Parse(text)
     return out
 end
 
---- The regular expression lines (the program applies them; the addon sends them over the strip).
-function D.Regexes()
-    local out = {}
-    for _, e in ipairs(D.Parse(D.Text())) do
-        if e.regex then out[#out + 1] = e.regex end
-    end
-    return out
-end
-
+--- After the dictionary changed: tell the program (over the strip, Core.lua) and keep the player's
+--- layer in the saved variables for a program that reads them (the game not running or the layer
+--- not sent yet). The dictionary is applied by the program, not here: it reads the default straight
+--- from this file, so a new default works without a /reload.
 function D.Rebuild()
-    if ns.RegexesChanged then ns.RegexesChanged() end
-    -- for the companion when it reads the saved variables (the game not running or not yet sent)
-    ns.db.regexes = table.concat(D.Regexes(), "\n")
-    exact, stems, phrases = {}, {}, {}
-    for _, e in ipairs(D.Parse(D.Text())) do
-        if e.regex then
-            -- the companion's
-        elseif #e.words == 1 and not e.star then
-            exact[e.words[1]] = e.value
-        elseif #e.words == 1 then
-            stems[#stems + 1] = e
-        else
-            local first = e.words[1]
-            phrases[first] = phrases[first] or {}
-            table.insert(phrases[first], e)
-        end
-    end
-    for _, list in pairs(phrases) do
-        table.sort(list, function(a, b) return #a.words > #b.words end)
-    end
-    table.sort(stems, function(a, b) return #a.words[1] > #b.words[1] end)
-end
-
-local function WithSuffix(value, suffix)
-    return (value:gsub("%*", function() return suffix end))
-end
-
---- Whether entry `e` matches the words from `i` on; returns the suffix of a starred last word.
-local function Match(e, tokens, i)
-    local n = #e.words
-    for k = 1, n do
-        local t = tokens[i + k - 1]
-        if not t then return nil end
-        local w = e.words[k]
-        if k == n and e.star then
-            if t.norm:sub(1, #w) ~= w then return nil end
-            return t.word:sub(#w + 1)
-        elseif t.norm ~= w then
-            return nil
-        end
-    end
-    return ""
-end
-
---- `text` with dictionary entries replaced: phrases first (longest first), then whole words,
---- then stems ("дамагер*" for "дамагера", the ending carried over to the "*" of the value).
-function D.Apply(text)
-    local tokens, pos = {}, 1
-    while true do
-        local s, e = text:find(WORD, pos)
-        if not s then break end
-        local word = text:sub(s, e)
-        tokens[#tokens + 1] = { s = s, e = e, word = word, norm = D.Norm(word) }
-        pos = e + 1
-    end
-    local out, last, i = {}, 1, 1
-    while i <= #tokens do
-        local t = tokens[i]
-        local value, span, inflected
-        for _, e in ipairs(phrases[t.norm] or {}) do
-            local suffix = Match(e, tokens, i)
-            if suffix then value, span, inflected = WithSuffix(e.value, suffix), #e.words, e.star break end
-        end
-        if not value and exact[t.norm] then value, span = exact[t.norm], 1 end
-        if not value then
-            for _, e in ipairs(stems) do
-                local suffix = Match(e, tokens, i)
-                if suffix then value, span, inflected = WithSuffix(e.value, suffix), 1, true break end
-            end
-        end
-        if value then
-            out[#out + 1] = text:sub(last, t.s - 1)
-            -- marked (\2 ... \3) so the program can decline the replacement after a preposition - but
-            -- not a stem's: it took the ending typed in chat ("на перекрёстке"), its case is right
-            -- already, and "на" would make it accusative ("на перекрёсток")
-            out[#out + 1] = value == "" and "" or inflected and value or ("\2" .. value .. "\3")
-            last = tokens[i + span - 1].e + 1
-            i = i + span
-        else
-            i = i + 1
-        end
-    end
-    out[#out + 1] = text:sub(last)
-    return table.concat(out)
-end
-
---- The replacement for a single word, if the dictionary has one (diagnostics).
-function D.Lookup(word)
-    return exact[D.Norm(word)]
+    if ns.DictionaryChanged then ns.DictionaryChanged() end
+    ns.db.dictionaryUser = D.UserLayer()
+    ns.db.regexes = nil
 end
 
 -- Layers. The default (D.DEFAULT) lives in the addon; the player's dictionary is the default with
@@ -570,6 +478,28 @@ function D.SetText(text)
     ns.db.dictionaryEdits = Diff(text, SameBlock)
     merged = nil
     D.Rebuild()
+end
+
+--- The player's layer as the program takes it, one line each, sorted (a stable checksum): their
+--- changed and added entry lines, and "!<default line>" for each default entry they deleted - the
+--- line, not its key, so the program finds the key itself; "-" for none.
+function D.UserLayer()
+    local e, def = Edits(), Default()
+    local out = {}
+    for key, block in pairs(e.lines) do
+        if key ~= "#" then
+            for line in (block .. "\n"):gmatch("(.-)\n") do
+                if line ~= "" and line:sub(1, 1) ~= "#" then out[#out + 1] = line end
+            end
+        end
+    end
+    for key in pairs(e.removed) do
+        for line in ((def.lines[key] or "") .. "\n"):gmatch("(.-)\n") do
+            if line ~= "" then out[#out + 1] = "!" .. line end
+        end
+    end
+    table.sort(out)
+    return #out > 0 and table.concat(out, "\n") or "-"
 end
 
 --- Back to the default: no edits.
