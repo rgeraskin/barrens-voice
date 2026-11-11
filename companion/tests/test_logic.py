@@ -550,3 +550,37 @@ class MergeMarks(unittest.TestCase):
 
     def test_spacing_from_the_original(self):
         self.assertEqual(merge_marks("помочь с[Брууз]?", "пом+очь с [Бр+ууз] ?"), "пом+очь с[Бр+ууз]?")
+
+
+class SameSpeaker(unittest.TestCase):
+    def test_name_dropped_when_going_on(self):
+        from wcv.protocol import without_repeated_name
+        self.assertEqual(without_repeated_name("Вася пишет:\x04 кто в ОП", True), "кто в ОП")
+        self.assertEqual(without_repeated_name("Вася пишет:\x04 кто в ОП", False), "Вася пишет: кто в ОП")
+        self.assertEqual(without_repeated_name("кто в ОП", True), "кто в ОП")              # names off: nothing to drop
+
+    def test_quiet_for(self):
+        import time
+        from wcv.audio import Player
+        from wcv.engines import Engines
+        player = Player.__new__(Player)                    # no thread, no winsound: the bookkeeping only
+        import queue
+        player.items = queue.Queue()
+        player.playing_until = time.monotonic() + 2        # a line plays two more seconds
+        self.assertEqual(player.quiet_for(), 0.0)
+        player.playing_until = time.monotonic() - 3        # ended three seconds ago
+        self.assertAlmostEqual(player.quiet_for(), 3.0, delta=0.2)
+
+        class Speaker:
+            def __init__(self, waiting=0, working=False):
+                self.lines, self.working = queue.Queue(), working
+                for _ in range(waiting):
+                    self.lines.put(object())
+        engines = Engines.__new__(Engines)
+        engines.player, engines.f5 = player, None
+        engines.sapi = Speaker()
+        self.assertAlmostEqual(engines.quiet_for(), 3.0, delta=0.2)
+        engines.sapi = Speaker(working=True)               # a line being made: not quiet
+        self.assertEqual(engines.quiet_for(), 0.0)
+        engines.sapi, engines.f5 = Speaker(), Speaker(waiting=1)
+        self.assertEqual(engines.quiet_for(), 0.0)

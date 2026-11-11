@@ -75,6 +75,7 @@ class Speaker(threading.Thread):
         self.player = player
         self.accentor = accentor or Accentor(log, config.get("ruaccent", True))
         self.lines: queue.Queue = queue.Queue()
+        self.working = False         # a line taken from the queue and not yet handed to the player
         self.ready = threading.Event()
         self.voices: list[Voice] = []
         self.all_voices: list[Voice] = []
@@ -213,7 +214,9 @@ class Speaker(threading.Thread):
         self.accentor.load()
         self.ready.set()
         while True:
+            self.working = False
             line = self.lines.get()
+            self.working = True
             generation = self.player.generation      # a stop while this is being made drops it
             sender, sex = line.sender, line.sex
             text = self.accentor.accent(line.text)

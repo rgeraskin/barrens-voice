@@ -51,6 +51,14 @@ class Player(threading.Thread):
         self.max_queue = max_queue
         self.generation = 0
         self.stopped = threading.Event()
+        self.playing_until = 0.0     # monotonic time the line being played ends (or ended)
+
+    def quiet_for(self) -> float:
+        """Seconds since the last line ended; 0 while one plays or waits to."""
+        import time
+        if not self.items.empty():
+            return 0.0
+        return max(0.0, time.monotonic() - self.playing_until)
 
     def play(self, data: bytes, generation: int | None = None) -> None:
         """Queue a line; one made for an earlier generation (before a stop) is dropped."""
@@ -85,6 +93,10 @@ class Player(threading.Thread):
             path = self.folder / f"line{self.turn}.wav"
             path.write_bytes(data)
             # asynchronous, so a stop can cut it
+            import time
+            length = seconds(data)
+            self.playing_until = time.monotonic() + length
             winsound.PlaySound(str(path), winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_NODEFAULT)
-            if self.stopped.wait(seconds(data)):
+            if self.stopped.wait(length):
                 winsound.PlaySound(None, 0)
+                self.playing_until = time.monotonic()

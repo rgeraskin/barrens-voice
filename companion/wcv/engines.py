@@ -97,6 +97,14 @@ class Engines:
             (self.home / "assignments.json").unlink(missing_ok=True)
         self.log("голоса рас будут розданы заново")
 
+    def quiet_for(self) -> float:
+        """Seconds since the last line was heard to its end; 0 while a line is being made, waits
+        or plays (in either engine)."""
+        for speaker in (self.sapi, self.f5):
+            if speaker is not None and (speaker.lines.qsize() or getattr(speaker, "working", False)):
+                return 0.0
+        return self.player.quiet_for() if self.player is not None else 1e9
+
     def for_line(self, line: Line):
         """The engine for a chat line: F5 when the line asks for it and it is ready (starting it if
         need be; meanwhile Windows voices), else SAPI."""

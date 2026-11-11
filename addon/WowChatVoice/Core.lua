@@ -91,6 +91,11 @@ function ns.Emoticons(text)
     return text
 end
 
+-- The name before a line is followed by a mark (\4): the program drops it when the same character
+-- goes on while their previous line is still being said or was just said (it knows when a line
+-- ends; the addon does not) - several lines in a row heard as one speech.
+local NAME_MARK = "\4"
+
 function ns.Send(kind, sender, race, sex, class, channel, text)
     local raw = (text or ""):gsub(SEP, " ")
     text = ns.Dictionary.Apply(ns.Clean(text or ""))
@@ -102,9 +107,9 @@ function ns.Send(kind, sender, race, sex, class, channel, text)
         if kind == "emote" then
             text = name .. " " .. text                     -- "Вася смеётся"
         elseif ns.db.sayVerb then
-            text = name .. " " .. (VERBS[kind] or "пишет") .. ": " .. text
+            text = name .. " " .. (VERBS[kind] or "пишет") .. ":" .. NAME_MARK .. " " .. text
         else
-            text = name .. ": " .. text
+            text = name .. ":" .. NAME_MARK .. " " .. text
         end
     end
     local options = ns.LineOptions() .. (";decl=%d;raw=1"):format(ns.db.declension == false and 0 or 1)

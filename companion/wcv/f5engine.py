@@ -181,6 +181,7 @@ class F5Speaker:
         self.config, self.log, self.home = config, log, home
         self.player = player
         self.lines: queue.Queue = queue.Queue()
+        self.working = False         # a line taken from the queue and not yet handed to the player
         self.ready = threading.Event()
         self.error: str | None = None
         self.accentor = accentor or Accentor(log, config.get("ruaccent", True))
@@ -275,7 +276,9 @@ class F5Speaker:
             return
         self.ready.set()
         while True:
+            self.working = False
             line = self.lines.get()
+            self.working = True
             if line is None:                 # shutdown: free the model and the GPU memory
                 self.tts = None
                 import gc

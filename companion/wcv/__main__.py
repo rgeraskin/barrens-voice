@@ -54,6 +54,9 @@ DEFAULT_CONFIG = {
     "battlenet_exe": "",
     "exit_with_wow": True,
     "spoken_notices": False,
+    # a character's next line within this many seconds after their previous one was heard (or while
+    # it still is) goes on without their name: one speech
+    "same_speaker_gap": 5.0,
     "log_details": True,
     "log_keep_days": 90,
     "debug": False,
@@ -223,6 +226,7 @@ def main() -> int:
     first_check = True
     misses = 0
     damaged_since = None      # a strip in view whose frames do not check out, since when
+    last_speaker = None       # (kind, sender, channel) of the last chat line passed on
     damaged_told = False
     wow_seen, wow_gone_since, wow_checked = False, None, 0.0
     unknown_kinds: set[str] = set()
@@ -306,7 +310,12 @@ def main() -> int:
                             unknown_kinds.add(line.kind)
                             log(f"строки типа «{line.kind}» не озвучиваю (аддон новее программы?)")
                     elif line and line.text and not first:
-                        text = unmask(MARKUP.sub("", line.text))   # "xyйня", "п0шел", "бл*ть"
+                        speaker_key = (line.kind, line.sender, line.channel)
+                        continuing = (speaker_key == last_speaker
+                                      and engines.quiet_for() <= config["same_speaker_gap"])
+                        last_speaker = speaker_key
+                        text = protocol.without_repeated_name(line.text, continuing)
+                        text = unmask(MARKUP.sub("", text))   # "xyйня", "п0шел", "бл*ть"
                         # the addon's replacements, then the regexes' (whose own patterns want plain
                         # text): each declined after its preposition when that is on
                         text = inflector.apply(text) if line.declension else strip_marks(text)

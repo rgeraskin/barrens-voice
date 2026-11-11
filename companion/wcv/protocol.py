@@ -175,6 +175,18 @@ class Line:
         return config["volume"] / 100 * ((100 if self.volume is None else self.volume) / 100)
 
 
+NAME_MARK = "\x04"   # the addon puts it after the speaker's name ("Вася пишет:\x04 привет")
+
+
+def without_repeated_name(text: str, continuing: bool) -> str:
+    """The line to say: the name the addon put before it dropped when the same character goes on
+    (their previous line still being said, or just said), else kept; the mark removed either way."""
+    if NAME_MARK not in text:
+        return text
+    name, rest = text.split(NAME_MARK, 1)
+    return rest.lstrip() if continuing else name + rest
+
+
 def parse(payload: bytes) -> Line | None:
     """kind, sender, race, sex, class, channel, options ("key=value;..."), text[, raw]. The addon
     strips the separator from the text, so a line of 7 fields has no options (defaults)."""

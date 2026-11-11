@@ -149,8 +149,20 @@ assert(#sent == 3, "no CatQuest: straight to the strip")
 GetTime = function() return 0 end
 print("catquest ok")
 
--- dictionary entries
+-- the name is followed by a mark (\4): the program drops it when the same character goes on
+ns.db.sayNames, ns.db.sayVerb, ns.db.waitForCatQuest = true, true, true
+sent = {}
+ns.Strip.Push = function(p) sent[#sent + 1] = p end
+local function said(i)
+    local fields = {}
+    for f in (sent[i] .. "\31"):gmatch("(.-)\31") do fields[#fields + 1] = f end
+    return (fields[8]:gsub("[\2\3]", ""))
+end
+ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "привет")
+ns.Send("emote", "Вася-Степи", "Orc", 2, "WARRIOR", "", "смеётся")
+assert(said(1) == "Вася пишет:\4 привет", said(1))
+assert(said(2) == "Вася смеётся", said(2))                                 -- an emote keeps its name, no mark
 assert(ns.Dictionary.Apply("че там, в пве или пвп?") == "\2чё\3 там, в \2пэ-вэ-й+е\3 или \2пэвэп+э\3?", ns.Dictionary.Apply("че там, в пве или пвп?"))
 assert(ns.Dictionary.Apply("серега, сереге") == "серёга, серёге", ns.Dictionary.Apply("серега, сереге"))
 assert(ns.Dictionary.Apply("на пикабу") == "на \2пикаб+у\3", ns.Dictionary.Apply("на пикабу"))
-print("entries ok")
+print("continue ok")
