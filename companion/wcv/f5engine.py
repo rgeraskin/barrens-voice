@@ -348,9 +348,11 @@ class F5Speaker:
     def say(self, line) -> None:
         while self.lines.qsize() >= self.config["max_queue"]:
             try:
-                self.lines.get_nowait()
+                old = self.lines.get_nowait()
             except queue.Empty:
                 break
+            if old is not None:
+                self.log(f"очередь полна ({self.config['max_queue']}): не прочитано: {old.sender}: {old.text[:80]}")
         self.lines.put(line)
 
 

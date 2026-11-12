@@ -16,6 +16,7 @@ ns.DEFAULTS = {
     officer = false,
     channels = false,  -- numbered channels: General, Trade, LookingForGroup, LocalDefense ...
     emote = false,     -- /e emotes
+    debug = false,     -- /wcv debug: why a chat line was not sent, and CatQuest's speech, to the program's log
     self = false,      -- your own lines
     onlyVisible = true, -- only lines a chat window of yours shows (its message types and channels, chat filters)
     waitForCatQuest = true, -- hold chat lines while CatQuest reads a quest; send them when it is done
@@ -102,7 +103,7 @@ function ns.Send(kind, sender, race, sex, class, channel, text)
     local raw = (text or ""):gsub(SEP, " ")
     text = ns.Clean(text or "")          -- the dictionary is the program's (it reads Dictionary.lua itself)
     text = text:gsub("%s+", " "):gsub("^ ", ""):gsub(" $", "")
-    if text == "" then return end
+    if text == "" then ns.Skip("пусто после очистки разметки", sender, raw) return end
     if ns.db.sayNames and sender and sender ~= "" then
         local name = Ambiguate and Ambiguate(sender, "none") or sender:match("^[^-]+")
         if not ns.db.sayLastNames then name = name:match("^%S+") or name end
@@ -172,6 +173,35 @@ function ns.Diag(text)
     ns.Strip.Push(table.concat({ "diag", "", "", "", "", "", ns.LineOptions(), text }, SEP))
 end
 
+-- Debug (/wcv debug): each chat line the addon gets but does not send, with the reason, and when
+-- CatQuest starts and stops speaking - notes in the program's log, which has the time the chat lacks.
+function ns.Skip(reason, sender, text)
+    if not ns.db.debug then return end
+    local who = sender and sender:match("^[^-]+") or sender or "?"
+    text = (text or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|H.-|h(.-)|h", "%1")
+    ns.Diag(("не отправлено (%s): %s: %s"):format(reason, who, ns.Protocol.TrimUTF8(text, 90)))
+end
+
+local catQuestSeen
+--- The CatQuest state as the debug log tells it ("" when it is silent).
+local function CatQuestState()
+    local core = rawget(_G, "CatQuestCore")
+    local st = type(core) == "table" and type(core.state) == "table" and core.state
+    if not st or not (st.playing == true or st.pending ~= nil) then return "" end
+    local what = st.playing == true and ("играет: %s, %s с"):format(tostring(st.source), tostring(st.duration and math.floor(st.duration + 0.5)))
+        or "ждёт своей очереди (pending)"
+    return what .. (CatQuestSpeaking() and " — чат ждёт" or " — считаем зависшим, чат не ждёт")
+end
+
+function ns.WatchCatQuest()
+    if not ns.db.debug then catQuestSeen = nil; return end
+    local now = CatQuestState()
+    if now ~= catQuestSeen then
+        if catQuestSeen ~= nil or now ~= "" then ns.Diag("CatQuest " .. (now == "" and "замолчал" or now)) end
+        catQuestSeen = now
+    end
+end
+
 --- A chat line to the strip - now, or after CatQuest has finished speaking.
 function ns.Deliver(payload)
     if ns.db.waitForCatQuest == false or (#held == 0 and not CatQuestSpeaking()) then
@@ -179,6 +209,7 @@ function ns.Deliver(payload)
         return
     end
     held[#held + 1] = { payload = payload, at = GetTime() }
+    if ns.db.debug then ns.Diag(("строка ждёт CatQuest (в очереди %d)"):format(#held)) end
     if not holdTicker and C_Timer and C_Timer.NewTicker then
         holdTicker = C_Timer.NewTicker(0.25, ns.ReleaseHeld)
     end
@@ -327,11 +358,11 @@ local function Visible(event, ...)
             break
         end
     end
-    if not seen then return false end
+    if not seen then return false, "нет открытого окна чата с этим типом или каналом" end
     local filters = ChatFrame_GetMessageEventFilters and ChatFrame_GetMessageEventFilters(event)
-    for _, filter in ipairs(filters or {}) do
+    for i, filter in ipairs(filters or {}) do
         local ok, hide = pcall(filter, seen, event, ...)
-        if ok and hide then return false end
+        if ok and hide then return false, ("скрыто фильтром чата другого аддона (№%d)"):format(i) end
     end
     return true
 end
@@ -339,8 +370,12 @@ end
 local function OnChat(event, text, sender, _, channelString, _, _, _, _, _, _, _, guid)
     local db = ns.db
     local key = EVENTS[event]
-    if not (db.enabled and key and db[key]) then return end
-    if guid and guid ~= "" and guid == UnitGUID("player") and not db.self then return end
+    if not (db.enabled and key) then return end
+    if not db[key] then ns.Skip("тип чата выключен в настройках: " .. key, sender, text) return end
+    if guid and guid ~= "" and guid == UnitGUID("player") and not db.self then
+        ns.Skip("свои сообщения выключены", sender, text)
+        return
+    end
     local race, sex, class
     if guid and guid ~= "" then
         local ok, _, englishClass, _, englishRace, gender = pcall(GetPlayerInfoByGUID, guid)
@@ -417,6 +452,7 @@ loader:SetScript("OnEvent", function(self, event, name, ...)
         -- the layer the saved variables hold now (they are written at login and /reload)
         local _, saved = LayerSet()
         if C_Timer and C_Timer.NewTicker then
+            C_Timer.NewTicker(0.25, ns.WatchCatQuest)
             -- For a program started after the game: the settings (a short frame) every 2 minutes.
             -- The dictionary layer - frames up to half a screen long - only when it changed in this
             -- session: otherwise the program reads the very same layer from the saved variables.
@@ -428,7 +464,10 @@ loader:SetScript("OnEvent", function(self, event, name, ...)
         end
         return
     end
-    if EVENTS[event] and ns.db.enabled and not Visible(event, name, ...) then return end
+    if EVENTS[event] and ns.db.enabled then
+        local visible, why = Visible(event, name, ...)
+        if not visible then ns.Skip(why, (...), name) return end
+    end
     OnChat(event, name, ...)
 end)
 
@@ -444,6 +483,7 @@ SlashCmdList.WOWCHATVOICE = function(msg)
         print("  " .. G .. "/wcv test|r — четыре тестовые строки разными голосами")
         print("  " .. G .. "/wcv last 5|r — ещё раз прочитать последние 5 строк чата (через текущий словарь)")
         print("  " .. G .. "/wcv reset|r — раздать голоса рас заново")
+        print("  " .. G .. "/wcv debug|r — отладка: почему строка чата не прочитана — в журнал программы")
         print("  " .. G .. "/wcv help|r — этот список")
     elseif msg == "test" then
         ns.Test()
@@ -454,6 +494,11 @@ SlashCmdList.WOWCHATVOICE = function(msg)
         ns.ResetVoices()
     elseif msg:match("^last") then
         ns.Replay(tonumber(msg:match("%d+")) or 5)
+    elseif msg == "debug" then
+        ns.db.debug = not ns.db.debug
+        print(PREFIX .. (ns.db.debug
+            and "отладка включена: строки чата, которые аддон не отправил, с причиной, и речь CatQuest — в журнале программы (logs, «диагностика аддона»)."
+            or "отладка выключена."))
     elseif msg == "on" or msg == "off" then
         ns.SetEnabled(msg == "on")
     else

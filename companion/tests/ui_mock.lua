@@ -159,6 +159,29 @@ ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "после т�
 ns.ReleaseHeld()
 assert(#sent == 4, "a stuck CatQuest does not hold the chat: " .. #sent)
 CatQuestCore.state = { playing = false }
+-- debug: CatQuest's speech and a held line noted in the program's log
+ns.db.debug = true
+sent = {}
+ns.WatchCatQuest()
+assert(#sent == 0, "silent CatQuest, nothing to note at first")
+CatQuestCore.state = { playing = true, source = "pack", startedAt = 300, duration = 34 }
+clock = 301
+ns.WatchCatQuest()
+assert(sent[1] and sent[1]:find("^diag\31") and sent[1]:find("играет: pack, 34 с — чат ждёт", 1, true), sent[1] or "nothing")
+ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "в очередь")
+assert(sent[2]:find("строка ждёт CatQuest", 1, true), sent[2] or "nothing")
+CatQuestCore.state = { playing = false }
+ns.WatchCatQuest()
+ns.ReleaseHeld()
+assert(sent[3]:find("CatQuest замолчал", 1, true) and sent[4]:find("в очередь", 1, true), tostring(sent[3]))
+ns.Skip("свои сообщения выключены", "Вася-Степи", "|cff00ff00привет|r")
+assert(sent[5]:find("не отправлено (свои сообщения выключены): Вася: привет", 1, true), sent[5])
+ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "   ")
+assert(sent[6]:find("пусто после очистки", 1, true), sent[6] or "nothing")
+ns.db.debug = false
+ns.Skip("x", "a", "b")
+assert(#sent == 6, "no notes with debug off")
+sent = { 1, 2, 3, 4 }
 CatQuestCore = nil
 ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "без CatQuest")
 assert(#sent == 5, "no CatQuest: straight to the strip")
