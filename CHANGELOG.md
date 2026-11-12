@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1
+
+- The dictionary reads «кв» as «квест», and a number before «шт» as so many pieces in the right form: «6шт» — «шесть штук», «1 шт.» — «одна штука».
+
 ## 0.2.0
 
 - Race voices now come from the game client itself: the Russian voice-over of the playable races — each race and sex has the player character's voice and three NPC voice types (orc guard, shady and standard; human official, standard and warrior; …), each also in a lower and a higher copy, 12 voices per race and sex. Real actors instead of synthesized CatQuest voices: the orc sounds low and rough and the speech comes out clearer. CatQuest is no longer needed.
