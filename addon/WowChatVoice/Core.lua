@@ -22,8 +22,7 @@ ns.DEFAULTS = {
     waitForCatQuest = true, -- hold chat lines while CatQuest reads a quest; send them when it is done
     cell = 2,          -- strip cell size, physical pixels
     rows = 1,          -- strip rows of cells
-    -- the strip's cells start at the "left" edge or the "right"; not "right" by default: a minimap at
-    -- the top edge draws over the strip there whatever its strata, and long lines get cut
+    -- the strip's cells start at the "left" edge of it or the "right"
     stripFrom = "left",
     -- dictionaryEdits: the player's changes to the default slang dictionary (Dictionary.lua, layers)
     rate = 100,        -- reading speed, percent of the voice's own pace (50..200)

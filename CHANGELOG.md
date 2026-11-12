@@ -2,6 +2,7 @@
 
 ## 0.2.1
 
+- The strip is drawn above the rest of the game's interface: it belonged to the game world's frame, and everything in the interface — the minimap at the top right, the action bars at the bottom — was drawn over it whatever its layer. It still stays up when the interface is hidden (Alt+Z).
 - The dictionary reads «кв» as «квест», and a number before «шт» as so many pieces in the right form: «6шт» — «шесть штук», «1 шт.» — «одна штука».
 - A quest's number that quest addons put after its name in chat («[[25] Свиток с рунами (3513)]») is no longer read out.
 

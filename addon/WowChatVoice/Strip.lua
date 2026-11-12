@@ -23,8 +23,7 @@ local lastShown = 0
 local seq = math.random(0, 65535)
 
 --- Cells run from the left edge rightwards by default, or from the right edge leftwards; the
---- program reads either. (On the right a minimap at the top edge covers them: it draws over every
---- frame there, so a long line is cut.)
+--- program reads either.
 local function Place(i)
     local t = textures[i]
     local col = (i - 1) % perRow
@@ -118,7 +117,11 @@ function S.SetShown(shown)
 end
 
 function S.Initialize()
-    frame = CreateFrame("Frame", "WowChatVoiceStrip", WorldFrame)
+    -- No parent: a child of WorldFrame is drawn under everything in UIParent whatever its strata (the
+    -- action bars and the minimap covered it), and a child of UIParent hides with it (Alt+Z). A frame
+    -- of its own is sorted with UIParent's by strata - TOOLTIP is above them - and stays up. Its
+    -- points are still set on WorldFrame (the whole screen), which only places it.
+    frame = CreateFrame("Frame", "WowChatVoiceStrip", nil)
     frame:SetIgnoreParentScale(true)
     frame:SetScale(1)
     frame:SetFrameStrata("TOOLTIP")
