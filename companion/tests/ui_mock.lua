@@ -112,6 +112,14 @@ assert(ns.Clean("продам |cff0070dd|Hitem:2589::::::::|h[Льняной м�
 assert(ns.Clean("на)(уя") == "нахуя", ns.Clean("на)(уя"))
 assert(ns.Clean(")(орошо") == "хорошо" and ns.Clean("ну }{ватит") == "ну хватит")
 assert(ns.Clean("привет))") == "привет." and ns.Clean("ок )(") == "ок.", ns.Clean("ок )("))
+-- a link coloured by name (|cnIQ1:), and a colon before a Russian letter left whole
+local link = "WTS |cnIQ1:|Hitem:250335::::::::39:1489:::1:3524::::::|h[Сильный эликсир стойкости]|h|r|cnIQ1:|Hitem:250333::::::::39:1489:::1:3524::::::|h[Сильный эликсир священника]|h|r"
+assert(ns.Clean(link) == "WTS Сильный эликсир стойкости Сильный эликсир священника", ns.Clean(link))
+assert(ns.Clean("внимание:Привет") == "внимание:Привет", ns.Clean("внимание:Привет"))
+assert(ns.Clean("ссылка:Dota") == "ссылка:Dota", ns.Clean("ссылка:Dota"))
+assert(ns.Clean("ну ты :Р") == "ну ты.", ns.Clean("ну ты :Р"))
+assert(ns.Clean("ок :D всё") == "ок. всё", ns.Clean("ок :D всё"))
+assert(ns.Clean("привет :) как") == "привет. как", ns.Clean("привет :) как"))
 print("clean ok")
 -- the dictionary is the program's now: the addon sends the line as typed (cleaned) and the player's
 -- layer of the dictionary as "dict" frames

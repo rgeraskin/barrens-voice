@@ -64,8 +64,10 @@ local PREFIX = "|cff66ccffWoW Chat Voice|r: "
 --- Chat text without the client's markup: colours, links (their visible text kept), textures,
 --- atlases and raid target icons ({rt1}, {череп}).
 function ns.Clean(text)
-    text = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
-    text = text:gsub("|H.-|h%[?(.-)%]?|h", "%1")       -- a quest or item link: its name, without the brackets
+    -- colours: "|cffRRGGBB", or by name: "|cnIQ1:" (an item quality's colour, in newer clients' links)
+    text = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|cn[%w_]-:", ""):gsub("|r", "")
+    text = text:gsub("|H.-|h%[?(.-)%]?|h", " %1 ")     -- a quest or item link: its name, without the brackets
+                                                        -- (spaced: two links in a row stay two names)
     text = text:gsub("|T.-|t", ""):gsub("|A.-|a", "")
     text = text:gsub("{.-}", ""):gsub("||", "|")
     -- A "+" typed in chat is the word; every "+" after this point is a dictionary stress mark.
@@ -81,7 +83,12 @@ function ns.Emoticons(text)
     -- ")(" "}{" "><" next to letters is an "х" in disguise (past the swear filter): "на)(уя"
     text = text:gsub("([\128-\191])[%)}>][%({<]([\208\209])", "%1х%2")
     text = text:gsub("^[%)}>][%({<]([\208\209])", "х%1"):gsub("(%s)[%)}>][%({<]([\208\209])", "%1х%2")
-    text = text:gsub("[:;=]%-?[%)%(DdPpРр]+", ".")          -- :) :( :D ;) :-P (Р — русская)
+    -- :) :( :D ;) :-P :Р (Р - Russian). Lua patterns see bytes: a Russian letter in a [set] would be
+    -- two loose bytes there and eat the first byte of any letter after a colon ("1:Сильный"), so it
+    -- goes as a sequence; a letter smiley only when no letter follows it ("ссылка:Dota" stays).
+    text = text:gsub("[:;=]%-?[%)%(]+", ".")
+    text = text:gsub("[:;=]%-?[DdPp]+%f[^%w\128-\255]", ".")
+    text = text:gsub("[:;=]%-?\208\160%f[^%w\128-\255]", "."):gsub("[:;=]%-?\209\128%f[^%w\128-\255]", ".")
     text = text:gsub("[%(%)][%(%)]+", ".")                  -- )) ((( )(
     local opens = select(2, text:gsub("%(", ""))
     local closes = select(2, text:gsub("%)", ""))
