@@ -2,7 +2,9 @@
 
 ## 0.2.1
 
+- Where the strip is can be set: «Мост…» in the settings (the strip is called the bridge there, with a tooltip on what it is) — the top edge (as before), the bottom edge, or a place of your own (X, Y and width in screen pixels; the fields start from the top or bottom line's numbers). Another addon drawing in the same place — such as wow-ai, which draws its own strip in the top left corner — hid ours, and chat lines were lost while it was up. While the window is open, an orange frame shows where the strip will go; «Сохранить» moves it.
 - The strip is drawn above the rest of the game's interface: it belonged to the game world's frame, and everything in the interface — the minimap at the top right, the action bars at the bottom — was drawn over it whatever its layer. It still stays up when the interface is hidden (Alt+Z).
+- The strip is as thick as it needs to be for the longest line: a narrow place of your own gets more rows (220 pixels wide — 7 rows, 14 pixels), and the bridge window shows the thickness. On a 1280-pixel-wide screen it now has two rows: one held 469 bytes, and parts of your dictionary edits (480 bytes) came to the program cut.
 - The dictionary reads «кв» as «квест», and a number before «шт» as so many pieces in the right form: «6шт» — «шесть штук», «1 шт.» — «одна штука».
 - A quest's number that quest addons put after its name in chat («[[25] Свиток с рунами (3513)]») is no longer read out.
 

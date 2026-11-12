@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: WoW Chat Voice
-## Notes: Озвучка чата: у каждого игрока свой голос — голоса рас (F5-TTS) или голоса Windows. Строки передаются программе-компаньону тонкой тёмной полоской у верхнего края экрана.
-## Version: 0.2.0
+## Notes: Озвучка чата: у каждого игрока свой голос — голоса рас (F5-TTS) или голоса Windows. Строки передаются программе-компаньону тонкой тёмной полоской у края экрана.
+## Version: 0.2.1
 ## SavedVariables: WowChatVoiceDB
 ## Category: Accessibility
 ## IconTexture: Interface\AddOns\WowChatVoice\Icon
@@ -14,6 +14,7 @@ VoiceList.lua
 Core.lua
 UI.lua
 DictionaryWindow.lua
+StripWindow.lua
 Options.lua
 VoicesWindow.lua
 Minimap.lua

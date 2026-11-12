@@ -24,6 +24,12 @@ ns.DEFAULTS = {
     rows = 1,          -- strip rows of cells
     -- the strip's cells start at the "left" edge of it or the "right"
     stripFrom = "left",
+    -- where the strip is: "top" (default), "bottom" or "custom" (stripX, stripY, stripWidth: physical
+    -- pixels of its top left corner and its width) - for another addon drawing in the same place
+    stripPlace = "top",
+    stripX = 0,
+    stripY = 0,
+    stripWidth = 800,
     -- dictionaryEdits: the player's changes to the default slang dictionary (Dictionary.lua, layers)
     rate = 100,        -- reading speed, percent of the voice's own pace (50..200)
     volume = 100,      -- loudness, percent (0..200: over 100 the program boosts, easing the peaks), on top of the program's own `volume`
@@ -239,15 +245,21 @@ end
 
 --- A line the companion does not speak: the current settings (which voices to keep loaded, which
 --- Windows voices are off).
-function ns.SendControl()
-    local options = ns.LineOptions()
+--- The settings frame: options, the Windows voices switched off, and where the strip is
+--- (strip=x,y,width,height,screen width,screen height, physical pixels).
+function ns.ControlPayload()
+    local options = ns.LineOptions() .. ";strip=" .. ns.Strip.Describe()
     if ns.db.voiceOff then
         local off = {}
         for name in pairs(ns.db.voiceOff) do off[#off + 1] = name end
         table.sort(off)
         options = options .. ";off=" .. table.concat(off, "|")
     end
-    ns.Strip.Push(table.concat({ "control", "", "", "", "", "", options, "-" }, SEP))
+    return table.concat({ "control", "", "", "", "", "", options, "-" }, SEP)
+end
+
+function ns.SendControl()
+    ns.Strip.Push(ns.ControlPayload())
 end
 
 -- The player's dictionary layer (their edits of the default: Dictionary.D.UserLayer) goes to the

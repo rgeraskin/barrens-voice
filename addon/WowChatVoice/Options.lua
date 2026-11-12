@@ -1,5 +1,6 @@
 -- The settings window (/wcv, the minimap button, Options > AddOns): the main switch on top, then
--- channels, reading and the dictionary (in a window of its own, DictionaryWindow.lua).
+-- channels, reading, the dictionary (in a window of its own, DictionaryWindow.lua) and where the strip
+-- is ("Мост" to the player, StripWindow.lua).
 local _, ns = ...
 local UI = ns.UI
 
@@ -7,6 +8,9 @@ local O = {}
 ns.Options = O
 
 local TITLE = "WoW Chat Voice"
+
+-- What "Мост" is, for the player (the settings' button and the bridge window).
+ns.BRIDGE_TIP = "Мост — то, через что аддон передаёт строки чата программе-компаньону, которая читает их вслух: тонкая тёмная линия у края экрана. Программа видит окно игры и читает эту линию — другого пути наружу у аддонов WoW нет. Если линию закрывает другой аддон (рисует что-то в том же месте), чат перестаёт читаться — тогда перенесите её."
 
 -- Channels, in two columns: setting, label, tooltip.
 local CHANNELS = {
@@ -63,7 +67,7 @@ local function Build()
     local get, set = Setting("minimapIcon", function() ns.Minimap.Update() end)
     checks[#checks + 1] = UI.Check(window, 262, y - 3, "Значок у миникарты",
         "ЛКМ — эти настройки, ПКМ — включить или выключить озвучку.", get, set)
-    UI.Tooltip(toggle, "Включить или выключить всю озвучку: полосу у верхнего края экрана и передачу чата "
+    UI.Tooltip(toggle, "Включить или выключить всю озвучку: мост к программе (линию у края экрана) и передачу чата "
         .. "программе. То же — ПКМ по значку у миникарты или /wcv on, /wcv off.")
     y = y - 38
 
@@ -192,6 +196,25 @@ local function Build()
     note:SetText("Как читать сленг и сокращения: WTS = продам, дд = дамагер, ОП = Огненная пропасть.")
     local dict = UI.Button(window, "Словарь…", 110, function() ns.DictionaryWindow.Toggle() end)
     dict:SetPoint("TOPRIGHT", -18, y)
+    y = y - 44
+
+    y = UI.Header(window, "Мост к программе", y)
+    local stripNote = window:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    stripNote:SetPoint("TOPLEFT", 22, y - 4)
+    stripNote:SetWidth(220)
+    stripNote:SetJustifyH("LEFT")
+    stripNote:SetText("Тонкая линия у края экрана, через которую аддон передаёт чат программе. Перенесите, "
+        .. "если её закрывает другой аддон.")
+    local strip = UI.Button(window, "Мост…", 110, function()
+        if ns.StripWindow then
+            ns.StripWindow.Toggle()
+        else   -- a file new to the addon: the game loads it only after a restart, not on /reload
+            print("|cff40c0ffWoW Chat Voice:|r окно «Мост» появится после перезапуска игры.")
+        end
+    end)
+    UI.Tooltip(strip, ns.BRIDGE_TIP)
+    UI.TextTooltip(window, stripNote, ns.BRIDGE_TIP)
+    strip:SetPoint("TOPRIGHT", -18, y)
     y = y - 44
 
     window:SetHeight(-y + 10)

@@ -10,6 +10,10 @@ local function widget()
         if k == "IsShown" then return function(self) return self._shown end end
         if k == "SetShown" then return function(self, v) self._shown = v; if v and self._scripts.OnShow then self._scripts.OnShow(self) end end end
         if k == "Show" then return function(self) self:SetShown(true) end end
+        if k == "Hide" then return function(self)
+            if self._shown and self._scripts.OnHide then self._scripts.OnHide(self) end
+            self._shown = false
+        end end
         if k == "SetScript" then return function(self, n, f) self._scripts[n] = f end end
         if k == "GetScript" then return function(self, n) return self._scripts[n] end end
         if k == "GetValue" then return function(self) return self._value or 100 end end
@@ -38,7 +42,7 @@ C_Timer = { NewTimer = function(_, f) return { Cancel = function() end } end, Ne
 Settings = { RegisterCanvasLayoutCategory = function() return {} end, RegisterAddOnCategory = function() end }
 local ns = {}
 for _, f in ipairs({ "Protocol.lua", "Strip.lua", "Dictionary.lua", "VoiceList.lua", "Core.lua", "UI.lua",
-                     "DictionaryWindow.lua", "Options.lua", "VoicesWindow.lua", "Minimap.lua" }) do
+                     "DictionaryWindow.lua", "StripWindow.lua", "Options.lua", "VoicesWindow.lua", "Minimap.lua" }) do
     assert(loadfile(f))("WowChatVoice", ns)
 end
 WowChatVoiceVoiceList = { { name = "Anna", label = "Anna (RHVoice)", gender = "Female", on = true },
@@ -217,3 +221,58 @@ ns.Send("emote", "Вася-Степи", "Orc", 2, "WARRIOR", "", "смеётся
 assert(said(1) == "Вася пишет:\4 привет", said(1))
 assert(said(2) == "Вася\5 смеётся", said(2))                               -- an emote: a name never dropped
 print("continue ok")
+
+-- where the strip goes: the top (default), the bottom, or a place of one's own kept on the screen
+ns.db.cell, ns.db.rows = 2, 1
+local gx, gy, gw, gh = ns.Strip.Geometry("top")
+assert(gx == 0 and gy == 0 and gw == 2360 and gh == 2, "top")
+gx, gy, gw, gh = ns.Strip.Geometry("bottom")
+assert(gx == 0 and gy == 1638 and gw == 2360, "bottom: " .. gy)
+gx, gy, gw = ns.Strip.Geometry("custom", 2300, 5000, 100)
+assert(gw == 200 and gx == 2160 and gy == 1624, ("custom, kept on the screen (200 px: 8 rows, 16 px): %d %d %d"):format(gx, gy, gw))
+-- x as typed, the width cut to the rest of the screen (a full-width line moved right: x stayed 0 before)
+gx, gy, gw = ns.Strip.Geometry("custom", 1700, 0, 2360)
+assert(gx == 1700 and gy == 0 and gw == 660, ("x kept, width cut: %d %d %d"):format(gx, gy, gw))
+-- a narrow line is a thicker one: the longest frame always fits
+for _, width in ipairs({ 200, 220, 640, 1280, 2360 }) do
+    local _, _, w, h = ns.Strip.Geometry("custom", 0, 0, width)
+    local cells = math.floor(w / 2) * (h / 2)
+    assert(ns.Protocol.MaxBytes(cells) >= ns.Strip.NEED_BYTES, ("width %d: %d bytes"):format(width, ns.Protocol.MaxBytes(cells)))
+end
+local _, _, _, thin = ns.Strip.Geometry("top")
+local _, _, _, thick = ns.Strip.Geometry("custom", 0, 0, 220)
+assert(thin == 2 and thick == 14, ("full width one row, 220 px seven: %d %d"):format(thin, thick))
+ns.db.stripPlace, ns.db.stripX, ns.db.stripY, ns.db.stripWidth = "custom", 100, 50, 900
+assert(ns.Strip.Describe() == "100,50,900,4,2360,1640", ns.Strip.Describe())
+assert(ns.ControlPayload():find(";strip=100,50,900,4,2360,1640", 1, true), "the settings frame tells the place")
+-- moving: the program is told first (ahead of the queue, where the strip is now), then it moves
+ns.Strip.Initialize()
+local firsts, pushed = {}, {}
+ns.Strip.PushFirst = function(p) firsts[#firsts + 1] = p end
+ns.Strip.Push = function(p) pushed[#pushed + 1] = p end
+ns.Strip.MoveTo()
+assert(#firsts == 1 and firsts[1]:find("^control\31") and firsts[1]:find("strip=100,50,900", 1, true), "told first")
+assert(#pushed == 1 and pushed[1]:find("strip=100,50,900", 1, true), "and again from the new place")
+assert(ns.db.stripGeometry == "100,50,900,4,2360,1640", "kept for a program started later")
+ns.db.stripPlace = "bottom"
+ns.StripWindow.Toggle()
+local pending = ns.StripWindow.Pending()
+assert(pending.place == "bottom" and pending.x == 0 and pending.y == 1638 and pending.width == 2360,
+    ("the fields show the bottom line: %s %s %s"):format(pending.x, pending.y, pending.width))
+ns.StripWindow.Pick("custom")
+assert(pending.place == "custom" and pending.y == 1638 and pending.width == 2360, "a place of one's own starts from them")
+ns.StripWindow.Pick("top")
+assert(pending.y == 0, "top: its numbers")
+-- a place of one's own, saved and opened again: as it was saved
+ns.StripWindow.Pick("custom")
+pending.x = 1700
+ns.StripWindow.Save()
+assert(ns.db.stripPlace == "custom" and ns.db.stripX == 1700 and ns.db.stripY == 0 and ns.db.stripWidth == 660,
+    ("saved: %s %s %s %s"):format(ns.db.stripPlace, ns.db.stripX, ns.db.stripY, ns.db.stripWidth))
+ns.StripWindow.Toggle()
+pending = ns.StripWindow.Pending()
+assert(pending.place == "custom" and pending.x == 1700 and pending.width == 660, "opened again: as saved")
+ns.Strip.Preview("bottom")
+ns.Strip.Preview(nil)
+ns.db.stripPlace = "top"
+print("strip place ok")

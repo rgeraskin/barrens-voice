@@ -66,6 +66,15 @@ function UI.Check(parent, x, y, label, tip, get, set)
     return c
 end
 
+--- A tooltip over a text (a font string has none of its own): an invisible frame on top of it.
+function UI.TextTooltip(parent, fontString, text)
+    local f = CreateFrame("Frame", nil, parent)
+    f:SetAllPoints(fontString)
+    f:EnableMouse(true)
+    UI.Tooltip(f, text)
+    return f
+end
+
 function UI.SetCheckEnabled(c, enabled)
     if enabled then c:Enable() else c:Disable() end
     c.label:SetTextColor(enabled and 1 or 0.5, enabled and 1 or 0.5, enabled and 1 or 0.5)

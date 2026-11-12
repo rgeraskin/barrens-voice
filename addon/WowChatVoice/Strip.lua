@@ -1,4 +1,5 @@
--- The strip: a black bar along the top edge of the screen, `cell` physical pixels high per row,
+-- The strip: a black bar along the top edge of the screen (or the bottom, or a place of the player's
+-- choosing: another addon may draw in the same corner), `cell` physical pixels high per row,
 -- with near-black coloured cells on it that carry the latest chat line (Protocol.lua): the whole
 -- bar reads as one dark line. A line's cells are held at least HOLD seconds so the reader catches
 -- each one, then IDLE_AFTER the strip goes back to an empty frame (14 cells), which tells the
@@ -14,13 +15,27 @@ local IDLE_AFTER = 0.5 -- then, with nothing queued, the strip goes back to an e
                        -- program grabs the window 20 times a second: 0.25 s is enough for it)
 local MAX_QUEUE = 20   -- lines waiting beyond this are dropped, oldest first
 
-local frame, background
+local frame, background, preview
 local textures = {}
 local painted = 0      -- cells coloured by the last paint
 local perRow, total, unit, cellPx = 0, 0, 1, 2
 local queue = {}
 local lastShown = 0
 local seq = math.random(0, 65535)
+local moving = false   -- between telling the program of a new place and moving there
+
+S.MIN_WIDTH = 200      -- physical pixels: a narrower strip holds too little of a line per row
+-- The longest frame the strip must hold, in payload bytes: a part of the dictionary layer (480) with
+-- its fields, or a chat line (255 bytes at most) with its name, channel and options, with room to
+-- spare. Rows are added until it fits: a narrow strip is a thicker one (and a 1280-pixel screen
+-- gets two rows: one held only 469 bytes).
+S.NEED_BYTES = 560
+
+--- Rows of cells a strip `width` physical pixels wide needs (at least the `rows` setting).
+function S.RowsFor(width)
+    local perRow = math.max(1, math.floor(width / ns.db.cell))
+    return math.max(ns.db.rows or 1, math.ceil(P.CellsFor(S.NEED_BYTES) / perRow))
+end
 
 --- Cells run from the left edge rightwards by default, or from the right edge leftwards; the
 --- program reads either.
@@ -37,18 +52,93 @@ local function Place(i)
     end
 end
 
---- Size the strip to the screen in physical pixels: at scale 1 the screen is 768 units high.
+--- Where the strip goes, in physical pixels of the screen: x, y (of its top left corner), width,
+--- height. "top" (the default) and "bottom" span the screen; "custom" is the player's x, y and width,
+--- kept on the screen: x and y as given (as far as a strip of the least width still fits), the width
+--- cut to what is left of the screen after x. The arguments override the saved settings (the
+--- settings window's preview).
+function S.Geometry(place, x, y, width)
+    local physW, physH = GetPhysicalScreenSize()
+    place = place or ns.db.stripPlace or "top"
+    if place == "custom" then
+        local least = math.min(S.MIN_WIDTH, physW)
+        x = math.max(0, math.min(math.floor(tonumber(x or ns.db.stripX) or 0), physW - least))
+        width = math.floor(tonumber(width or ns.db.stripWidth) or physW)
+        width = math.max(least, math.min(width, physW - x))
+        local h = ns.db.cell * S.RowsFor(width)
+        y = math.max(0, math.min(math.floor(tonumber(y or ns.db.stripY) or 0), physH - h))
+        return x, y, width, h
+    end
+    local h = ns.db.cell * S.RowsFor(physW)
+    if place == "bottom" then
+        return 0, physH - h, physW, h
+    end
+    return 0, 0, physW, h
+end
+
+--- The strip's place as the program takes it: "x,y,width,height,screen width,screen height".
+function S.Describe()
+    local x, y, w, h = S.Geometry()
+    local physW, physH = GetPhysicalScreenSize()
+    return ("%d,%d,%d,%d,%d,%d"):format(x, y, w, h, physW, physH)
+end
+
+--- Size and place the strip in physical pixels: at scale 1 the screen is 768 units high.
 function S.Layout()
     if not frame then return end
     local physW, physH = GetPhysicalScreenSize()
+    local x, y, w, h = S.Geometry()
     unit = 768 / physH
     cellPx = ns.db.cell
-    perRow = math.floor(physW / cellPx)
-    total = perRow * ns.db.rows
+    perRow = math.floor(w / cellPx)
+    total = perRow * math.floor(h / cellPx)
     frame:ClearAllPoints()
-    frame:SetPoint("TOPLEFT", WorldFrame, "TOPLEFT", 0, 0)
-    frame:SetSize(physW * unit, cellPx * ns.db.rows * unit)
+    frame:SetPoint("TOPLEFT", WorldFrame, "TOPLEFT", x * unit, -y * unit)
+    frame:SetSize(w * unit, h * unit)
     for i = 1, #textures do Place(i) end
+    ns.db.stripGeometry = S.Describe()   -- for a program started while the game runs
+end
+
+--- Move the strip to the place now in the settings. The program is told first, on the strip where
+--- it is now (a frame ahead of the queue, held a second with nothing else shown, so no chat line is
+--- shown where the program no longer looks); then the strip moves and says where it is from there.
+function S.MoveTo()
+    if not frame then return end
+    S.PushFirst(ns.ControlPayload())
+    moving = true
+    lastShown = 0
+    C_Timer.After(1, function()
+        moving = false
+        S.Layout()
+        S.Push(ns.ControlPayload())
+    end)
+end
+
+--- A bright frame around where the strip would go (the settings window's preview), under the strip
+--- so its cells stay readable; nil hides it.
+function S.Preview(place, x, y, width)
+    if not frame then return end
+    if not place then
+        if preview then preview:Hide() end
+        return
+    end
+    if not preview then
+        preview = CreateFrame("Frame", nil, nil)            -- no parent, as the strip: above the UI
+        preview:SetIgnoreParentScale(true)
+        preview:SetScale(1)
+        preview:SetFrameStrata("TOOLTIP")
+        preview:SetFrameLevel(8990)
+        preview:EnableMouse(false)
+        local t = preview:CreateTexture(nil, "BACKGROUND")
+        t:SetAllPoints()
+        t:SetColorTexture(1, 0.5, 0, 0.85)
+    end
+    local px, py, pw, ph = S.Geometry(place, x, y, width)
+    local pad = 3
+    preview:ClearAllPoints()
+    preview:SetPoint("TOPLEFT", WorldFrame, "TOPLEFT", (px - pad) * unit, -(py - pad) * unit)
+    preview:SetSize((pw + 2 * pad) * unit, (ph + 2 * pad) * unit)
+    preview:Show()
 end
 
 local function Paint(cells)
@@ -80,7 +170,7 @@ local function OnUpdate()
         end
         return
     end
-    if now - lastShown < HOLD then return end
+    if now - lastShown < HOLD or (moving and lastShown > 0) then return end
     Paint(table.remove(queue, 1))
     lastShown = now
     idle = false
@@ -137,6 +227,9 @@ function S.Initialize()
     frame:SetScript("OnUpdate", OnUpdate)
     frame:RegisterEvent("DISPLAY_SIZE_CHANGED")
     frame:RegisterEvent("UI_SCALE_CHANGED")
-    frame:SetScript("OnEvent", function() S.Layout() end)
+    frame:SetScript("OnEvent", function()
+        S.Layout()
+        if ns.ControlPayload and ns.db then S.Push(ns.ControlPayload()) end   -- a new screen: a new place
+    end)
     S.SetShown(ns.db.enabled)
 end

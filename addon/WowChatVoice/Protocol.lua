@@ -41,6 +41,11 @@ function P.MaxBytes(cells)
     return math.max(0, math.min(bytes, 4095))
 end
 
+--- How many cells `bytes` payload bytes take (the header included).
+function P.CellsFor(bytes)
+    return P.HEADER_CELLS + math.ceil((P.HEADER_BITS + 8 * bytes) / P.BITS_PER_CELL)
+end
+
 --- `s` cut to at most `n` bytes without splitting a UTF-8 character.
 function P.TrimUTF8(s, n)
     if #s <= n then return s end
