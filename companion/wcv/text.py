@@ -117,7 +117,10 @@ def plain(text: str) -> str:
 NEXT_WORD = re.compile(r"\s+([а-яёА-ЯЁ+]+)")
 GENDERS = {"masc", "femn", "neut"}
 # words that number rather than count: "15 уровня" is the fifteenth (a count is "15 уровней")
-NUMBERED = {"уровень", "этаж", "место", "ранг", "фаза", "сезон", "глава", "акт", "волна", "слот", "босс"}
+NUMBERED = {"уровень", "этаж", "место", "число", "ранг", "фаза", "сезон", "глава", "акт", "волна", "слот", "босс"}
+# a numbered noun whose singular the stress model takes for the plural ("числ+а" - "two numbers"):
+# after an ordinal it is the singular, stressed here
+SINGULAR_STRESS = {"числа": "ч+исла", "места": "м+еста"}
 PREV_WORD = re.compile(r"([а-яёА-ЯЁ]+)\s+$")
 # the cases a preposition asks of the word after it (only those a count never takes in the singular)
 GOVERNS = {**dict.fromkeys(("с", "со"), {"gent", "ablt"}),
@@ -234,9 +237,11 @@ def numbers_to_words(text: str) -> str:
         return text
     morph = _analyzer()
 
-    def spell(m):
+    def spell(m) -> tuple[str, int]:
+        """The number in words, and where the text it stands for ends (past the word after it
+        when that word's stress is settled here too)."""
         if len(m.group()) >= 10:
-            return m.group()
+            return m.group(), m.end()
         n = int(m.group())
         spoken = num2words(n, lang="ru")
         following = NEXT_WORD.match(m.string, m.end())
@@ -245,13 +250,26 @@ def numbers_to_words(text: str) -> str:
             try:
                 as_ordinal = ordinal(n, before.group(1) if before else "", following.group(1), morph)
                 if as_ordinal:
-                    return as_ordinal
+                    word = following.group(1)
+                    stressed = SINGULAR_STRESS.get(word.lower())
+                    if stressed:                       # "одиннадцатого ч+исла", not the plural "числ+а"
+                        stressed = word[0] + stressed[1:]
+                        return as_ordinal + m.string[m.end():following.start(1)] + stressed, following.end(1)
+                    return as_ordinal, m.end()
                 spoken = agree(n, spoken, following.group(1), morph)
             except Exception:  # noqa: BLE001 - a number read in the nominative is still a number
                 pass
-        return spoken
+        return spoken, m.end()
 
-    return NUMBER.sub(spell, text)
+    out, pos = [], 0
+    for m in NUMBER.finditer(text):
+        if m.start() < pos:
+            continue                                   # inside a word taken with the number before
+        spoken, end = spell(m)
+        out += [text[pos:m.start()], spoken]
+        pos = end
+    out.append(text[pos:])
+    return "".join(out)
 
 
 class Accentor:
