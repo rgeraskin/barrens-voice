@@ -216,6 +216,8 @@ class DictionaryInCompanion(unittest.TestCase):
         self.assertEqual(d.apply_words("че там, в пве или пвп?"), "\x02чё\x03 там, в \x02пэ-вэ-й+е\x03 или \x02пэвэп+э\x03?")
         self.assertEqual(d.apply_words("серега, сереге"), "серёга, серёге")
         self.assertEqual(plain("на пикабу"), "на пикаб+у")
+        self.assertEqual(plain("в 20 по мск"), "в 20 по эм-эс-к+а")
+        self.assertEqual(d.apply_words("кто танчит? я танчу, вчера танчила"), "кто т+анчит? я т+анчу, вчера т+анчила")
         self.assertEqual(d.apply("за 5к"), "за 5000")                                           # a default regex
 
     def test_the_players_layer(self):
@@ -640,3 +642,4 @@ class SameSpeaker(unittest.TestCase):
         self.assertEqual(engines.quiet_for(), 0.0)
         engines.sapi, engines.f5 = Speaker(), Speaker(waiting=1)
         self.assertEqual(engines.quiet_for(), 0.0)
+
