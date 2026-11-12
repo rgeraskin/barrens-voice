@@ -141,3 +141,97 @@ class RoundTrip(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def scene(width: int, height: int, seed: int = 3) -> bytearray:
+    """A dark game picture: noise, with stray dark purple and green pixels that look like sync cells."""
+    rnd = random.Random(seed)
+    raw = bytearray()
+    for _ in range(width * height):
+        kind = rnd.random()
+        if kind < 0.02:
+            r, g, b = 36, 0, 36                       # a lone "sync" pixel
+        elif kind < 0.04:
+            r, g, b = 0, 36, 0
+        else:
+            r, g, b = rnd.randint(0, 90), rnd.randint(0, 90), rnd.randint(0, 90)
+        raw += bytes((b, g, r, 255))
+    return raw
+
+
+def paste(raw: bytearray, width: int, img: Image, x: int, y: int) -> None:
+    for row in range(img.height):
+        start = ((y + row) * width + x) * 4
+        raw[start:start + img.width * 4] = img.raw[row * img.width * 4:(row + 1) * img.width * 4]
+
+
+@unittest.skipUnless(LUAJIT, "luajit not installed")
+class FindingTheStrip(unittest.TestCase):
+    """The strip moved somewhere the program was not told of: found over the whole window."""
+    PAYLOAD = RoundTrip.PAYLOAD
+
+    def test_anywhere_from_either_edge(self):
+        from wcv.locate import find
+        width, height = 640, 240
+        for from_right in (False, True):
+            strip = render(encode(91, self.PAYLOAD, 400 // 2), 400, 2, 1, from_right=from_right)
+            raw = scene(width, height)
+            paste(raw, width, strip, 120, 200)
+            hit = find(bytes(raw), width, height, width_hint=400)
+            self.assertIsNotNone(hit, f"from the right: {from_right}")
+            x, y, w, h, frame = hit
+            self.assertEqual((x, y, w), (120, 200, 400))
+            self.assertEqual(frame.payload, self.PAYLOAD)
+
+    def test_without_a_width(self):
+        from wcv.locate import find
+        width, height = 640, 120
+        raw = scene(width, height, seed=5)
+        paste(raw, width, render(encode(5, self.PAYLOAD, 300), 600, 2, 1), 0, 118)   # the bottom edge
+        x, y, w, h, frame = find(bytes(raw), width, height)
+        self.assertEqual((x, y, h), (0, 118, 2))
+        self.assertEqual(frame.seq, 5)
+
+    def test_a_narrow_strip_of_several_rows(self):
+        # 220 px wide: the addon gives it 7 rows so a long line fits; found and read in full
+        from wcv.locate import find
+        payload = "\x1f".join(["party", "Громмаш-Степи", "Orc", "2", "WARRIOR", "", "rate=100",
+                               "Длинная строка чата " * 12]).encode()[:540]
+        width, height = 640, 200
+        raw = scene(width, height, seed=11)
+        paste(raw, width, render(encode(12, payload, 110 * 7), 220, 2, 7), 300, 60)
+        hit = find(bytes(raw), width, height, width_hint=220, capture_height=64)
+        self.assertIsNotNone(hit)
+        self.assertEqual(hit[:3], (300, 60, 220))
+        self.assertEqual(hit[4].payload, payload)
+
+    def test_nothing_there(self):
+        from wcv.locate import find
+        self.assertIsNone(find(bytes(scene(320, 100, seed=9)), 320, 100))
+
+
+class StripPlace(unittest.TestCase):
+    def test_parse_and_region(self):
+        from wcv.locate import parse_place, region
+        self.assertEqual(parse_place("100,50,900,2,2560,1440"), (100, 50, 900, 2, 2560, 1440))
+        self.assertIsNone(parse_place("1,2,3"))
+        self.assertIsNone(parse_place("1,2,0,2,10,10"))
+        self.assertEqual(region((0, 0, 1920, 2, 1920, 1080), 1920, 1080, 16), (0, 0, 1920, 16))
+        self.assertEqual(region((0, 1078, 1920, 2, 1920, 1080), 1920, 1080, 16), (0, 1078, 1920, 2))   # the bottom
+        # a window not at the game's resolution: scaled
+        self.assertEqual(region((100, 50, 900, 2, 2560, 1440), 1280, 720, 16), (50, 25, 450, 16))
+
+    def test_saved_variables(self):
+        import tempfile
+        from unittest import mock
+        from wcv import locate
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "WowChatVoice.lua"
+            path.write_text('WowChatVoiceDB = {\n["stripGeometry"] = "0,1078,1920,2,1920,1080",\n}\n', encoding="utf-8")
+            with mock.patch("wcv.dictionary.find_saved", return_value=path):
+                self.assertEqual(locate.saved_place({}), (0, 1078, 1920, 2, 1920, 1080))
+
+    def test_control_frame_option(self):
+        line = parse("\x1f".join(["control", "", "", "", "", "", "rate=100;vol=100;voice=f5;strip=0,1078,1920,2,1920,1080", "-"]).encode())
+        from wcv.locate import parse_place
+        self.assertEqual(parse_place(line.options["strip"]), (0, 1078, 1920, 2, 1920, 1080))

@@ -154,6 +154,12 @@ def restart_online(log) -> None:
     os.execv(sys.executable, [sys.executable, "-m", "wcv"] + sys.argv[1:])
 
 
+def describe_place(place) -> str:
+    x, y, w, h, sw, sh = place
+    where = "верх" if y == 0 and w == sw else "низ" if y + h == sh and w == sw else "своё место"
+    return f"{where}, x {x}, y {y}, ширина {w} (экран {sw}×{sh})"
+
+
 def main() -> int:
     if sys.platform != "win32":
         print("Windows only")
@@ -232,6 +238,12 @@ def main() -> int:
     wow_seen, wow_gone_since, wow_checked = False, None, 0.0
     unknown_kinds: set[str] = set()
     capturer = Capturer(config, log)
+    from . import locate
+    place = locate.saved_place(config)
+    if place:                     # where the addon last put the strip; its settings frame says it again
+        capturer.set_place(place)
+        log("полоска (по сохранённым настройкам аддона): " + describe_place(place))
+    absent_since, searched = None, 0.0
     with contextlib.nullcontext():
         while True:
             now = time.monotonic()
@@ -265,6 +277,20 @@ def main() -> int:
                 time.sleep(config["poll_interval"])
                 continue
             frame = protocol.decode(protocol.Image(*grabbed))
+            if frame is None and protocol.last_failure == "absent":
+                # no strip where it was said to be: look over the whole window, every 5 s (~0.3 s of work)
+                absent_since = absent_since or time.monotonic()
+                if time.monotonic() - absent_since > 2 and time.monotonic() - searched > 5:
+                    searched = time.monotonic()
+                    whole = capturer.grab_full()
+                    # rows enough for a narrow strip: the addon makes it thicker so a long line fits
+                    hit = locate.find(*whole, width_hint=capturer.rect[2],
+                                      capture_height=max(config["capture_height"], 64)) if whole else None
+                    if hit and hit[:4] != capturer.rect:
+                        capturer.use(hit[:4])
+                        log(f"полоска найдена в другом месте: x {hit[0]}, y {hit[1]}, ширина {hit[2]}")
+            elif frame is not None:
+                absent_since = None
             if frame is None:
                 misses += 1
                 if protocol.last_failure == "damaged":
@@ -294,7 +320,11 @@ def main() -> int:
                     if line and line.voice:
                         engines.want(line.voice)
                     if line and line.kind == "control":
-                        pass                                       # settings: applied above
+                        # settings: applied above; and where the strip is (or is about to move)
+                        place = locate.parse_place(line.options.get("strip", ""))
+                        if place and place != capturer.place:
+                            capturer.set_place(place)
+                            log("полоска: " + describe_place(place))
                     elif line and line.kind == "dict":
                         dictionary.receive(line.options, line.text)  # state, not speech: even if first
                     elif line and line.kind == "stop":

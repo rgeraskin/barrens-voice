@@ -4,6 +4,10 @@ Windows Graphics Capture (the `windows-capture` package, as OBS uses) reads the 
 so it works while another window covers the game. When it is not available, a grab of that part of
 the screen (mss) - which sees only what is on top. Neither sees a minimised game: WoW draws nothing
 then.
+
+What is kept of each frame is the strip's rectangle in the client area - the top rows by default,
+or where the addon says the strip is (locate.py) - and, when asked, the whole client area, to look
+for a strip that is not where it was said to be.
 """
 from __future__ import annotations
 
@@ -14,14 +18,18 @@ from .window import find_wow_window, frame_offset
 
 
 class WindowCapture:
-    """Windows Graphics Capture of one window; the newest top strip kept for latest()."""
+    """Windows Graphics Capture of one window; the newest strip rectangle kept for latest(), the
+    whole client area for full() when asked."""
 
-    def __init__(self, hwnd: int, client: tuple[int, int, int, int], height: int, log):
+    def __init__(self, hwnd: int, client: tuple[int, int, int, int], rect: tuple[int, int, int, int], log):
         from windows_capture import WindowsCapture
 
-        self.hwnd, self.client, self.height, self.log = hwnd, client, height, log
+        self.hwnd, self.client, self.log = hwnd, client, log
+        self.rect = rect               # x, y, width, height of the strip in the client area
         self.lock = threading.Lock()
         self.strip: tuple[bytes, int, int] | None = None
+        self.whole: tuple[bytes, int, int] | None = None
+        self.want_whole = False
         self.stamp = 0.0
         self.closed = False
         self.offset = frame_offset(hwnd)
@@ -34,12 +42,22 @@ class WindowCapture:
                 control.stop()
                 return
             buf = frame.frame_buffer                      # rows x columns x BGRA
-            x, y = self.offset
-            width = min(self.client[2], buf.shape[1] - x)
-            rows = buf[y:y + self.height, x:x + width]
+            ox, oy = self.offset
+            x, y, w, h = self.rect
+            w = min(w, buf.shape[1] - ox - x)
+            h = min(h, buf.shape[0] - oy - y)
+            if w <= 0 or h <= 0:
+                return
+            rows = buf[oy + y:oy + y + h, ox + x:ox + x + w]
+            whole = None
+            if self.want_whole:
+                cw, ch = min(self.client[2], buf.shape[1] - ox), min(self.client[3], buf.shape[0] - oy)
+                whole = (buf[oy:oy + ch, ox:ox + cw].tobytes(), cw, ch)
             with self.lock:
-                self.strip = (rows.tobytes(), width, rows.shape[0])
+                self.strip = (rows.tobytes(), w, h)
                 self.stamp = time.monotonic()
+                if whole is not None:
+                    self.whole, self.want_whole = whole, False
 
         @self.session.event
         def on_closed():
@@ -50,6 +68,12 @@ class WindowCapture:
     def latest(self):
         with self.lock:
             return self.strip
+
+    def full(self):
+        """The whole client area from a frame after the previous call (None the first time)."""
+        with self.lock:
+            whole, self.whole, self.want_whole = self.whole, None, True
+        return whole
 
     def stop(self) -> None:
         self.closed = True
@@ -62,6 +86,8 @@ class Capturer:
         self.config, self.log = config, log
         self.height = config["capture_height"]
         self.window = None            # (hwnd, client rect)
+        self.place = None             # where the addon says the strip is (locate.Place); None: the top
+        self.rect = (0, 0, 0, 0)      # the strip's rectangle in the client area
         self.wgc: WindowCapture | None = None
         self.wgc_failed = not config.get("window_capture", True)
         self.screen = None
@@ -73,14 +99,47 @@ class Capturer:
                 self.wgc.stop()
                 self.wgc = None
             self.window = found
+            self._fit()
             if found and not self.wgc_failed:
                 try:
-                    self.wgc = WindowCapture(found[0], found[1], self.height, self.log)
+                    self.wgc = WindowCapture(found[0], found[1], self.rect, self.log)
                     self.log("захват окна WoW: Windows Graphics Capture (работает и под другими окнами)")
                 except Exception as e:  # noqa: BLE001 - fall back to grabbing the screen
                     self.wgc_failed = True
                     self.log(f"Windows Graphics Capture недоступен ({e}); снимаю экран — игра должна быть сверху")
         return found
+
+    def _fit(self) -> None:
+        """The strip's rectangle for the current window: where the addon says, else the top rows."""
+        if self.window is None:
+            return
+        from .locate import region
+        cw, ch = self.window[1][2], self.window[1][3]
+        self.use(region(self.place, cw, ch, self.height) if self.place else (0, 0, cw, min(self.height, ch)))
+
+    def set_place(self, place) -> None:
+        """The strip's place as the addon gave it (locate.Place), or None for the top edge."""
+        self.place = place
+        self._fit()
+
+    def use(self, rect: tuple[int, int, int, int]) -> None:
+        """Grab this rectangle of the client area (x, y, width, height) from now on."""
+        self.rect = rect
+        if self.wgc is not None:
+            self.wgc.rect = rect
+
+    def grab_full(self):
+        """(raw BGRA bytes, width, height) of the whole client area, or None (Windows Graphics
+        Capture: from a frame after the previous call - None the first time)."""
+        if self.window is None:
+            return None
+        if self.wgc is not None:
+            return self.wgc.full()
+        if self.screen is None:
+            return None
+        left, top, width, height = self.window[1]
+        shot = self.screen.grab({"left": left, "top": top, "width": width, "height": height})
+        return bytes(shot.raw), shot.width, shot.height
 
     def grab(self):
         """(raw BGRA bytes, width, height) of the strip, or None."""
@@ -95,6 +154,7 @@ class Capturer:
         if self.screen is None:
             import mss
             self.screen = mss.MSS() if hasattr(mss, "MSS") else mss.mss()
-        left, top, width, _ = self.window[1]
-        shot = self.screen.grab({"left": left, "top": top, "width": width, "height": self.height})
+        left, top = self.window[1][:2]
+        x, y, w, h = self.rect
+        shot = self.screen.grab({"left": left + x, "top": top + y, "width": w, "height": h})
         return bytes(shot.raw), shot.width, shot.height
