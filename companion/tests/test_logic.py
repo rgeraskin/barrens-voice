@@ -15,6 +15,11 @@ from wcv.text import apply_stress, merge_marks  # noqa: E402
 
 
 class Text(unittest.TestCase):
+    def test_quest_number_dropped(self):
+        from wcv.text import plain
+        self.assertEqual(plain("LFM [[25] Свиток с рунами (3513)]"), "LFM Свиток с рунами")
+        self.assertEqual(plain("[Свиток (3513)] и (через 5 мин)"), "Свиток и (через 5 мин)")
+
     def test_dictionary_marks_win(self):
         original = "Нужен дам+агер в Мёртвые копи"
         accented = "Н+ужен дамаг+ер в М+ёртвые к+опи"   # RUAccent's guess for the slang word

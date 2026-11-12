@@ -3,6 +3,7 @@
 ## 0.2.1
 
 - The dictionary reads «кв» as «квест», and a number before «шт» as so many pieces in the right form: «6шт» — «шесть штук», «1 шт.» — «одна штука».
+- A quest's number that quest addons put after its name in chat («[[25] Свиток с рунами (3513)]») is no longer read out.
 
 ## 0.2.0
 

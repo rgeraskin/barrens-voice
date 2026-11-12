@@ -62,6 +62,7 @@ def _with_marks(word: str, marked: str) -> str:
 
 LEVEL_TAG = re.compile(r"\[\d+[^\]\s]{0,3}\]")   # "[24]", "[60+]", "[23D]" before a quest name (Questie & co)
 BRACKETS = re.compile(r"[\[\]{}]")
+QUEST_ID = re.compile(r"\s*\(\d+\)(?=\s*\])")   # "[[25] Свиток с рунами (3513)]": the quest's number in the database
 SHOUTED = re.compile(r"\b[А-ЯЁ]{4,}\b")
 # A word in capitals of 2-5 letters the dictionary did not expand: a word shouted ("ВСЁ", "СТОЙ")
 # when pymorphy knows it as one, else an abbreviation - spelt when it cannot be said as syllables
@@ -104,12 +105,13 @@ def _capitals(match) -> str:
 
 
 def plain(text: str) -> str:
-    """Text as it is said: a quest level tag ("[24]" before a quest name) goes, other brackets left
+    """Text as it is said: a quest level tag ("[24]" before a quest name) and a quest's number at the
+    end of its name ("(3513)]", as quest addons write it) go, other brackets left
     over become spaces - they also glued the word before them to the next ("с[Разыскивается"); a word in capitals of 4
     letters or more is lowered, or RUAccent stresses it as an abbreviation ("РАЗ+ЫСКИВАЕТСЯ"); an
     abbreviation the dictionary did not expand is spelt when it cannot be said as syllables ("ППС" -
     "пэ-пэ-+эс", "США"), see `_capitals`."""
-    text = BRACKETS.sub(" ", LEVEL_TAG.sub(" ", text))
+    text = BRACKETS.sub(" ", LEVEL_TAG.sub(" ", QUEST_ID.sub("", text)))
     text = SHOUTED.sub(lambda m: m.group().lower(), CAPITALS.sub(_capitals, text))
     return re.sub(r"\s+([,.!?:;…])", r"\1", re.sub(r"\s{2,}", " ", text)).strip()
 
