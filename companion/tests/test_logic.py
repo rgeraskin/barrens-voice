@@ -622,9 +622,9 @@ class SameSpeaker(unittest.TestCase):
         import time
         from wcv.audio import Player
         from wcv.engines import Engines
-        player = Player.__new__(Player)                    # no thread, no winsound: the bookkeeping only
         import queue
-        player.items = queue.Queue()
+        import tempfile
+        player = Player(8, tempfile.mkdtemp())              # not started: no thread, no winsound
         player.playing_until = time.monotonic() + 2        # a line plays two more seconds
         self.assertEqual(player.quiet_for(), 0.0)
         player.playing_until = time.monotonic() - 3        # ended three seconds ago
@@ -644,3 +644,46 @@ class SameSpeaker(unittest.TestCase):
         engines.sapi, engines.f5 = Speaker(), Speaker(waiting=1)
         self.assertEqual(engines.quiet_for(), 0.0)
 
+
+class PauseForCatQuest(unittest.TestCase):
+    """While CatQuest speaks the player holds the lines; the line it cut is played again from its
+    start, then the queue (a fake winsound: the real one is Windows only)."""
+
+    def test_cut_line_again_then_queue(self):
+        import sys
+        import tempfile
+        import threading
+        import time
+        import types
+        played, lock = [], threading.Lock()
+        fake = types.SimpleNamespace(SND_FILENAME=1, SND_ASYNC=2, SND_NODEFAULT=4)
+        def play_sound(path, flags):
+            if path:
+                with lock:
+                    played.append(Path(path).read_bytes()[-1:])     # a line's last byte names it
+        fake.PlaySound = play_sound
+        sys.modules["winsound"] = fake
+        from wcv.audio import Player, wav
+        def line(mark, secs):
+            return wav(b"\0\0" * int(8000 * secs), 8000)[:-1] + mark
+        with tempfile.TemporaryDirectory() as d:
+            p = Player(8, d)
+            p.start()
+            p.play(line(b"A", 0.6))
+            p.play(line(b"B", 0.1))
+            time.sleep(0.2)
+            self.assertTrue(p.pause())                   # A cut
+            self.assertFalse(p.pause())                  # already paused
+            time.sleep(0.3)
+            self.assertEqual(played, [b"A"])             # nothing more while paused
+            self.assertEqual(p.quiet_for(), 0.0)
+            self.assertTrue(p.resume())
+            time.sleep(1.5)
+            self.assertEqual(played, [b"A", b"A", b"B"])  # A again from its start, then B
+            p.play(line(b"C", 0.6))
+            time.sleep(0.2)
+            p.pause()
+            p.stop()                                     # a stop during a pause: nothing comes back
+            p.resume()
+            time.sleep(0.8)
+            self.assertEqual(played, [b"A", b"A", b"B", b"C"])

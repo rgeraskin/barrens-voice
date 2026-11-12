@@ -10,6 +10,7 @@ import threading
 import wave
 
 TAIL = 0.25   # seconds of silence after each line
+PAUSE_MAX = 90.0   # a pause whose "resume" never came ends by itself
 
 
 def wav(pcm: bytes, rate: int, volume: float = 1.0) -> bytes:
@@ -40,7 +41,7 @@ class Player(threading.Thread):
     """winsound cannot play from memory asynchronously (RuntimeError), and only an asynchronous
     sound can be cut: each line is written to a file first, a few names in turn."""
 
-    def __init__(self, max_queue: int = 8, folder=None):
+    def __init__(self, max_queue: int = 8, folder=None, log=None):
         super().__init__(daemon=True, name="player")
         import tempfile
         from pathlib import Path
@@ -52,11 +53,18 @@ class Player(threading.Thread):
         self.generation = 0
         self.stopped = threading.Event()
         self.playing_until = 0.0     # monotonic time the line being played ends (or ended)
+        self.log = log or (lambda *a: None)
+        self.running = threading.Event()   # cleared while paused (CatQuest speaks)
+        self.running.set()
+        self.paused_at = 0.0
+        self.current = None          # (generation, data) being played
+        self.cut_by_pause = False
+        self.again = None            # the line a pause cut: played again from its start
 
     def quiet_for(self) -> float:
         """Seconds since the last line ended; 0 while one plays or waits to."""
         import time
-        if not self.items.empty():
+        if not self.items.empty() or not self.running.is_set() or self.again is not None:
             return 0.0
         return max(0.0, time.monotonic() - self.playing_until)
 
@@ -69,11 +77,40 @@ class Player(threading.Thread):
                 self.items.get_nowait()
             except queue.Empty:
                 break
+            self.log(f"очередь звука полна ({self.max_queue}): готовая строка не прочитана")
         self.items.put((self.generation, data))
+
+    def pause(self) -> bool:
+        """Hold the lines (CatQuest speaks): the one being played is cut, to be played again from its
+        start on resume(). False if already paused."""
+        import time
+        if not self.running.is_set():
+            return False
+        self.paused_at = time.monotonic()
+        self.running.clear()
+        if self.current is not None:
+            self.cut_by_pause = True
+            self.stopped.set()
+        return True
+
+    def resume(self) -> bool:
+        """Go on: the cut line first, then the queue. False if not paused."""
+        if self.running.is_set():
+            return False
+        self.running.set()
+        return True
+
+    def _wait_running(self) -> None:
+        import time
+        while not self.running.wait(0.5):
+            if time.monotonic() - self.paused_at > PAUSE_MAX:
+                self.log(f"пауза для CatQuest дольше {PAUSE_MAX:.0f} с — продолжаю")
+                self.running.set()
 
     def stop(self) -> None:
         """Cut the line being played and forget the queue."""
         self.generation += 1
+        self.again = None
         while not self.items.empty():
             try:
                 self.items.get_nowait()
@@ -85,10 +122,19 @@ class Player(threading.Thread):
         import winsound
 
         while True:
-            generation, data = self.items.get()
+            item, self.again = self.again, None
+            if item is None:
+                item = self.items.get()
+            self._wait_running()
+            generation, data = item
             if generation != self.generation:
                 continue
             self.stopped.clear()
+            self.cut_by_pause = False
+            self.current = item
+            if not self.running.is_set():         # paused just now: before it started
+                self.current, self.again = None, item
+                continue
             self.turn = (self.turn + 1) % 3
             path = self.folder / f"line{self.turn}.wav"
             path.write_bytes(data)
@@ -100,3 +146,6 @@ class Player(threading.Thread):
             if self.stopped.wait(length):
                 winsound.PlaySound(None, 0)
                 self.playing_until = time.monotonic()
+                if self.cut_by_pause and generation == self.generation:
+                    self.again = item
+            self.current = None

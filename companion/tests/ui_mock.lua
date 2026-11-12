@@ -162,18 +162,25 @@ CatQuestCore.state = { playing = false }
 -- debug: CatQuest's speech and a held line noted in the program's log
 ns.db.debug = true
 sent = {}
+local first = {}
+ns.Strip.PushFirst = function(p) first[#first + 1] = p end
 ns.WatchCatQuest()
 assert(#sent == 0, "silent CatQuest, nothing to note at first")
+assert(#first == 1 and first[1]:find("^resume\31"), "the first check tells the program the state")
 CatQuestCore.state = { playing = true, source = "pack", startedAt = 300, duration = 34 }
 clock = 301
 ns.WatchCatQuest()
 assert(sent[1] and sent[1]:find("^diag\31") and sent[1]:find("играет: pack, 34 с — чат ждёт", 1, true), sent[1] or "nothing")
+assert(#first == 2 and first[2]:find("^pause\31"), "CatQuest speaks: the program pauses, ahead of the queue")
+ns.WatchCatQuest()
+assert(#first == 2, "a pause is sent once")
 ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "в очередь")
 assert(sent[2]:find("строка ждёт CatQuest", 1, true), sent[2] or "nothing")
 CatQuestCore.state = { playing = false }
 ns.WatchCatQuest()
 ns.ReleaseHeld()
 assert(sent[3]:find("CatQuest замолчал", 1, true) and sent[4]:find("в очередь", 1, true), tostring(sent[3]))
+assert(#first == 3 and first[3]:find("^resume\31"), "CatQuest silent: the program goes on")
 ns.Skip("свои сообщения выключены", "Вася-Степи", "|cff00ff00привет|r")
 assert(sent[5]:find("не отправлено (свои сообщения выключены): Вася: привет", 1, true), sent[5])
 ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "   ")

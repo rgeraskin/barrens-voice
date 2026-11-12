@@ -193,7 +193,18 @@ local function CatQuestState()
     return what .. (CatQuestSpeaking() and " — чат ждёт" or " — считаем зависшим, чат не ждёт")
 end
 
+-- While CatQuest speaks the program pauses: the chat line being read is cut and said again from its
+-- start once CatQuest is silent, then the queue goes on. nil at first: the first check tells the
+-- program the state either way (a /reload during a pause must not leave it paused).
+local pausedForCatQuest
+
+--- Every 0.25 s: pause or resume the program with CatQuest's speech; the debug notes.
 function ns.WatchCatQuest()
+    local speaking = ns.db.enabled and ns.db.waitForCatQuest ~= false and CatQuestSpeaking() or false
+    if speaking ~= pausedForCatQuest then
+        pausedForCatQuest = speaking
+        ns.Strip.PushFirst(table.concat({ speaking and "pause" or "resume", "", "", "", "", "", ns.LineOptions(), "-" }, SEP))
+    end
     if not ns.db.debug then catQuestSeen = nil; return end
     local now = CatQuestState()
     if now ~= catQuestSeen then

@@ -203,7 +203,7 @@ def main() -> int:
     inflector = Inflector(log, config.get("declension", True))
     inflector.load()
     from .audio import Player
-    player = Player(config["max_queue"], APP_DIR / "tmp")
+    player = Player(config["max_queue"], APP_DIR / "tmp", log=log)
     player.start()
     sapi = Speaker(config, log, accentor, player)
     sapi.start()
@@ -301,6 +301,12 @@ def main() -> int:
                         if not first:
                             engines.stop()
                             log("стоп: замолкаю")
+                    elif line and line.kind == "pause":            # state: even if first
+                        if player.pause():
+                            log("CatQuest говорит: чат на паузе")
+                    elif line and line.kind == "resume":
+                        if player.resume():
+                            log("CatQuest замолчал: чат продолжает (прерванная строка — сначала)")
                     elif line and line.kind == "reset" and not first:
                         engines.reset_assignments()
                     elif line and line.kind == "diag" and not first:

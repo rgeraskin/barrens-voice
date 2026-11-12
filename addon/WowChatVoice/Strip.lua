@@ -104,6 +104,15 @@ function S.PushNow(payload)
     lastShown = 0
 end
 
+--- Put a payload ahead of the queued ones, keeping them (a pause for CatQuest must not wait behind
+--- chat lines, nor drop them as PushNow does).
+function S.PushFirst(payload)
+    seq = (seq + 1) % 65536
+    local cells = P.Encode(seq, payload, total)
+    table.insert(queue, 1, cells)
+    while #queue > MAX_QUEUE do table.remove(queue, 2) end
+end
+
 function S.SetShown(shown)
     if frame then frame:SetShown(shown) end
 end
