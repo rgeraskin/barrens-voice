@@ -162,14 +162,8 @@ class Speaker(threading.Thread):
                 break
 
     def say(self, line) -> None:
-        while self.lines.qsize() >= self.config["max_queue"]:
-            try:
-                old = self.lines.get_nowait()
-            except queue.Empty:
-                break
-            if old is not None:
-                self.log(f"очередь полна ({self.config['max_queue']}): не прочитано: {old.sender}: {old.text[:80]}")
-        self.lines.put(line)
+        from .audio import queue_line
+        queue_line(self.lines, line, self.config["max_queue"], self.log)
 
     def _even(self, pcm: bytes, kind: str, volume: float) -> bytes:
         """The same loudness for every engine (RHVoice, Silero and Edge differ a lot), a yell

@@ -730,3 +730,58 @@ class CompanionStatus(unittest.TestCase):
             self.assertFalse(seen.seen(""))
             self.assertTrue(SeenLines(Path(d) / "seen.txt").seen("a1-1"))
 
+
+class ReplayQueue(unittest.TestCase):
+    """/wcv last: lines sent again are asked for - none dropped when the queue is full; live ones may be."""
+
+    def line(self, text, replay=False):
+        from wcv.protocol import parse
+        options = "rate=100" + (";replay=1" if replay else "")
+        return parse("\x1f".join(["party", "Вася", "Orc", "2", "WARRIOR", "", options, text]).encode())
+
+    def test_live_dropped_replayed_kept_in_order(self):
+        import queue
+        from wcv.audio import queue_line
+        q, said = queue.Queue(), []
+        for k in range(12):                                   # a replay of 12 lines at once
+            queue_line(q, self.line(f"r{k}", replay=True), 8, said.append)
+        self.assertEqual(said, [])                            # none dropped
+        queue_line(q, self.line("live1"), 8, said.append)     # live lines go on behind them
+        queue_line(q, self.line("live2"), 8, said.append)
+        texts = [q.get_nowait().text for _ in range(q.qsize())]
+        self.assertEqual(texts, [f"r{k}" for k in range(12)] + ["live1", "live2"])
+
+    def test_live_lines_keep_up(self):
+        import queue
+        from wcv.audio import queue_line
+        q, said = queue.Queue(), []
+        queue_line(q, self.line("r0", replay=True), 3, said.append)
+        for k in range(5):
+            queue_line(q, self.line(f"l{k}"), 3, said.append)
+        texts = [q.get_nowait().text for _ in range(q.qsize())]
+        self.assertEqual(texts, ["r0", "l2", "l3", "l4"])     # the oldest live ones went, the replayed one stayed
+        self.assertEqual(len(said), 2)
+
+    def test_made_audio_waits_for_room(self):
+        import tempfile
+        import threading
+        import time
+        from wcv.audio import Player
+        p = Player(2, tempfile.mkdtemp())                     # not started: nothing plays
+        p.play(b"a")
+        p.play(b"b")
+        done = threading.Event()
+        threading.Thread(target=lambda: (p.play(b"c"), done.set()), daemon=True).start()
+        time.sleep(0.2)
+        self.assertFalse(done.is_set())                       # waits instead of dropping a made line
+        p.items.get_nowait()                                  # one played
+        self.assertTrue(done.wait(1))
+        self.assertEqual([p.items.get_nowait()[1] for _ in range(p.items.qsize())], [b"b", b"c"])
+        p.play(b"d")
+        p.play(b"e")
+        stuck = threading.Event()
+        threading.Thread(target=lambda: (p.play(b"f"), stuck.set()), daemon=True).start()
+        time.sleep(0.1)
+        p.stop()                                              # a stop lets a waiting line go (dropped)
+        self.assertTrue(stuck.wait(1))
+        self.assertTrue(p.items.empty())

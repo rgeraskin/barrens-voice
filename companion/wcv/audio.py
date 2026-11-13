@@ -37,6 +37,35 @@ def seconds(data: bytes) -> float:
         return w.getnframes() / w.getframerate()
 
 
+def _replayed(line) -> bool:
+    return getattr(line, "options", {}).get("replay") == "1"
+
+
+def queue_line(lines: queue.Queue, line, limit: int, log) -> None:
+    """A chat line into an engine's queue. With `limit` live lines waiting, the oldest of them is
+    dropped - the reading keeps up with the chat - but never a line sent again by /wcv last (asked
+    for; the addon marks it replay=1): a replay waits whole and does not count toward the limit, so
+    the chat that comes meanwhile keeps its own `limit` lines behind it."""
+    if lines.qsize() >= limit:
+        waiting = []
+        while True:
+            try:
+                waiting.append(lines.get_nowait())
+            except queue.Empty:
+                break
+        live = [i for i, x in enumerate(waiting) if x is not None and not _replayed(x)]
+        dropped = set()
+        while len(live) >= limit and not _replayed(line):
+            i = live.pop(0)
+            dropped.add(i)
+            old = waiting[i]
+            log(f"очередь полна ({limit}): не прочитано: {old.sender}: {old.text[:80]}")
+        for i, x in enumerate(waiting):
+            if i not in dropped:
+                lines.put(x)
+    lines.put(line)
+
+
 class Player(threading.Thread):
     """winsound cannot play from memory asynchronously (RuntimeError), and only an asynchronous
     sound can be cut: each line is written to a file first, a few names in turn."""
@@ -69,15 +98,18 @@ class Player(threading.Thread):
         return max(0.0, time.monotonic() - self.playing_until)
 
     def play(self, data: bytes, generation: int | None = None) -> None:
-        """Queue a line; one made for an earlier generation (before a stop) is dropped."""
+        """Queue a line; one made for an earlier generation (before a stop) is dropped. With
+        max_queue lines made and waiting, it waits for room - synthesis ahead of the playing - rather
+        than lose a line already made (which lines to drop is decided before they are made:
+        queue_line)."""
+        import time
         if generation is not None and generation != self.generation:
             return
-        while self.items.qsize() >= self.max_queue:
-            try:
-                self.items.get_nowait()
-            except queue.Empty:
-                break
-            self.log(f"очередь звука полна ({self.max_queue}): готовая строка не прочитана")
+        made_for = self.generation
+        while self.items.qsize() >= self.max_queue and self.generation == made_for:
+            time.sleep(0.05)
+        if self.generation != made_for:          # a stop while it waited
+            return
         self.items.put((self.generation, data))
 
     def pause(self) -> bool:

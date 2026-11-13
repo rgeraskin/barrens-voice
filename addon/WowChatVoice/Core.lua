@@ -135,7 +135,7 @@ function ns.Send(kind, sender, race, sex, class, channel, text)
     -- an id the companion knows a line by: a line sent again is read once; the session tag keeps ids
     -- apart across /reload
     local options = ns.LineOptions() .. (";decl=%d;id=%s-%d;raw=1"):format(ns.db.declension == false and 0 or 1,
-        SESSION, lineCount)
+        SESSION, lineCount) .. (ns.replaying and ";replay=1" or "")
     -- the line as typed goes last, for the program's log: when the strip is short of room, it is
     -- what gets cut, not the text to say
     local payload = table.concat({ kind, sender or "", race or "", tostring(sex or ""), class or "",
@@ -340,12 +340,21 @@ function ns.SetVoices(value)
     end
 end
 
--- The last chat lines read, as they came (before the dictionary), for /wcv last N.
+-- The last chat lines read, as they came (before the dictionary), for /wcv last N. Kept in the saved
+-- variables (written at /reload and logout), so they outlive a /reload and a game restart - not a
+-- crash. The saved variables are the account's: another character replays the same lines.
 local HISTORY = 50
 ns.history = {}
 
+--- Take the history the saved variables kept (at load, once ns.db is there).
+function ns.RestoreHistory()
+    if type(ns.db.history) ~= "table" then ns.db.history = {} end
+    ns.history = ns.db.history
+    while #ns.history > HISTORY do table.remove(ns.history, 1) end
+end
+
 local function Remember(...)
-    table.insert(ns.history, { ... })
+    table.insert(ns.history, { n = select("#", ...), ... })   -- n: a nil (no race known) stays in place
     if #ns.history > HISTORY then table.remove(ns.history, 1) end
 end
 
@@ -356,7 +365,13 @@ function ns.Replay(n)
         print(PREFIX .. "пока нечего повторять: ни одной прочитанной строки чата.")
         return
     end
-    for i = #ns.history - n + 1, #ns.history do ns.Send(unpack(ns.history[i])) end
+    -- marked replay=1: the companion drops none of them when its queue is full (live lines it may)
+    ns.replaying = true
+    for i = #ns.history - n + 1, #ns.history do
+        local h = ns.history[i]
+        ns.Send(unpack(h, 1, h.n))
+    end
+    ns.replaying = false
     print(PREFIX .. ("повторяю последние строки: %d."):format(n))
 end
 
@@ -527,6 +542,7 @@ loader:SetScript("OnEvent", function(self, event, name, ...)
         ns.firstRun = WowChatVoiceDB == nil   -- no saved settings yet: a welcome at login
         WowChatVoiceDB = Merge(WowChatVoiceDB or {}, ns.DEFAULTS)
         ns.db = WowChatVoiceDB
+        ns.RestoreHistory()
         ns.Dictionary.Migrate(ns.db)
         ns.Dictionary.Rebuild()
         ns.Strip.Initialize()

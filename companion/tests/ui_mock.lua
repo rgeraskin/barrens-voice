@@ -455,5 +455,41 @@ GetAddOnMetadata = nil
 print = plainPrint
 print("welcome ok")
 
+-- /wcv last: the lines again, in order, marked replay=1; a sender with no race known keeps its line
+local replayed = {}
+ns.Strip.Push = function(p) replayed[#replayed + 1] = p end
+ns.db.enabled, ns.db.waitForCatQuest = true, false
+ns.history = {}
+local function remember(...) table.insert(ns.history, { n = select("#", ...), ... }) end
+remember("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "первая")
+remember("party", "Петя-Степи", nil, nil, nil, "", "вторая")       -- race not known yet
+remember("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "третья")
+local plainPrint2 = print
+print = function() end
+ns.Replay(3)
+print = plainPrint2
+assert(#replayed == 3, "all three: " .. #replayed)
+for k, word in ipairs({ "первая", "вторая", "третья" }) do
+    assert(replayed[k]:find(word, 1, true) and replayed[k]:find("replay=1", 1, true), "in order, marked: " .. k)
+end
+ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "живая")
+assert(not replayed[4]:find("replay=1", 1, true), "a live line after it: not marked")
+print("replay ok")
 
 
+-- the history outlives a /reload: it is the saved variables' table
+local kept = {}
+ns.Strip.Push = function(p) kept[#kept + 1] = p end
+ns.db.history = { { n = 7, "party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "до перезагрузки" },
+                  { n = 7, [1] = "party", [2] = "Петя-Степи", [6] = "", [7] = "без расы" } }   -- as saved, a hole kept out
+ns.RestoreHistory()
+assert(ns.history == ns.db.history, "the same table: what is added is saved")
+local quiet = print
+print = function() end
+ns.Replay(2)
+print = quiet
+assert(#kept == 2 and kept[1]:find("до перезагрузки", 1, true) and kept[2]:find("без расы", 1, true), "replayed after a reload")
+ns.db.history = "broken"
+ns.RestoreHistory()
+assert(type(ns.history) == "table" and #ns.history == 0, "a broken saved value: a fresh history")
+print("history ok")

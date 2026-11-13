@@ -12,6 +12,8 @@
 - At login the chat says whether the reading works: «озвучка чата работает», or that the companion app is not running and the chat is read as soon as it is started. The companion notes the time in a file in the addon's folder every 15 seconds, and the game reads it at login and /reload (not during play); the settings show it too.
 - A welcome on the first run: what the addon is, that the companion app does the reading, where the settings are. After an update, one line on what is new.
 - The race voices option no longer says they come from CatQuest: since 0.2.0 they come from the game's own Russian voice-over.
+- `/wcv last` no longer loses lines: a replay of more than 8 lines went past the companion's queue, and the extra ones were dropped (on a 14-line replay, 6 were); over 20 lines, the strip's queue dropped the first ones too. Replayed lines are now never dropped and do not count toward the queue's 8 live lines, and a line already made into sound waits for its turn instead of being thrown away.
+- `/wcv last` remembers the last 50 lines across /reload and a game restart: they are kept in the addon's saved settings.
 - The dictionary reads «найдется» (and «найдет», «найдешь», «найдем», «найдете») with «ё», and «еще» as «ещё».
 
 ## 0.2.0
