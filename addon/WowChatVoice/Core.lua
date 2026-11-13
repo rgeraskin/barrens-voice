@@ -17,6 +17,7 @@ ns.DEFAULTS = {
     channels = false,  -- numbered channels: General, Trade, LookingForGroup, LocalDefense ...
     emote = false,     -- /e emotes
     fadeChat = false,  -- chat windows transparent until the mouse is over them (ChatFade.lua)
+    skipAddons = true, -- lines other players' addons write for them (Questie, DBM...) are not read
     debug = false,     -- /wcv debug: why a chat line was not sent, and CatQuest's speech, to the program's log
     self = false,      -- your own lines
     onlyVisible = true, -- only lines a chat window of yours shows (its message types and channels, chat filters)
@@ -426,12 +427,37 @@ end
 
 ns.EVENTS = EVENTS   -- the chat events the addon reads (ChatFade.lua marks their lines with a filter)
 
---- Whether a chat event's line is one the addon hands to the program (the channel on, one's own
---- lines only when they are on) - for the chat windows' fading too (ChatFade.lua).
-function ns.Reads(event, guid)
+-- Addons that write into the chat for their player: party progress (Questie), boss timers (DBM,
+-- BigWigs), meters (Details!, Skada, Recount), announcers (RSA)... A line is taken for one when it
+-- starts with a raid target icon and a Latin word with a colon ("{звезда} Questie: ... 1/1"; players
+-- who put an icon first go on in Russian), or with one of these names: "<DBM>", "[Questie]",
+-- "Details!:". Lowercase, as the line is lowered to be matched.
+ns.ADDON_TAGS = {}
+-- (no names a character could have - "Nova: привет" is a player talking to Nova)
+for _, name in ipairs({ "questie", "dbm", "bigwigs", "details", "skada", "recount", "rsa",
+                        "novainstancetracker", "leatrix", "autoinvite", "elvui", "vuhdo", "healbot",
+                        "weakauras", "mrt", "exrt", "angryassign", "raidassist", "questhelper", "guidelime",
+                        "restedxp", "zygor", "lfgbulletinboard", "classicquestlog", "auctionator" }) do
+    ns.ADDON_TAGS[name] = true
+end
+
+--- The addon a chat line comes from (its name as written), or nil for a line a player typed.
+function ns.AddonLine(text)
+    if type(text) ~= "string" then return nil end
+    local name = text:match("^%s*{[^}]+}%s*(%a[%w%-]*!?)%s*:")
+    if name then return name end
+    name = text:match("^%s*[<%[]%s*(%a[%w%-]*!?)%s*[>%]]") or text:match("^%s*(%a[%w%-]*!?)%s*:")
+    if name and ns.ADDON_TAGS[(name:gsub("!$", "")):lower()] then return name end
+    return nil
+end
+
+--- Whether a chat event's line is one the addon hands to the program (the channel on, not an addon's
+--- line, one's own lines only when they are on) - for the chat windows' fading too (ChatFade.lua).
+function ns.Reads(event, guid, text)
     local db = ns.db
     local key = EVENTS[event]
     if not (db and db.enabled and key and db[key]) then return false end
+    if db.skipAddons ~= false and ns.AddonLine(text) then return false end
     return db.self or not (guid and guid ~= "" and guid == UnitGUID("player"))
 end
 
@@ -442,6 +468,11 @@ local function OnChat(event, text, sender, _, channelString, _, _, _, _, _, _, _
     if not db[key] then ns.Skip("тип чата выключен в настройках: " .. key, sender, text) return end
     if guid and guid ~= "" and guid == UnitGUID("player") and not db.self then
         ns.Skip("свои сообщения выключены", sender, text)
+        return
+    end
+    local addon = db.skipAddons ~= false and ns.AddonLine(text)
+    if addon then
+        ns.Skip("сообщение аддона " .. addon, sender, text)
         return
     end
     local race, sex, class

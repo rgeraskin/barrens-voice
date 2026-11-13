@@ -127,9 +127,9 @@ local function Hook(cf)
 end
 
 --- The chat filter: never hides a line, only marks the window with whether the addon reads it.
-function F.Filter(frame, event, _, _, ...)
+function F.Filter(frame, event, text, _, ...)
     if ns.askingFilters then return false end    -- Core's "is it visible" check calls the filters too
-    marks[frame] = { read = ns.Reads(event, (select(10, ...))), at = GetTime() }
+    marks[frame] = { read = ns.Reads(event, (select(10, ...)), text), at = GetTime() }
     return false
 end
 

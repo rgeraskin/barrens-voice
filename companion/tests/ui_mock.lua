@@ -476,6 +476,22 @@ ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "живая")
 assert(not replayed[4]:find("replay=1", 1, true), "a live line after it: not marked")
 print("replay ok")
 
+-- lines other players' addons write: not read (Questie, DBM...), a player's own words are
+local AL = ns.AddonLine
+assert(AL("{звезда} Questie: Сердце Тарагамана Ненасытного: 1/1 для |cffffff00|Hquest:5761:0|h[Убить тварь]|h|r!") == "Questie")
+assert(AL("{rt1} Interrupted: Fireball") == "Interrupted", "an icon and a Latin word with a colon")
+assert(AL("<DBM> Pull in 5") == "DBM" and AL("[Questie] accepted") == "Questie" and AL("Details!: Damage Done") == "Details!")
+assert(AL("Полуказуальная RU/UA гильдия <MIR> ищет игроков!") == nil, "a guild tag inside a player's line")
+assert(AL("[UA] Спільнота < ХАОС > запрошує") == nil, "[UA] is no addon")
+assert(AL("{череп} танк: бери этого") == nil, "an icon, then Russian: a player")
+assert(AL("WTS: сумки") == nil and AL("Nova: привет") == nil, "a Latin word with a colon that is no addon")
+ns.db.enabled, ns.db.party, ns.db.self = true, true, false
+assert(not ns.Reads("CHAT_MSG_PARTY", "Player-1-9", "{звезда} Questie: Баззалан – убито: 1/1"), "not read")
+assert(ns.Reads("CHAT_MSG_PARTY", "Player-1-9", "кто идёт в ОП?"), "a player's line: read")
+ns.db.skipAddons = false
+assert(ns.Reads("CHAT_MSG_PARTY", "Player-1-9", "{звезда} Questie: Баззалан – убито: 1/1"), "the setting off: read")
+ns.db.skipAddons = true
+print("addon lines ok")
 
 -- the history outlives a /reload: it is the saved variables' table
 local kept = {}

@@ -13,6 +13,7 @@
 - A welcome on the first run: what the addon is, that the companion app does the reading, where the settings are. After an update, one line on what is new.
 - The race voices option no longer says they come from CatQuest: since 0.2.0 they come from the game's own Russian voice-over.
 - `/wcv last` no longer loses lines: a replay of more than 8 lines went past the companion's queue, and the extra ones were dropped (on a 14-line replay, 6 were); over 20 lines, the strip's queue dropped the first ones too. Replayed lines are now never dropped and do not count toward the queue's 8 live lines, and a line already made into sound waits for its turn instead of being thrown away.
+- Lines other players' addons write into the chat for them — Questie's party progress («{звезда} Questie: … 1/1»), DBM, BigWigs, Details! and others — are no longer read («Не читать сообщения аддонов», on by default): with Questie on two players in a group each progress line was read twice.
 - `/wcv last` remembers the last 50 lines across /reload and a game restart: they are kept in the addon's saved settings.
 - The dictionary reads «найдется» (and «найдет», «найдешь», «найдем», «найдете») with «ё», and «еще» as «ещё».
 
