@@ -223,6 +223,8 @@ class DictionaryInCompanion(unittest.TestCase):
         self.assertEqual(plain("на пикабу"), "на пикаб+у")
         self.assertEqual(plain("в 20 по мск"), "в 20 по эм-эс-к+а")
         self.assertEqual(plain("кто сдал кв? квас и квартира"), "кто сдал квест? квас и квартира")
+        self.assertEqual(plain("найдется кто? предмет найден"), "найдётся кто? предмет найден")
+        self.assertEqual(plain("кто еще идёт? Еще один"), "кто ещё идёт? ещё один")
         self.assertEqual(d.apply_words("кто танчит? я танчу, вчера танчила"), "кто т+анчит? я т+анчу, вчера т+анчила")
         self.assertEqual(d.apply("за 5к"), "за 5000")                                           # a default regex
         from wcv.dictionary import plurals

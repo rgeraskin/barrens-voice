@@ -8,6 +8,7 @@
 - The program learns where the strip is from the addon, which tells it before moving the strip, on the strip where it still is; no chat line is lost while it moves. If the program misses that, or is started while the game runs, it reads the place from the addon's saved settings, and failing that finds the strip anywhere in the game window within seconds.
 - The dictionary reads «кв» as «квест», and a number before «шт» as so many pieces in the right form: «6шт» — «шесть штук», «1 шт.» — «одна штука».
 - A quest's number that quest addons put after its name in chat («[[25] Свиток с рунами (3513)]») is no longer read out.
+- The dictionary reads «найдется» (and «найдет», «найдешь», «найдем», «найдете») with «ё», and «еще» as «ещё».
 
 ## 0.2.0
 
