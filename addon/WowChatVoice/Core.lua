@@ -68,6 +68,13 @@ local SEP = "\31"
 local VERBS = { say = "говорит", yell = "кричит", whisper = "шепчет", test = "говорит" }
 local PREFIX = "|cff66ccffWoW Chat Voice|r: "
 
+--- A line that is nothing but a question or questions ("кто в ОП?", "танк нужен? хил?"): no full stop,
+--- exclamation mark or ellipsis anywhere, and it ends with "?". The voices rise at a question mark
+--- unevenly, so such a line is announced "спрашивает" - the ear gets it from the verb.
+function ns.IsQuestion(text)
+    return type(text) == "string" and text:find("%?%s*$") ~= nil and not text:find("[%.!…]")
+end
+
 --- Chat text without the client's markup: colours, links (their visible text kept), textures,
 --- atlases and raid target icons ({rt1}, {череп}).
 function ns.Clean(text)
@@ -127,7 +134,9 @@ function ns.Send(kind, sender, race, sex, class, channel, text)
         if kind == "emote" then
             text = name .. KEPT_NAME_MARK .. " " .. text   -- "Вася смеётся"
         elseif ns.db.sayVerb then
-            text = name .. " " .. (VERBS[kind] or "пишет") .. ":" .. NAME_MARK .. " " .. text
+            local verb = VERBS[kind] or "пишет"
+            if kind ~= "yell" and kind ~= "whisper" and ns.IsQuestion(text) then verb = "спрашивает" end
+            text = name .. " " .. verb .. ":" .. NAME_MARK .. " " .. text
         else
             text = name .. ":" .. NAME_MARK .. " " .. text
         end

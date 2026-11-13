@@ -221,6 +221,15 @@ end
 ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "привет")
 ns.Send("emote", "Вася-Степи", "Orc", 2, "WARRIOR", "", "смеётся")
 assert(said(1) == "Вася пишет:\4 привет", said(1))
+assert(ns.IsQuestion("кто в ОП?") and ns.IsQuestion("танк нужен? хил?") and ns.IsQuestion("где? ") and ns.IsQuestion("что???"))
+assert(not ns.IsQuestion("привет. кто идёт?") and not ns.IsQuestion("ура! кто со мной?") and not ns.IsQuestion("кто в ОП")
+    and not ns.IsQuestion("ну... кто?") and not ns.IsQuestion("5.5 кто?"), "other sentences: no")
+ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "кто идёт в ОП?")
+ns.Send("say", "Вася-Степи", "Orc", 2, "WARRIOR", "", "что тут?")
+ns.Send("yell", "Вася-Степи", "Orc", 2, "WARRIOR", "", "что тут?")
+ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "привет, кто идёт?!")
+assert(said(3) == "Вася спрашивает:\4 кто идёт в ОП?" and said(4) == "Вася спрашивает:\4 что тут?"
+    and said(5) == "Вася кричит:\4 что тут?" and said(6) == "Вася пишет:\4 привет, кто идёт?!", said(3) .. " | " .. said(4) .. " | " .. said(5) .. " | " .. said(6))
 assert(said(2) == "Вася\5 смеётся", said(2))                               -- an emote: a name never dropped
 print("continue ok")
 
