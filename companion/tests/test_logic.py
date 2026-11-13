@@ -785,3 +785,34 @@ class ReplayQueue(unittest.TestCase):
         p.stop()                                              # a stop lets a waiting line go (dropped)
         self.assertTrue(stuck.wait(1))
         self.assertTrue(p.items.empty())
+
+
+class StderrLog(unittest.TestCase):
+    def test_lines_kept_progress_bars_collapsed(self):
+        import io
+        import tempfile
+        from wcv import __main__ as m
+        with tempfile.TemporaryDirectory() as d:
+            old_dir, old_file, old_day = m.LOG_DIR, m._log_file, m._log_day
+            m.LOG_DIR, m._log_file, m._log_day = Path(d), None, None
+            try:
+                console = io.StringIO()
+                err = m.StderrToLog(console)
+                err.write("W1113 torch: a warning\n")
+                err.write("Loading weights:   0%|    | 0/587\r")
+                err.write("Loading weights:  50%|##  | 290/587\r")
+                err.write("Loading weights: 100%|####| 587/587\n")
+                err.write("half a li")
+                err.write("ne\n")
+                err.flush()
+                self.assertIn("a warning", console.getvalue())                  # the console still gets it all
+                self.assertIn("0/587", console.getvalue())
+                m._log_file.close()
+                text = next(Path(d).glob("wcv-*.log")).read_text(encoding="utf-8")
+                lines = [l[9:] for l in text.splitlines()]
+                self.assertEqual(lines, ["[stderr] W1113 torch: a warning",
+                                         "[stderr] Loading weights: 100%|####| 587/587", "[stderr] half a line"])
+            finally:
+                if m._log_file:
+                    m._log_file.close()
+                m.LOG_DIR, m._log_file, m._log_day = old_dir, old_file, old_day

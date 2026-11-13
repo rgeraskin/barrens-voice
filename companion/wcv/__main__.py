@@ -10,6 +10,7 @@ import json
 import os
 import re
 import sys
+import threading
 import time
 from datetime import datetime
 from pathlib import Path
@@ -76,23 +77,66 @@ _log_file = None
 _log_day = None
 
 
-def log(message: str) -> None:
-    """To the console and to logs/wcv-YYYY-MM-DD.log (appended: one file a day, kept for later)."""
+_log_lock = threading.Lock()
+
+
+def _write_log_file(line: str, now: datetime) -> None:
+    """One line into logs/wcv-YYYY-MM-DD.log (appended: one file a day, kept for later)."""
     global _log_file, _log_day
+    with _log_lock:
+        try:
+            day = f"{now:%Y-%m-%d}"
+            if day != _log_day:
+                if _log_file is not None:
+                    _log_file.close()
+                LOG_DIR.mkdir(exist_ok=True)
+                _log_file = open(LOG_DIR / f"wcv-{day}.log", "a", encoding="utf-8", buffering=1)
+                _log_day = day
+            _log_file.write(line + "\n")
+        except OSError:
+            pass
+
+
+def log(message: str) -> None:
+    """To the console and to logs/wcv-YYYY-MM-DD.log."""
     now = datetime.now()
     line = f"{now:%H:%M:%S} {message}"
     print(line, flush=True)
-    try:
-        day = f"{now:%Y-%m-%d}"
-        if day != _log_day:
-            if _log_file is not None:
-                _log_file.close()
-            LOG_DIR.mkdir(exist_ok=True)
-            _log_file = open(LOG_DIR / f"wcv-{day}.log", "a", encoding="utf-8", buffering=1)
-            _log_day = day
-        _log_file.write(line + "\n")
-    except OSError:
-        pass
+    _write_log_file(line, now)
+
+
+class StderrToLog:
+    """What the libraries write to stderr (warnings of torch and transformers, errors outside the
+    program's own logging) goes to the console as before and to the log file too, a line at a time
+    with the time. A progress bar redraws its line with "\\r": only the finished line is kept."""
+
+    def __init__(self, console):
+        self.console, self.pending = console, ""
+
+    def write(self, text: str) -> int:
+        try:
+            self.console.write(text)
+        except (OSError, ValueError):
+            pass
+        self.pending += text
+        while "\n" in self.pending:
+            line, self.pending = self.pending.split("\n", 1)
+            line = line.split("\r")[-1].rstrip()
+            if line:
+                now = datetime.now()
+                _write_log_file(f"{now:%H:%M:%S} [stderr] {line}", now)
+        if "\r" in self.pending:                       # a bar redrawing itself: only its last state counts
+            self.pending = self.pending.rsplit("\r", 1)[-1]
+        return len(text)
+
+    def flush(self) -> None:
+        try:
+            self.console.flush()
+        except (OSError, ValueError):
+            pass
+
+    def __getattr__(self, name):                        # isatty, encoding, fileno... as the console has them
+        return getattr(self.console, name)
 
 
 def prune_logs(keep_days: int) -> None:
@@ -166,6 +210,8 @@ def main() -> int:
         return 1
     offline = offline_models()
     install_crash_logging()
+    if not isinstance(sys.stderr, StderrToLog):
+        sys.stderr = StderrToLog(sys.stderr)
     from .speech import Speaker
     from .capture import Capturer
     from .window import make_dpi_aware

@@ -17,6 +17,7 @@
 - `/wcv last` remembers the last 50 lines across /reload and a game restart: they are kept in the addon's saved settings.
 - The dictionary reads «найдется» (and «найдет», «найдешь», «найдем», «найдете») with «ё», and «еще» as «ещё».
 - The companion keeps every model in one Hugging Face cache (`hf_home`, by default the `hf` folder next to it): Whisper, used to build the voice bank, lay in the system's cache apart from F5 and Vocos.
+- Warnings and errors the libraries write to stderr (torch, transformers) go into the companion's log file too, marked `[stderr]`.
 
 ## 0.2.0
 
