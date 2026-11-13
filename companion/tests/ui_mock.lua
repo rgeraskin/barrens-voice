@@ -43,7 +43,7 @@ C_Timer = { NewTimer = function(_, f) return { Cancel = function() end } end, Ne
             After = function(_, f) f() end }
 Settings = { RegisterCanvasLayoutCategory = function() return {} end, RegisterAddOnCategory = function() end }
 local ns = {}
-for _, f in ipairs({ "Protocol.lua", "Strip.lua", "Dictionary.lua", "VoiceList.lua", "Core.lua", "ChatFade.lua", "UI.lua",
+for _, f in ipairs({ "Protocol.lua", "Strip.lua", "Dictionary.lua", "VoiceList.lua", "Core.lua", "ChatFade.lua", "CompanionStatus.lua", "Companion.lua", "UI.lua",
                      "DictionaryWindow.lua", "StripWindow.lua", "Options.lua", "VoicesWindow.lua", "Minimap.lua" }) do
     assert(loadfile(f))("WowChatVoice", ns)
 end
@@ -398,7 +398,62 @@ assert(ChatFrame1:GetAlpha() == 1, "the setting off: the chat as it was")
 assert(editBox:GetAlpha() == 1, "and its edit box")
 print("chat fade ok")
 
+-- is the companion running: the time it writes into CompanionStatus.lua, read when the addon loads
+local said, realPrint = {}, print
+print = function(text) said[#said + 1] = text end
+local Co = ns.Companion
+Co.Read({ beat = 1000 }, 1010)
+assert(Co.State() == "running", "a fresh time: running")
+Co.SayAtLogin()
+assert(said[1]:find("озвучка чата работает"), tostring(said[1]))
+Co.Read({ beat = 1000 }, 1100)
+assert(Co.State() == "stopped", "a time over 45 s old: not running")
+Co.Read(nil, 1100)
+assert(Co.State() == "stopped", "no time at all (the file as shipped): not running")
+Co.SayAtLogin()
+assert(said[2]:find("приложение%-компаньон WoW Chat Voice не запущено — чат будет озвучиваться, как только"), tostring(said[2]))
+assert(Co.Describe():find("не был запущен"), Co.Describe())
+-- not running at login: the transparent chat is hidden all the same (a companion started later reads it)
+ns.db.fadeChat = true
+ChatFrame1:SetAlpha(1)
+now = now + 20                               -- past the 10 s the last line not read showed the window for
+for _ = 1, 10 do ns.ChatFade.Update(nil, 0.3) end
+assert(ChatFrame1:GetAlpha() == 0, "the setting decides, not a state that may be old")
+ns.db.fadeChat = false
+ns.ChatFade.Apply()
+Co.Read({ beat = 1000 }, 1010)
+print = realPrint
+print("companion ok")
 
+-- the word at login: the welcome on the first run, a line after an update, then the companion's line
+local welcome, plainPrint = {}, print
+print = function(text) welcome[#welcome + 1] = text end
+GetAddOnMetadata = function() return "0.2.1" end
+ns.firstRun, ns.db.seenVersion = true, nil
+ns.LoginWord()
+assert(#welcome == 4 and welcome[1]:find("добро пожаловать") and welcome[2]:find("приложение%-компаньон")
+    and welcome[4]:find("озвучка чата"), "welcome, then whether the reading works")
+assert(ns.db.seenVersion == "0.2.1", "the version is kept")
+ns.firstRun = false
+welcome = {}
+ns.LoginWord()
+assert(#welcome == 1 and welcome[1]:find("озвучка чата"), "the same version again: only whether the reading works")
+welcome = {}
+ns.db.seenVersion = "0.2.0"                  -- an update
+ns.LoginWord()
+assert(#welcome == 2 and welcome[1]:find("обновление 0.2.1: окно чата можно прятать"), tostring(welcome[1]))
+ns.db.seenVersion = nil                      -- from a version before the line was there: the line too
+welcome = {}
+ns.LoginWord()
+assert(#welcome == 2 and welcome[1]:find("обновление 0.2.1"), "an update from before 0.2.1")
+GetAddOnMetadata = function() return "9.9.9" end
+ns.db.seenVersion = "0.2.1"
+welcome = {}
+ns.LoginWord()
+assert(welcome[1]:find("что нового — в описании аддона"), "a version with no news of its own")
+GetAddOnMetadata = nil
+print = plainPrint
+print("welcome ok")
 
 
 

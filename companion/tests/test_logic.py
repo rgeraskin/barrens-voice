@@ -698,3 +698,35 @@ class PauseForCatQuest(unittest.TestCase):
             time.sleep(0.8)
             self.assertEqual(played, [b"A", b"A", b"B", b"C"])
 
+
+class CompanionStatus(unittest.TestCase):
+    """The companion's word to the addon: the time in CompanionStatus.lua, read by the game at login."""
+
+    def test_written_as_lua_the_addon_reads(self):
+        import re
+        import tempfile
+        from wcv import status
+        with tempfile.TemporaryDirectory() as d:
+            self.assertTrue(status.write(Path(d), now=1234567890))
+            text = (Path(d) / status.FILE).read_text(encoding="utf-8")
+            self.assertRegex(text, r"\nWowChatVoiceStatus = \{ beat = 1234567890 \}\n")
+            self.assertFalse((Path(d) / "CompanionStatus.tmp").exists())          # written whole, then swapped in
+
+    def test_shipped_file_matches(self):
+        # the addon ships the file (so it exists when the game starts) under the same name
+        from wcv import status
+        shipped = Path(__file__).resolve().parents[2] / "addon" / "WowChatVoice" / status.FILE
+        self.assertIn("WowChatVoiceStatus = nil", shipped.read_text(encoding="utf-8"))
+        toc = (shipped.parent / "WowChatVoice.toc").read_text(encoding="utf-8")
+        self.assertLess(toc.index(status.FILE), toc.index("Companion.lua\n"))     # read before the module
+
+    def test_lines_read_once_across_restarts(self):
+        import tempfile
+        from wcv.status import SeenLines
+        with tempfile.TemporaryDirectory() as d:
+            seen = SeenLines(Path(d) / "seen.txt")
+            self.assertFalse(seen.seen("a1-1"))
+            self.assertTrue(seen.seen("a1-1"))
+            self.assertFalse(seen.seen(""))
+            self.assertTrue(SeenLines(Path(d) / "seen.txt").seen("a1-1"))
+

@@ -13,6 +13,8 @@ Dictionary.lua
 VoiceList.lua
 Core.lua
 ChatFade.lua
+CompanionStatus.lua
+Companion.lua
 UI.lua
 DictionaryWindow.lua
 StripWindow.lua

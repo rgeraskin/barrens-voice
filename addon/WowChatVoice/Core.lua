@@ -112,6 +112,9 @@ end
 -- to the name ("Лок" stays a name).
 local NAME_MARK, KEPT_NAME_MARK = "\4", "\5"
 
+local SESSION = ("%x%02x"):format((time and time() or 0) % 0x100000, math.random(0, 255))
+local lineCount = 0
+
 function ns.Send(kind, sender, race, sex, class, channel, text)
     local raw = (text or ""):gsub(SEP, " ")
     text = ns.Clean(text or "")          -- the dictionary is the program's (it reads Dictionary.lua itself)
@@ -128,7 +131,11 @@ function ns.Send(kind, sender, race, sex, class, channel, text)
             text = name .. ":" .. NAME_MARK .. " " .. text
         end
     end
-    local options = ns.LineOptions() .. (";decl=%d;raw=1"):format(ns.db.declension == false and 0 or 1)
+    lineCount = lineCount + 1
+    -- an id the companion knows a line by: a line sent again is read once; the session tag keeps ids
+    -- apart across /reload
+    local options = ns.LineOptions() .. (";decl=%d;id=%s-%d;raw=1"):format(ns.db.declension == false and 0 or 1,
+        SESSION, lineCount)
     -- the line as typed goes last, for the program's log: when the strip is short of room, it is
     -- what gets cut, not the text to say
     local payload = table.concat({ kind, sender or "", race or "", tostring(sex or ""), class or "",
@@ -450,6 +457,42 @@ function ns.Stop()
     ns.Strip.PushNow(table.concat({ "stop", "", "", "", "", "", options, "-" }, SEP))
 end
 
+local function Version()
+    local meta = C_AddOns and C_AddOns.GetAddOnMetadata or GetAddOnMetadata
+    return meta and meta(ADDON, "Version") or "?"
+end
+
+-- What a version brought, in a few words, for the line after an update (CHANGELOG.md has it all).
+ns.NEWS = {
+    ["0.2.1"] = "окно чата можно прятать, пока на нём нет мыши; мост к компаньону можно перенести; при входе видно, "
+        .. "работает ли озвучка",
+}
+
+--- The word at login: the welcome on the first run, a line on what is new after an update (the
+--- version last seen is kept), and every time whether the reading works (Companion.lua).
+function ns.LoginWord()
+    local version = Version()
+    if ns.firstRun then
+        ns.Welcome()
+    elseif ns.db.seenVersion ~= version then
+        print(PREFIX .. ("обновление %s: %s. Настройки — /wcv."):format(version, ns.NEWS[version]
+            or "что нового — в описании аддона"))
+    end
+    ns.db.seenVersion = version
+    if ns.Companion then ns.Companion.SayAtLogin() end      -- a file new in 0.2.1: after a game restart
+end
+
+--- The first run's word (as CatQuest does it): what this is, that it needs the companion app, where
+--- the settings are.
+function ns.Welcome()
+    local version = Version()
+    print(PREFIX .. ("|cffffd100добро пожаловать!|r WoW Chat Voice %s — озвучка чата: у каждого игрока свой голос "
+        .. "его расы и пола."):format(version))
+    print(PREFIX .. "читает вслух приложение-компаньон WoW Chat Voice (Windows): без него аддон молчит. Удобнее всего "
+        .. "запускать игру через него — оно само запустит игру.")
+    print(PREFIX .. "настройки — значок у миникарты или /wcv; команды — /wcv help.")
+end
+
 function ns.SetEnabled(enabled)
     ns.db.enabled = enabled and true or false
     if ns.db.enabled then
@@ -481,6 +524,7 @@ loader:RegisterEvent("ADDON_LOADED")
 loader:SetScript("OnEvent", function(self, event, name, ...)
     if event == "ADDON_LOADED" then
         if name ~= ADDON then return end
+        ns.firstRun = WowChatVoiceDB == nil   -- no saved settings yet: a welcome at login
         WowChatVoiceDB = Merge(WowChatVoiceDB or {}, ns.DEFAULTS)
         ns.db = WowChatVoiceDB
         ns.Dictionary.Migrate(ns.db)
@@ -495,6 +539,7 @@ loader:SetScript("OnEvent", function(self, event, name, ...)
         return
     end
     if event == "PLAYER_LOGIN" then
+        ns.LoginWord()
         ns.SendControl()   -- the companion loads the voices chosen here
         ns.SendDictionary(true)
         -- the layer the saved variables hold now (they are written at login and /reload)

@@ -184,13 +184,18 @@ def main() -> int:
     log(f"запуск; настройки: {CONFIG_PATH}")
     prune_logs(config["log_keep_days"])
     from . import launch
+    from .status import Beat, SeenLines
+    from .voicelist import find_addon
+    # "the companion is running", for the addon at login (status.py): from now on, before the game
+    # is launched and while the models load
+    Beat(find_addon(config), log).start()
+    seen_lines = SeenLines(APP_DIR / "tmp" / "seen_lines.txt")
     if config["launch_wow"] and not launch.wow_running():
         # the race voices come from the client's files: (re)made before the game, after an update
         from .f5engine import prepare_voices
         prepare_voices(config, APP_DIR, log)
         launch.launch(config, log)   # the game starts while the voices load
     from .dictionary import Dictionary
-    from .voicelist import find_addon
     dictionary = Dictionary(config, log, find_addon(config))
     dictionary.refresh()
     dictionary_checked = time.monotonic()
@@ -346,6 +351,9 @@ def main() -> int:
                         if line.kind not in unknown_kinds:
                             unknown_kinds.add(line.kind)
                             log(f"строки типа «{line.kind}» не озвучиваю (аддон новее программы?)")
+                    elif line and line.text and not first and seen_lines.seen(line.options.get("id", "")):
+                        # a line the addon sent again: this one was read already
+                        log(f"строка {line.options.get('id')} уже прочитана — пропускаю повтор")
                     elif line and line.text and not first:
                         speaker_key = (line.kind, line.sender, line.channel)
                         continuing = (speaker_key == last_speaker

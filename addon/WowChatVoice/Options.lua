@@ -28,12 +28,15 @@ local CHANNELS = {
     { "self", "Свои сообщения", "Читать и ваши собственные строки." },
 }
 
-local window, toggle, verb, lastNames
+local window, toggle, verb, lastNames, programState
 local checks, radios, sliders = {}, {}, {}
 
 local function Refresh()
     if not window then return end
     toggle:SetText(ns.db.enabled and "|cff40ff40Озвучка чата включена|r" or "|cffff5050Озвучка чата выключена|r")
+    if programState then
+        programState:SetText("Озвучка: " .. (ns.Companion and ns.Companion.Describe() or "|cffaaaaaaне проверить|r"))
+    end
     for _, c in ipairs(checks) do c.refresh() end
     UI.SetCheckEnabled(verb, ns.db.sayNames)
     UI.SetCheckEnabled(lastNames, ns.db.sayNames)
@@ -211,6 +214,14 @@ local function Build()
     stripNote:SetJustifyH("LEFT")
     stripNote:SetText("Тонкая линия у края экрана, через которую аддон передаёт чат компаньону. Перенесите, "
         .. "если её закрывает другой аддон.")
+    programState = window:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    programState:SetPoint("TOPLEFT", 22, y - 34)
+    programState:SetWidth(376)
+    programState:SetJustifyH("LEFT")
+    UI.TextTooltip(window, programState, "Работало ли приложение-компаньон WoW Chat Voice, которое читает чат вслух, "
+        .. "когда вы входили в игру: оно раз в 15 секунд отмечается в файле в папке аддона, а игра читает этот файл "
+        .. "при входе и /reload. Запущенный позже компаньон тоже читает чат — аддон просто узнает об этом при "
+        .. "следующем /reload.")
     local strip = UI.Button(window, "Мост…", 110, function()
         if ns.StripWindow then
             ns.StripWindow.Toggle()
@@ -221,7 +232,7 @@ local function Build()
     UI.Tooltip(strip, ns.BRIDGE_TIP)
     UI.TextTooltip(window, stripNote, ns.BRIDGE_TIP)
     strip:SetPoint("TOPRIGHT", -18, y)
-    y = y - 44
+    y = y - 60
 
     window:SetHeight(-y + 10)
 
