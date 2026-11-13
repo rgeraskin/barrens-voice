@@ -10,7 +10,7 @@ ns.Options = O
 local TITLE = "WoW Chat Voice"
 
 -- What "Мост" is, for the player (the settings' button and the bridge window).
-ns.BRIDGE_TIP = "Мост — то, через что аддон передаёт строки чата программе-компаньону, которая читает их вслух: тонкая тёмная линия у края экрана. Программа видит окно игры и читает эту линию — другого пути наружу у аддонов WoW нет. Если линию закрывает другой аддон (рисует что-то в том же месте), чат перестаёт читаться — тогда перенесите её."
+ns.BRIDGE_TIP = "Мост — то, через что аддон передаёт строки чата приложению-компаньону WoW Chat Voice, которое читает их вслух: тонкая тёмная линия у края экрана. Компаньон видит окно игры и читает эту линию — другого пути наружу у аддонов WoW нет. Если линию закрывает другой аддон (рисует что-то в том же месте), чат перестаёт читаться — тогда перенесите её."
 
 -- Channels, in two columns: setting, label, tooltip.
 local CHANNELS = {
@@ -67,13 +67,13 @@ local function Build()
     local get, set = Setting("minimapIcon", function() ns.Minimap.Update() end)
     checks[#checks + 1] = UI.Check(window, 262, y - 3, "Значок у миникарты",
         "ЛКМ — эти настройки, ПКМ — включить или выключить озвучку.", get, set)
-    UI.Tooltip(toggle, "Включить или выключить всю озвучку: мост к программе (линию у края экрана) и передачу чата "
-        .. "программе. То же — ПКМ по значку у миникарты или /wcv on, /wcv off.")
+    UI.Tooltip(toggle, "Включить или выключить всю озвучку: мост к компаньону (линию у края экрана) и передачу чата "
+        .. "ему. То же — ПКМ по значку у миникарты или /wcv on, /wcv off.")
     y = y - 38
 
     -- Second row, lined up with the first: try it, and hand the race voices out afresh.
     StaticPopupDialogs["WOWCHATVOICE_RESET"] = {
-        text = "Раздать голоса рас заново?\n\nПрограмма забудет, у кого какой голос был, и выдаст их снова — "
+        text = "Раздать голоса рас заново?\n\nКомпаньон забудет, у кого какой голос был, и выдаст их снова — "
             .. "так же, без повторов, начиная с тех, кто заговорит первым.",
         button1 = YES, button2 = NO,
         OnAccept = function() ns.ResetVoices() end,
@@ -84,7 +84,7 @@ local function Build()
     UI.Tooltip(test, "Четыре тестовые строки разными голосами (/wcv test). Все команды — /wcv help.")
     local reset = UI.Button(window, "Перераздать голоса", 140, function() StaticPopup_Show("WOWCHATVOICE_RESET") end)
     reset:SetPoint("TOPRIGHT", -18, y)
-    UI.Tooltip(reset, "Голос расы закрепляется за персонажем навсегда (файл assignments.json программы). "
+    UI.Tooltip(reset, "Голос расы закрепляется за персонажем навсегда (файл assignments.json компаньона). "
         .. "Кнопка раздаёт голоса рас заново — например, после смены настроек голосов. То же — /wcv reset.")
     y = y - 40
 
@@ -114,7 +114,7 @@ local function Build()
         .. "говорит (/s), кричит (/y), шепчет (шёпот), пишет (остальные каналы).", get, set)
     checks[#checks + 1] = verb
     get, set = Setting("declension")
-    checks[#checks + 1] = UI.Check(window, 18, y - 72, "Склонять замены после предлогов", "Программа ставит замены "
+    checks[#checks + 1] = UI.Check(window, 18, y - 72, "Склонять замены после предлогов", "Компаньон ставит замены "
         .. "словаря в нужный падеж по предлогу перед ними: «в ОП» — «в Огненную пропасть», «для дд» — «для "
         .. "дамагера» (pymorphy3).", get, set)
     get, set = Setting("waitForCatQuest")
@@ -142,8 +142,8 @@ local function Build()
         UI.Tooltip(r, tip)
         radios[value] = r
     end
-    Radio("f5", "Расы", "Голоса рас из аддона CatQuest через нейросеть F5-TTS: у каждого персонажа свой голос его "
-        .. "расы и пола. Нужна видеокарта NVIDIA; без неё программа читает голосами Windows.", 76)
+    Radio("f5", "Расы", "Голоса рас из русской озвучки самой игры через нейросеть F5-TTS: у каждого персонажа свой голос его "
+        .. "расы и пола. Нужна видеокарта NVIDIA; без неё компаньон читает голосами Windows.", 76)
     Radio("sapi", "Windows", "Русские голоса Windows (RHVoice, Silero, Edge): каждому игроку свой голос по имени и "
         .. "полу. Какие раздавать — кнопка справа.", 146)
     local pick = UI.Button(window, "Голоса Windows…", 140, function() ns.VoicesWindow.Toggle() end)
@@ -198,12 +198,12 @@ local function Build()
     dict:SetPoint("TOPRIGHT", -18, y)
     y = y - 44
 
-    y = UI.Header(window, "Мост к программе", y)
+    y = UI.Header(window, "Мост к компаньону", y)
     local stripNote = window:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     stripNote:SetPoint("TOPLEFT", 22, y - 4)
     stripNote:SetWidth(220)
     stripNote:SetJustifyH("LEFT")
-    stripNote:SetText("Тонкая линия у края экрана, через которую аддон передаёт чат программе. Перенесите, "
+    stripNote:SetText("Тонкая линия у края экрана, через которую аддон передаёт чат компаньону. Перенесите, "
         .. "если её закрывает другой аддон.")
     local strip = UI.Button(window, "Мост…", 110, function()
         if ns.StripWindow then

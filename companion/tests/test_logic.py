@@ -697,3 +697,4 @@ class PauseForCatQuest(unittest.TestCase):
             p.resume()
             time.sleep(0.8)
             self.assertEqual(played, [b"A", b"A", b"B", b"C"])
+

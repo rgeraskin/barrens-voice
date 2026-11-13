@@ -146,7 +146,7 @@ local function Build()
     empty = window:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     empty:SetPoint("CENTER")
     empty:SetWidth(320)
-    empty:SetText("Список пуст: запустите программу озвучки (она запишет голоса в аддон) и сделайте /reload.")
+    empty:SetText("Список пуст: запустите приложение-компаньон (оно запишет голоса в аддон) и сделайте /reload.")
 
     window:SetScript("OnShow", Refresh)
 end

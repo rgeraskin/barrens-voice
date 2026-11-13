@@ -326,9 +326,9 @@ function ns.SetVoices(value)
     ns.db.voices = value
     ns.SendControl()
     if value == "f5" then
-        print(PREFIX .. "голоса рас (CatQuest). Программа загружает модель — около 15 секунд, пока читают голоса Windows.")
+        print(PREFIX .. "голоса рас. Компаньон загружает модель — около 15 секунд, пока читают голоса Windows.")
     else
-        print(PREFIX .. "голоса Windows. Программа выгружает модель голосов рас.")
+        print(PREFIX .. "голоса Windows. Компаньон выгружает модель голосов рас.")
     end
 end
 
@@ -512,7 +512,7 @@ SlashCmdList.WOWCHATVOICE = function(msg)
         print("  " .. G .. "/wcv test|r — четыре тестовые строки разными голосами")
         print("  " .. G .. "/wcv last 5|r — ещё раз прочитать последние 5 строк чата (через текущий словарь)")
         print("  " .. G .. "/wcv reset|r — раздать голоса рас заново")
-        print("  " .. G .. "/wcv debug|r — отладка: почему строка чата не прочитана — в журнал программы")
+        print("  " .. G .. "/wcv debug|r — отладка: почему строка чата не прочитана — в журнал компаньона")
         print("  " .. G .. "/wcv help|r — этот список")
     elseif msg == "test" then
         ns.Test()
@@ -526,7 +526,7 @@ SlashCmdList.WOWCHATVOICE = function(msg)
     elseif msg == "debug" then
         ns.db.debug = not ns.db.debug
         print(PREFIX .. (ns.db.debug
-            and "отладка включена: строки чата, которые аддон не отправил, с причиной, и речь CatQuest — в журнале программы (logs, «диагностика аддона»)."
+            and "отладка включена: строки чата, которые аддон не отправил, с причиной, и речь CatQuest — в журнале компаньона (logs, «диагностика аддона»)."
             or "отладка выключена."))
     elseif msg == "on" or msg == "off" then
         ns.SetEnabled(msg == "on")

@@ -49,13 +49,13 @@ local function Refresh()
 end
 
 local function Build()
-    window = UI.Window("WowChatVoiceStripWindow", "Мост к программе", 400, 300)
+    window = UI.Window("WowChatVoiceStripWindow", "Мост к компаньону", 400, 300)
     local y = -30
     local note = window:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     note:SetPoint("TOPLEFT", 18, y)
     note:SetWidth(364)
     note:SetJustifyH("LEFT")
-    note:SetText("Мост — тонкая тёмная линия у края экрана: через неё аддон передаёт строки чата программе. Если её "
+    note:SetText("Мост — тонкая тёмная линия у края экрана: через неё аддон передаёт строки чата компаньону. Если её "
         .. "закрывает другой аддон (рисует что-то в том же месте), перенесите её. Оранжевая рамка показывает, где она будет.")
     UI.TextTooltip(window, note, ns.BRIDGE_TIP)
     y = y - 46
@@ -119,7 +119,7 @@ local function Build()
 
     local save = UI.Button(window, "Сохранить", 130, function() W.Save() end)
     save:SetPoint("TOPLEFT", 18, y)
-    UI.Tooltip(save, "Перенести линию. Программа узнаёт новое место от аддона ещё по старой линии, затем линия переезжает.")
+    UI.Tooltip(save, "Перенести линию. Компаньон узнаёт новое место от аддона ещё по старой линии, затем линия переезжает.")
     local cancel = UI.Button(window, "Отмена", 130, function() window:Hide() end)
     cancel:SetPoint("TOPRIGHT", -18, y)
     y = y - 30
