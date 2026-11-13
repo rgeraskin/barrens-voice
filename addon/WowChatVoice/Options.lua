@@ -121,7 +121,13 @@ local function Build()
     checks[#checks + 1] = UI.Check(window, 18, y - 96, "Ждать, пока говорит CatQuest", "Пока аддон CatQuest читает "
         .. "квест, строки чата ждут и звучат, как только он закончит; ждавшие дольше 40 секунд пропускаются. "
         .. "Без CatQuest ничего не меняет.", get, set)
-    y = y - 126
+    get, set = Setting("fadeChat", function() if ns.ChatFade then ns.ChatFade.Apply() end end)
+    checks[#checks + 1] = UI.Check(window, 18, y - 120, "Прятать окно чата, пока на нём нет мыши", "Чат и так "
+        .. "звучит: окна чата (текст, фон, вкладки, поле ввода) прозрачны, пока на них не наведена мышь и вы ничего "
+        .. "не пишете. Строка, которую компаньон не читает вслух — системное сообщение, добыча, выключенный канал, "
+        .. "ваша собственная, сообщение аддона, — показывает окно на 10 секунд: то, чего не слышно, видно. "
+        .. "Работает, пока озвучка включена.", get, set)
+    y = y - 150
 
     local voicesLabel = window:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     voicesLabel:SetPoint("TOPLEFT", 22, y - 4)

@@ -16,6 +16,7 @@ ns.DEFAULTS = {
     officer = false,
     channels = false,  -- numbered channels: General, Trade, LookingForGroup, LocalDefense ...
     emote = false,     -- /e emotes
+    fadeChat = false,  -- chat windows transparent until the mouse is over them (ChatFade.lua)
     debug = false,     -- /wcv debug: why a chat line was not sent, and CatQuest's speech, to the program's log
     self = false,      -- your own lines
     onlyVisible = true, -- only lines a chat window of yours shows (its message types and channels, chat filters)
@@ -389,11 +390,27 @@ local function Visible(event, ...)
     end
     if not seen then return false, "нет открытого окна чата с этим типом или каналом" end
     local filters = ChatFrame_GetMessageEventFilters and ChatFrame_GetMessageEventFilters(event)
+    ns.askingFilters = true       -- our own chat filter (ChatFade.lua) keeps out of this
     for i, filter in ipairs(filters or {}) do
         local ok, hide = pcall(filter, seen, event, ...)
-        if ok and hide then return false, ("скрыто фильтром чата другого аддона (№%d)"):format(i) end
+        if ok and hide then
+            ns.askingFilters = false
+            return false, ("скрыто фильтром чата другого аддона (№%d)"):format(i)
+        end
     end
+    ns.askingFilters = false
     return true
+end
+
+ns.EVENTS = EVENTS   -- the chat events the addon reads (ChatFade.lua marks their lines with a filter)
+
+--- Whether a chat event's line is one the addon hands to the program (the channel on, one's own
+--- lines only when they are on) - for the chat windows' fading too (ChatFade.lua).
+function ns.Reads(event, guid)
+    local db = ns.db
+    local key = EVENTS[event]
+    if not (db and db.enabled and key and db[key]) then return false end
+    return db.self or not (guid and guid ~= "" and guid == UnitGUID("player"))
 end
 
 local function OnChat(event, text, sender, _, channelString, _, _, _, _, _, _, _, guid)
@@ -448,6 +465,7 @@ function ns.SetEnabled(enabled)
     end
     if ns.Minimap then ns.Minimap.Refresh() end
     if ns.Options.Refresh then ns.Options.Refresh() end
+    if ns.ChatFade then ns.ChatFade.Apply() end     -- the chat is not read aloud: show it
     print(PREFIX .. "озвучка чата " .. (ns.db.enabled and "включена" or "выключена"))
 end
 
@@ -469,6 +487,7 @@ loader:SetScript("OnEvent", function(self, event, name, ...)
         ns.Dictionary.Rebuild()
         ns.Strip.Initialize()
         ns.Options.Initialize()
+        if ns.ChatFade then ns.ChatFade.Initialize() end   -- a file new in 0.2.1: loaded after a game restart
         ns.Minimap.Update()
         self:UnregisterEvent("ADDON_LOADED")
         for e in pairs(EVENTS) do self:RegisterEvent(e) end

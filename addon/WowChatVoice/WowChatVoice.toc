@@ -12,6 +12,7 @@ Strip.lua
 Dictionary.lua
 VoiceList.lua
 Core.lua
+ChatFade.lua
 UI.lua
 DictionaryWindow.lua
 StripWindow.lua

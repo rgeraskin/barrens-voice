@@ -10,6 +10,8 @@ local function widget()
         if k == "IsShown" then return function(self) return self._shown end end
         if k == "SetShown" then return function(self, v) self._shown = v; if v and self._scripts.OnShow then self._scripts.OnShow(self) end end end
         if k == "Show" then return function(self) self:SetShown(true) end end
+        if k == "GetAlpha" then return function(self) return rawget(self, "_alpha") or 1 end end
+        if k == "SetAlpha" then return function(self, v) self._alpha = v end end
         if k == "Hide" then return function(self)
             if self._shown and self._scripts.OnHide then self._scripts.OnHide(self) end
             self._shown = false
@@ -41,7 +43,7 @@ C_Timer = { NewTimer = function(_, f) return { Cancel = function() end } end, Ne
             After = function(_, f) f() end }
 Settings = { RegisterCanvasLayoutCategory = function() return {} end, RegisterAddOnCategory = function() end }
 local ns = {}
-for _, f in ipairs({ "Protocol.lua", "Strip.lua", "Dictionary.lua", "VoiceList.lua", "Core.lua", "UI.lua",
+for _, f in ipairs({ "Protocol.lua", "Strip.lua", "Dictionary.lua", "VoiceList.lua", "Core.lua", "ChatFade.lua", "UI.lua",
                      "DictionaryWindow.lua", "StripWindow.lua", "Options.lua", "VoicesWindow.lua", "Minimap.lua" }) do
     assert(loadfile(f))("WowChatVoice", ns)
 end
@@ -276,3 +278,127 @@ ns.Strip.Preview("bottom")
 ns.Strip.Preview(nil)
 ns.db.stripPlace = "top"
 print("strip place ok")
+
+-- the chat windows out of sight: transparent without the mouse; a line not read aloud shows its window
+local filters = {}
+ChatTypeGroup = { SYSTEM = { "CHAT_MSG_SYSTEM" }, PARTY = { "CHAT_MSG_PARTY", "CHAT_MSG_PARTY_LEADER" } }
+ChatFrame_AddMessageEventFilter = function(event, f) filters[event] = f end
+hooksecurefunc = function(t, name, f)
+    local orig = t[name]
+    t[name] = function(...) if orig then orig(...) end f(...) end
+end
+wipe = function(t) for k in pairs(t) do t[k] = nil end return t end
+ChatFrame1 = widget()
+ChatFrame1._shown = true
+ChatFrame1.isDocked, ChatFrame1.buttonFrame, ChatFrame1.ResizeButton = false, false, false
+local editBox = widget()
+editBox._focus = false
+editBox.HasFocus = function(self) return self._focus end
+editBox.IsVisible = function() return true end
+editBox.IsMouseOver = function() return false end
+ChatFrame1.editBox = editBox
+CHAT_FRAMES = { "ChatFrame1" }
+local now = 1000
+GetTime = function() return now end
+ns.db.enabled, ns.db.fadeChat, ns.db.party, ns.db.self = true, true, true, false
+ns.ChatFade.Initialize()
+local function settle(seconds) for _ = 1, 10 do ns.ChatFade.Update(nil, seconds / 10) end end
+settle(2)
+assert(ChatFrame1:GetAlpha() == 0, "no mouse: transparent " .. ChatFrame1:GetAlpha())
+assert(editBox:GetAlpha() == 0, "the edit box too")
+editBox._focus = true
+settle(0.3)
+assert(editBox:GetAlpha() == 1 and ChatFrame1:GetAlpha() == 1, "typing: the window and its edit box show")
+editBox._focus = false
+settle(2)
+assert(editBox:GetAlpha() == 0, "done typing: out of sight again")
+local function line(event, text, guid)
+    filters[event](ChatFrame1, event, text, "Вася-Степи", "", "", "", "", 0, 0, "", 0, 1, guid)
+    ChatFrame1:AddMessage(text)
+end
+line("CHAT_MSG_PARTY", "привет", "Player-1-2")
+settle(0.3)
+assert(ChatFrame1:GetAlpha() == 0, "a line read aloud: the window stays out of sight")
+-- a General line: CHAT_MSG_CHANNEL is in no ChatTypeGroup list, yet it is read - no flash either
+ns.db.channels = true
+assert(filters.CHAT_MSG_CHANNEL, "the channels' messages have the filter too")
+line("CHAT_MSG_CHANNEL", "кто в ОП?", "Player-1-3")
+settle(0.3)
+assert(ChatFrame1:GetAlpha() == 0, "a General line read aloud: the window stays out of sight")
+line("CHAT_MSG_SYSTEM", "Вы получили 5 серебра")
+settle(0.3)
+assert(ChatFrame1:GetAlpha() == 1, "a system line is not read: the window shows")
+now = now + 11
+settle(2)
+assert(ChatFrame1:GetAlpha() == 0, "10 s later: out of sight again")
+line("CHAT_MSG_PARTY", "моя строка", "me")
+settle(0.3)
+assert(ChatFrame1:GetAlpha() == 1, "one's own line, not read: shows")
+now = now + 11
+settle(2)
+ChatFrame1:AddMessage("|cff40c0ffДругой аддон:|r что-то")
+settle(0.3)
+assert(ChatFrame1:GetAlpha() == 1, "an addon's print (no chat event): shows")
+ns.askingFilters = true
+assert(filters.CHAT_MSG_PARTY(ChatFrame1, "CHAT_MSG_PARTY", "x") == false, "the filter never hides a line")
+ns.askingFilters = false
+-- the mouse over the chat counts only when nothing else lies over it there
+now = now + 20
+settle(2)
+ChatFrame1.IsMouseOver = function() return true end
+ChatFrame1.GetName = function() return "ChatFrame1" end
+local map = widget()
+map.GetName = function() return "WorldMapFrame" end
+map.GetParent = function() return nil end
+GetMouseFocus = function() return map end
+settle(0.5)
+assert(ChatFrame1:GetAlpha() == 0, "a map over the chat: the mouse there does not count")
+GetMouseFocus = function() return ChatFrame1 end
+settle(0.3)
+assert(ChatFrame1:GetAlpha() == 1, "the mouse on the chat itself: shows")
+GetMouseFocus = function() return WorldFrame end
+assert(ns.ChatFade.MouseOnChat(), "nothing under the mouse (the world): free")
+local tab = widget()
+tab.GetName = function() return "ChatFrame1Tab" end
+GetMouseFocus = function() return tab end
+assert(ns.ChatFade.MouseOnChat(), "its tab: the chat's")
+GetMouseFocus = nil
+ChatFrame1.IsMouseOver = function() return false end
+now = now + 20
+settle(2)
+-- a line in a tab that is not the one shown, and the combat log: no flash
+local log = widget()
+log._shown, log.isDocked, log.buttonFrame, log.editBox, log.ResizeButton = false, true, false, false, false
+ChatFrame2 = log
+CHAT_FRAMES = { "ChatFrame1", "ChatFrame2" }
+GENERAL_CHAT_DOCK = widget()
+GENERAL_CHAT_DOCK.IsMouseOver = function() return false end
+GENERAL_CHAT_DOCK.overflowButton = false
+ChatFrame1.isDocked = true
+FCFDock_GetSelectedWindow = function() return ChatFrame1 end
+settle(2)                                     -- hooks the new window; the new tab strip fades
+filters.CHAT_MSG_SYSTEM(ChatFrame2, "CHAT_MSG_SYSTEM", "Hobby Warrior создает: Медный слиток.")
+ChatFrame2:AddMessage("Hobby Warrior создает: Медный слиток.")
+settle(0.5)
+assert(ChatFrame1:GetAlpha() == 0 and GENERAL_CHAT_DOCK:GetAlpha() == 0, "a background tab's line: no flash")
+-- switched to that tab: its lines show the chat like any other
+FCFDock_GetSelectedWindow = function() return ChatFrame2 end
+ChatFrame2._shown = true
+ChatFrame2:AddMessage("Вы наносите 12 ед. урона")
+settle(0.5)
+assert(GENERAL_CHAT_DOCK:GetAlpha() == 1, "the tab on screen: its line shows the chat")
+now = now + 20
+ChatFrame2._shown = false
+FCFDock_GetSelectedWindow, GENERAL_CHAT_DOCK, ChatFrame2 = nil, nil, nil
+CHAT_FRAMES = { "ChatFrame1" }
+ChatFrame1.isDocked = false
+ns.db.fadeChat = false
+ns.ChatFade.Apply()
+assert(ChatFrame1:GetAlpha() == 1, "the setting off: the chat as it was")
+assert(editBox:GetAlpha() == 1, "and its edit box")
+print("chat fade ok")
+
+
+
+
+
