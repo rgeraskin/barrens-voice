@@ -16,6 +16,7 @@
 - Lines other players' addons write into the chat for them — Questie's party progress («{звезда} Questie: … 1/1»), DBM, BigWigs, Details! and others — are no longer read («Не читать сообщения аддонов», on by default): with Questie on two players in a group each progress line was read twice.
 - `/wcv last` remembers the last 50 lines across /reload and a game restart: they are kept in the addon's saved settings.
 - The dictionary reads «найдется» (and «найдет», «найдешь», «найдем», «найдете») with «ё», and «еще» as «ещё».
+- The companion keeps every model in one Hugging Face cache (`hf_home`, by default the `hf` folder next to it): Whisper, used to build the voice bank, lay in the system's cache apart from F5 and Vocos.
 
 ## 0.2.0
 

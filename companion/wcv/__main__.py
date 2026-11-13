@@ -173,6 +173,9 @@ def main() -> int:
     make_dpi_aware()
 
     config = load_config()
+    # one Hugging Face cache for every model (F5, Vocos, RUAccent, Whisper): hf_home in config.json,
+    # else the hf folder next to the program - before anything of Hugging Face is imported
+    os.environ["HF_HOME"] = config.get("hf_home") or str(APP_DIR / "hf")
     if "--selftest" in sys.argv:
         from .speech import selftest
         selftest(config, log)

@@ -193,8 +193,6 @@ class F5Speaker:
     # --- setup (on the synth thread) --------------------------------------------------------
 
     def _load(self) -> None:
-        if self.config.get("hf_home"):
-            os.environ["HF_HOME"] = self.config["hf_home"]
         import soundfile as sf
         import torch
         import torchaudio
