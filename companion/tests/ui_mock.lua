@@ -517,24 +517,24 @@ print("companion ok")
 -- the word at login: the welcome on the first run, a line after an update, then the companion's line
 local welcome, plainPrint = {}, print
 print = function(text) welcome[#welcome + 1] = text end
-GetAddOnMetadata = function() return "0.2.1" end
+GetAddOnMetadata = function() return "0.3.0" end
 ns.firstRun, ns.db.seenVersion = true, nil
 ns.LoginWord()
 assert(#welcome == 4 and welcome[1]:find("добро пожаловать") and welcome[2]:find("приложение%-компаньон")
     and welcome[4]:find("озвучка чата"), "welcome, then whether the reading works")
-assert(ns.db.seenVersion == "0.2.1", "the version is kept")
+assert(ns.db.seenVersion == "0.3.0", "the version is kept")
 ns.firstRun = false
 welcome = {}
 ns.LoginWord()
 assert(#welcome == 1 and welcome[1]:find("озвучка чата"), "the same version again: only whether the reading works")
 welcome = {}
-ns.db.seenVersion = "0.2.0"                  -- an update
+ns.db.seenVersion = "0.2.1"                  -- an update
 ns.LoginWord()
-assert(#welcome == 2 and welcome[1]:find("обновление 0.2.1: окно чата можно прятать"), tostring(welcome[1]))
+assert(#welcome == 2 and welcome[1]:find("обновление 0.3.0: ритейл WoW"), tostring(welcome[1]))
 ns.db.seenVersion = nil                      -- from a version before the line was there: the line too
 welcome = {}
 ns.LoginWord()
-assert(#welcome == 2 and welcome[1]:find("обновление 0.2.1"), "an update from before 0.2.1")
+assert(#welcome == 2 and welcome[1]:find("обновление 0.3.0"), "an update from before 0.2.1")
 GetAddOnMetadata = function() return "9.9.9" end
 ns.db.seenVersion = "0.2.1"
 welcome = {}
