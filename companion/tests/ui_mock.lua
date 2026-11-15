@@ -375,6 +375,29 @@ GetMouseFocus = nil
 ChatFrame1.IsMouseOver = function() return false end
 now = now + 20
 settle(2)
+-- whispers and guild lines show the window if asked, though they are read aloud
+ns.db.whisper, ns.db.guild = true, true
+now = now + 20
+settle(2)
+line("CHAT_MSG_WHISPER", "привет", "Player-1-4")
+settle(0.3)
+assert(ChatFrame1:GetAlpha() == 0, "a read whisper: no flash, as before")
+ns.db.fadeWhisper = true
+line("CHAT_MSG_WHISPER", "привет", "Player-1-4")
+settle(0.3)
+assert(ChatFrame1:GetAlpha() == 1, "a whisper with the option on: the window shows")
+now = now + 20
+settle(2)
+ns.db.fadeGuild = true
+line("CHAT_MSG_GUILD", "всем привет", "Player-1-5")
+settle(0.3)
+assert(ChatFrame1:GetAlpha() == 1, "a guild line with the option on: the window shows")
+now = now + 20
+settle(2)
+ns.db.fadeWhisper, ns.db.fadeGuild = false, false
+line("CHAT_MSG_GUILD", "ещё раз", "Player-1-5")
+settle(0.3)
+assert(ChatFrame1:GetAlpha() == 0, "options off again: a guild line does not show it")
 -- a line in a tab that is not the one shown, and the combat log: no flash
 local log = widget()
 log._shown, log.isDocked, log.buttonFrame, log.editBox, log.ResizeButton = false, true, false, false, false

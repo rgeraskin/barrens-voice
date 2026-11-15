@@ -38,6 +38,7 @@ local CHANNELS = {
 }
 
 local window, toggle, verb, lastNames, programState
+local fadeSubs = {}   -- its sub-options: grey while the chat is not hidden
 local numbered = {}   -- the check boxes of the numbered channels (grey while "Общие каналы" is off)
 local checks, radios, sliders = {}, {}, {}
 
@@ -49,6 +50,7 @@ local function Refresh()
     end
     for _, c in ipairs(checks) do c.refresh() end
     for _, c in ipairs(numbered) do UI.SetCheckEnabled(c, ns.db.channels) end
+    for _, c in ipairs(fadeSubs) do UI.SetCheckEnabled(c, ns.db.fadeChat) end
     UI.SetCheckEnabled(verb, ns.db.sayNames)
     UI.SetCheckEnabled(lastNames, ns.db.sayNames)
     for value, r in pairs(radios) do r:SetChecked((ns.db.voices or "f5") == value) end
@@ -149,13 +151,21 @@ local function Build()
     checks[#checks + 1] = UI.Check(window, 18, y - 96, "Ждать, пока говорит CatQuest", "Пока аддон CatQuest читает "
         .. "квест, строки чата ждут и звучат, как только он закончит; ждавшие дольше 40 секунд пропускаются. "
         .. "Без CatQuest ничего не меняет.", get, set)
-    get, set = Setting("fadeChat", function() if ns.ChatFade then ns.ChatFade.Apply() end end)
+    get, set = Setting("fadeChat", function() if ns.ChatFade then ns.ChatFade.Apply() end Refresh() end)
     checks[#checks + 1] = UI.Check(window, 18, y - 120, "Прятать окно чата, пока на нём нет мыши", "Чат и так "
         .. "звучит: окна чата (текст, фон, вкладки, поле ввода) прозрачны, пока на них не наведена мышь и вы ничего "
         .. "не пишете. Строка, которую компаньон не читает вслух — системное сообщение, добыча, выключенный канал, "
         .. "ваша собственная, сообщение аддона, — показывает окно на 10 секунд: то, чего не слышно, видно. "
         .. "Работает, пока озвучка включена.", get, set)
-    y = y - 150
+    for i, item in ipairs({
+        { "fadeWhisper", "при шёпоте", "Шёпот вам показывает окно чата, хотя и озвучивается: его легко пропустить на слух." },
+        { "fadeGuild", "при строке гильдии", "Строка гильдии (и офицерского чата) показывает окно, хотя и озвучивается." } }) do
+        local g, s = Setting(item[1])
+        local c = UI.Check(window, 42 + (i - 1) * 170, y - 144, "Показывать " .. item[2], item[3], g, s)
+        checks[#checks + 1] = c
+        fadeSubs[#fadeSubs + 1] = c
+    end
+    y = y - 176
 
     local voicesLabel = window:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     voicesLabel:SetPoint("TOPLEFT", 22, y - 4)
