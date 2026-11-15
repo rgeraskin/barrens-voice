@@ -25,6 +25,7 @@ RACES = {
     "draenei": "human", "lightforgeddraenei": "human", "worgen": "human", "kultiran": "human", "dracthyr": "human",
     "highmountaintauren": "tauren", "zandalaritroll": "troll", "magharorc": "orc",
     "darkirondwarf": "dwarf", "earthendwarf": "dwarf", "pandaren": "dwarf",
+    "skyborne": "skyborne",   # Forever's own race: its own voice when the client has it in Russian, else human
 }
 RECENT = 30 * 60   # seconds: characters heard within this count as "in the conversation"
 FORGET = 60 * 24 * 3600   # seconds: characters not heard for this long are forgotten

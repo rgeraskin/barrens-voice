@@ -5,7 +5,7 @@ the player's machine). It needs to know which files to read: their FileDataIDs, 
 across game builds. They come from the community listfile (wowdev/wow-listfile), downloaded here
 into tools/.cache once; only the numbers and a tag per file go into the table - no game data.
 
-Voices per race and sex:
+Voices per race and sex (Skyborne, Forever's own race, has only the character's voice):
   "<race>-<sex>"         the player character's voice: its error messages ("Недостаточно маны")
                          and calm emotes (hello, thank you, yes, no, ...);
   "<race>-<sex>/<type>"  each NPC voice type of the race ("standard", "guard", "warrior", ...):
@@ -37,6 +37,15 @@ CALM_EMOTES = {"hello", "goodbye", "thankyou", "yourewelcome", "yes", "no", "fol
                "congratulations", "outofmana", "healme", "train", "nevermind"}
 JOKES = {"flirt", "pissed", "silly", "joke"}
 NPC_TAGS = {"greeting": 1, "farewell": 1, "vendor": 1, "pissed": 3}
+# Skyborne, Forever's own race (both factions): one folder per sex, sound/character/skyborne_elf_<sex>,
+# files vo_skyborne_elf_<sex>_<tag>_<id>.ogg; no NPC voices. Its error messages (anything not below)
+# are calm speech; these are emotes and jokes, and the rest - shouts, sounds - is left out.
+SKY_EMOTES = {"hello", "bye", "thank", "yw", "nod", "no", "follow", "wait", "welcome", "congratulate",
+              "healme", "train", "apologize"}
+SKY_JOKES = {"flirt", "joke"}
+SKY_OUT = {"roar", "cackle", "kiss", "chicken", "applaud", "violin", "charge", "cheer", "flee", "openfire", "taunt",
+           "threaten", "attackmytarget", "incoming", "whoa", "oops", "sigh", "rasp", "bored", "beg", "cry", "yawn",
+           "helpme"}
 
 
 def listfile() -> Path:
@@ -57,6 +66,18 @@ def classify(path: str):
     if not name.endswith(".ogg"):
         return None
     stem = re.sub(r"\d+$", "", name[:-4])
+    sky = re.fullmatch(r"sound/character/skyborne_elf_(female|male)", folder)
+    if sky:
+        sex = sky.group(1)
+        found = re.fullmatch(rf"vo_skyborne_elf_{sex}_(.+?)_?", stem)
+        tag = found.group(1) if found else ""
+        if not tag or tag in SKY_OUT:
+            return None
+        if tag in SKY_EMOTES:
+            return f"skyborne-{sex}", tag, 2
+        if tag in SKY_JOKES:
+            return f"skyborne-{sex}", tag, 3
+        return f"skyborne-{sex}", "error", 1
     for race, (char_dir, npc_prefix) in RACES.items():
         if folder.startswith(f"sound/character/{char_dir}/"):
             sub = folder.rsplit("/", 1)[1]

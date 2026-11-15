@@ -66,6 +66,13 @@ class Assign(unittest.TestCase):
         self.assertEqual(len(set(got)), 6, got)
         self.assertEqual({g for g in got[:2]}, {"orc-male", "orc-male#60"})
 
+    def test_skyborne_own_voice_or_human(self):
+        sky = Slot("skyborne-female", "skyborne-female", "skyborne", "female", 0.0, "sf.wav", "текст")
+        a = Assigner(slots() + [sky], self.path)
+        self.assertEqual(a.slot_for("Еноты Дикие", "Skyborne", "3", now=1).id, "skyborne-female")
+        b = Assigner(slots(), Path(self.dir.name) / "b.json")         # no Russian Skyborne lines in the client
+        self.assertEqual(b.slot_for("Еноты Дикие", "Skyborne", "3", now=1).id, "human-female")
+
     def test_stable_and_persisted(self):
         a = Assigner(slots(), self.path)
         first = a.slot_for("Громмаш-Степи", "Orc", "2", now=1).id
@@ -825,6 +832,7 @@ class StderrLog(unittest.TestCase):
                 if m._log_file:
                     m._log_file.close()
                 m.LOG_DIR, m._log_file, m._log_day = old_dir, old_file, old_day
+
 
 class AddonMissing(unittest.TestCase):
     def test_stops_without_the_addon(self):

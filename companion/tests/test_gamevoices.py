@@ -116,6 +116,14 @@ class Table(unittest.TestCase):
                 self.assertGreaterEqual(len(ids), 4, f"{race}-{sex}: {ids}")          # the character + 3 NPC types
                 self.assertTrue(any(f[2] == 1 for f in table[f"{race}-{sex}"]["files"]))
 
+    def test_skyborne(self):
+        # Forever's own race: the character's voice only, calm speech first
+        table = json.loads(gamevoices.TABLE.read_text(encoding="utf-8"))["voices"]
+        for sex in ("male", "female"):
+            files = table[f"skyborne-{sex}"]["files"]
+            self.assertGreaterEqual(sum(1 for f in files if f[2] == 1), 20)
+            self.assertGreaterEqual(sum(1 for f in files if f[2] == 2), 10)
+
 
 if __name__ == "__main__":
     unittest.main()
