@@ -39,8 +39,10 @@ def text_ids(text: str, vocab: dict[str, int]) -> np.ndarray:
 
 
 class F5Onnx:
-    def __init__(self, model_dir: Path, vocab_path: Path, provider: str = "DmlExecutionProvider", log=print):
+    def __init__(self, model_dir: Path, vocab_path: Path, provider: str = "DmlExecutionProvider", log=print,
+                 session_config: dict | None = None):
         self.model_dir, self.vocab_path, self.provider, self.log = Path(model_dir), Path(vocab_path), provider, log
+        self.session_config = dict(session_config or {})
         self.lock = threading.Lock()
         self.loaded = False
 
@@ -61,6 +63,8 @@ class F5Onnx:
         if self.provider == "DmlExecutionProvider":
             options.enable_mem_pattern = False           # DirectML's own requirements
             options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+        for key, value in self.session_config.items():
+            options.add_session_config_entry(key, str(value))
         card = [(self.provider, {"device_id": 0, "performance_preference": "high_performance"})
                 if self.provider == "DmlExecutionProvider" else self.provider, "CPUExecutionProvider"]
         cpu = ["CPUExecutionProvider"]
