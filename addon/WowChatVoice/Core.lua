@@ -264,8 +264,32 @@ function ns.Deliver(payload)
 end
 
 --- The options every line carries: speed, loudness and engine ("f5" or "sapi"; `voice` overrides).
+-- What the sliders call 100 % is not the program's 100 %: the voices are slow and quiet at the program's
+-- own 100, so the sliders' 100 stands for RATE_BASE and VOLUME_BASE of it (125 % speed, 120 % volume,
+-- as the author's own settings were). The program takes 50..200 of the speed and 0..240 of the volume; the
+-- sliders run 40..160 and 0..200, so the thumbs of the two stand alike at 100 (the middle).
+ns.RATE_BASE, ns.VOLUME_BASE = 1.25, 1.2
+
+--- What the slider's value means to the program.
+function ns.Effective(value, base)
+    return math.floor((value or 100) * base + 0.5)
+end
+
+--- A saved setting from before the sliders' 100 stood for a base (the program's own scale): the same
+--- sound as before, on the new scale, to the step of 5.
+function ns.MigrateScale(db)
+    if db.scale == 1 then return end
+    local function convert(v, base, hi)
+        return math.max(0, math.min(hi, math.floor((v / base) / 5 + 0.5) * 5))
+    end
+    if type(db.rate) == "number" then db.rate = math.max(40, convert(db.rate, ns.RATE_BASE, 160)) end
+    if type(db.volume) == "number" then db.volume = convert(db.volume, ns.VOLUME_BASE, 200) end
+    db.scale = 1
+end
+
 function ns.LineOptions(voice)
-    return ("rate=%d;vol=%d;voice=%s"):format(ns.db.rate or 100, ns.db.volume or 100, voice or ns.db.voices or "f5")
+    return ("rate=%d;vol=%d;voice=%s"):format(ns.Effective(ns.db.rate, ns.RATE_BASE),
+        ns.Effective(ns.db.volume, ns.VOLUME_BASE), voice or ns.db.voices or "f5")
 end
 
 --- A line the companion does not speak: the current settings (which voices to keep loaded, which
@@ -617,6 +641,7 @@ loader:SetScript("OnEvent", function(self, event, name, ...)
         ns.firstRun = WowChatVoiceDB == nil   -- no saved settings yet: a welcome at login
         WowChatVoiceDB = Merge(WowChatVoiceDB or {}, ns.DEFAULTS)
         ns.db = WowChatVoiceDB
+        if ns.firstRun then ns.db.scale = 1 else ns.MigrateScale(ns.db) end   -- settings of the program's own scale
         ns.RestoreHistory()
         ns.Dictionary.Migrate(ns.db)
         ns.Dictionary.Rebuild()

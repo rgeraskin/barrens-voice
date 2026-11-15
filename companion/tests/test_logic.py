@@ -364,6 +364,8 @@ class Volume(unittest.TestCase):
         line = parse("say\x1fВася\x1fOrc\x1f2\x1fWARRIOR\x1f\x1frate=100;vol=40;voice=f5\x1fпривет".encode())
         self.assertEqual(line.volume, 40)
         self.assertAlmostEqual(line.gain({"volume": 50}), 0.2)
+        loud = parse("say\x1fВася\x1fOrc\x1f2\x1fWARRIOR\x1f\x1frate=100;vol=999;voice=f5\x1fпривет".encode())
+        self.assertEqual(loud.volume, 240)                 # the slider's top (200 %) is 240 for the program
         bare = parse("say\x1fВася\x1fOrc\x1f2\x1fWARRIOR\x1f\x1frate=100;voice=f5\x1fпривет".encode())
         self.assertIsNone(bare.volume)
         self.assertAlmostEqual(bare.gain({"volume": 100}), 1.0)

@@ -168,7 +168,7 @@ class Line:
     declension: bool = True  # decline the dictionary's replacements after prepositions
     options: dict = field(default_factory=dict)   # all the line's options, as sent
     raw: str = ""            # the line as typed in chat, before any rule (for the log)
-    volume: int | None = None  # the addon's volume slider, percent 0..200; None: config.json alone
+    volume: int | None = None  # the addon's volume slider, percent 0..240; None: config.json alone
 
     def gain(self, config: dict) -> float:
         """The loudness to play this line at (0..1): config.json's `volume` times the addon's."""
@@ -214,7 +214,7 @@ def parse(payload: bytes) -> Line | None:
     else:
         text, raw = "\x1f".join(fields[6:]), ""
     rate = int(options["rate"]) if options.get("rate", "").isdigit() else 100
-    volume = max(0, min(200, int(options["vol"]))) if options.get("vol", "").isdigit() else None
+    volume = max(0, min(240, int(options["vol"]))) if options.get("vol", "").isdigit() else None
     return Line(kind, sender, race, sex, cls, channel, text.strip(), max(50, min(200, rate)),
                 options.get("voice", ""), options.get("off"), options.get("sapi", ""),
                 options.get("decl", "1") != "0", options, raw.strip(), volume)

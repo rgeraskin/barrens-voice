@@ -557,3 +557,24 @@ ns.db.channels = false
 assert(not ns.Reads("CHAT_MSG_CHANNEL", "Player-1-9", "кто в ОП?", "Общий", "1. Общий"), "channels off: none")
 ns.db.channels, ns.db.chTrade = true, true
 print("numbered channels ok")
+
+-- the sliders' 100 % stands for the program's 125 % speed and 120 % volume
+ns.db.rate, ns.db.volume, ns.db.voices = 100, 100, "f5"
+assert(ns.LineOptions():find("rate=125;vol=120;", 1, true), ns.LineOptions())
+ns.db.rate, ns.db.volume = 160, 200
+assert(ns.LineOptions():find("rate=200;vol=240;", 1, true), "the top of the sliders is within the program's limits: " .. ns.LineOptions())
+ns.db.rate, ns.db.volume = 40, 0
+assert(ns.LineOptions():find("rate=50;vol=0;", 1, true), ns.LineOptions())
+local old = { rate = 125, volume = 120 }              -- saved before: the same sound is 100 and 100 now
+ns.MigrateScale(old)
+assert(old.rate == 100 and old.volume == 100 and old.scale == 1, old.rate .. " " .. old.volume)
+old = { rate = 200, volume = 200 }                    -- the program's top: the sliders' top
+ns.MigrateScale(old)
+assert(old.rate == 160 and old.volume == 165, old.rate .. " " .. old.volume)
+old = { rate = 100, volume = 100 }
+ns.MigrateScale(old)
+assert(old.rate == 80 and old.volume == 85, "100 of the program's own scale: " .. old.rate .. " " .. old.volume)
+ns.MigrateScale(old)
+assert(old.rate == 80, "migrated once")
+ns.db.rate, ns.db.volume = 100, 100
+print("scale ok")
