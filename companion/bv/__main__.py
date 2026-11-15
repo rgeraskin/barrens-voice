@@ -23,7 +23,7 @@ DEFAULT_CONFIG = {
     "_help": "rate -10..10, volume 0..100. exclude: voices left out (part of the name). "
              "gender_overrides: voices whose gender SAPI does not know. players: {\"Name\": \"part of a voice name\"}. "
              "stress: how each engine gets the dictionary's stress marks (plus, acute or strip). "
-             "engine: f5 (race voices from the game client, on an NVIDIA GPU) or sapi (Windows voices). "
+             "engine: f5 (race voices from the game client, on a DirectX 12 GPU) or sapi (Windows voices). "
              "voice_shifts: semitones of the extra copies of each race voice. players: also takes F5 voice ids (orc-male#60).",
     "engine": "f5",
     "rate": 0,
@@ -36,7 +36,6 @@ DEFAULT_CONFIG = {
     "ruaccent": True,
     "restore_yo": True,
     "declension": True,
-    "nfe_step": 16,
     "f5_margin": 1.25,
     "f5_tail": 0.5,
     # slow voices drawn toward the bank's faster quarter (quantile) by this share, at most this many
@@ -109,7 +108,7 @@ def log(message: str) -> None:
 
 
 class StderrToLog:
-    """What the libraries write to stderr (warnings of torch and transformers, errors outside the
+    """What the libraries write to stderr (warnings of the libraries, errors outside the
     program's own logging) goes to the console as before and to the log file too, a line at a time
     with the time. A progress bar redraws its line with "\\r": only the finished line is kept."""
 
@@ -228,10 +227,6 @@ def main() -> int:
     # one Hugging Face cache for every model (F5, Vocos, RUAccent, Whisper): hf_home in config.json,
     # else the hf folder next to the program - before anything of Hugging Face is imported
     os.environ["HF_HOME"] = config.get("hf_home") or str(APP_DIR / "hf")
-    # torch's note on every start, before it is imported: "Redirects are currently not supported in
-    # Windows or MacOs" (its distributed launcher's, which the companion never uses)
-    import logging
-    logging.getLogger("torch.distributed.elastic.multiprocessing.redirects").setLevel(logging.ERROR)
     if "--selftest" in sys.argv:
         from .speech import selftest
         selftest(config, log)

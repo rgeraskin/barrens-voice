@@ -258,7 +258,7 @@ def _shift(samples, semitones: float):
 
 def build(config: dict, out: Path, log, checker) -> list[Slot]:
     """The bank: kept as it is while the game build and settings are the same, else made again
-    from the client with `checker` (a loaded refcheck.Checker: Whisper)."""
+    from the client with `checker` (a loaded whisper_onnx.OnnxChecker: Whisper)."""
     shifts = config.get("voice_shifts", [])
     stamp = _stamp(config, shifts)
     if stamp is None:

@@ -1,10 +1,17 @@
-mss>=9
-pywin32>=306
-numpy
-ruaccent
-onnxruntime
-num2words
-pymorphy3
-pymorphy3-dicts-ru
-windows-capture
-praat-parselmouth
+# Versions the companion was tested with (a newer huggingface_hub, 2.x, breaks RUAccent's offline load)
+mss==10.2.0
+pywin32==312
+numpy==2.5.4
+ruaccent==1.5.8.3
+num2words==0.5.14
+pymorphy3==2.0.6
+pymorphy3-dicts-ru==2.4.417150.4580142
+windows-capture==2.0.1
+praat-parselmouth==0.4.7
+# race voices: F5 and Whisper through ONNX Runtime (DirectML is installed by BarrensVoice.cmd, after
+# RUAccent has pulled in the CPU-only onnxruntime)
+soundfile==0.14.0
+scipy==1.18.1
+transformers==5.22.2
+tokenizers==0.23.3
+huggingface_hub==1.33.0

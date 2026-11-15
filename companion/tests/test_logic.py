@@ -508,7 +508,7 @@ class SavedVoices(unittest.TestCase):
 
 
 class OnnxParts(unittest.TestCase):
-    """0.4.0: what the ONNX engines do without a model - F5's vocabulary and text, the switch, resampling."""
+    """What the ONNX engines do without a model - F5's vocabulary and text, the provider and models, resampling."""
 
     def test_vocab_and_ids(self):
         from bv.f5onnx import read_vocab, text_ids
@@ -532,10 +532,12 @@ class OnnxParts(unittest.TestCase):
         self.assertAlmostEqual(float(out[-241]), 0.1, places=5)  # only the last 10 ms
         self.assertEqual(len(clean_tail(x[:100], 256, 24000)), 0)
 
-    def test_backend_switch(self):
-        from bv.f5engine import onnx_backend
-        self.assertFalse(onnx_backend({}))
-        self.assertTrue(onnx_backend({"f5_backend": "ONNX"}))
+    def test_provider_and_models(self):
+        from bv.f5engine import PROVIDER, model_dir, provider
+        self.assertEqual(provider({}), PROVIDER)
+        self.assertEqual(provider({"f5_onnx_provider": "CPUExecutionProvider"}), "CPUExecutionProvider")
+        self.assertEqual(model_dir({}, Path("app")), Path("app") / "models" / "f5-onnx")
+        self.assertEqual(model_dir({"f5_onnx_dir": "E:/m"}, Path("app")), Path("E:/m"))
 
     def test_resample(self):
         import numpy as np

@@ -1,5 +1,5 @@
 """Whisper through ONNX Runtime (0.4.0): it hears the client's voice lines while the voice bank is built,
-without torch - refcheck.Checker's job, the same interface (load, transcribe, score).
+the checker gamevoices.build takes (load, transcribe, score).
 
 The model is OpenAI's whisper-large-v3-turbo (MIT) as onnx-community exports it: the encoder and the
 decoder without a cache, in float16. The turbo decoder has 4 layers and a voice line is a few seconds,
