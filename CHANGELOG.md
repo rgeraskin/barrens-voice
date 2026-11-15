@@ -6,6 +6,7 @@
 - Retail's races speak with their own voices from the game's Russian voice-over (the character's voice, three variants per sex): blood elves, draenei, goblins, worgen (and in human form), pandaren, dracthyr (and in dragon form), the allied races, earthen and haranir. A race whose recordings the client lacks speaks as its kin. Forever's bank keeps only Forever's races.
 - Retail closes chat to addons in dungeons, raids, boss fights, Mythic+ and PvP (text, sender and GUID come as secret values): such lines are not read and no error is raised; the addon says so once, and the hidden chat window shows them.
 - The chat waits for Wayfarer (WayfarerRU) as for CatQuest: its quests, NPC lines, place lore and radio stories pause the chat, a paused Wayfarer does not. One setting for both: «Ждать озвучку квестов (CatQuest, Wayfarer)».
+- The dictionary reads «чиловая» as «чил+овая» in every form, «пиши» as «пиш+и», «губа» as «губ+а», «тикет» as «т+икет» in every form, «хелло» as «хелл+оу», «менеджмент» and «манаменеджмент» with the stress on «м+е» in every form, «утес» as «утёс» in every form, and «ждем», «ждет», «ждешь», «ждете» with ё.
 
 ## 0.2.1
 
