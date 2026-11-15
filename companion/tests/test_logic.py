@@ -507,6 +507,32 @@ class SavedVoices(unittest.TestCase):
             self.assertEqual(saved_voices(config), "sapi")
 
 
+class OnnxParts(unittest.TestCase):
+    """0.4.0: what the ONNX engines do without a model - F5's vocabulary and text, the switch, resampling."""
+
+    def test_vocab_and_ids(self):
+        from wcv.f5onnx import read_vocab, text_ids
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "vocab.txt"
+            path.write_text(" \n!\n+\nа\nб\n,\n\x0b\n", encoding="utf-8")   # a space line; an odd symbol too
+            vocab = read_vocab(path)
+        self.assertEqual(vocab[" "], 0)
+        self.assertEqual(vocab["\x0b"], 6)                       # lines split on "\n" only, as F5 reads the file
+        self.assertEqual(text_ids("б+а; я", vocab).tolist(), [[4, 2, 3, 5, 0, 0]])   # ";" -> ","; unknown -> 0
+
+    def test_backend_switch(self):
+        from wcv.f5engine import onnx_backend
+        self.assertFalse(onnx_backend({}))
+        self.assertTrue(onnx_backend({"f5_backend": "ONNX"}))
+
+    def test_resample(self):
+        import numpy as np
+        from wcv.whisper_onnx import resample
+        x = np.sin(np.linspace(0, 100, 24000)).astype(np.float32)
+        self.assertEqual(len(resample(x, 24000, 16000)), 16000)
+        self.assertIs(resample(x, 16000, 16000).dtype, np.dtype(np.float32))
+
+
 class Links(unittest.TestCase):
     """Pages the addon asks the companion to open: only its own list, the same as the addon's."""
 

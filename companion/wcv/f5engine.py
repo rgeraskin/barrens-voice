@@ -93,25 +93,38 @@ def wav_bytes(samples, rate: int, volume: float, gain_db: float = 0.0) -> bytes:
     return wav((np.clip(samples, -1, 1) * 32767).astype("<i2").tobytes(), rate)
 
 
+def onnx_backend(config: dict) -> bool:
+    """F5 and Whisper through ONNX Runtime (0.4.0, `f5_backend: "onnx"`) instead of torch."""
+    return str(config.get("f5_backend", "torch")).lower() == "onnx"
+
+
 def make_bank(config: dict, home: Path, log) -> list:
     """The voice bank (gamevoices): as it is, or made again from the game client with Whisper
     loaded for it and freed from the GPU afterwards."""
     out = gamevoices.bank_dir(config, home)
     checker = None
     if gamevoices.stale(config, out):
-        from .refcheck import Checker
-        checker = Checker(log)
+        if onnx_backend(config):
+            from .whisper_onnx import OnnxChecker
+            checker = OnnxChecker(log, config.get("f5_onnx_provider", "DmlExecutionProvider"))
+        else:
+            from .refcheck import Checker
+            checker = Checker(log)
         if not checker.load():
             checker = None
     try:
         return gamevoices.build(config, out, log, checker)
     finally:
         if checker is not None:
-            checker.pipe = None
             import gc
-            import torch
-            gc.collect()
-            torch.cuda.empty_cache()
+            if onnx_backend(config):
+                checker.encoder = checker.decoder = None
+                gc.collect()
+            else:
+                checker.pipe = None
+                import torch
+                gc.collect()
+                torch.cuda.empty_cache()
 
 
 def prepare_voices(config: dict, home: Path, log) -> None:
@@ -121,9 +134,14 @@ def prepare_voices(config: dict, home: Path, log) -> None:
     try:
         if not gamevoices.stale(config, gamevoices.bank_dir(config, home)):
             return
-        import torch
-        if not torch.cuda.is_available():
-            return
+        if onnx_backend(config):
+            import onnxruntime
+            if config.get("f5_onnx_provider", "DmlExecutionProvider") not in onnxruntime.get_available_providers():
+                return
+        else:
+            import torch
+            if not torch.cuda.is_available():
+                return
         make_bank(config, home, log)
     except ImportError:
         return
@@ -187,12 +205,53 @@ class F5Speaker:
         self.accentor = accentor or Accentor(log, config.get("ruaccent", True))
         self.assigner: Assigner | None = None
         self.tts = None
+        self.onnx = None             # F5Onnx with f5_backend "onnx"
+        self.device = ""
         self.ref_text: dict[str, str] = {}
         self.target_pace = 0.0
 
     # --- setup (on the synth thread) --------------------------------------------------------
 
     def _load(self) -> None:
+        if onnx_backend(self.config):
+            self._load_onnx()
+        else:
+            self._load_torch()
+        import soundfile as sf
+        slots = self.assigner.slots
+        self.ref_text = {s.id: self.accentor.accent(s.text) for s in slots}
+        self.ref_seconds = {s.id: sf.info(s.path).duration for s in slots}
+        paces = sorted(s.speech / max(1, len(s.text.encode("utf-8"))) for s in slots if s.shift == 0 and s.speech)
+        quantile = self.config.get("voice_pace_quantile", 0.25)
+        self.target_pace = paces[min(len(paces) - 1, int(len(paces) * quantile))] if paces else 0.0
+        first = next(s for s in slots if s.race)
+        self._synth(first, "Проверка.", 100)   # warm-up: the first call is slow
+        self.log(f"F5-TTS готов на {self.device}")
+
+    def _load_onnx(self) -> None:
+        """F5 through ONNX Runtime: no torch; the models from `f5_onnx_dir`."""
+        import onnxruntime
+
+        provider = self.config.get("f5_onnx_provider", "DmlExecutionProvider")
+        if provider not in onnxruntime.get_available_providers():
+            raise RuntimeError(f"ONNX Runtime без {provider} (нужна видеокарта с DirectX 12)")
+        model_dir = self.config.get("f5_onnx_dir") or str(self.home / "onnx")
+        if not (Path(model_dir) / "F5_Metadata.onnx").exists():
+            raise RuntimeError(f"нет моделей F5 в ONNX: {model_dir} (f5_onnx_dir в config.json)")
+        slots = make_bank(self.config, self.home, self.log)
+        self.assigner = Assigner(slots, self.home / "assignments.json", self.config["players"])
+        self.log("загружаю RUAccent ...")
+        self.accentor.load()
+        self.log("загружаю F5-TTS (ONNX) ...")
+        from huggingface_hub import hf_hub_download
+
+        from .f5onnx import F5Onnx
+        self.onnx = F5Onnx(Path(model_dir), Path(hf_hub_download(MODEL_REPO, VOCAB_FILE)), provider, self.log)
+        self.onnx.load()
+        self.ref_audio: dict[str, object] = {}
+        self.device = f"ONNX Runtime, {provider}"
+
+    def _load_torch(self) -> None:
         import soundfile as sf
         import torch
         import torchaudio
@@ -220,14 +279,7 @@ class F5Speaker:
                              vocab_file=hf_hub_download(MODEL_REPO, VOCAB_FILE), device="cuda")
         offline = os.environ.get("HF_HUB_OFFLINE") == "1"
         self.log("модели F5 и Vocos: " + ("из кэша, без сети" if offline else "из кэша Hugging Face (с проверкой обновлений)"))
-        self.ref_text = {s.id: self.accentor.accent(s.text) for s in slots}
-        self.ref_seconds = {s.id: sf.info(s.path).duration for s in slots}
-        paces = sorted(s.speech / max(1, len(s.text.encode("utf-8"))) for s in slots if s.shift == 0 and s.speech)
-        quantile = self.config.get("voice_pace_quantile", 0.25)
-        self.target_pace = paces[min(len(paces) - 1, int(len(paces) * quantile))] if paces else 0.0
-        first = next(s for s in slots if s.race)
-        self._synth(first, "Проверка.", 100)   # warm-up: the first call is slow
-        self.log(f"F5-TTS готов на {torch.cuda.get_device_name(0)}")
+        self.device = torch.cuda.get_device_name(0)
 
     def reference(self, slot, text: str):
         """(clip, its text, its seconds)."""
@@ -248,10 +300,18 @@ class F5Speaker:
         ref_file, ref_text, ref = self.reference(slot, text)
         total = self.duration(slot, text, rate, character)
         for attempt in range(2):
-            with contextlib.redirect_stdout(io.StringIO()):   # F5 prints ref_text/gen_text for each call
-                wav, sr, _ = self.tts.infer(ref_file=ref_file, ref_text=ref_text, gen_text=text,
-                                            nfe_step=self.config["nfe_step"], speed=rate / 100,
-                                            fix_duration=total, show_info=lambda *a: None, progress=None)
+            if self.onnx is not None:
+                if ref_file not in self.ref_audio:
+                    import soundfile as sf
+                    from .whisper_onnx import resample
+                    data, sr_in = sf.read(ref_file, dtype="float32", always_2d=True)
+                    self.ref_audio[ref_file] = resample(data.mean(axis=1), sr_in, self.onnx.in_rate)
+                wav, sr = self.onnx.synth(self.ref_audio[ref_file], ref_text, text, total)
+            else:
+                with contextlib.redirect_stdout(io.StringIO()):   # F5 prints ref_text/gen_text for each call
+                    wav, sr, _ = self.tts.infer(ref_file=ref_file, ref_text=ref_text, gen_text=text,
+                                                nfe_step=self.config["nfe_step"], speed=rate / 100,
+                                                fix_duration=total, show_info=lambda *a: None, progress=None)
             if attempt or silence_after(wav, sr) >= CUT_TAIL:
                 break
             total = ref + (total - ref) * 1.25
@@ -278,11 +338,12 @@ class F5Speaker:
             line = self.lines.get()
             self.working = True
             if line is None:                 # shutdown: free the model and the GPU memory
-                self.tts = None
+                self.tts = self.onnx = None
                 import gc
-                import torch
                 gc.collect()
-                torch.cuda.empty_cache()
+                if not onnx_backend(self.config):
+                    import torch
+                    torch.cuda.empty_cache()
                 return
             generation = self.player.generation   # a stop while this is being made drops it
             slot = self.assigner.slot_for(line.sender, line.race, line.sex)
