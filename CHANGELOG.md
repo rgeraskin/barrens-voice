@@ -21,6 +21,8 @@
 - The dictionary reads «тг» as «телеграм», «ага» with the stress on the last «а», and «доведёте» (and «доведёт», «доведёшь», «доведём») with «ё».
 - A line that is nothing but questions is announced «Громмаш спрашивает: …» instead of «пишет» (the voices raise their tone at a question mark unevenly, the verb tells it by ear); yells and whispers keep their verbs.
 - The dictionary reads «Серёжа» in every case, and «учёный» in its forms, with «ё».
+- «1 место» is read as a count, «одно место» (it was «первое»): in chat it is mostly «1 место в группу»; «15 место» and «на 2 месте» stay ordinal.
+- The dictionary reads «Серёжа» in every case, and «учёный» in its forms, with «ё».
 
 ## 0.2.0
 

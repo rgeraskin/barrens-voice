@@ -119,7 +119,7 @@ def plain(text: str) -> str:
 NEXT_WORD = re.compile(r"\s+([а-яёА-ЯЁ+]+)")
 GENDERS = {"masc", "femn", "neut"}
 # words that number rather than count: "15 уровня" is the fifteenth (a count is "15 уровней")
-NUMBERED = {"уровень", "этаж", "место", "число", "ранг", "фаза", "сезон", "глава", "акт", "волна", "слот", "босс"}
+NUMBERED = {"уровень", "этаж", "число", "ранг", "фаза", "сезон", "глава", "акт", "волна", "слот", "босс"}
 # a numbered noun whose singular the stress model takes for the plural ("числ+а" - "two numbers"):
 # after an ordinal it is the singular, stressed here
 SINGULAR_STRESS = {"числа": "ч+исла", "места": "м+еста"}
