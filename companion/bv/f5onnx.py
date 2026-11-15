@@ -38,6 +38,21 @@ def text_ids(text: str, vocab: dict[str, int]) -> np.ndarray:
     return np.array([[vocab.get(ch, 0) for ch in text.translate(PUNCTUATION)]], dtype=np.int32)
 
 
+TAIL_FRAMES = 2       # Decode's last frames: a burst at full scale, heard as a click when the line stops
+FADE_SECONDS = 0.01
+
+
+def clean_tail(samples: np.ndarray, hop: int, rate: int) -> np.ndarray:
+    """The line without Decode's last TAIL_FRAMES frames and with a short fade-out. The exported Vocos
+    ends every line with a few dozen samples at ±1 (torch's F5 gives the line two frames shorter, ending
+    in silence): heard as a click, and that false peak also made the line quieter in `tidy`."""
+    out = samples[:max(0, len(samples) - TAIL_FRAMES * hop)].copy()
+    n = min(len(out), int(rate * FADE_SECONDS))
+    if n:
+        out[-n:] *= np.linspace(1.0, 0.0, n, dtype=out.dtype)
+    return out
+
+
 class F5Onnx:
     def __init__(self, model_dir: Path, vocab_path: Path, provider: str = "DmlExecutionProvider", log=print,
                  session_config: dict | None = None):
@@ -107,7 +122,7 @@ class F5Onnx:
                                       "ref_mel_tail": tail})[0]
             # where the time goes: preparing, the denoising steps, Vocos (seconds), and the frames
             self.timings = (prepared - started, denoised - prepared, time.perf_counter() - denoised, duration)
-        return np.asarray(out, dtype=np.float32).reshape(-1), self.out_rate
+        return clean_tail(np.asarray(out, dtype=np.float32).reshape(-1), self.hop, self.out_rate), self.out_rate
 
     def _denoise(self, noise: np.ndarray, fixed: dict) -> np.ndarray:
         """The denoising steps. On the card the conditions go there once and the noise stays there,

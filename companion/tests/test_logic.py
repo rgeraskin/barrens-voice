@@ -520,6 +520,18 @@ class OnnxParts(unittest.TestCase):
         self.assertEqual(vocab["\x0b"], 6)                       # lines split on "\n" only, as F5 reads the file
         self.assertEqual(text_ids("б+а; я", vocab).tolist(), [[4, 2, 3, 5, 0, 0]])   # ";" -> ","; unknown -> 0
 
+    def test_clean_tail(self):
+        import numpy as np
+        from bv.f5onnx import clean_tail
+        x = np.full(24000, 0.1, np.float32)
+        x[-30:] = -1.0                                           # the burst Decode ends a line with
+        out = clean_tail(x, 256, 24000)
+        self.assertEqual(len(out), 24000 - 512)
+        self.assertLess(float(np.abs(out).max()), 0.11)          # no false peak left for `tidy`
+        self.assertEqual(float(out[-1]), 0.0)                    # faded out: nothing to click
+        self.assertAlmostEqual(float(out[-241]), 0.1, places=5)  # only the last 10 ms
+        self.assertEqual(len(clean_tail(x[:100], 256, 24000)), 0)
+
     def test_backend_switch(self):
         from bv.f5engine import onnx_backend
         self.assertFalse(onnx_backend({}))
