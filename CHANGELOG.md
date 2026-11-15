@@ -7,6 +7,7 @@
 - Retail closes chat to addons in dungeons, raids, boss fights, Mythic+ and PvP (text, sender and GUID come as secret values): such lines are not read and no error is raised; the addon says so once, and the hidden chat window shows them.
 - The chat waits for Wayfarer (WayfarerRU) as for CatQuest: its quests, NPC lines, place lore and radio stories pause the chat, a paused Wayfarer does not. One setting for both: «Ждать озвучку квестов (CatQuest, Wayfarer)».
 - The dictionary reads «чиловая» as «чил+овая» in every form, «пиши» as «пиш+и», «губа» as «губ+а», «тикет» as «т+икет» in every form, «хелло» as «хелл+оу», «менеджмент» and «манаменеджмент» with the stress on «м+е» in every form, «утес» as «утёс» in every form, and «ждем», «ждет», «ждешь», «ждете» with ё.
+- «РЛ» is read as «руины Лордерона» (declined after a preposition: «у руин Лордерона»), and as «рейд-лидер» where the words around it say so («нужен РЛ», «РЛ сказал», «пишите РЛу», «с РЛом»). Declension: a hyphenated word declines as one («с рейд-лидером»), and «руины» as a thing («в руины», not «в руин»).
 
 ## 0.2.1
 

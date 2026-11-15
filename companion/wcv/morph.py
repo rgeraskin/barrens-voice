@@ -12,7 +12,7 @@ import threading
 
 MARKED = re.compile(r"\x02([^\x02\x03]*)\x03")
 PREVIOUS = re.compile(r"([а-яё]+)\W*$", re.IGNORECASE)
-WORD = re.compile(r"[\w'+]+|[^\w'+]+")
+WORD = re.compile(r"[\w'+]+(?:-[\w'+]+)*|[^\w'+]+")   # "рейд-лидер" is one word: its second half declines
 
 # Preposition -> case. "в"/"на" can be "where" (prepositional) as well as "where to" (accusative);
 # chat looking for groups means "where to" far more often.
@@ -123,7 +123,15 @@ class Inflector:
             adjectives = [o for o in nominative if o.tag.POS in ("ADJF", "PRTF")]
             if adjectives:
                 return adjectives[0]
-        return (nominative or options)[0]
+        best = (nominative or options)[0]
+        if best.tag.animacy == "anim":
+            # "руины": pymorphy reads the nominative only as animate, so "в руины" became "в руин" (the
+            # animate accusative); a thing of the same word, if pymorphy knows one, declines right
+            things = [o for o in options if o.tag.animacy == "inan" and o.normal_form == best.normal_form
+                      and o.tag.POS == best.tag.POS and o.tag.number == best.tag.number]
+            if things:
+                return things[0]
+        return best
 
     @staticmethod
     def _like(original: str, new: str) -> str:

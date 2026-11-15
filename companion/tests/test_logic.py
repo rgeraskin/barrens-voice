@@ -224,6 +224,20 @@ class DictionaryInCompanion(unittest.TestCase):
         d.refresh()
         return d
 
+    def test_rl(self):
+        # «РЛ»: the Ruins of Lordaeron, unless the words around it say it is the raid leader
+        from wcv.morph import Inflector
+        d, inf = self.book(), Inflector(print)
+
+        def read(text):
+            return inf.apply(d.apply(inf.apply(d.apply_words(text)), mark=True))
+        self.assertEqual(read("встречаемся в РЛ"), "встречаемся в ру+ины Лордер+она")
+        self.assertEqual(read("у РЛ стоим"), "у ру+ин Лордер+она стоим")
+        self.assertEqual(read("нужен РЛ на МК"), "нужен рейд-лидер на МК")
+        self.assertEqual(read("РЛ сказал ждать"), "рейд-лидер сказал ждать")
+        self.assertEqual(read("пишите РЛу"), "пишите рейд-лидеру")
+        self.assertEqual(read("с рлом договорились"), "с рейд-лидером договорились")
+
     def test_default_entries(self):
         d = self.book()
         plain = lambda text: d.apply_words(text).replace("\x02", "").replace("\x03", "")

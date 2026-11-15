@@ -46,6 +46,14 @@ class Declension(unittest.TestCase):
         self.check("нужен " + m("т+анк") + " и " + m("х+ил"), "нужен т+анк и х+ил")
         self.check(m("продам") + " сумки", "продам сумки")
 
+    def test_things_and_hyphens(self):
+        # pymorphy reads nominative "руины" only as animate: the thing reading declines right
+        self.check("в " + m("ру+ины Лордер+она"), "в ру+ины Лордер+она")
+        self.check("из " + m("ру+ины Лордер+она"), "из ру+ин Лордер+она")
+        # a hyphenated word declines as one: "рейд-лидером", not "рейдом лидер"
+        self.check("с " + m("рейд-лидер"), "с рейд-лидером")
+        self.check("для " + m("рейд-лидер"), "для рейд-лидера")
+
 
 if __name__ == "__main__":
     unittest.main()
