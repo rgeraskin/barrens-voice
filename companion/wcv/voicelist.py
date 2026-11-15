@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .dictionary import wow_roots
+from .dictionary import GAMES, game_of, wow_roots
 
 ENGINES = {"edge": "Edge", "rhvoice": "RHVoice", "silero": "Silero", "other": "Windows"}
 
@@ -27,7 +27,7 @@ def missing_addon(config: dict) -> str | None:
     games = [str(r) for r in wow_roots(config) if (r / "Interface").is_dir() or (r / "Wow.exe").exists()]
     where = ("в папке игры " + ", ".join(games)) if games else "— папка игры тоже не найдена"
     return ("аддон WoW Chat Voice не установлен: нет Interface\\AddOns\\WowChatVoice\\WowChatVoice.toc " + where + ". "
-            "Скопируйте папку addon\\WowChatVoice в World of Warcraft\\_forever_\\Interface\\AddOns\\ "
+            "Скопируйте папку addon\\WowChatVoice в World of Warcraft\\" + GAMES[game_of(config)] + "\\Interface\\AddOns\\ "
             "(или укажите wow_dir в config.json, если игра стоит в другом месте) и запустите компаньон снова.")
 
 

@@ -9,7 +9,7 @@ echo Installing F5-TTS: race voices, NVIDIA GPU, several GB...
 .venv\Scripts\python.exe -m pip install -q -r requirements-f5.txt || echo F5-TTS not installed: Windows voices only.
 :run
 title WoW Chat Voice
-.venv\Scripts\python.exe -m wcv
+.venv\Scripts\python.exe -m wcv %*
 if errorlevel 1 pause
 exit /b
 :fail

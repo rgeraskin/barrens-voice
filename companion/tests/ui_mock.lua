@@ -598,3 +598,42 @@ assert(CL({ "officer", "Офицеры", "OFFICER", "/o" }) == "Офицеры (
 assert(CL({ "self", "Свои сообщения" }) == "Свои сообщения", "no command")
 SLASH_PARTY1, SLASH_PARTY2, SLASH_PARTY3, SLASH_RAID1, SLASH_RAID2, SLASH_RAID3, SLASH_GUILD1, SLASH_GUILD2 = nil
 print("channel labels ok")
+
+-- retail's closed chat: secret text, sender and GUID are not touched or read; the window shows the line
+local SECRET = setmetatable({}, { __tostring = function() error("a secret value cannot be read") end,
+    __index = function() error("a secret value cannot be read") end,
+    __concat = function() error("a secret value cannot be read") end,
+    __eq = function() error("a secret value cannot be compared") end })
+issecretvalue = function(v) return rawequal(v, SECRET) end
+assert(ns.Secret("обычный", "Вася") == false and ns.Secret("обычный", SECRET) == true)
+local pushed, told, quiet2 = {}, {}, print
+ns.Strip.Push = function(p) pushed[#pushed + 1] = p end
+print = function(t) told[#told + 1] = t end
+ns.db.enabled, ns.db.party, ns.db.onlyVisible = true, true, false
+local function event(text, sender, guid)
+    ns.OnEvent("CHAT_MSG_PARTY", text, sender, "", "", "", "", 0, 0, "", 0, 1, guid)
+end
+event(SECRET, SECRET, SECRET)
+event(SECRET, SECRET, SECRET)
+assert(#pushed == 0, "a secret line is not sent")
+assert(#told == 1 and told[1]:find("закрывает чат от аддонов"), "told once while it lasts: " .. #told)
+event("кто идёт?", "Вася-Степи", "Player-1-2")
+assert(#pushed == 1, "an open line after it is sent")
+event(SECRET, SECRET, SECRET)
+assert(#told == 2, "closed again later: told again")
+-- the chat window: a secret line shows it (the filter does not read it)
+ns.db.fadeChat = true
+ChatFrame1:SetAlpha(1)
+now = now + 30
+for _ = 1, 10 do ns.ChatFade.Update(nil, 0.3) end
+assert(ChatFrame1:GetAlpha() == 0, "hidden before")
+ns.db.debug = true
+filters.CHAT_MSG_PARTY(ChatFrame1, "CHAT_MSG_PARTY", SECRET, SECRET, "", "", "", "", 0, 0, "", 0, 1, SECRET)
+ChatFrame1:AddMessage(SECRET)
+for _ = 1, 2 do ns.ChatFade.Update(nil, 0.3) end
+assert(ChatFrame1:GetAlpha() == 1, "a closed-chat line shows the window")
+ns.db.debug, ns.db.fadeChat = false, false
+ns.ChatFade.Apply()
+print = quiet2
+issecretvalue = nil
+print("secret chat ok")

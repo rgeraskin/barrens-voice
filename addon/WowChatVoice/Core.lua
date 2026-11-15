@@ -522,6 +522,30 @@ function ns.Reads(event, guid, text, baseName, channelString)
     return db.self or not (guid and guid ~= "" and guid == UnitGUID("player"))
 end
 
+-- Retail (12.x) keeps chat from addons in a dungeon or raid, in a boss fight, a Mythic+ or a PvP
+-- match ("chat messaging lockdown"): the text, the sender and the GUID come as secret values, which no
+-- addon can read - any string operation on one is an error. Such a line is not read; the chat window
+-- shows it (ChatFade.lua); the player is told once while it lasts. WoW Forever has no such rule.
+--- Whether any of the values is secret (retail's restrictions; never on a client without them).
+function ns.Secret(...)
+    local issecretvalue = rawget(_G, "issecretvalue")
+    if not issecretvalue then return false end
+    for i = 1, select("#", ...) do
+        if issecretvalue((select(i, ...))) then return true end
+    end
+    return false
+end
+
+ns.secretTold = false
+function ns.SecretLine()
+    if ns.db.debug then ns.Diag("не отправлено (закрытый чат: подземелье, рейд, бой с боссом или PvP)") end
+    if not ns.secretTold then
+        ns.secretTold = true
+        print(PREFIX .. "здесь игра закрывает чат от аддонов (подземелье, рейд, бой с боссом или PvP): он не "
+            .. "озвучивается, строки видны в окне чата.")
+    end
+end
+
 local function OnChat(event, text, sender, _, channelString, _, _, _, _, baseName, _, _, guid)
     local db = ns.db
     local key = EVENTS[event]
@@ -635,7 +659,7 @@ end
 
 local loader = CreateFrame("Frame")
 loader:RegisterEvent("ADDON_LOADED")
-loader:SetScript("OnEvent", function(self, event, name, ...)
+local function OnEvent(self, event, name, ...)
     if event == "ADDON_LOADED" then
         if name ~= ADDON then return end
         ns.firstRun = WowChatVoiceDB == nil   -- no saved settings yet: a welcome at login
@@ -673,12 +697,19 @@ loader:SetScript("OnEvent", function(self, event, name, ...)
         end
         return
     end
+    if EVENTS[event] and ns.db.enabled and ns.Secret(name, (...), (select(11, ...))) then
+        ns.SecretLine()                -- retail: a dungeon, raid, boss fight or PvP keeps chat from addons
+        return
+    end
     if EVENTS[event] and ns.db.enabled then
+        ns.secretTold = false
         local visible, why = Visible(event, name, ...)
         if not visible then ns.Skip(why, (...), name) return end
     end
     OnChat(event, name, ...)
-end)
+end
+loader:SetScript("OnEvent", OnEvent)
+ns.OnEvent = function(event, ...) OnEvent(loader, event, ...) end   -- for the tests
 
 SLASH_WOWCHATVOICE1 = "/wcv"
 SlashCmdList.WOWCHATVOICE = function(msg)

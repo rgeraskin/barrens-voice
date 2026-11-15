@@ -60,12 +60,15 @@ def find_battlenet(config: dict) -> Path | None:
 
 
 def launch(config: dict, log) -> bool:
-    """Ask Battle.net to start the game (`launch_product`: WoWF is Forever, WoW retail)."""
+    """Ask Battle.net to start the game of `game` (`launch_product` for Forever, WoWF;
+    `launch_product_retail` for retail, WoW)."""
     exe = find_battlenet(config)
     if exe is None:
         log("Battle.net не найден: запустите игру сами (или укажите battlenet_exe в config.json)")
         return False
-    product = config.get("launch_product", "WoWF")
+    from .dictionary import game_of
+    product = (config.get("launch_product_retail", "WoW") if game_of(config) == "retail"
+               else config.get("launch_product", "WoWF"))
     subprocess.Popen([str(exe), f"--exec=launch {product}"], close_fds=True,
                      creationflags=getattr(subprocess, "DETACHED_PROCESS", 0))
     log(f"запускаю игру через Battle.net ({product}) ...")

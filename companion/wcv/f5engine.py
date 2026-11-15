@@ -96,7 +96,7 @@ def wav_bytes(samples, rate: int, volume: float, gain_db: float = 0.0) -> bytes:
 def make_bank(config: dict, home: Path, log) -> list:
     """The voice bank (gamevoices): as it is, or made again from the game client with Whisper
     loaded for it and freed from the GPU afterwards."""
-    out = home / "voices"
+    out = gamevoices.bank_dir(config, home)
     checker = None
     if gamevoices.stale(config, out):
         from .refcheck import Checker
@@ -119,7 +119,7 @@ def prepare_voices(config: dict, home: Path, log) -> None:
     are read while nothing (Battle.net patching, the game) is busy with them. Quiet when the bank
     is up to date or F5 cannot run here (the F5 engine reports that when it is asked for)."""
     try:
-        if not gamevoices.stale(config, home / "voices"):
+        if not gamevoices.stale(config, gamevoices.bank_dir(config, home)):
             return
         import torch
         if not torch.cuda.is_available():

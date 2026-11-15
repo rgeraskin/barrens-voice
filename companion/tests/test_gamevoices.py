@@ -45,6 +45,22 @@ class Storage(unittest.TestCase):
         self.assertEqual(casc.parse_root(raw, {10}), {10: [(en, b"E" * 16), (ru, b"R" * 16)]})
         self.assertEqual(casc.parse_root(raw, {12, 99}), {12: [(en, b"F" * 16)]})
 
+    def test_missing_file_from_the_other_game(self):
+        # retail lists a file it has not downloaded; Forever holds the same content key on its disk
+        ru = casc.LOCALES["ruRU"]
+
+        class Fake(casc.Storage):
+            def __init__(self, root_entries, local):
+                self.entries, self.local = root_entries, local
+            def root(self, wanted):
+                return {f: v for f, v in self.entries.items() if f in wanted}
+            def read_ckeys(self, ckeys):
+                return {ck: self.local[ck] for ck in ckeys if ck in self.local}
+        retail = Fake({1: [(ru, b"A" * 16)], 2: [(ru, b"B" * 16)]}, {b"A" * 16: b"oggA"})
+        forever = Fake({}, {b"B" * 16: b"oggB"})
+        self.assertEqual(retail.read_files({1, 2}), {1: b"oggA"})
+        self.assertEqual(retail.read_files({1, 2}, others=[forever]), {1: b"oggA", 2: b"oggB"})
+
     def test_product_of(self):
         with tempfile.TemporaryDirectory() as d:
             flavor = Path(d) / "_forever_"

@@ -37,13 +37,26 @@ def unescape(body: str) -> str:
     return raw.decode("utf-8", "replace")
 
 
+GAMES = {"forever": "_forever_", "retail": "_retail_"}
+
+
+def game_of(config: dict) -> str:
+    """The game the companion works with: "forever" (default) or "retail" (config.json `game`, or
+    the --retail / --forever switch)."""
+    game = str(config.get("game") or "forever").lower()
+    return game if game in GAMES else "forever"
+
+
 def wow_roots(config: dict) -> list[Path]:
-    """Game folders (_forever_, _retail_) of the configured and the usual WoW installs."""
+    """The game folder (_forever_ or _retail_, as `game` says) of the configured and the usual WoW
+    installs - only that game's: with both installed, the other one's addon and saved variables must
+    not be taken for this one's."""
+    flavor = GAMES[game_of(config)]
     roots = [Path(config["wow_dir"])] if config.get("wow_dir") else []
     for drive in "CDEFGH":
         for base in (f"{drive}:/World of Warcraft", f"{drive}:/Games/World of Warcraft",
                      f"{drive}:/Program Files (x86)/World of Warcraft"):
-            roots += [Path(base) / "_forever_", Path(base) / "_retail_"]
+            roots.append(Path(base) / flavor)
     return roots
 
 

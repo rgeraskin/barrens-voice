@@ -119,9 +119,23 @@ class Storage:
         ckey = bytes.fromhex(self.config["root"][0])
         return parse_root(self.read_ekey(self.ekeys_for([ckey])[ckey]), wanted)
 
-    def read_files(self, fdids, locale: str = "ruRU") -> dict[int, bytes]:
+    def read_ckeys(self, ckeys) -> dict[bytes, bytes]:
+        """The files with these content keys that this storage holds locally (retail downloads much of
+        its data only when the game needs it, so a file it lists may not be on the disk)."""
+        ekeys = self.ekeys_for(ckeys)
+        out: dict[bytes, bytes] = {}
+        for ckey, ekey in ekeys.items():
+            try:
+                out[ckey] = self.read_ekey(ekey)
+            except (KeyError, ValueError, OSError, zlib.error):
+                continue
+        return out
+
+    def read_files(self, fdids, locale: str = "ruRU", others=()) -> dict[int, bytes]:
         """The files' bytes in `locale` - only files that have a recording of their own for it (a
-        file shared by every locale is left out: for voices that is the English one)."""
+        file shared by every locale is left out: for voices that is the English one). A file not in
+        this storage is taken from `others` (another game's storages) by its content key: the same
+        key is the same file, byte for byte."""
         flag, english = LOCALES[locale], LOCALES["enUS"]
         entries = self.root(fdids)
         chosen: dict[int, bytes] = {}
@@ -130,15 +144,13 @@ class Storage:
             own = {ck for loc, ck in versions if loc & flag and not loc & english}
             if own:
                 chosen[fdid] = next(iter(own))
-        ekeys = self.ekeys_for(chosen.values())
-        out: dict[int, bytes] = {}
-        for fdid, ckey in chosen.items():
-            if ckey in ekeys:
-                try:
-                    out[fdid] = self.read_ekey(ekeys[ckey])
-                except (KeyError, ValueError, OSError, zlib.error):
-                    continue                           # not in the local storage, or encrypted
-        return out
+        have = self.read_ckeys(chosen.values())
+        for other in others:
+            missing = [ck for ck in chosen.values() if ck not in have]
+            if not missing:
+                break
+            have.update(other.read_ckeys(missing))
+        return {fdid: have[ckey] for fdid, ckey in chosen.items() if ckey in have}
 
 
 def parse_root(raw: bytes, wanted) -> dict[int, list[tuple[int, bytes]]]:

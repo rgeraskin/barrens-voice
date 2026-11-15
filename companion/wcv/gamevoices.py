@@ -60,15 +60,37 @@ def find_game(config: dict) -> tuple[Path, Path] | None:
         except (LookupError, OSError):
             return False
 
-    roots = wow_roots(config)
-    for flavor in ("_forever_", "_retail_"):
-        for root in roots:
-            if root.name == flavor and usable(root):
-                return root.parent, root
-    for root in roots:                                 # a wow_dir pointing at some other game folder
+    roots = wow_roots(config)                          # only the chosen game's folders
+    for root in roots:
         if usable(root):
             return root.parent, root
     return None
+
+
+def other_storages(config: dict, log) -> list:
+    """The storages of the other WoW games installed: retail keeps much of its data on Blizzard's
+    servers until the game needs it, so the voices of the classic races may not be on its disk,
+    while Forever has the very same files (the same content keys)."""
+    from .casc import Storage
+    from .dictionary import GAMES, game_of
+    out = []
+    for game in GAMES:
+        if game == game_of(config):
+            continue
+        found = find_game({**config, "game": game, "wow_dir": ""})
+        if found:
+            try:
+                from .casc import product_of
+                out.append(Storage(found[0], product_of(found[1])))
+            except (LookupError, OSError, ValueError) as e:
+                log(f"хранилище {found[1]}: {e}")
+    return out
+
+
+def bank_dir(config: dict, home: Path) -> Path:
+    """Each game its own bank: the clients' files and builds differ (voices, voices-retail)."""
+    from .dictionary import game_of
+    return home / ("voices" if game_of(config) == "forever" else "voices-" + game_of(config))
 
 
 def _stamp(config: dict, shifts) -> dict | None:
@@ -218,8 +240,10 @@ def build(config: dict, out: Path, log, checker) -> list[Slot]:
         "каждого обновления игры, несколько минут ...")
     table = json.loads(TABLE.read_text(encoding="utf-8"))["voices"]
     storage = Storage(Path(stamp["install"]), stamp["product"])
-    files = storage.read_files({f[0] for v in table.values() for f in v["files"]}, "ruRU")
-    log(f"русских реплик в клиенте: {len(files)}")
+    others = other_storages(config, log)
+    files = storage.read_files({f[0] for v in table.values() for f in v["files"]}, "ruRU", others)
+    log(f"русских реплик в клиенте: {len(files)}" + (" (недостающие — из другой установленной игры WoW, те же файлы)"
+                                                      if others else ""))
     out.mkdir(parents=True, exist_ok=True)
     for old in out.glob("*.wav"):
         old.unlink()

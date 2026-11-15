@@ -115,9 +115,13 @@ local function OnAddMessage(self, text)
     if mark and mark.read and GetTime() - mark.at <= MARK_FOR and not asked then return end
     if ns.db and ns.db.fadeChat and F.Reveal(self) then
         if ns.db.debug then        -- /wcv debug: which line showed the window, and why
-            local line = tostring(text):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|H.-|h(.-)|h", "%1")
+            local line = "(закрытый текст)"   -- a secret one (retail) cannot be looked at
+            if not (ns.Secret and ns.Secret(text)) then
+                line = tostring(text):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|H.-|h(.-)|h", "%1")
+            end
             ns.Diag(("окно чата %s показано: %s — %s"):format(self.GetName and self:GetName() or "?",
                 asked and mark.read and "так просили в настройках (шёпот или гильдия)"
+                    or mark and mark.secret and "закрытый чат (подземелье, рейд, PvP), компаньону не передать"
                     or mark and "строку компаньон не читает" or "строка не из события чата (вывод аддона?)",
                 ns.Protocol.TrimUTF8(line, 90)))
         end
@@ -134,6 +138,11 @@ end
 --- The chat filter: never hides a line, only marks the window with whether the addon reads it.
 function F.Filter(frame, event, text, _, ...)
     if ns.askingFilters then return false end    -- Core's "is it visible" check calls the filters too
+    if ns.Secret and ns.Secret(text, (select(10, ...))) then
+        -- retail's closed chat (Core.lua): not read, so the window shows the line
+        marks[frame] = { read = false, secret = true, at = GetTime(), event = event }
+        return false
+    end
     marks[frame] = { read = ns.Reads(event, (select(10, ...)), text, (select(7, ...)), (select(2, ...))), at = GetTime(),
                      event = event }
     return false

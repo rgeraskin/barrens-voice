@@ -853,3 +853,25 @@ class AddonMissing(unittest.TestCase):
             with mock.patch("wcv.voicelist.wow_roots", return_value=[Path(d) / "nowhere"]):
                 self.assertIn("папка игры тоже не найдена", voicelist.missing_addon({}))
 
+
+
+class GameChoice(unittest.TestCase):
+    """Forever by default; retail by config or --retail: only that game's folders, launcher and bank."""
+
+    def test_folders_bank_and_product(self):
+        from unittest import mock
+        from wcv import gamevoices, launch
+        from wcv.dictionary import game_of, wow_roots
+        self.assertEqual(game_of({}), "forever")
+        self.assertEqual(game_of({"game": "Retail"}), "retail")
+        self.assertEqual(game_of({"game": "classic"}), "forever")             # unknown: the default
+        self.assertTrue(all(r.name == "_forever_" for r in wow_roots({})))
+        self.assertTrue(all(r.name == "_retail_" for r in wow_roots({"game": "retail"})))
+        self.assertEqual(gamevoices.bank_dir({}, Path("app")), Path("app/voices"))
+        self.assertEqual(gamevoices.bank_dir({"game": "retail"}, Path("app")), Path("app/voices-retail"))
+        with mock.patch("wcv.launch.find_battlenet", return_value=Path("bn.exe")), \
+             mock.patch("wcv.launch.subprocess.Popen") as popen:
+            launch.launch({"game": "retail"}, lambda *a: None)
+            self.assertIn("--exec=launch WoW", popen.call_args[0][0])
+            launch.launch({}, lambda *a: None)
+            self.assertIn("--exec=launch WoWF", popen.call_args[0][0])

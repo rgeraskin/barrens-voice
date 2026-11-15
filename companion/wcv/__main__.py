@@ -51,7 +51,9 @@ DEFAULT_CONFIG = {
     "wow_dir": "",
     "hf_home": "",
     "launch_wow": True,
+    "game": "forever",            # or "retail"; --retail / --forever on the command line override it
     "launch_product": "WoWF",
+    "launch_product_retail": "WoW",
     "battlenet_exe": "",
     "exit_with_wow": True,
     "spoken_notices": False,
@@ -219,6 +221,9 @@ def main() -> int:
     make_dpi_aware()
 
     config = load_config()
+    for game in ("retail", "forever"):                # WowChatVoice-Retail.cmd: the same companion, the other game
+        if f"--{game}" in sys.argv:
+            config["game"] = game
     # one Hugging Face cache for every model (F5, Vocos, RUAccent, Whisper): hf_home in config.json,
     # else the hf folder next to the program - before anything of Hugging Face is imported
     os.environ["HF_HOME"] = config.get("hf_home") or str(APP_DIR / "hf")
@@ -230,7 +235,8 @@ def main() -> int:
         from .f5engine import selftest as f5_selftest
         return f5_selftest(config, log, APP_DIR)
     log("=" * 60)
-    log(f"запуск; настройки: {CONFIG_PATH}")
+    from .dictionary import game_of
+    log(f"запуск; настройки: {CONFIG_PATH}; игра: {'WoW (ритейл)' if game_of(config) == 'retail' else 'WoW Forever'}")
     prune_logs(config["log_keep_days"])
     from . import launch
     from .status import Beat, SeenLines

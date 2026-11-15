@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0 (в работе)
+
+- Retail WoW: the companion works with one chosen game — `WowChatVoice-Retail.cmd` (or `"game": "retail"`) starts it for retail: retail's folder, Battle.net's «WoW», a voice bank of its own (`voices-retail`). Voice files retail has not downloaded yet are taken from an installed WoW Forever: the same content keys, the same files. The addon's TOC lists both games' interface versions.
+- Retail closes chat to addons in dungeons, raids, boss fights, Mythic+ and PvP (text, sender and GUID come as secret values): such lines are not read and no error is raised; the addon says so once, and the hidden chat window shows them.
+
 ## 0.2.1
 
 - Where the strip is can be set: «Мост…» in the settings (the strip is called the bridge there, with a tooltip on what it is; the program is the companion app there, «приложение-компаньон», or just «компаньон») — the top edge (as before), the bottom edge, or a place of your own (X, Y and width in screen pixels; the fields start from the top or bottom line's numbers). Another addon drawing in the same place — such as wow-ai, which draws its own strip in the top left corner — hid ours, and chat lines were lost while it was up. While the window is open, an orange frame shows where the strip will go; «Сохранить» moves it.
