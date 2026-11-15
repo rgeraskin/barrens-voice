@@ -228,6 +228,10 @@ def main() -> int:
     # one Hugging Face cache for every model (F5, Vocos, RUAccent, Whisper): hf_home in config.json,
     # else the hf folder next to the program - before anything of Hugging Face is imported
     os.environ["HF_HOME"] = config.get("hf_home") or str(APP_DIR / "hf")
+    # torch's note on every start, before it is imported: "Redirects are currently not supported in
+    # Windows or MacOs" (its distributed launcher's, which the companion never uses)
+    import logging
+    logging.getLogger("torch.distributed.elastic.multiprocessing.redirects").setLevel(logging.ERROR)
     if "--selftest" in sys.argv:
         from .speech import selftest
         selftest(config, log)

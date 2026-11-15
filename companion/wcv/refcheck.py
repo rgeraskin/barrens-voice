@@ -25,10 +25,19 @@ class Checker:
 
     def load(self) -> bool:
         try:
+            import logging
+
             import torch
             from transformers import pipeline
-            self.pipe = pipeline("automatic-speech-recognition", model=MODEL, torch_dtype=torch.float16,
-                                 device="cuda")
+            # transformers' own noise in the log: Whisper's generate passes its suppress tokens along with
+            # a generation config (a deprecation inside the library, nothing to change here), and "use a
+            # dataset" - the bank hears clips one by one on purpose, each deciding whether to go on
+            logging.getLogger("transformers.generation.utils").addFilter(
+                lambda record: "generation-related arguments" not in record.getMessage())
+            logging.getLogger("transformers.pipelines.base").setLevel(logging.ERROR)
+            self.pipe = pipeline("automatic-speech-recognition", model=MODEL, dtype=torch.float16, device="cuda")
+            # a BPE tokenizer: the WordPiece clean-up would strip spaces before punctuation
+            self.pipe.tokenizer.clean_up_tokenization_spaces = False
             return True
         except Exception as e:  # noqa: BLE001 - reported; the bank cannot be made without it
             self.log(f"Whisper недоступен: {e}")
