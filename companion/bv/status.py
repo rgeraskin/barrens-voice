@@ -4,7 +4,7 @@ The game reads an addon's Lua files from disk at every load - login and /reload 
 the companion rewrites is a channel back, if only at those moments (the way VoiceList.lua is). The
 companion writes the time into it every EVERY seconds from its start, before it launches the game
 and while its models load; the addon compares that time with its own clock when it loads and says
-in the chat whether the reading works. The file ships with the addon (WowChatVoiceStatus = nil), so
+in the chat whether the reading works. The file ships with the addon (BarrensVoiceStatus = nil), so
 it exists when the game starts: the client sees only files that were there at its launch.
 
 Sound files as flags (PlaySoundFile tells an empty file from a valid one, as wow-ai uses) would be
@@ -26,9 +26,9 @@ def write(addon: Path, now: float | None = None) -> bool:
     """The status file with the time now (epoch seconds, as the game's time()); False if it failed."""
     now = int(time.time() if now is None else now)
     path = Path(addon) / FILE
-    text = ("-- Written by the WoW Chat Voice companion app every 15 seconds while it runs; the addon reads it\n"
+    text = ("-- Written by the Barrens Voice companion app every 15 seconds while it runs; the addon reads it\n"
             "-- at login and /reload (Companion.lua).\n"
-            f"WowChatVoiceStatus = {{ beat = {now} }}\n")
+            f"BarrensVoiceStatus = {{ beat = {now} }}\n")
     tmp = path.with_suffix(".tmp")
     try:
         tmp.write_text(text, encoding="utf-8")

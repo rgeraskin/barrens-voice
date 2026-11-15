@@ -43,7 +43,7 @@ def _replayed(line) -> bool:
 
 def queue_line(lines: queue.Queue, line, limit: int, log) -> None:
     """A chat line into an engine's queue. With `limit` live lines waiting, the oldest of them is
-    dropped - the reading keeps up with the chat - but never a line sent again by /wcv last (asked
+    dropped - the reading keeps up with the chat - but never a line sent again by /bv last (asked
     for; the addon marks it replay=1): a replay waits whole and does not count toward the limit, so
     the chat that comes meanwhile keeps its own `limit` lines behind it."""
     if lines.qsize() >= limit:
@@ -74,7 +74,7 @@ class Player(threading.Thread):
         super().__init__(daemon=True, name="player")
         import tempfile
         from pathlib import Path
-        self.folder = Path(folder) if folder else Path(tempfile.gettempdir()) / "wow-chat-voice"
+        self.folder = Path(folder) if folder else Path(tempfile.gettempdir()) / "barrens-voice"
         self.folder.mkdir(parents=True, exist_ok=True)
         self.turn = 0
         self.items: queue.Queue = queue.Queue()

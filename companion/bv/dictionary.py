@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-SAVED = "WowChatVoice.lua"
+SAVED = "BarrensVoice.lua"
 # The player's layer the addon keeps for us in its saved variables (as it sends it over the strip).
 LUA_USER = re.compile(r'\["dictionaryUser"\]\s*=\s*"((?:[^"\\]|\\.)*)"', re.S)
 DEFAULT_BLOCK = re.compile(r"D\.DEFAULT\s*=\s*\[\[(.*?)\]\]", re.S)
@@ -61,7 +61,7 @@ def wow_roots(config: dict) -> list[Path]:
 
 
 def find_saved(config: dict) -> Path | None:
-    """The newest WowChatVoice.lua under WTF/Account/*/SavedVariables of the WoW installs we know."""
+    """The newest BarrensVoice.lua under WTF/Account/*/SavedVariables of the WoW installs we know."""
     found = []
     for root in wow_roots(config):
         account = root / "WTF" / "Account"

@@ -9,9 +9,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "companion"))
 
-from wcv.protocol import Image, decode, parse  # noqa: E402
+from bv.protocol import Image, decode, parse  # noqa: E402
 
-PROTOCOL = ROOT / "addon" / "WowChatVoice" / "Protocol.lua"
+PROTOCOL = ROOT / "addon" / "BarrensVoice" / "Protocol.lua"
 ENCODE = Path(__file__).with_name("encode.lua")
 LEVELS = (0, 12, 24, 36)   # the addon's P.LEVELS
 LUAJIT = shutil.which("luajit")
@@ -117,7 +117,7 @@ class RoundTrip(unittest.TestCase):
         self.assertIsNone(decode(Image(scene, 1920, 2)))
 
     def test_damaged(self):
-        from wcv import protocol
+        from bv import protocol
         cells = encode(5, self.PAYLOAD, 960)
         r, g, b = cells[40]
         cells[40] = ((r + 1) % 4, g, b)
@@ -128,7 +128,7 @@ class RoundTrip(unittest.TestCase):
 
     def test_covered_from_the_right(self):
         # a minimap at the top edge: the strip drawn from the right, cells 19+ covered by the scene
-        from wcv import protocol
+        from bv import protocol
         img = render(encode(8, self.PAYLOAD, 960), 1920, 2, 1, from_right=True)
         raw = bytearray(img.raw)
         for y in range(2):
@@ -171,7 +171,7 @@ class FindingTheStrip(unittest.TestCase):
     PAYLOAD = RoundTrip.PAYLOAD
 
     def test_anywhere_from_either_edge(self):
-        from wcv.locate import find
+        from bv.locate import find
         width, height = 640, 240
         for from_right in (False, True):
             strip = render(encode(91, self.PAYLOAD, 400 // 2), 400, 2, 1, from_right=from_right)
@@ -184,7 +184,7 @@ class FindingTheStrip(unittest.TestCase):
             self.assertEqual(frame.payload, self.PAYLOAD)
 
     def test_without_a_width(self):
-        from wcv.locate import find
+        from bv.locate import find
         width, height = 640, 120
         raw = scene(width, height, seed=5)
         paste(raw, width, render(encode(5, self.PAYLOAD, 300), 600, 2, 1), 0, 118)   # the bottom edge
@@ -194,7 +194,7 @@ class FindingTheStrip(unittest.TestCase):
 
     def test_a_narrow_strip_of_several_rows(self):
         # 220 px wide: the addon gives it 7 rows so a long line fits; found and read in full
-        from wcv.locate import find
+        from bv.locate import find
         payload = "\x1f".join(["party", "Громмаш-Степи", "Orc", "2", "WARRIOR", "", "rate=100",
                                "Длинная строка чата " * 12]).encode()[:540]
         width, height = 640, 200
@@ -206,13 +206,13 @@ class FindingTheStrip(unittest.TestCase):
         self.assertEqual(hit[4].payload, payload)
 
     def test_nothing_there(self):
-        from wcv.locate import find
+        from bv.locate import find
         self.assertIsNone(find(bytes(scene(320, 100, seed=9)), 320, 100))
 
 
 class StripPlace(unittest.TestCase):
     def test_parse_and_region(self):
-        from wcv.locate import parse_place, region
+        from bv.locate import parse_place, region
         self.assertEqual(parse_place("100,50,900,2,2560,1440"), (100, 50, 900, 2, 2560, 1440))
         self.assertIsNone(parse_place("1,2,3"))
         self.assertIsNone(parse_place("1,2,0,2,10,10"))
@@ -224,14 +224,14 @@ class StripPlace(unittest.TestCase):
     def test_saved_variables(self):
         import tempfile
         from unittest import mock
-        from wcv import locate
+        from bv import locate
         with tempfile.TemporaryDirectory() as d:
-            path = Path(d) / "WowChatVoice.lua"
-            path.write_text('WowChatVoiceDB = {\n["stripGeometry"] = "0,1078,1920,2,1920,1080",\n}\n', encoding="utf-8")
-            with mock.patch("wcv.dictionary.find_saved", return_value=path):
+            path = Path(d) / "BarrensVoice.lua"
+            path.write_text('BarrensVoiceDB = {\n["stripGeometry"] = "0,1078,1920,2,1920,1080",\n}\n', encoding="utf-8")
+            with mock.patch("bv.dictionary.find_saved", return_value=path):
                 self.assertEqual(locate.saved_place({}), (0, 1078, 1920, 2, 1920, 1080))
 
     def test_control_frame_option(self):
         line = parse("\x1f".join(["control", "", "", "", "", "", "rate=100;vol=100;voice=f5;strip=0,1078,1920,2,1920,1080", "-"]).encode())
-        from wcv.locate import parse_place
+        from bv.locate import parse_place
         self.assertEqual(parse_place(line.options["strip"]), (0, 1078, 1920, 2, 1920, 1080))

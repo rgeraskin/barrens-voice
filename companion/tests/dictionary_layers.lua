@@ -1,8 +1,8 @@
 -- The dictionary's layers (Dictionary.lua): the default plus the player's edits.
--- Run: mise run test-lua (from addon/WowChatVoice, it loadfiles the addon by relative path)
+-- Run: mise run test-lua (from addon/BarrensVoice, it loadfiles the addon by relative path)
 local ns = { db = {} }
-assert(loadfile("Protocol.lua"))("WowChatVoice", ns)
-assert(loadfile("Dictionary.lua"))("WowChatVoice", ns)
+assert(loadfile("Protocol.lua"))("BarrensVoice", ns)
+assert(loadfile("Dictionary.lua"))("BarrensVoice", ns)
 local D = ns.Dictionary
 local function has(text, s) return text:find(s, 1, true) ~= nil end
 local function count(text, s)

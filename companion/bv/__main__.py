@@ -1,6 +1,6 @@
-"""WoW Chat Voice companion: reads the addon's strip off the WoW window and speaks each chat line.
+"""Barrens Voice companion: reads the addon's strip off the WoW window and speaks each chat line.
 
-Run: python -m wcv  (config.json next to the wcv folder is created on first run)
+Run: python -m bv  (config.json next to the bv folder is created on first run)
 """
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ DEFAULT_CONFIG = {
     "voice_pace_blend": 0.85,
     "voice_pace_limit": 1.8,
     "character_tempo": 0.08,
-    # F5 only; 0 turns a part off. See wcv/intonation.py.
+    # F5 only; 0 turns a part off. See bv/intonation.py.
     "question_intonation": {"yes_no_rise_st": 7, "yes_no_end_db": 8, "wh_peak_st": 6},
     "kind_gain_db": {"yell": 3, "whisper": -4},
     "voice_shifts": [-1.5, 1.5],
@@ -84,7 +84,7 @@ _log_lock = threading.Lock()
 
 
 def _write_log_file(line: str, now: datetime) -> None:
-    """One line into logs/wcv-YYYY-MM-DD.log (appended: one file a day, kept for later)."""
+    """One line into logs/bv-YYYY-MM-DD.log (appended: one file a day, kept for later)."""
     global _log_file, _log_day
     with _log_lock:
         try:
@@ -93,7 +93,7 @@ def _write_log_file(line: str, now: datetime) -> None:
                 if _log_file is not None:
                     _log_file.close()
                 LOG_DIR.mkdir(exist_ok=True)
-                _log_file = open(LOG_DIR / f"wcv-{day}.log", "a", encoding="utf-8", buffering=1)
+                _log_file = open(LOG_DIR / f"bv-{day}.log", "a", encoding="utf-8", buffering=1)
                 _log_day = day
             _log_file.write(line + "\n")
         except OSError:
@@ -101,7 +101,7 @@ def _write_log_file(line: str, now: datetime) -> None:
 
 
 def log(message: str) -> None:
-    """To the console and to logs/wcv-YYYY-MM-DD.log."""
+    """To the console and to logs/bv-YYYY-MM-DD.log."""
     now = datetime.now()
     line = f"{now:%H:%M:%S} {message}"
     print(line, flush=True)
@@ -147,7 +147,7 @@ def prune_logs(keep_days: int) -> None:
     if keep_days <= 0 or not LOG_DIR.is_dir():
         return
     cutoff = datetime.now().timestamp() - keep_days * 86400
-    for path in LOG_DIR.glob("wcv-*.log"):
+    for path in LOG_DIR.glob("bv-*.log"):
         if path.stat().st_mtime < cutoff:
             path.unlink(missing_ok=True)
 
@@ -198,7 +198,7 @@ def restart_online(log) -> None:
     """A model missing from the cache in offline mode: forget the mark and start again online."""
     MODELS_READY.unlink(missing_ok=True)
     log("в кэше моделей чего-то не хватает — перезапускаюсь с доступом к сети")
-    os.execv(sys.executable, [sys.executable, "-m", "wcv"] + sys.argv[1:])
+    os.execv(sys.executable, [sys.executable, "-m", "bv"] + sys.argv[1:])
 
 
 def describe_place(place) -> str:
@@ -222,7 +222,7 @@ def main() -> int:
     make_dpi_aware()
 
     config = load_config()
-    for game in ("retail", "forever"):                # WowChatVoice-Retail.cmd: the same companion, the other game
+    for game in ("retail", "forever"):                # BarrensVoice-Retail.cmd: the same companion, the other game
         if f"--{game}" in sys.argv:
             config["game"] = game
     # one Hugging Face cache for every model (F5, Vocos, RUAccent, Whisper): hf_home in config.json,

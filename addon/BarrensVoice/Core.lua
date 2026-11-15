@@ -25,7 +25,7 @@ ns.DEFAULTS = {
     fadeWhisper = false, -- ... but a whisper shows the window though it is read aloud
     fadeGuild = false, --     and so does a guild (or officer) line
     skipAddons = true, -- lines other players' addons write for them (Questie, DBM...) are not read
-    debug = false,     -- /wcv debug: why a chat line was not sent, and CatQuest's speech, to the program's log
+    debug = false,     -- /bv debug: why a chat line was not sent, and CatQuest's speech, to the program's log
     self = true,       -- your own lines
     onlyVisible = true, -- only lines a chat window of yours shows (its message types and channels, chat filters)
     waitForCatQuest = true, -- hold chat lines while CatQuest or Wayfarer reads a quest; send them when it is done
@@ -73,7 +73,7 @@ local EVENTS = {
 
 local SEP = "\31"
 local VERBS = { say = "говорит", yell = "кричит", whisper = "шепчет", test = "говорит" }
-local PREFIX = "|cff66ccffWoW Chat Voice|r: "
+local PREFIX = "|cff66ccffBarrens Voice|r: "
 
 --- A line that is nothing but a question or questions ("кто в ОП?", "танк нужен? хил?"): no full stop,
 --- exclamation mark or ellipsis anywhere, and it ends with "?". The voices rise at a question mark
@@ -234,7 +234,7 @@ function ns.Diag(text)
     ns.Strip.Push(table.concat({ "diag", "", "", "", "", "", ns.LineOptions(), text }, SEP))
 end
 
--- Debug (/wcv debug): each chat line the addon gets but does not send, with the reason, and when
+-- Debug (/bv debug): each chat line the addon gets but does not send, with the reason, and when
 -- CatQuest or Wayfarer starts and stops speaking - notes in the program's log, which has the time the chat lacks.
 function ns.Skip(reason, sender, text)
     if not ns.db.debug then return end
@@ -404,12 +404,12 @@ end
 -- Pages the settings link to (the «Помощь» tab, more voices on «Голоса»). An addon can neither open a
 -- browser nor put text on the clipboard (LaunchURL and CopyToClipboard are Blizzard's own), so the
 -- companion does both on a click: the addon sends only the name, and the companion keeps its own
--- list of the same addresses (wcv/links.py) and touches nothing else. The address also stands in a
+-- list of the same addresses (bv/links.py) and touches nothing else. The address also stands in a
 -- box in the settings, to select and copy with Ctrl+C when the companion is not running.
 ns.LINKS = {
     discord = { "Discord", "https://discord.gg/hxpuTQF2Bb" },
     telegram = { "Telegram", "https://t.me/+NwReoOS9x7hhYjgy" },
-    github = { "GitHub", "https://github.com/rgeraskin/wow-chat-voice/issues" },
+    github = { "GitHub", "https://github.com/rgeraskin/barrens-voice/issues" },
     rhvoice = { "RHVoice", "https://rhvoice.su/voices/" },
     silero = { "Silero", "https://github.com/snakers4/silero-models/releases?q=SAPI" },
 }
@@ -461,7 +461,7 @@ function ns.SetVoices(value)
     end
 end
 
--- The last chat lines read, as they came (before the dictionary), for /wcv last N. Kept in the saved
+-- The last chat lines read, as they came (before the dictionary), for /bv last N. Kept in the saved
 -- variables (written at /reload and logout), so they outlive a /reload and a game restart - not a
 -- crash. The saved variables are the account's: another character replays the same lines.
 local HISTORY = 50
@@ -666,10 +666,10 @@ local TESTS = {
 
 function ns.Test()
     for _, t in ipairs(TESTS) do ns.Send("test", t[1], t[2], t[3], t[4], "", t[5]) end
-    print("|cff66ccffWoW Chat Voice|r: отправлено " .. #TESTS .. " тестовых строки.")
+    print("|cff66ccffBarrens Voice|r: отправлено " .. #TESTS .. " тестовых строки.")
 end
 
---- Silence now: the program cuts the line being said and drops what is waiting (/wcv stop).
+--- Silence now: the program cuts the line being said and drops what is waiting (/bv stop).
 function ns.Stop()
     local options = ns.LineOptions()
     ns.Strip.PushNow(table.concat({ "stop", "", "", "", "", "", options, "-" }, SEP))
@@ -682,7 +682,7 @@ end
 
 -- What a version brought, in a few words, for the line after an update (CHANGELOG.md has it all).
 ns.NEWS = {
-    ["0.3.0"] = "ритейл WoW (WowChatVoice-Retail.cmd) с голосами всех его рас; окно чата можно прятать, пока на нём нет "
+    ["0.3.0"] = "ритейл WoW (BarrensVoice-Retail.cmd) с голосами всех его рас; окно чата можно прятать, пока на нём нет "
         .. "мыши; настройки во вкладках; чат ждёт и Wayfarer; «ё» в словах из чата ставится сама",
     ["0.2.1"] = "мост к компаньону можно перенести",
 }
@@ -691,14 +691,14 @@ ns.NEWS = {
 --- version last seen is kept), and every time whether the reading works (Companion.lua).
 -- Where to write about bugs and words read wrong: said at the first run and after an update, not at
 -- every login.
-local HELP_HINT = "ошибки, неверное произношение, идеи — вкладка «Помощь» в настройках (/wcv): там Discord, Telegram и GitHub."
+local HELP_HINT = "ошибки, неверное произношение, идеи — вкладка «Помощь» в настройках (/bv): там Discord, Telegram и GitHub."
 
 function ns.LoginWord()
     local version = Version()
     if ns.firstRun then
         ns.Welcome()
     elseif ns.db.seenVersion ~= version then
-        print(PREFIX .. ("обновление %s: %s. Настройки — /wcv."):format(version, ns.NEWS[version]
+        print(PREFIX .. ("обновление %s: %s. Настройки — /bv."):format(version, ns.NEWS[version]
             or "что нового — в описании аддона"))
         print(PREFIX .. HELP_HINT)
     end
@@ -710,11 +710,11 @@ end
 --- the settings are.
 function ns.Welcome()
     local version = Version()
-    print(PREFIX .. ("|cffffd100добро пожаловать!|r WoW Chat Voice %s — озвучка чата: у каждого игрока свой голос "
+    print(PREFIX .. ("|cffffd100добро пожаловать!|r Barrens Voice %s — озвучка чата: у каждого игрока свой голос "
         .. "его расы и пола."):format(version))
-    print(PREFIX .. "читает вслух приложение-компаньон WoW Chat Voice (Windows): без него аддон молчит. Удобнее всего "
+    print(PREFIX .. "читает вслух приложение-компаньон Barrens Voice (Windows): без него аддон молчит. Удобнее всего "
         .. "запускать игру через него — оно само запустит игру.")
-    print(PREFIX .. "настройки — значок у миникарты или /wcv; команды — /wcv help.")
+    print(PREFIX .. "настройки — значок у миникарты или /bv; команды — /bv help.")
     print(PREFIX .. HELP_HINT)
 end
 
@@ -749,9 +749,9 @@ loader:RegisterEvent("ADDON_LOADED")
 local function OnEvent(self, event, name, ...)
     if event == "ADDON_LOADED" then
         if name ~= ADDON then return end
-        ns.firstRun = WowChatVoiceDB == nil   -- no saved settings yet: a welcome at login
-        WowChatVoiceDB = Merge(WowChatVoiceDB or {}, ns.DEFAULTS)
-        ns.db = WowChatVoiceDB
+        ns.firstRun = BarrensVoiceDB == nil   -- no saved settings yet: a welcome at login
+        BarrensVoiceDB = Merge(BarrensVoiceDB or {}, ns.DEFAULTS)
+        ns.db = BarrensVoiceDB
         if ns.firstRun then ns.db.scale = 1 else ns.MigrateScale(ns.db) end   -- settings of the program's own scale
         ns.RestoreHistory()
         ns.Dictionary.Migrate(ns.db)
@@ -798,19 +798,19 @@ end
 loader:SetScript("OnEvent", OnEvent)
 ns.OnEvent = function(event, ...) OnEvent(loader, event, ...) end   -- for the tests
 
-SLASH_WOWCHATVOICE1 = "/wcv"
-SlashCmdList.WOWCHATVOICE = function(msg)
+SLASH_BARRENSVOICE1 = "/bv"
+SlashCmdList.BARRENSVOICE = function(msg)
     msg = (msg or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
     if msg == "help" or msg == "?" then
         local G = "|cffffd100"
         print(PREFIX .. "команды:")
-        print("  " .. G .. "/wcv|r — окно настроек (то же: значок у миникарты)")
-        print("  " .. G .. "/wcv on|r, " .. G .. "/wcv off|r — включить или выключить озвучку (выключение сразу обрывает фразу)")
-        print("  " .. G .. "/wcv stop|r — замолчать сейчас и очистить очередь, не выключая")
-        print("  " .. G .. "/wcv test|r — четыре тестовые строки разными голосами")
-        print("  " .. G .. "/wcv last 5|r — ещё раз прочитать последние 5 строк чата (через текущий словарь)")
-        print("  " .. G .. "/wcv debug|r — отладка: почему строка чата не прочитана — в журнал компаньона")
-        print("  " .. G .. "/wcv help|r — этот список")
+        print("  " .. G .. "/bv|r — окно настроек (то же: значок у миникарты)")
+        print("  " .. G .. "/bv on|r, " .. G .. "/bv off|r — включить или выключить озвучку (выключение сразу обрывает фразу)")
+        print("  " .. G .. "/bv stop|r — замолчать сейчас и очистить очередь, не выключая")
+        print("  " .. G .. "/bv test|r — четыре тестовые строки разными голосами")
+        print("  " .. G .. "/bv last 5|r — ещё раз прочитать последние 5 строк чата (через текущий словарь)")
+        print("  " .. G .. "/bv debug|r — отладка: почему строка чата не прочитана — в журнал компаньона")
+        print("  " .. G .. "/bv help|r — этот список")
     elseif msg == "test" then
         ns.Test()
     elseif msg == "stop" then

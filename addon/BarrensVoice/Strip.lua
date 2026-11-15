@@ -13,7 +13,7 @@ ns.Strip = S
 local HOLD = 0.25      -- seconds each line stays up before the next queued one
 local IDLE_AFTER = 0.5 -- then, with nothing queued, the strip goes back to an empty frame (the
                        -- program grabs the window 20 times a second: 0.25 s is enough for it)
-local MAX_QUEUE = 60   -- lines waiting beyond this are dropped, oldest first (a /wcv last of all 50
+local MAX_QUEUE = 60   -- lines waiting beyond this are dropped, oldest first (a /bv last of all 50
                        -- history lines must fit: at 4 lines a second they are up in under 15 s)
 
 local frame, background, preview
@@ -212,7 +212,7 @@ function S.Initialize()
     -- action bars and the minimap covered it), and a child of UIParent hides with it (Alt+Z). A frame
     -- of its own is sorted with UIParent's by strata - TOOLTIP is above them - and stays up. Its
     -- points are still set on WorldFrame (the whole screen), which only places it.
-    frame = CreateFrame("Frame", "WowChatVoiceStrip", nil)
+    frame = CreateFrame("Frame", "BarrensVoiceStrip", nil)
     frame:SetIgnoreParentScale(true)
     frame:SetScale(1)
     frame:SetFrameStrata("TOOLTIP")

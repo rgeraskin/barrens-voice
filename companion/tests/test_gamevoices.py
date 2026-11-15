@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from wcv import casc, gamevoices  # noqa: E402
+from bv import casc, gamevoices  # noqa: E402
 
 
 def root_v2(blocks):

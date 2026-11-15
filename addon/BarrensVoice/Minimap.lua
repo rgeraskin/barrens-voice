@@ -5,7 +5,7 @@ local _, ns = ...
 local M = {}
 ns.Minimap = M
 
-local ICON = "Interface\\AddOns\\WowChatVoice\\Icon"
+local ICON = "Interface\\AddOns\\BarrensVoice\\Icon"
 local button, icon
 
 local function Position()
@@ -17,7 +17,7 @@ end
 
 local function ShowTooltip(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-    GameTooltip:AddLine("WoW Chat Voice")
+    GameTooltip:AddLine("Barrens Voice")
     GameTooltip:AddLine(ns.db.enabled and "|cff40ff40Озвучка чата включена|r" or "|cffff4040Озвучка чата выключена|r")
     GameTooltip:AddLine("ЛКМ — настройки", 1, 1, 1)
     GameTooltip:AddLine("ПКМ — включить или выключить (выключение сразу обрывает фразу)", 1, 1, 1)
@@ -34,7 +34,7 @@ function M.ToggleEnabled()
 end
 
 local function Create()
-    button = CreateFrame("Button", "WowChatVoiceMinimapButton", Minimap)
+    button = CreateFrame("Button", "BarrensVoiceMinimapButton", Minimap)
     button:SetSize(31, 31)
     button:SetFrameStrata("MEDIUM")
     button:SetFrameLevel(8)
@@ -86,6 +86,6 @@ function M.Update()
 end
 
 -- The client's addon compartment (the button by the minimap that lists addons); named in the .toc.
-function WowChatVoice_OnCompartmentClick(_, which)
+function BarrensVoice_OnCompartmentClick(_, which)
     if which == "RightButton" then M.ToggleEnabled() else ns.Options.Toggle() end
 end

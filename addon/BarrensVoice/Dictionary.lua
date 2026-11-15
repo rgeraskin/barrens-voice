@@ -348,7 +348,7 @@ end
 --- Byte lengths are kept, so a normalised word and the original line up byte for byte.
 function D.Norm(s)
     -- ASCII by hand rather than s:lower(): byte for byte, whatever the client's lower() does with
-    -- UTF-8 (/wcv diag on the ruRU Forever client: lower() handles Cyrillic correctly too).
+    -- UTF-8 (/bv diag on the ruRU Forever client: lower() handles Cyrillic correctly too).
     s = s:gsub("[A-Z]", function(c) return string.char(c:byte() + 32) end)
     s = s:gsub("\208([\144-\159])", function(c) return "\208" .. string.char(c:byte() + 32) end)
     s = s:gsub("\208([\160-\175])", function(c) return "\209" .. string.char(c:byte() - 32) end)

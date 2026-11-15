@@ -20,7 +20,7 @@ function C.Read(status, at)
     beat = type(status) == "table" and tonumber(status.beat) or nil
 end
 
-C.Read(rawget(_G, "WowChatVoiceStatus"), time and time() or 0)
+C.Read(rawget(_G, "BarrensVoiceStatus"), time and time() or 0)
 
 --- "running", "stopped" (no time, or an old one).
 function C.State()
@@ -30,11 +30,11 @@ end
 
 --- The line at login.
 function C.SayAtLogin()
-    local prefix = "|cff66ccffWoW Chat Voice|r: "
+    local prefix = "|cff66ccffBarrens Voice|r: "
     if C.State() == "running" then
         print(prefix .. "озвучка чата работает.")
     else
-        print(prefix .. "приложение-компаньон WoW Chat Voice не запущено — чат будет озвучиваться, как только вы его запустите.")
+        print(prefix .. "приложение-компаньон Barrens Voice не запущено — чат будет озвучиваться, как только вы его запустите.")
     end
 end
 

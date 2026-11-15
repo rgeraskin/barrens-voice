@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from wcv.protocol import Line  # noqa: E402
+from bv.protocol import Line  # noqa: E402
 
 
 class FakeF5:
@@ -36,7 +36,7 @@ class FakeSapi:
         self.said.append(line.text)
 
 
-from wcv.engines import Engines  # noqa: E402
+from bv.engines import Engines  # noqa: E402
 
 FAKE_F5 = types.SimpleNamespace(F5Speaker=FakeF5)
 
@@ -50,7 +50,7 @@ def wait(engines):
 class EnginesTest(unittest.TestCase):
     def setUp(self):
         # the engine imports F5Speaker when it loads; a fake one only for these tests
-        patcher = unittest.mock.patch.dict(sys.modules, {"wcv.f5engine": FAKE_F5})
+        patcher = unittest.mock.patch.dict(sys.modules, {"bv.f5engine": FAKE_F5})
         patcher.start()
         self.addCleanup(patcher.stop)
 

@@ -1,5 +1,5 @@
 """Draws the addon icon: a golden speech bubble with sound waves on a dark arcane background.
-Writes addon/WowChatVoice/Icon.tga (64x64, what the game reads) and tools/icon_preview.png.
+Writes addon/BarrensVoice/Icon.tga (64x64, what the game reads) and tools/icon_preview.png.
 Run: mise run icon"""
 import math
 from pathlib import Path
@@ -60,7 +60,7 @@ def main():
         rim.arc(box, start=-38, end=38, fill=(120, 220, 255, 255 - i * 45), width=24 - i * 4)
 
     icon = img.resize((64, 64), Image.LANCZOS)
-    icon.save(ROOT / "addon" / "WowChatVoice" / "Icon.tga")
+    icon.save(ROOT / "addon" / "BarrensVoice" / "Icon.tga")
     img.resize((256, 256), Image.LANCZOS).save(ROOT / "tools" / "icon_preview.png")
     print("ok")
 

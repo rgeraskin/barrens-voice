@@ -12,8 +12,8 @@ ENGINES = {"edge": "Edge", "rhvoice": "RHVoice", "silero": "Silero", "other": "W
 
 def find_addon(config: dict) -> Path | None:
     for root in wow_roots(config):
-        path = root / "Interface" / "AddOns" / "WowChatVoice"
-        if (path / "WowChatVoice.toc").exists():
+        path = root / "Interface" / "AddOns" / "BarrensVoice"
+        if (path / "BarrensVoice.toc").exists():
             return path
     return None
 
@@ -26,8 +26,8 @@ def missing_addon(config: dict) -> str | None:
         return None
     games = [str(r) for r in wow_roots(config) if (r / "Interface").is_dir() or (r / "Wow.exe").exists()]
     where = ("в папке игры " + ", ".join(games)) if games else "— папка игры тоже не найдена"
-    return ("аддон WoW Chat Voice не установлен: нет Interface\\AddOns\\WowChatVoice\\WowChatVoice.toc " + where + ". "
-            "Скопируйте папку addon\\WowChatVoice в World of Warcraft\\" + GAMES[game_of(config)] + "\\Interface\\AddOns\\ "
+    return ("аддон Barrens Voice не установлен: нет Interface\\AddOns\\BarrensVoice\\BarrensVoice.toc " + where + ". "
+            "Скопируйте папку addon\\BarrensVoice в World of Warcraft\\" + GAMES[game_of(config)] + "\\Interface\\AddOns\\ "
             "(или укажите wow_dir в config.json, если игра стоит в другом месте) и запустите компаньон снова.")
 
 
@@ -46,14 +46,14 @@ def _lua(s: str) -> str:
 def render(voices, default_off) -> str:
     rows = [f"    {{ name = {_lua(v.description)}, label = {_lua(label(v))}, gender = {_lua(v.gender)}, "
             f"on = {'false' if default_off(v) else 'true'} }}," for v in voices]
-    return ("-- Written by the WoW Chat Voice program: the Windows voices it can speak with.\n"
-            "WowChatVoiceVoiceList = {\n" + "\n".join(rows) + "\n}\n")
+    return ("-- Written by the Barrens Voice program: the Windows voices it can speak with.\n"
+            "BarrensVoiceVoiceList = {\n" + "\n".join(rows) + "\n}\n")
 
 
 def write(config: dict, voices, default_off, log) -> None:
     addon = find_addon(config)
     if addon is None:
-        log("аддон WowChatVoice не найден: список голосов для него не записан")
+        log("аддон BarrensVoice не найден: список голосов для него не записан")
         return
     path = addon / "VoiceList.lua"
     text = render(voices, default_off)

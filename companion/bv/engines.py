@@ -8,7 +8,7 @@ from pathlib import Path
 
 from .protocol import Line
 
-NOTICE_SENDER = "WoW Chat Voice"
+NOTICE_SENDER = "Barrens Voice"
 
 
 class Engines:

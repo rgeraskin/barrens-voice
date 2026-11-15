@@ -1,4 +1,4 @@
-"""Decoder for the addon's pixel strip (addon/WowChatVoice/Protocol.lua, README "Protocol").
+"""Decoder for the addon's pixel strip (addon/BarrensVoice/Protocol.lua, README "Protocol").
 
 Standard library only, so the round-trip test runs anywhere.
 """

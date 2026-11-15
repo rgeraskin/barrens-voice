@@ -46,9 +46,9 @@ Settings = { RegisterCanvasLayoutCategory = function() return {} end, RegisterAd
 local ns = {}
 for _, f in ipairs({ "Protocol.lua", "Strip.lua", "Dictionary.lua", "VoiceList.lua", "Core.lua", "ChatFade.lua", "CompanionStatus.lua", "Companion.lua", "UI.lua",
                      "DictionaryWindow.lua", "StripWindow.lua", "Options.lua", "VoicesWindow.lua", "Minimap.lua" }) do
-    assert(loadfile(f))("WowChatVoice", ns)
+    assert(loadfile(f))("BarrensVoice", ns)
 end
-WowChatVoiceVoiceList = { { name = "Anna", label = "Anna (RHVoice)", gender = "Female", on = true },
+BarrensVoiceVoiceList = { { name = "Anna", label = "Anna (RHVoice)", gender = "Female", on = true },
                           { name = "Aidar (Russian)", label = "Aidar (Silero)", gender = "Male", on = true } }
 ns.db = setmetatable({ rate = 100, voices = "f5", enabled = true,
                        sayNames = true, sayVerb = true, minimapIcon = true }, {})
@@ -501,7 +501,7 @@ assert(Co.State() == "stopped", "a time over 45 s old: not running")
 Co.Read(nil, 1100)
 assert(Co.State() == "stopped", "no time at all (the file as shipped): not running")
 Co.SayAtLogin()
-assert(said[2]:find("приложение%-компаньон WoW Chat Voice не запущено — чат будет озвучиваться, как только"), tostring(said[2]))
+assert(said[2]:find("приложение%-компаньон Barrens Voice не запущено — чат будет озвучиваться, как только"), tostring(said[2]))
 assert(Co.Describe():find("не был запущен"), Co.Describe())
 Co.Read({ beat = 1000 }, 1010)
 assert(Co.Describe():find("был запущен") and not Co.Describe():find("не был"), Co.Describe())
@@ -549,7 +549,7 @@ GetAddOnMetadata = nil
 print = plainPrint
 print("welcome ok")
 
--- /wcv last: the lines again, in order, marked replay=1; a sender with no race known keeps its line
+-- /bv last: the lines again, in order, marked replay=1; a sender with no race known keeps its line
 local replayed = {}
 ns.Strip.Push = function(p) replayed[#replayed + 1] = p end
 ns.db.enabled, ns.db.waitForCatQuest = true, false

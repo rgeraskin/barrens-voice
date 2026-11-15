@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from wcv.morph import Inflector, strip_marks  # noqa: E402
+from bv.morph import Inflector, strip_marks  # noqa: E402
 
 HAVE = importlib.util.find_spec("pymorphy3") is not None
 

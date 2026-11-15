@@ -7,17 +7,17 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from wcv.assign import Assigner  # noqa: E402
-from wcv.dictionary import parse as parse_rules, unescape  # noqa: E402
-from wcv.gamevoices import Slot  # noqa: E402
-from wcv.protocol import parse  # noqa: E402
-from wcv.speech import sapi_rate  # noqa: E402
-from wcv.text import apply_stress, merge_marks  # noqa: E402
+from bv.assign import Assigner  # noqa: E402
+from bv.dictionary import parse as parse_rules, unescape  # noqa: E402
+from bv.gamevoices import Slot  # noqa: E402
+from bv.protocol import parse  # noqa: E402
+from bv.speech import sapi_rate  # noqa: E402
+from bv.text import apply_stress, merge_marks  # noqa: E402
 
 
 class Text(unittest.TestCase):
     def test_quest_number_dropped(self):
-        from wcv.text import plain
+        from bv.text import plain
         self.assertEqual(plain("LFM [[25] Свиток с рунами (3513)]"), "LFM Свиток с рунами")
         self.assertEqual(plain("[Свиток (3513)] и (через 5 мин)"), "Свиток и (через 5 мин)")
 
@@ -154,7 +154,7 @@ if __name__ == "__main__":
 
 class VoiceListFile(unittest.TestCase):
     def test_render(self):
-        from wcv.voicelist import label, render
+        from bv.voicelist import label, render
 
         class V:
             def __init__(self, d, e, g):
@@ -171,7 +171,7 @@ class VoiceListFile(unittest.TestCase):
 
 class Plurals(unittest.TestCase):
     def test_russian_forms(self):
-        from wcv.dictionary import plurals
+        from bv.dictionary import plurals
         forms = "[дамагер|дамагера|дамагеров]"
         got = {n: plurals(f"{n} {forms}") for n in (0, 1, 2, 4, 5, 11, 12, 14, 21, 22, 25, 101, 111)}
         self.assertEqual(got[1], "1 дамагер")
@@ -186,7 +186,7 @@ class Plurals(unittest.TestCase):
 
 class StableVoices(unittest.TestCase):
     def test_switching_a_voice_off_moves_only_its_people(self):
-        from wcv.speech import Speaker, Voice
+        from bv.speech import Speaker, Voice
         sp = Speaker({"players": {}, "exclude": [], "gender_overrides": {}}, print)
         voices = [Voice(None, f"Voice{i}", "Male", "rhvoice") for i in range(12)]
         sp.all_voices = voices
@@ -215,10 +215,10 @@ class ResetAssignments(unittest.TestCase):
 class DictionaryInCompanion(unittest.TestCase):
     """The addon's dictionary applied by the program: the default from Dictionary.lua, the player's
     layer from the strip or the saved variables."""
-    ADDON = Path(__file__).resolve().parents[2] / "addon" / "WowChatVoice"
+    ADDON = Path(__file__).resolve().parents[2] / "addon" / "BarrensVoice"
 
     def book(self, addon=None):
-        from wcv.dictionary import Dictionary
+        from bv.dictionary import Dictionary
         d = Dictionary({}, lambda *a: None, addon or self.ADDON)
         d.user_path = Path("/nonexistent")                 # no saved variables in the tests
         d.from_addon = "test"
@@ -227,7 +227,7 @@ class DictionaryInCompanion(unittest.TestCase):
 
     def test_rl(self):
         # «РЛ»: the Ruins of Lordaeron, unless the words around it say it is the raid leader
-        from wcv.morph import Inflector
+        from bv.morph import Inflector
         d, inf = self.book(), Inflector(print)
 
         def read(text):
@@ -272,7 +272,7 @@ class DictionaryInCompanion(unittest.TestCase):
         self.assertEqual(d.apply_words("чиловая игра, за чиловую"), "чил+овая игра, за чил+овую")
         self.assertEqual(d.apply_words("кто танчит? я танчу, вчера танчила"), "кто т+анчит? я т+анчу, вчера т+анчила")
         self.assertEqual(d.apply("за 5к"), "за 5000")                                           # a default regex
-        from wcv.dictionary import plurals
+        from bv.dictionary import plurals
         self.assertEqual(plurals(d.apply("продам 6шт, 1 шт. и 2 шт")), "продам 6 штук, 1 штука и 2 штуки")
 
     def test_the_players_layer(self):
@@ -290,10 +290,10 @@ class DictionaryInCompanion(unittest.TestCase):
 
     def test_saved_variables_until_the_addon_sends(self):
         import tempfile
-        from wcv.dictionary import Dictionary
+        from bv.dictionary import Dictionary
         with tempfile.TemporaryDirectory() as dd:
-            path = Path(dd) / "WowChatVoice.lua"
-            path.write_text('WowChatVoiceDB = {\n["dictionaryUser"] = "лок=лок\\n!ОП=Огненная пропасть",\n}\n',
+            path = Path(dd) / "BarrensVoice.lua"
+            path.write_text('BarrensVoiceDB = {\n["dictionaryUser"] = "лок=лок\\n!ОП=Огненная пропасть",\n}\n',
                             encoding="utf-8")
             d = Dictionary({}, lambda *a: None, self.ADDON)
             d.user_path = path
@@ -305,7 +305,7 @@ class DictionaryInCompanion(unittest.TestCase):
         import shutil
         import tempfile
         with tempfile.TemporaryDirectory() as dd:
-            addon = Path(dd) / "WowChatVoice"
+            addon = Path(dd) / "BarrensVoice"
             addon.mkdir()
             shutil.copy(self.ADDON / "Dictionary.lua", addon / "Dictionary.lua")
             d = self.book(addon)
@@ -318,7 +318,7 @@ class DictionaryInCompanion(unittest.TestCase):
             self.assertEqual(d.apply_words("ыыы"), "\x02смех\x03")
 
     def test_names_kept_out(self):
-        from wcv.protocol import split_name, without_repeated_name
+        from bv.protocol import split_name, without_repeated_name
         self.assertEqual(split_name("Лок пишет:\x04 привет"), ("Лок пишет:", " привет", True))
         self.assertEqual(split_name("Лок\x05 смеётся"), ("Лок", " смеётся", False))
         self.assertEqual(split_name("привет"), ("", "привет", False))
@@ -327,7 +327,7 @@ class DictionaryInCompanion(unittest.TestCase):
 
 class PlayerStop(unittest.TestCase):
     def test_stop_drops_queued_and_late_lines(self):
-        from wcv.audio import Player, wav
+        from bv.audio import Player, wav
         p = Player()
         data = wav(b"\0\0" * 100, 22050)
         made_before_stop = p.generation
@@ -341,7 +341,7 @@ class PlayerStop(unittest.TestCase):
         self.assertEqual(p.items.qsize(), 1)
 
     def test_sentence_groups(self):
-        from wcv.f5engine import sentence_groups
+        from bv.f5engine import sentence_groups
         self.assertEqual(sentence_groups("Привет. Кто идёт? Собираемся у входа."),
                          ["Привет.", "Кто идёт?", "Собираемся у входа."])
         self.assertEqual(sentence_groups("Кто в ОП? Нужен танк?"), ["Кто в ОП?", "Нужен танк?"])
@@ -366,7 +366,7 @@ class RawText(unittest.TestCase):
 
 class RefCheck(unittest.TestCase):
     def test_similarity(self):
-        from wcv.refcheck import similarity
+        from bv.refcheck import similarity
         text = "Возвращайся ко мне, когда соберёшь достаточно мази."
         self.assertEqual(similarity(text, "возвращайся ко мне когда соберешь достаточно мази"), 1.0)
         leaked = "нести в сердце горе. Возвращайся ко мне, когда соберёшь достаточно мази."
@@ -375,7 +375,7 @@ class RefCheck(unittest.TestCase):
 
 class Questions(unittest.TestCase):
     def test_kind(self):
-        from wcv.intonation import kind, question_word, stressed_vowel
+        from bv.intonation import kind, question_word, stressed_vowel
         self.assertEqual(kind("Кт+о идёт?"), "wh")
         self.assertEqual(kind("Ну а где т+анк?"), "wh")
         self.assertEqual(question_word("Ну а где т+анк?"), 2)
@@ -388,7 +388,7 @@ class Questions(unittest.TestCase):
         self.assertEqual(stressed_vowel("Ну где?", 1), (1, 2))
 
     def test_yes_no(self):
-        from wcv.intonation import is_yes_no
+        from bv.intonation import is_yes_no
         self.assertTrue(is_yes_no("Идёшь с нами в Мёртвые к+опи?"))
         self.assertTrue(is_yes_no("Привет. Готов ли ты?"))
         self.assertFalse(is_yes_no("Кто идёт с нами?"))
@@ -398,7 +398,7 @@ class Questions(unittest.TestCase):
 
 class Volume(unittest.TestCase):
     def test_volume_option(self):
-        from wcv.protocol import parse
+        from bv.protocol import parse
         line = parse("say\x1fВася\x1fOrc\x1f2\x1fWARRIOR\x1f\x1frate=100;vol=40;voice=f5\x1fпривет".encode())
         self.assertEqual(line.volume, 40)
         self.assertAlmostEqual(line.gain({"volume": 50}), 0.2)
@@ -415,7 +415,7 @@ class Limiter(unittest.TestCase):
             import numpy as np
         except ImportError:
             self.skipTest("numpy")
-        from wcv.f5engine import limit
+        from bv.f5engine import limit
         x = np.array([0.1, -0.5, 0.79, 1.2, -1.9, 3.0], dtype="float32")
         y = limit(x)
         self.assertTrue(np.allclose(y[:3], x[:3]))              # below the knee: untouched
@@ -432,7 +432,7 @@ class NumberAgreement(unittest.TestCase):
             self.skipTest("num2words / pymorphy3")
 
     def test_agree(self):
-        from wcv.text import numbers_to_words as f
+        from bv.text import numbers_to_words as f
         cases = {
             "на 1 р+уку": "на одну р+уку", "без 1 руки": "без одной руки", "2 руки": "две руки",
             "на 1 мага": "на одного мага", "нужен 1 маг": "нужен один маг", "1 золотой": "один золотой",
@@ -458,8 +458,8 @@ class NumberAgreement(unittest.TestCase):
             self.assertEqual(f(text), spoken, text)
 
     def test_silver_rule(self):
-        from wcv.dictionary import parse, plurals
-        from wcv.text import numbers_to_words
+        from bv.dictionary import parse, plurals
+        from bv.text import numbers_to_words
         rules = parse(r"~(?<!через )\b(\d+)\s*(?:с|s)\b(?!\s*(?:кд|cd))=\1 [серебро|серебра|серебра]", print)
         def say(text):
             for pattern, replacement in rules:
@@ -471,8 +471,8 @@ class NumberAgreement(unittest.TestCase):
         self.assertNotIn("серебр", say("через 5с кд"))   # seconds of a cooldown, not money
 
     def test_seconds_rules(self):
-        from wcv.dictionary import parse, plurals
-        from wcv.text import numbers_to_words
+        from bv.dictionary import parse, plurals
+        from bv.text import numbers_to_words
         rules = parse("\n".join([
             r"~(?<!через )\b(\d+)\s*(?:с|s)\b(?!\s*(?:кд|cd|кулд\+?аун))=\1 [серебро|серебра|серебра]",
             r"~(?<=через )(\d+)\s*(?:с|s|сек)\b=\1 [секунду|секунды|секунд]",
@@ -497,13 +497,13 @@ class NumberAgreement(unittest.TestCase):
 class SavedVoices(unittest.TestCase):
     def test_reads_the_addons_choice(self):
         import tempfile
-        from wcv.dictionary import saved_voices
+        from bv.dictionary import saved_voices
         with tempfile.TemporaryDirectory() as d:
             sv = Path(d) / "_forever_" / "WTF" / "Account" / "X" / "SavedVariables"
             sv.mkdir(parents=True)
             config = {"wow_dir": str(Path(d) / "_forever_")}
             self.assertIsNone(saved_voices(config))
-            (sv / "WowChatVoice.lua").write_text('WowChatVoiceDB = {\n["voices"] = "sapi",\n}\n', encoding="utf-8")
+            (sv / "BarrensVoice.lua").write_text('BarrensVoiceDB = {\n["voices"] = "sapi",\n}\n', encoding="utf-8")
             self.assertEqual(saved_voices(config), "sapi")
 
 
@@ -511,7 +511,7 @@ class OnnxParts(unittest.TestCase):
     """0.4.0: what the ONNX engines do without a model - F5's vocabulary and text, the switch, resampling."""
 
     def test_vocab_and_ids(self):
-        from wcv.f5onnx import read_vocab, text_ids
+        from bv.f5onnx import read_vocab, text_ids
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "vocab.txt"
             path.write_text(" \n!\n+\nа\nб\n,\n\x0b\n", encoding="utf-8")   # a space line; an odd symbol too
@@ -521,13 +521,13 @@ class OnnxParts(unittest.TestCase):
         self.assertEqual(text_ids("б+а; я", vocab).tolist(), [[4, 2, 3, 5, 0, 0]])   # ";" -> ","; unknown -> 0
 
     def test_backend_switch(self):
-        from wcv.f5engine import onnx_backend
+        from bv.f5engine import onnx_backend
         self.assertFalse(onnx_backend({}))
         self.assertTrue(onnx_backend({"f5_backend": "ONNX"}))
 
     def test_resample(self):
         import numpy as np
-        from wcv.whisper_onnx import resample
+        from bv.whisper_onnx import resample
         x = np.sin(np.linspace(0, 100, 24000)).astype(np.float32)
         self.assertEqual(len(resample(x, 24000, 16000)), 16000)
         self.assertIs(resample(x, 16000, 16000).dtype, np.dtype(np.float32))
@@ -537,22 +537,22 @@ class Links(unittest.TestCase):
     """Pages the addon asks the companion to open: only its own list, the same as the addon's."""
 
     def test_open_known_only(self):
-        from wcv.links import LINKS, open_link
+        from bv.links import LINKS, open_link
         opened, log = [], []
         self.assertEqual(open_link(" rhvoice ", log.append, opened.append), LINKS["rhvoice"])
         self.assertIsNone(open_link("https://evil.example", log.append, opened.append))
         self.assertEqual(opened, [LINKS["rhvoice"]])
 
     def test_copy_known_only(self):
-        from wcv.links import LINKS, copy_link
+        from bv.links import LINKS, copy_link
         copied, log = [], []
         self.assertEqual(copy_link("discord", log.append, copied.append), LINKS["discord"])
         self.assertIsNone(copy_link("rm -rf", log.append, copied.append))
         self.assertEqual(copied, [LINKS["discord"]])
 
     def test_same_as_the_addon(self):
-        from wcv.links import LINKS
-        core = (Path(__file__).resolve().parents[2] / "addon" / "WowChatVoice" / "Core.lua").read_text(encoding="utf-8")
+        from bv.links import LINKS
+        core = (Path(__file__).resolve().parents[2] / "addon" / "BarrensVoice" / "Core.lua").read_text(encoding="utf-8")
         block = core.split("ns.LINKS = {", 1)[1].split("\n}", 1)[0]
         addon = dict(re.findall(r'(\w+) = \{ "[^"]+", "([^"]+)" \}', block))
         self.assertEqual(addon, LINKS)
@@ -562,7 +562,7 @@ class Yo(unittest.TestCase):
     """«ё» from eyo-kernel's safe dictionary: only where «е» cannot be meant."""
 
     def test_restore(self):
-        from wcv.yo import restore
+        from bv.yo import restore
         self.assertEqual(restore("ждем на утесе, еще учеными"), "ждём на утёсе, ещё учёными")
         self.assertEqual(restore("Ждем. ЖДЕМ!"), "Ждём. ЖДЁМ!")                # the case typed is kept
         self.assertEqual(restore("все берет"), "все берет")                      # either reading is a word: left
@@ -575,7 +575,7 @@ class Yo(unittest.TestCase):
 
     def test_dictionary_format(self):
         # read as eyo-kernel reads it: endings in brackets; «_» - lower case only; a capital - a name only
-        from wcv.yo import load
+        from bv.yo import load
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "yo.txt"
             path.write_text("# notice\nберёз(а|ы)\n_киёв\nАксён(|а)\n", encoding="utf-8")
@@ -590,7 +590,7 @@ class Yo(unittest.TestCase):
 
 class Unmasking(unittest.TestCase):
     def test_disguised_letters(self):
-        from wcv.unmask import unmask
+        from bv.unmask import unmask
         self.assertEqual(unmask("xyйня какая-то"), "хуйня какая-то")          # Latin twins
         self.assertEqual(unmask("пuздец"), "пиздец")
         self.assertEqual(unmask("п0шел ты"), "пошел ты")                      # a digit inside a word
@@ -610,7 +610,7 @@ class Unmasking(unittest.TestCase):
         self.assertEqual(unmask("5*10"), "5*10")
 
     def test_plain(self):
-        from wcv.text import plain
+        from bv.text import plain
         self.assertEqual(plain("кто м+ожет пом+очь с[РАЗЫСКИВАЕТСЯ: Бр+ууз]?"), "кто м+ожет пом+очь с разыскивается: Бр+ууз?")
         self.assertEqual(plain("[24] Миссия: выполнима"), "Миссия: выполнима")
         self.assertEqual(plain("идём в ОП"), "идём в оп")                    # the dictionary expands it first; else a word
@@ -651,7 +651,7 @@ class HighVoices(unittest.TestCase):
 
     def test_range_follows_the_voice(self):
         import parselmouth
-        from wcv.intonation import pitch_range
+        from bv.intonation import pitch_range
         high = parselmouth.Sound(self.voice(520)[0].astype("float64"), sampling_frequency=24000)
         low = parselmouth.Sound(self.voice(120)[0].astype("float64"), sampling_frequency=24000)
         bass = parselmouth.Sound(self.voice(52)[0].astype("float64"), sampling_frequency=24000)
@@ -660,7 +660,7 @@ class HighVoices(unittest.TestCase):
         self.assertLess(pitch_range(bass)[0], 50)                                   # the orc character dips to 52-55 Hz
 
     def test_high_and_low_voices_still_rise(self):
-        from wcv.intonation import shape
+        from bv.intonation import shape
         for f0 in (520, 52):
             x, rate = self.voice(f0)
             y = shape(x, rate, "Идёшь с н+ами?", {"yes_no_end_db": None})
@@ -673,7 +673,7 @@ class Tempo(unittest.TestCase):
               "character_tempo": 0.08}
 
     def seconds(self, pace, character="", **over):
-        from wcv.f5engine import line_seconds
+        from bv.f5engine import line_seconds
         return line_seconds(pace, 0.04, 100, 100, character, {**self.CONFIG, **over})
 
     def test_slow_voices_drawn_toward_the_faster_quarter(self):
@@ -693,7 +693,7 @@ class Tempo(unittest.TestCase):
             self.assertLessEqual(abs(self.seconds(0.04, name) / 4.0 - 1), 0.08 + 1e-9)
 
     def test_rate_and_margin_on_top(self):
-        from wcv.f5engine import line_seconds
+        from bv.f5engine import line_seconds
         self.assertAlmostEqual(line_seconds(0.04, 0.04, 100, 200, "", self.CONFIG), 2.0)   # 200 % speed
         self.assertAlmostEqual(line_seconds(0.04, 0.04, 100, 100, "", {**self.CONFIG, "f5_tail": 0.5}), 4.5)
 
@@ -702,7 +702,7 @@ class Tempo(unittest.TestCase):
             import numpy as np
         except ImportError:
             self.skipTest("numpy")
-        from wcv.f5engine import silence_after
+        from bv.f5engine import silence_after
         rate = 24000
         speech = np.sin(np.arange(rate) / rate * 2 * np.pi * 150).astype("float32")
         self.assertLess(silence_after(speech, rate), 0.02)                              # runs to the end
@@ -715,7 +715,7 @@ class AssignmentsFile(unittest.TestCase):
         import json
         import tempfile
         import time
-        from wcv import assign
+        from bv import assign
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "assignments.json"
             now = time.time()
@@ -751,15 +751,15 @@ class MergeMarks(unittest.TestCase):
 
 class SameSpeaker(unittest.TestCase):
     def test_name_dropped_when_going_on(self):
-        from wcv.protocol import without_repeated_name
+        from bv.protocol import without_repeated_name
         self.assertEqual(without_repeated_name("Вася пишет:\x04 кто в ОП", True), "кто в ОП")
         self.assertEqual(without_repeated_name("Вася пишет:\x04 кто в ОП", False), "Вася пишет: кто в ОП")
         self.assertEqual(without_repeated_name("кто в ОП", True), "кто в ОП")              # names off: nothing to drop
 
     def test_quiet_for(self):
         import time
-        from wcv.audio import Player
-        from wcv.engines import Engines
+        from bv.audio import Player
+        from bv.engines import Engines
         import queue
         import tempfile
         player = Player(8, tempfile.mkdtemp())              # not started: no thread, no winsound
@@ -801,7 +801,7 @@ class PauseForCatQuest(unittest.TestCase):
                     played.append(Path(path).read_bytes()[-1:])     # a line's last byte names it
         fake.PlaySound = play_sound
         sys.modules["winsound"] = fake
-        from wcv.audio import Player, wav
+        from bv.audio import Player, wav
         def line(mark, secs):
             return wav(b"\0\0" * int(8000 * secs), 8000)[:-1] + mark
         with tempfile.TemporaryDirectory() as d:
@@ -833,24 +833,24 @@ class CompanionStatus(unittest.TestCase):
     def test_written_as_lua_the_addon_reads(self):
         import re
         import tempfile
-        from wcv import status
+        from bv import status
         with tempfile.TemporaryDirectory() as d:
             self.assertTrue(status.write(Path(d), now=1234567890))
             text = (Path(d) / status.FILE).read_text(encoding="utf-8")
-            self.assertRegex(text, r"\nWowChatVoiceStatus = \{ beat = 1234567890 \}\n")
+            self.assertRegex(text, r"\nBarrensVoiceStatus = \{ beat = 1234567890 \}\n")
             self.assertFalse((Path(d) / "CompanionStatus.tmp").exists())          # written whole, then swapped in
 
     def test_shipped_file_matches(self):
         # the addon ships the file (so it exists when the game starts) under the same name
-        from wcv import status
-        shipped = Path(__file__).resolve().parents[2] / "addon" / "WowChatVoice" / status.FILE
-        self.assertIn("WowChatVoiceStatus = nil", shipped.read_text(encoding="utf-8"))
-        toc = (shipped.parent / "WowChatVoice.toc").read_text(encoding="utf-8")
+        from bv import status
+        shipped = Path(__file__).resolve().parents[2] / "addon" / "BarrensVoice" / status.FILE
+        self.assertIn("BarrensVoiceStatus = nil", shipped.read_text(encoding="utf-8"))
+        toc = (shipped.parent / "BarrensVoice.toc").read_text(encoding="utf-8")
         self.assertLess(toc.index(status.FILE), toc.index("Companion.lua\n"))     # read before the module
 
     def test_lines_read_once_across_restarts(self):
         import tempfile
-        from wcv.status import SeenLines
+        from bv.status import SeenLines
         with tempfile.TemporaryDirectory() as d:
             seen = SeenLines(Path(d) / "seen.txt")
             self.assertFalse(seen.seen("a1-1"))
@@ -860,16 +860,16 @@ class CompanionStatus(unittest.TestCase):
 
 
 class ReplayQueue(unittest.TestCase):
-    """/wcv last: lines sent again are asked for - none dropped when the queue is full; live ones may be."""
+    """/bv last: lines sent again are asked for - none dropped when the queue is full; live ones may be."""
 
     def line(self, text, replay=False):
-        from wcv.protocol import parse
+        from bv.protocol import parse
         options = "rate=100" + (";replay=1" if replay else "")
         return parse("\x1f".join(["party", "Вася", "Orc", "2", "WARRIOR", "", options, text]).encode())
 
     def test_live_dropped_replayed_kept_in_order(self):
         import queue
-        from wcv.audio import queue_line
+        from bv.audio import queue_line
         q, said = queue.Queue(), []
         for k in range(12):                                   # a replay of 12 lines at once
             queue_line(q, self.line(f"r{k}", replay=True), 8, said.append)
@@ -881,7 +881,7 @@ class ReplayQueue(unittest.TestCase):
 
     def test_live_lines_keep_up(self):
         import queue
-        from wcv.audio import queue_line
+        from bv.audio import queue_line
         q, said = queue.Queue(), []
         queue_line(q, self.line("r0", replay=True), 3, said.append)
         for k in range(5):
@@ -894,7 +894,7 @@ class ReplayQueue(unittest.TestCase):
         import tempfile
         import threading
         import time
-        from wcv.audio import Player
+        from bv.audio import Player
         p = Player(2, tempfile.mkdtemp())                     # not started: nothing plays
         p.play(b"a")
         p.play(b"b")
@@ -919,7 +919,7 @@ class StderrLog(unittest.TestCase):
     def test_lines_kept_progress_bars_collapsed(self):
         import io
         import tempfile
-        from wcv import __main__ as m
+        from bv import __main__ as m
         with tempfile.TemporaryDirectory() as d:
             old_dir, old_file, old_day = m.LOG_DIR, m._log_file, m._log_day
             m.LOG_DIR, m._log_file, m._log_day = Path(d), None, None
@@ -936,7 +936,7 @@ class StderrLog(unittest.TestCase):
                 self.assertIn("a warning", console.getvalue())                  # the console still gets it all
                 self.assertIn("0/587", console.getvalue())
                 m._log_file.close()
-                text = next(Path(d).glob("wcv-*.log")).read_text(encoding="utf-8")
+                text = next(Path(d).glob("bv-*.log")).read_text(encoding="utf-8")
                 lines = [l[9:] for l in text.splitlines()]
                 self.assertEqual(lines, ["[stderr] W1113 torch: a warning",
                                          "[stderr] Loading weights: 100%|####| 587/587", "[stderr] half a line"])
@@ -950,19 +950,19 @@ class AddonMissing(unittest.TestCase):
     def test_stops_without_the_addon(self):
         import tempfile
         from unittest import mock
-        from wcv import voicelist
+        from bv import voicelist
         with tempfile.TemporaryDirectory() as d:
             game = Path(d) / "_forever_"
             (game / "Interface" / "AddOns").mkdir(parents=True)
-            with mock.patch("wcv.voicelist.wow_roots", return_value=[game]):
+            with mock.patch("bv.voicelist.wow_roots", return_value=[game]):
                 message = voicelist.missing_addon({})
                 self.assertIn("не установлен", message)
                 self.assertIn(str(game), message)                 # where it looked
-                addon = game / "Interface" / "AddOns" / "WowChatVoice"
+                addon = game / "Interface" / "AddOns" / "BarrensVoice"
                 addon.mkdir()
-                (addon / "WowChatVoice.toc").write_text("## Title: WoW Chat Voice\n", encoding="utf-8")
+                (addon / "BarrensVoice.toc").write_text("## Title: Barrens Voice\n", encoding="utf-8")
                 self.assertIsNone(voicelist.missing_addon({}))
-            with mock.patch("wcv.voicelist.wow_roots", return_value=[Path(d) / "nowhere"]):
+            with mock.patch("bv.voicelist.wow_roots", return_value=[Path(d) / "nowhere"]):
                 self.assertIn("папка игры тоже не найдена", voicelist.missing_addon({}))
 
 
@@ -972,8 +972,8 @@ class GameChoice(unittest.TestCase):
 
     def test_folders_bank_and_product(self):
         from unittest import mock
-        from wcv import gamevoices, launch
-        from wcv.dictionary import game_of, wow_roots
+        from bv import gamevoices, launch
+        from bv.dictionary import game_of, wow_roots
         self.assertEqual(game_of({}), "forever")
         self.assertEqual(game_of({"game": "Retail"}), "retail")
         self.assertEqual(game_of({"game": "classic"}), "forever")             # unknown: the default
@@ -981,8 +981,8 @@ class GameChoice(unittest.TestCase):
         self.assertTrue(all(r.name == "_retail_" for r in wow_roots({"game": "retail"})))
         self.assertEqual(gamevoices.bank_dir({}, Path("app")), Path("app/voices"))
         self.assertEqual(gamevoices.bank_dir({"game": "retail"}, Path("app")), Path("app/voices-retail"))
-        with mock.patch("wcv.launch.find_battlenet", return_value=Path("bn.exe")), \
-             mock.patch("wcv.launch.subprocess.Popen") as popen:
+        with mock.patch("bv.launch.find_battlenet", return_value=Path("bn.exe")), \
+             mock.patch("bv.launch.subprocess.Popen") as popen:
             launch.launch({"game": "retail"}, lambda *a: None)
             self.assertIn("--exec=launch WoW", popen.call_args[0][0])
             launch.launch({}, lambda *a: None)

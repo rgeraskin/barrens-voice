@@ -1,4 +1,4 @@
--- The settings window (/wcv, the minimap button, Options > AddOns), in the game's own tabs under the
+-- The settings window (/bv, the minimap button, Options > AddOns), in the game's own tabs under the
 -- frame (PanelTabButtonTemplate): "Общее" (the main switch, speed and volume, the chat windows, and the
 -- foldable "Мост", StripWindow.lua), "Каналы и чтение", "Голоса" (the engine and the Windows voices,
 -- VoicesWindow.lua) and "Словарь" (DictionaryWindow.lua). Each tab opens with a line on what is on it, and
@@ -10,10 +10,10 @@ local UI = ns.UI
 local O = {}
 ns.Options = O
 
-local TITLE = "WoW Chat Voice"
+local TITLE = "Barrens Voice"
 
 -- What "Мост" is, for the player (the settings' button and the bridge window).
-ns.BRIDGE_TIP = "Мост — то, через что аддон передаёт строки чата приложению-компаньону WoW Chat Voice, которое читает их вслух: тонкая тёмная линия у края экрана. Компаньон видит окно игры и читает эту линию — другого пути наружу у аддонов WoW нет. Если линию закрывает другой аддон (рисует что-то в том же месте), чат перестаёт читаться — тогда перенесите её."
+ns.BRIDGE_TIP = "Мост — то, через что аддон передаёт строки чата приложению-компаньону Barrens Voice, которое читает их вслух: тонкая тёмная линия у края экрана. Компаньон видит окно игры и читает эту линию — другого пути наружу у аддонов WoW нет. Если линию закрывает другой аддон (рисует что-то в том же месте), чат перестаёт читаться — тогда перенесите её."
 
 -- The numbered channels, under "Общие каналы": setting, label, tooltip. No numbers: a channel's number is
 -- the player's own (in the author's logs Trade was 2 in one town and 4 elsewhere, "Торговля (локальный)").
@@ -151,7 +151,7 @@ local function BuildGeneral(tab, description)
     local y = Describe(tab, description)
     -- Three buttons of one size in a row: the main switch (green or red), trying the voices, handing
     -- the race voices out afresh.
-    StaticPopupDialogs["WOWCHATVOICE_RESET"] = {
+    StaticPopupDialogs["BARRENSVOICE_RESET"] = {
         text = "Раздать голоса рас заново?\n\nКомпаньон забудет, у кого какой голос был, и выдаст их снова — "
             .. "так же, без повторов, начиная с тех, кто заговорит первым.",
         button1 = YES, button2 = NO,
@@ -162,11 +162,11 @@ local function BuildGeneral(tab, description)
     toggle = UI.Button(tab, "", W, function() ns.SetEnabled(not ns.db.enabled) end)
     toggle:SetPoint("TOPLEFT", LEFT, y)
     UI.Tooltip(toggle, "Включить или выключить всю озвучку: мост к компаньону (линию у края экрана) и передачу чата "
-        .. "ему. То же — ПКМ по значку у миникарты или /wcv on, /wcv off.")
+        .. "ему. То же — ПКМ по значку у миникарты или /bv on, /bv off.")
     local test = UI.Button(tab, "Проверка", W, ns.Test)
     test:SetPoint("TOPLEFT", LEFT + W + GAP, y)
-    UI.Tooltip(test, "Четыре тестовые строки разными голосами (/wcv test). Все команды — /wcv help.")
-    local reset = UI.Button(tab, "Перераздать голоса", W, function() StaticPopup_Show("WOWCHATVOICE_RESET") end)
+    UI.Tooltip(test, "Четыре тестовые строки разными голосами (/bv test). Все команды — /bv help.")
+    local reset = UI.Button(tab, "Перераздать голоса", W, function() StaticPopup_Show("BARRENSVOICE_RESET") end)
     reset:SetPoint("TOPLEFT", LEFT + 2 * (W + GAP), y)
     UI.Tooltip(reset, "Раздать голоса рас заново: у каждого персонажа может оказаться другой голос.")
     y = y - 30
@@ -179,7 +179,7 @@ local function BuildGeneral(tab, description)
     programState:SetPoint("TOPLEFT", LEFT + 4, y)
     programState:SetPoint("RIGHT", -LEFT, 0)
     programState:SetJustifyH("LEFT")
-    UI.TextTooltip(tab, programState, "Работало ли приложение-компаньон WoW Chat Voice, которое читает чат вслух, "
+    UI.TextTooltip(tab, programState, "Работало ли приложение-компаньон Barrens Voice, которое читает чат вслух, "
         .. "когда вы входили в игру: оно раз в 15 секунд отмечается в файле в папке аддона, а игра читает этот файл "
         .. "при входе и /reload. Запущенный позже компаньон тоже читает чат — аддон просто узнает об этом при "
         .. "следующем /reload.")
@@ -262,7 +262,7 @@ local function BuildGeneral(tab, description)
         O.Bridge = Fold
     else   -- a file new to the addon: the game loads it only after a restart, not on /reload
         fold:SetScript("OnClick", function()
-            print("|cff40c0ffWoW Chat Voice:|r раздел «Мост» появится после перезапуска игры.")
+            print("|cff40c0ffBarrens Voice:|r раздел «Мост» появится после перезапуска игры.")
         end)
     end
     fold:SetText("Мост к компаньону…")
@@ -366,7 +366,7 @@ local function BuildVoices(tab, description)
 end
 
 -- "Помощь": where to write about bugs, ideas and words read wrong.
-local MEDIA = "Interface\\AddOns\\WowChatVoice\\Media\\"
+local MEDIA = "Interface\\AddOns\\BarrensVoice\\Media\\"
 local function BuildHelp(tab, description)
     local y = Describe(tab, description)
     for _, item in ipairs({ { "discord", "discord" }, { "telegram", "telegram" }, { "github", "github" } }) do
@@ -395,7 +395,7 @@ local function BuildDictionary(tab, description)
 end
 
 local function Build()
-    window = UI.Window("WowChatVoiceOptions", TITLE, 580, 620)
+    window = UI.Window("BarrensVoiceOptions", TITLE, 580, 620)
     local builders = { general = BuildGeneral, reading = BuildReading, voices = BuildVoices,
                        dictionary = BuildDictionary, help = BuildHelp }
     local previous
@@ -468,7 +468,7 @@ local function RegisterInGameSettings()
     open:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -12)
     local hint = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     hint:SetPoint("LEFT", open, "RIGHT", 10, 0)
-    hint:SetText("или /wcv в чате")
+    hint:SetText("или /bv в чате")
     if Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory then
         Settings.RegisterAddOnCategory(Settings.RegisterCanvasLayoutCategory(panel, panel.name))
     elseif InterfaceOptions_AddCategory then

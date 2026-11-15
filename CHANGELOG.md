@@ -2,6 +2,7 @@
 
 ## 0.4.0 (в работе)
 
+- The mod is called **Barrens Voice** now (after the Barrens chat): the addon's folder is `BarrensVoice`, its command `/bv`, its saved settings `BarrensVoiceDB`; the companion starts with `BarrensVoice.cmd` / `BarrensVoice-Retail.cmd`, its Python package is `bv`, its logs `bv-YYYY-MM-DD.log`. Nothing carries over from the old names by itself.
 - A «Помощь» tab in the settings: where to write about bugs, ideas and words read wrong — Discord, Telegram and the GitHub issues, each with its icon, its address in a box (a click selects it, Ctrl+C copies) and «Копировать» and «Открыть». The game gives an addon neither the browser nor the clipboard, so the companion does both (bridge kinds `open` and `copy`, only for the addresses it knows). The welcome on the first run and the line after an update point to it.
 - An ONNX Runtime engine for the race voices and the voice bank, next to torch (`"f5_backend": "onnx"`, off by default): F5 exported to ONNX (DakeQQ/F5-TTS-ONNX) on DirectML — any DirectX 12 card — and Whisper large-v3-turbo in ONNX for building the bank, no torch needed. On an RTX 5070 Ti a line takes about 1.7 s against torch's 1.0 s, so torch stays the default for now.
 - The links to more Windows voices (RHVoice, Silero) on «Голоса» are rows of the same kind: the address to see and copy, «Копировать» and «Открыть».

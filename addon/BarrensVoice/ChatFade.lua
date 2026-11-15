@@ -114,7 +114,7 @@ local function OnAddMessage(self, text)
     local asked = mark and ALWAYS_SHOW[mark.event] and ns.db and ns.db[ALWAYS_SHOW[mark.event]]
     if mark and mark.read and GetTime() - mark.at <= MARK_FOR and not asked then return end
     if ns.db and ns.db.fadeChat and F.Reveal(self) then
-        if ns.db.debug then        -- /wcv debug: which line showed the window, and why
+        if ns.db.debug then        -- /bv debug: which line showed the window, and why
             local line = "(закрытый текст)"   -- a secret one (retail) cannot be looked at
             if not (ns.Secret and ns.Secret(text)) then
                 line = tostring(text):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|H.-|h(.-)|h", "%1")

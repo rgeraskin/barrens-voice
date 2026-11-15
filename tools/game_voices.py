@@ -1,4 +1,4 @@
-"""Make companion/wcv/game_voices.json: which game files hold each race voice (`mise run voices-table`).
+"""Make companion/bv/game_voices.json: which game files hold each race voice (`mise run voices-table`).
 
 The companion builds its F5 voice bank from recordings in the game client itself (read-only, on
 the player's machine). It needs to know which files to read: their FileDataIDs, which are stable
@@ -24,7 +24,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 CACHE = ROOT / "tools" / ".cache" / "community-listfile.csv"
 URL = "https://github.com/wowdev/wow-listfile/releases/latest/download/community-listfile.csv"
-OUT = ROOT / "companion" / "wcv" / "game_voices.json"
+OUT = ROOT / "companion" / "bv" / "game_voices.json"
 
 # The playable races of WoW Forever: the race as the bank names it -> its folder in sound/character
 # and its prefix in sound/creature (the Forsaken's NPCs are "undead...npc").

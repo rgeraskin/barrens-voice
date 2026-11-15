@@ -8,7 +8,7 @@ import webbrowser
 LINKS = {
     "discord": "https://discord.gg/hxpuTQF2Bb",
     "telegram": "https://t.me/+NwReoOS9x7hhYjgy",
-    "github": "https://github.com/rgeraskin/wow-chat-voice/issues",
+    "github": "https://github.com/rgeraskin/barrens-voice/issues",
     "rhvoice": "https://rhvoice.su/voices/",
     "silero": "https://github.com/snakers4/silero-models/releases?q=SAPI",
 }

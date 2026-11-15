@@ -13,7 +13,7 @@ local window, content, filter, count, empty
 local rows = {}
 
 local function List()
-    return WowChatVoiceVoiceList or {}
+    return BarrensVoiceVoiceList or {}
 end
 
 local function IsOn(entry)
