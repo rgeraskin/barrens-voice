@@ -227,7 +227,9 @@ class DictionaryInCompanion(unittest.TestCase):
         self.assertEqual(plain("кто еще идёт? Еще один"), "кто ещё идёт? ещё один")
         self.assertEqual(plain("пишите в тг"), "пишите в телегр+ам")
         self.assertEqual(plain("доведете до конца"), "довед+ёте до конца")
+        self.assertEqual(plain("ученого, ученые и ученик"), "учёного, учёные и ученик")
         self.assertEqual(plain("ага, пойдём"), "аг+а, пойдём")
+        self.assertEqual(plain("сережа, у сережи, сережу"), "серёжа, у серёжи, серёжу")
         self.assertEqual(d.apply_words("кто танчит? я танчу, вчера танчила"), "кто т+анчит? я т+анчу, вчера т+анчила")
         self.assertEqual(d.apply("за 5к"), "за 5000")                                           # a default regex
         from wcv.dictionary import plurals

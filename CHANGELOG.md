@@ -20,6 +20,7 @@
 - Warnings and errors the libraries write to stderr (torch, transformers) go into the companion's log file too, marked `[stderr]`.
 - The dictionary reads «тг» as «телеграм», «ага» with the stress on the last «а», and «доведёте» (and «доведёт», «доведёшь», «доведём») with «ё».
 - A line that is nothing but questions is announced «Громмаш спрашивает: …» instead of «пишет» (the voices raise their tone at a question mark unevenly, the verb tells it by ear); yells and whispers keep their verbs.
+- The dictionary reads «Серёжа» in every case, and «учёный» in its forms, with «ё».
 
 ## 0.2.0
 
