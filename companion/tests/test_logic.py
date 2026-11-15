@@ -264,7 +264,9 @@ class DictionaryInCompanion(unittest.TestCase):
         self.assertEqual(plain("губа не дура"), "губ+а не дура")
         self.assertEqual(plain("хелло всем"), "хелл+оу всем")
         self.assertEqual(plain("с др тебя"), "с дэ-+эр тебя")
-        self.assertEqual(plain("кто берет ружье"), "кто берёт ружьё")   # both readings are words; in WoW it is these
+        self.assertEqual(plain("кто берет ружье"), "кто берёт ружьё")
+        self.assertEqual(plain("нюдес, нюдесы и нюдсы"), "н+юдес, н+юдесы и н+юдсы")
+        self.assertEqual(plain("чето не то"), "чёто не то")   # both readings are words; in WoW it is these
         self.assertEqual(plain("учусь манаменеджменту, менеджмент"), "учусь манам+енеджменту, м+енеджмент")
         self.assertEqual(plain("жду тикета, тикет закрыли"), "жду т+икета, т+икет закрыли")
         self.assertEqual(d.apply_words("чиловая игра, за чиловую"), "чил+овая игра, за чил+овую")
