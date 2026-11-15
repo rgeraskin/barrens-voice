@@ -62,6 +62,12 @@ ns.Options.Toggle(); assert(ns.db.volume == 150 and ns.db.rate == 100, "Refresh 
 print("options ok")
 ns.Options.Open("dictionary"); assert(ns.Options.Current() == "dictionary"); print("dictionary ok")
 ns.Options.Open("voices"); assert(ns.Options.Current() == "voices"); print("voices ok")
+assert(ns.Retail() == false, "no GetBuildInfo: Forever")
+GetBuildInfo = function() return "12.1.5", "70783", "Nov 2026", 120105 end
+assert(ns.Retail() == true, "retail by its interface version")
+GetBuildInfo = function() return "1.60.1", "70938", "Nov 2026", 16001 end
+assert(ns.Retail() == false, "Forever")
+GetBuildInfo = nil
 do  -- «Скачать дополнительные голоса …: RHVoice, Silero»: the companion is asked to open the page; the address goes to the chat too
     local pushedLink, saidLink, push0, print0 = {}, {}, ns.Strip.Push, print
     ns.Strip.Push = function(p) pushedLink[#pushedLink + 1] = p end

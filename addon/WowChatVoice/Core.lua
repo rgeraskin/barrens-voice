@@ -13,20 +13,20 @@ ns.DEFAULTS = {
     yell = true,
     whisper = true,    -- whispers to you
     guild = true,
-    officer = false,
-    channels = false,  -- numbered channels: General, Trade, LookingForGroup, LocalDefense ...
+    officer = true,
+    channels = true,   -- numbered channels: General, Trade, LookingForGroup, LocalDefense ...
     chGeneral = true,  -- ... which of them once "channels" is on: General,
     chTrade = true,    --     Trade,
     chLfg = true,      --     LookingForGroup,
     chDefense = true,  --     LocalDefense / WorldDefense,
     chOther = true,    --     any other numbered channel (a custom one)
-    emote = false,     -- /e emotes
+    emote = true,      -- /e emotes
     fadeChat = false,  -- chat windows transparent until the mouse is over them (ChatFade.lua)
     fadeWhisper = false, -- ... but a whisper shows the window though it is read aloud
     fadeGuild = false, --     and so does a guild (or officer) line
     skipAddons = true, -- lines other players' addons write for them (Questie, DBM...) are not read
     debug = false,     -- /wcv debug: why a chat line was not sent, and CatQuest's speech, to the program's log
-    self = false,      -- your own lines
+    self = true,       -- your own lines
     onlyVisible = true, -- only lines a chat window of yours shows (its message types and channels, chat filters)
     waitForCatQuest = true, -- hold chat lines while CatQuest or Wayfarer reads a quest; send them when it is done
     cell = 2,          -- strip cell size, physical pixels
@@ -44,9 +44,9 @@ ns.DEFAULTS = {
     volume = 100,      -- loudness, percent (0..200: over 100 the program boosts, easing the peaks), on top of the program's own `volume`
     minimapIcon = true,
     minimapAngle = 160, -- degrees on the minimap ring (CatQuest's sits at 200)
-    sayNames = false,  -- "Name: text"
-    sayVerb = false,   -- "Name says: text" (says / yells / whispers / writes, by chat kind)
-    sayLastNames = false, -- the whole name ("Ивар Седой"); off: up to the first space ("Ивар")
+    sayNames = true,   -- "Name: text"
+    sayVerb = true,    -- "Name says: text" (says / yells / whispers / writes, by chat kind)
+    sayLastNames = true,  -- the whole name ("Ивар Седой"); off: up to the first space ("Ивар")
     declension = true, -- the program declines dictionary replacements after prepositions (pymorphy3)
     voices = "f5",     -- "f5": race voices (CatQuest, F5-TTS); "sapi": Windows voices
     -- voiceOff: [Windows voice name] = true for voices switched off; nil until changed here (the
@@ -393,6 +393,12 @@ function ns.DictionaryChanged()
     if not (C_Timer and ns.Strip and ns.db) then return end
     if layerTimer then layerTimer:Cancel() end
     layerTimer = C_Timer.NewTimer(2, function() layerTimer = nil; ns.SendDictionary(false) end)
+end
+
+--- Retail WoW (12.x), not Forever (1.x): by the client's interface version.
+function ns.Retail()
+    local ok, _, _, _, interface = pcall(GetBuildInfo)
+    return ok and (tonumber(interface) or 0) >= 100000 or false
 end
 
 -- Pages the companion opens in the browser on a click in the settings (an addon cannot: LaunchURL is

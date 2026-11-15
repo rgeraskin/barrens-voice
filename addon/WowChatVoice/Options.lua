@@ -90,7 +90,7 @@ local function Refresh()
     for _, c in ipairs(numbered) do UI.SetCheckEnabled(c, ns.db.channels) end
     for _, c in ipairs(fadeSubs) do UI.SetCheckEnabled(c, ns.db.fadeChat) end
     UI.SetCheckEnabled(verb, ns.db.sayNames)
-    UI.SetCheckEnabled(lastNames, ns.db.sayNames)
+    if lastNames then UI.SetCheckEnabled(lastNames, ns.db.sayNames) end
     for value, r in pairs(radios) do r:SetChecked((ns.db.voices or "f5") == value) end
     for key, sl in pairs(sliders) do
         -- through the minimum: setting the value the slider already has does not move the thumb,
@@ -275,26 +275,36 @@ local function BuildReading(tab, description)
     local get, set = Setting("sayNames", function() Refresh() end)
     checks[#checks + 1] = UI.Check(tab, LEFT, y, "Озвучивать имена", "Перед сообщением читать имя написавшего: "
         .. "«Громмаш: всем привет».", get, set)
-    get, set = Setting("sayLastNames")
-    lastNames = UI.Check(tab, LEFT + SUB, y - 24, "и фамилии: «Ивар Седой», а не «Ивар»", "Читать имя целиком. Выключено — "
-        .. "только до первого пробела: у персонажа «Ивар Седой» прозвучит «Ивар».", get, set)
-    checks[#checks + 1] = lastNames
+    -- Forever only: retail names have no spaces, and CatQuest and Wayfarer are Forever's addons
+    local retail, row = ns.Retail(), 1
+    if not retail then
+        get, set = Setting("sayLastNames")
+        lastNames = UI.Check(tab, LEFT + SUB, y - 24 * row, "и фамилии: «Ивар Седой», а не «Ивар»", "Читать имя целиком. "
+            .. "Выключено — только до первого пробела: у персонажа «Ивар Седой» прозвучит «Ивар».", get, set)
+        checks[#checks + 1] = lastNames
+        row = row + 1
+    end
     get, set = Setting("sayVerb")
-    verb = UI.Check(tab, LEFT + SUB, y - 48, "с глаголом: «Громмаш говорит: …»", "Вместо двоеточия — что сделал игрок: "
+    verb = UI.Check(tab, LEFT + SUB, y - 24 * row, "с глаголом: «Громмаш говорит: …»", "Вместо двоеточия — что сделал игрок: "
         .. "говорит (/s), кричит (/y), шепчет (шёпот), пишет (остальные каналы), спрашивает (если в строке одни "
         .. "вопросы).", get, set)
     checks[#checks + 1] = verb
+    row = row + 1
     get, set = Setting("skipAddons")
-    checks[#checks + 1] = UI.Check(tab, LEFT, y - 72, "Не читать сообщения аддонов", "Аддоны других игроков пишут "
+    checks[#checks + 1] = UI.Check(tab, LEFT, y - 24 * row, "Не читать сообщения аддонов", "Аддоны других игроков пишут "
         .. "в чат от их имени: Questie — «{звезда} Questie: … 1/1», DBM, BigWigs, Details! и другие. Такие строки "
         .. "не озвучиваются (если в группе у двоих Questie, одно и то же звучало бы дважды); в прозрачном чате "
         .. "они видны, раз их не слышно.", get, set)
-    get, set = Setting("waitForCatQuest")
-    checks[#checks + 1] = UI.Check(tab, LEFT, y - 96, "Ждать озвучку квестов (CatQuest, Wayfarer)",
-        "Пока аддон CatQuest или Wayfarer читает квест, реплику NPC, рассказ о месте или путевую историю, чат "
-        .. "замолкает и после дочитывает прерванную строку с начала; ждавшие дольше 40 секунд пропускаются. "
-        .. "Без этих аддонов ничего не меняет.", get, set)
-    y = y - 124
+    row = row + 1
+    if not retail then
+        get, set = Setting("waitForCatQuest")
+        checks[#checks + 1] = UI.Check(tab, LEFT, y - 24 * row, "Ждать озвучку квестов (CatQuest, Wayfarer)",
+            "Пока аддон CatQuest или Wayfarer читает квест, реплику NPC, рассказ о месте или путевую историю, чат "
+            .. "замолкает и после дочитывает прерванную строку с начала; ждавшие дольше 40 секунд пропускаются. "
+            .. "Без этих аддонов ничего не меняет.", get, set)
+        row = row + 1
+    end
+    y = y - 24 * row - 4
 
     y = UI.Header(tab, "Каналы", y)
     for i, item in ipairs(CHANNELS) do
