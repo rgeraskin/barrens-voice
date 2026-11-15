@@ -254,12 +254,8 @@ class DictionaryInCompanion(unittest.TestCase):
         self.assertEqual(plain("на пикабу"), "на пикаб+у")
         self.assertEqual(plain("в 20 по мск"), "в 20 по эм-эс-к+а")
         self.assertEqual(plain("кто сдал кв? квас и квартира"), "кто сдал квест? квас и квартира")
-        self.assertEqual(plain("найдется кто? предмет найден"), "найдётся кто? предмет найден")
-        self.assertEqual(plain("кто еще идёт? Еще один"), "кто ещё идёт? ещё один")
         self.assertEqual(plain("пишите в тг"), "пишите в телегр+ам")
         self.assertEqual(plain("доведете до конца"), "довед+ёте до конца")
-        self.assertEqual(plain("ученого, ученые и ученик"), "учёного, учёные и ученик")
-        self.assertEqual(plain("ученого, ученые и ученик"), "учёного, учёные и ученик")
         self.assertEqual(plain("ага, пойдём"), "аг+а, пойдём")
         self.assertEqual(plain("сережа, у сережи, сережу"), "серёжа, у серёжи, серёжу")
         self.assertEqual(plain("сережа, у сережи, сережу"), "серёжа, у серёжи, серёжу")
@@ -268,8 +264,6 @@ class DictionaryInCompanion(unittest.TestCase):
         self.assertEqual(plain("хелло всем"), "хелл+оу всем")
         self.assertEqual(plain("учусь манаменеджменту, менеджмент"), "учусь манам+енеджменту, м+енеджмент")
         self.assertEqual(plain("жду тикета, тикет закрыли"), "жду т+икета, т+икет закрыли")
-        self.assertEqual(plain("ждем танка, он ждет нас"), "ждём танка, он ждёт нас")
-        self.assertEqual(plain("на утесе у Утеса Громов"), "на утёсе у утёса Громов")
         self.assertEqual(d.apply_words("чиловая игра, за чиловую"), "чил+овая игра, за чил+овую")
         self.assertEqual(d.apply_words("кто танчит? я танчу, вчера танчила"), "кто т+анчит? я т+анчу, вчера т+анчила")
         self.assertEqual(d.apply("за 5к"), "за 5000")                                           # a default regex
@@ -518,6 +512,10 @@ class Yo(unittest.TestCase):
         self.assertEqual(restore("все берет"), "все берет")                      # either reading is a word: left
         self.assertEqual(restore("пр+опасть, т+ебе"), "пр+опасть, т+ебе")        # the dictionary's stress: left
         self.assertEqual(restore("уже ждём"), "уже ждём")                       # typed with «ё» already
+        self.assertEqual(restore("найдется кто? предмет найден"), "найдётся кто? предмет найден")
+        self.assertEqual(restore("кто еще идёт? Еще один"), "кто ещё идёт? Ещё один")
+        self.assertEqual(restore("ученого, ученые и ученик"), "учёного, учёные и ученик")
+        self.assertEqual(restore("на утесе у Утеса Громов"), "на утёсе у Утёса Громов")
 
     def test_dictionary_format(self):
         # read as eyo-kernel reads it: endings in brackets; «_» - lower case only; a capital - a name only
