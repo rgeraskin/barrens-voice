@@ -664,6 +664,8 @@ end
 
 -- What a version brought, in a few words, for the line after an update (CHANGELOG.md has it all).
 ns.NEWS = {
+    ["0.3.0"] = "ритейл WoW (WowChatVoice-Retail.cmd) с голосами всех его рас; чат ждёт и Wayfarer; «ё» в словах из чата "
+        .. "ставится сама",
     ["0.2.1"] = "окно чата можно прятать, пока на нём нет мыши; мост к компаньону можно перенести; при входе видно, "
         .. "работает ли озвучка",
 }
