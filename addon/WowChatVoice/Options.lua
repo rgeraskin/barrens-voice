@@ -78,6 +78,8 @@ local TABS = {
     { "reading", "Каналы и чтение", "Какие каналы и строки читать вслух и как произносить имена." },
     { "voices", "Голоса", "Чем читать: голоса рас или голоса Windows, и какие голоса Windows раздавать игрокам." },
     { "dictionary", "Словарь", "Как читать сленг и сокращения: WTS = продам, дд = дамагер, ОП = Огненная пропасть." },
+    { "help", "Помощь", "Ошибки, улучшения, предложения или что-то прочитано неправильно — пишите в Discord или "
+        .. "Telegram, или сразу заведите issue на GitHub." },
 }
 
 local function Refresh()
@@ -360,7 +362,26 @@ local function BuildVoices(tab, description)
     pane:SetPoint("TOPLEFT", 0, y - 30)
     pane:SetPoint("BOTTOMRIGHT", 0, 0)
     ns.VoicesWindow.Create(pane)
-    return 520
+    return 570
+end
+
+-- "Помощь": where to write about bugs, ideas and words read wrong.
+local MEDIA = "Interface\\AddOns\\WowChatVoice\\Media\\"
+local function BuildHelp(tab, description)
+    local y = Describe(tab, description)
+    for _, item in ipairs({ { "discord", "discord" }, { "telegram", "telegram" }, { "github", "github" } }) do
+        y = y - UI.LinkRow(tab, LEFT, y, 580 - 2 * LEFT - 4, item[1], MEDIA .. item[2])
+    end
+    y = y - 8
+    local note = tab:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    note:SetPoint("TOPLEFT", LEFT + 4, y)
+    note:SetPoint("RIGHT", -LEFT, 0)
+    note:SetJustifyH("LEFT")
+    note:SetText("Что прислать: что прозвучало и как надо, а лучше — строку из журнала компаньона (папка logs рядом с ним). "
+        .. "Неверное ударение можно сразу поправить себе на вкладке «Словарь».\n\n"
+        .. "Адрес можно выделить щелчком и скопировать (Ctrl+C). «Копировать» и «Открыть» выполняет компаньон: "
+        .. "аддону игра не даёт ни браузер, ни буфер обмена.")
+    return -(y - 90)
 end
 
 -- "Словарь": the editor (DictionaryWindow.lua).
@@ -376,7 +397,7 @@ end
 local function Build()
     window = UI.Window("WowChatVoiceOptions", TITLE, 580, 620)
     local builders = { general = BuildGeneral, reading = BuildReading, voices = BuildVoices,
-                       dictionary = BuildDictionary }
+                       dictionary = BuildDictionary, help = BuildHelp }
     local previous
     for _, item in ipairs(TABS) do
         local key = item[1]

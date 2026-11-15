@@ -416,6 +416,10 @@ def main() -> int:
                         if not first:                          # a click in the addon's settings
                             from .links import open_link
                             open_link(line.text, log)
+                    elif line and line.kind == "copy":
+                        if not first:
+                            from .links import copy_link
+                            copy_link(line.text, log)
                     elif line and line.kind == "diag" and not first:
                         log(f"[диагностика аддона] {line.text}")
                     elif line and line.kind not in LABELS:

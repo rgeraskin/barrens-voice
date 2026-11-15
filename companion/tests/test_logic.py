@@ -517,6 +517,13 @@ class Links(unittest.TestCase):
         self.assertIsNone(open_link("https://evil.example", log.append, opened.append))
         self.assertEqual(opened, [LINKS["rhvoice"]])
 
+    def test_copy_known_only(self):
+        from wcv.links import LINKS, copy_link
+        copied, log = [], []
+        self.assertEqual(copy_link("discord", log.append, copied.append), LINKS["discord"])
+        self.assertIsNone(copy_link("rm -rf", log.append, copied.append))
+        self.assertEqual(copied, [LINKS["discord"]])
+
     def test_same_as_the_addon(self):
         from wcv.links import LINKS
         core = (Path(__file__).resolve().parents[2] / "addon" / "WowChatVoice" / "Core.lua").read_text(encoding="utf-8")

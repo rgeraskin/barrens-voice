@@ -1,0 +1,1 @@
+Discord, Telegram and GitHub icons for the «Помощь» tab: the logos of [Simple Icons](https://github.com/simple-icons/simple-icons) (CC0 1.0), in the brands' colours (GitHub in white for the dark window), rendered at 32×32 into TGA. The logos are trademarks of their owners; they only mark the links to those sites.

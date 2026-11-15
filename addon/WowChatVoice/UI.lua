@@ -88,6 +88,47 @@ function UI.Button(parent, text, width, onClick)
     return b
 end
 
+--- A page to visit (one of ns.LINKS): an icon if given, its name, the address in a box (a click selects
+--- it, Ctrl+C copies it; typing does not change it), and «Копировать» and «Открыть», which the companion
+--- does (Core.lua ns.CopyLink, ns.OpenLink). `width` from `x` to the last button. Returns the row's height.
+function UI.LinkRow(parent, x, y, width, key, icon)
+    local link = ns.LINKS[key]
+    local left = x
+    if icon then
+        local t = parent:CreateTexture(nil, "ARTWORK")
+        t:SetSize(20, 20)
+        t:SetPoint("TOPLEFT", x, y)
+        t:SetTexture(icon)
+        left = x + 26
+    end
+    local name = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    name:SetPoint("TOPLEFT", left, y - 4)
+    name:SetWidth(70)
+    name:SetJustifyH("LEFT")
+    name:SetText(link[1])
+    local open = UI.Button(parent, "Открыть", 76, function() ns.OpenLink(key) end)
+    open:SetPoint("TOPLEFT", x + width - 76, y)
+    UI.Tooltip(open, "Компаньон откроет страницу в браузере (сам аддон этого не может).")
+    local copy = UI.Button(parent, "Копировать", 96, function() ns.CopyLink(key) end)
+    copy:SetPoint("RIGHT", open, "LEFT", -4, 0)
+    UI.Tooltip(copy, "Компаньон положит адрес в буфер обмена. Без компаньона — щёлкните по адресу и нажмите Ctrl+C.")
+    local box = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
+    box:SetHeight(20)
+    box:SetAutoFocus(false)
+    box:SetPoint("LEFT", name, "RIGHT", 8, 0)
+    box:SetPoint("RIGHT", copy, "LEFT", -10, 0)
+    box:SetText(link[2])
+    box:SetCursorPosition(0)
+    box:SetScript("OnTextChanged", function(self, user)
+        if user then self:SetText(link[2]); self:HighlightText() end
+    end)
+    box:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
+    box:SetScript("OnMouseUp", function(self) self:SetFocus(); self:HighlightText() end)
+    box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    box:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+    return 26
+end
+
 --- A dark box with a border, for text fields (falls back to a plain dark panel without
 --- BackdropTemplate).
 function UI.Box(parent)

@@ -401,21 +401,39 @@ function ns.Retail()
     return ok and (tonumber(interface) or 0) >= 100000 or false
 end
 
--- Pages the companion opens in the browser on a click in the settings (an addon cannot: LaunchURL is
--- Blizzard's own). The addon sends only the name; the companion keeps its own list of the same
--- addresses (wcv/links.py) and opens nothing else.
+-- Pages the settings link to (the «Помощь» tab, more voices on «Голоса»). An addon can neither open a
+-- browser nor put text on the clipboard (LaunchURL and CopyToClipboard are Blizzard's own), so the
+-- companion does both on a click: the addon sends only the name, and the companion keeps its own
+-- list of the same addresses (wcv/links.py) and touches nothing else. The address also stands in a
+-- box in the settings, to select and copy with Ctrl+C when the companion is not running.
 ns.LINKS = {
+    discord = { "Discord", "https://discord.gg/hxpuTQF2Bb" },
+    telegram = { "Telegram", "https://t.me/+NwReoOS9x7hhYjgy" },
+    github = { "GitHub", "https://github.com/rgeraskin/wow-chat-voice/issues" },
     rhvoice = { "RHVoice", "https://rhvoice.su/voices/" },
     silero = { "Silero", "https://github.com/snakers4/silero-models/releases?q=SAPI" },
 }
+
+local function AskCompanion(kind, key)
+    ns.Strip.Push(table.concat({ kind, "", "", "", "", "", ns.LineOptions(), key }, SEP))
+end
 
 --- Ask the companion to open one of ns.LINKS in the browser; the address goes to the chat too.
 function ns.OpenLink(key)
     local link = ns.LINKS[key]
     if not link then return end
-    ns.Strip.Push(table.concat({ "open", "", "", "", "", "", ns.LineOptions(), key }, SEP))
+    AskCompanion("open", key)
     print(PREFIX .. ("%s: компаньон откроет страницу в браузере. Если не открылась (компаньон не запущен) — адрес: %s")
         :format(link[1], link[2]))
+end
+
+--- Ask the companion to put one of ns.LINKS on the clipboard.
+function ns.CopyLink(key)
+    local link = ns.LINKS[key]
+    if not link then return end
+    AskCompanion("copy", key)
+    print(PREFIX .. ("%s: компаньон положит адрес в буфер обмена — вставьте его в браузер (Ctrl+V). Если компаньон не "
+        .. "запущен, щёлкните по адресу в настройках и нажмите Ctrl+C."):format(link[1]))
 end
 
 --- Ask the program to forget which race voice each character had and hand them out afresh.
@@ -671,6 +689,10 @@ ns.NEWS = {
 
 --- The word at login: the welcome on the first run, a line on what is new after an update (the
 --- version last seen is kept), and every time whether the reading works (Companion.lua).
+-- Where to write about bugs and words read wrong: said at the first run and after an update, not at
+-- every login.
+local HELP_HINT = "ошибки, неверное произношение, идеи — вкладка «Помощь» в настройках (/wcv): там Discord, Telegram и GitHub."
+
 function ns.LoginWord()
     local version = Version()
     if ns.firstRun then
@@ -678,6 +700,7 @@ function ns.LoginWord()
     elseif ns.db.seenVersion ~= version then
         print(PREFIX .. ("обновление %s: %s. Настройки — /wcv."):format(version, ns.NEWS[version]
             or "что нового — в описании аддона"))
+        print(PREFIX .. HELP_HINT)
     end
     ns.db.seenVersion = version
     if ns.Companion then ns.Companion.SayAtLogin() end      -- a file new in 0.2.1: after a game restart
@@ -692,6 +715,7 @@ function ns.Welcome()
     print(PREFIX .. "читает вслух приложение-компаньон WoW Chat Voice (Windows): без него аддон молчит. Удобнее всего "
         .. "запускать игру через него — оно само запустит игру.")
     print(PREFIX .. "настройки — значок у миникарты или /wcv; команды — /wcv help.")
+    print(PREFIX .. HELP_HINT)
 end
 
 function ns.SetEnabled(enabled)

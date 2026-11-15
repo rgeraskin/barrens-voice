@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.0 (в работе)
+
+- A «Помощь» tab in the settings: where to write about bugs, ideas and words read wrong — Discord, Telegram and the GitHub issues, each with its icon, its address in a box (a click selects it, Ctrl+C copies) and «Копировать» and «Открыть». The game gives an addon neither the browser nor the clipboard, so the companion does both (bridge kinds `open` and `copy`, only for the addresses it knows). The welcome on the first run and the line after an update point to it.
+- The links to more Windows voices (RHVoice, Silero) on «Голоса» are rows of the same kind: the address to see and copy, «Копировать» and «Открыть».
+
 ## 0.3.0
 
 - Retail WoW: the companion works with one chosen game — `WowChatVoice-Retail.cmd` (or `"game": "retail"`) starts it for retail: retail's folder, Battle.net's «WoW», a voice bank of its own (`voices-retail`). Voice files retail has not downloaded yet are taken from an installed WoW Forever: the same content keys, the same files. The addon's TOC lists both games' interface versions.

@@ -62,6 +62,7 @@ ns.Options.Toggle(); assert(ns.db.volume == 150 and ns.db.rate == 100, "Refresh 
 print("options ok")
 ns.Options.Open("dictionary"); assert(ns.Options.Current() == "dictionary"); print("dictionary ok")
 ns.Options.Open("voices"); assert(ns.Options.Current() == "voices"); print("voices ok")
+ns.Options.Open("help"); assert(ns.Options.Current() == "help"); print("help tab ok")
 assert(ns.Retail() == false, "no GetBuildInfo: Forever")
 GetBuildInfo = function() return "12.1.5", "70783", "Nov 2026", 120105 end
 assert(ns.Retail() == true, "retail by its interface version")
@@ -74,9 +75,12 @@ do  -- «Скачать дополнительные голоса …: RHVoice, 
     print = function(t) saidLink[#saidLink + 1] = t end
     ns.OpenLink("silero")
     ns.OpenLink("https://evil.example")
+    ns.CopyLink("discord")
     ns.Strip.Push, print = push0, print0
-    assert(#pushedLink == 1 and pushedLink[1]:find("^open\31") and pushedLink[1]:find("\31silero$"), pushedLink[1] or "nothing")
-    assert(#saidLink == 1 and saidLink[1]:find("snakers4/silero-models", 1, true), "the address in the chat")
+    assert(#pushedLink == 2 and pushedLink[1]:find("^open\31") and pushedLink[1]:find("\31silero$"), pushedLink[1] or "nothing")
+    assert(pushedLink[2]:find("^copy\31") and pushedLink[2]:find("\31discord$"), pushedLink[2] or "nothing")
+    assert(#saidLink == 2 and saidLink[1]:find("snakers4/silero-models", 1, true), "the address in the chat")
+    assert(saidLink[2]:find("буфер обмена", 1, true), saidLink[2])
     print("links ok")
 end
 for _, name in ipairs({ "reading", "general", "no such tab" }) do ns.Options.Open(name) end
@@ -520,8 +524,8 @@ print = function(text) welcome[#welcome + 1] = text end
 GetAddOnMetadata = function() return "0.3.0" end
 ns.firstRun, ns.db.seenVersion = true, nil
 ns.LoginWord()
-assert(#welcome == 4 and welcome[1]:find("добро пожаловать") and welcome[2]:find("приложение%-компаньон")
-    and welcome[4]:find("озвучка чата"), "welcome, then whether the reading works")
+assert(#welcome == 5 and welcome[1]:find("добро пожаловать") and welcome[2]:find("приложение%-компаньон")
+    and welcome[4]:find("«Помощь»", 1, true) and welcome[5]:find("озвучка чата"), "welcome, then whether the reading works")
 assert(ns.db.seenVersion == "0.3.0", "the version is kept")
 ns.firstRun = false
 welcome = {}
@@ -530,11 +534,12 @@ assert(#welcome == 1 and welcome[1]:find("озвучка чата"), "the same v
 welcome = {}
 ns.db.seenVersion = "0.2.1"                  -- an update
 ns.LoginWord()
-assert(#welcome == 2 and welcome[1]:find("обновление 0.3.0: ритейл WoW"), tostring(welcome[1]))
+assert(#welcome == 3 and welcome[1]:find("обновление 0.3.0: ритейл WoW") and welcome[2]:find("«Помощь»", 1, true),
+    tostring(welcome[1]))
 ns.db.seenVersion = nil                      -- from a version before the line was there: the line too
 welcome = {}
 ns.LoginWord()
-assert(#welcome == 2 and welcome[1]:find("обновление 0.3.0"), "an update from before 0.2.1")
+assert(#welcome == 3 and welcome[1]:find("обновление 0.3.0"), "an update from before 0.2.1")
 GetAddOnMetadata = function() return "9.9.9" end
 ns.db.seenVersion = "0.2.1"
 welcome = {}

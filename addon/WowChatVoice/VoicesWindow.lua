@@ -88,24 +88,18 @@ function V.Create(pane)
         .. "с большой задержкой или не работают на вашем компьютере. Отмеченные раздаются игрокам (по имени и полу), "
         .. "«>» — послушать.")
 
-    -- where to get more voices: pages the companion opens in the browser (Core.lua ns.OpenLink)
+    -- where to get more voices: the address to copy, and «Копировать» / «Открыть» (UI.LinkRow)
     local example = window:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     example:SetPoint("TOPLEFT", 18, -62)
     example:SetText("Скачать дополнительные голоса можно, например, здесь:")
-    local x = example
+    local y = -78
     for _, key in ipairs({ "rhvoice", "silero" }) do
-        local link = ns.LINKS[key]
-        local b = UI.Button(window, link[1], 90, function() ns.OpenLink(key) end)
-        b:SetPoint("LEFT", x, "RIGHT", 8, 0)
-        UI.Tooltip(b, ("Страница русских голосов %s для Windows (SAPI 5): скачайте установщик и запустите его, "
-            .. "после установки перезапустите компаньон и сделайте /reload — голоса появятся в списке ниже. Страницу в браузере открывает "
-            .. "компаньон; адрес — %s"):format(link[1], link[2]))
-        x = b
+        y = y - UI.LinkRow(window, 22, y, 580 - 44, key)
     end
 
     filter = CreateFrame("EditBox", nil, window, "InputBoxTemplate")
     filter:SetHeight(20)
-    filter:SetPoint("TOPLEFT", 24, -90)
+    filter:SetPoint("TOPLEFT", 24, -140)
     filter:SetWidth(170)
     filter:SetAutoFocus(false)
     local placeholder = filter:CreateFontString(nil, "OVERLAY", "GameFontDisable")
@@ -127,7 +121,7 @@ function V.Create(pane)
     allOff:SetPoint("LEFT", allOn, "RIGHT", 4, 0)
 
     local box = UI.Box(window)
-    box:SetPoint("TOPLEFT", 14, -118)
+    box:SetPoint("TOPLEFT", 14, -168)
     box:SetPoint("BOTTOMRIGHT", -14, 30)
     local scroll = CreateFrame("ScrollFrame", nil, box, "UIPanelScrollFrameTemplate")
     scroll:SetPoint("TOPLEFT", 8, -8)
