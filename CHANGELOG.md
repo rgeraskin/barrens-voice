@@ -26,6 +26,7 @@
 - Under «Общие каналы» each numbered channel has its own box: General, Trade, Looking for group, Defense and the others — to read General and not Trade, say. All are on by default, so nothing changes until you switch one off.
 - With the chat windows hidden, a whisper or a guild line can show the window though it is read aloud («Показывать при шёпоте», «Показывать при строке гильдии», off by default).
 - Speed and volume: the sliders' 100 % is now the default sound (it used to be 125 % speed and 120 % volume, which sounded better); the speed goes 40–160 % and the volume 0–200 %, so both marks stand in the middle at 100. Saved settings are converted once, so everything sounds as before.
+- `/wcv reset` is gone: handing the race voices out again is the «Перераздать голоса» button, which asks first; a command for a thing done once in a blue moon is one more to remember.
 
 ## 0.2.0
 

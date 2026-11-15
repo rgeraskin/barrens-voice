@@ -100,8 +100,7 @@ local function Build()
     UI.Tooltip(test, "Четыре тестовые строки разными голосами (/wcv test). Все команды — /wcv help.")
     local reset = UI.Button(window, "Перераздать голоса", 140, function() StaticPopup_Show("WOWCHATVOICE_RESET") end)
     reset:SetPoint("TOPRIGHT", -18, y)
-    UI.Tooltip(reset, "Голос расы закрепляется за персонажем навсегда (файл assignments.json компаньона). "
-        .. "Кнопка раздаёт голоса рас заново — например, после смены настроек голосов. То же — /wcv reset.")
+    UI.Tooltip(reset, "Раздать голоса рас заново: у каждого персонажа может оказаться другой голос.")
     y = y - 40
 
     y = UI.Header(window, "Каналы", y)

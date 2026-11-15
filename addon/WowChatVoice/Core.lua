@@ -691,7 +691,6 @@ SlashCmdList.WOWCHATVOICE = function(msg)
         print("  " .. G .. "/wcv stop|r — замолчать сейчас и очистить очередь, не выключая")
         print("  " .. G .. "/wcv test|r — четыре тестовые строки разными голосами")
         print("  " .. G .. "/wcv last 5|r — ещё раз прочитать последние 5 строк чата (через текущий словарь)")
-        print("  " .. G .. "/wcv reset|r — раздать голоса рас заново")
         print("  " .. G .. "/wcv debug|r — отладка: почему строка чата не прочитана — в журнал компаньона")
         print("  " .. G .. "/wcv help|r — этот список")
     elseif msg == "test" then
@@ -699,8 +698,6 @@ SlashCmdList.WOWCHATVOICE = function(msg)
     elseif msg == "stop" then
         ns.Stop()
         print(PREFIX .. "замолкаю (очередь очищена).")
-    elseif msg == "reset" then
-        ns.ResetVoices()
     elseif msg:match("^last") then
         ns.Replay(tonumber(msg:match("%d+")) or 5)
     elseif msg == "debug" then
