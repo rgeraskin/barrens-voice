@@ -395,6 +395,23 @@ function ns.DictionaryChanged()
     layerTimer = C_Timer.NewTimer(2, function() layerTimer = nil; ns.SendDictionary(false) end)
 end
 
+-- Pages the companion opens in the browser on a click in the settings (an addon cannot: LaunchURL is
+-- Blizzard's own). The addon sends only the name; the companion keeps its own list of the same
+-- addresses (wcv/links.py) and opens nothing else.
+ns.LINKS = {
+    rhvoice = { "RHVoice", "https://rhvoice.su/voices/" },
+    silero = { "Silero", "https://github.com/snakers4/silero-models/releases?q=SAPI" },
+}
+
+--- Ask the companion to open one of ns.LINKS in the browser; the address goes to the chat too.
+function ns.OpenLink(key)
+    local link = ns.LINKS[key]
+    if not link then return end
+    ns.Strip.Push(table.concat({ "open", "", "", "", "", "", ns.LineOptions(), key }, SEP))
+    print(PREFIX .. ("%s: компаньон откроет страницу в браузере. Если не открылась (компаньон не запущен) — адрес: %s")
+        :format(link[1], link[2]))
+end
+
 --- Ask the program to forget which race voice each character had and hand them out afresh.
 function ns.ResetVoices()
     local options = ns.LineOptions()

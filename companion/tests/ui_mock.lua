@@ -62,6 +62,17 @@ ns.Options.Toggle(); assert(ns.db.volume == 150 and ns.db.rate == 100, "Refresh 
 print("options ok")
 ns.Options.Open("dictionary"); assert(ns.Options.Current() == "dictionary"); print("dictionary ok")
 ns.Options.Open("voices"); assert(ns.Options.Current() == "voices"); print("voices ok")
+do  -- «Скачать дополнительные голоса …: RHVoice, Silero»: the companion is asked to open the page; the address goes to the chat too
+    local pushedLink, saidLink, push0, print0 = {}, {}, ns.Strip.Push, print
+    ns.Strip.Push = function(p) pushedLink[#pushedLink + 1] = p end
+    print = function(t) saidLink[#saidLink + 1] = t end
+    ns.OpenLink("silero")
+    ns.OpenLink("https://evil.example")
+    ns.Strip.Push, print = push0, print0
+    assert(#pushedLink == 1 and pushedLink[1]:find("^open\31") and pushedLink[1]:find("\31silero$"), pushedLink[1] or "nothing")
+    assert(#saidLink == 1 and saidLink[1]:find("snakers4/silero-models", 1, true), "the address in the chat")
+    print("links ok")
+end
 for _, name in ipairs({ "reading", "general", "no such tab" }) do ns.Options.Open(name) end
 assert(ns.Options.Current() == "general", "an unknown tab: the first one")
 print("tabs ok")

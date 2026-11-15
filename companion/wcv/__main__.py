@@ -408,6 +408,10 @@ def main() -> int:
                             log("CatQuest замолчал: чат продолжает (прерванная строка — сначала)")
                     elif line and line.kind == "reset" and not first:
                         engines.reset_assignments()
+                    elif line and line.kind == "open":
+                        if not first:                          # a click in the addon's settings
+                            from .links import open_link
+                            open_link(line.text, log)
                     elif line and line.kind == "diag" and not first:
                         log(f"[диагностика аддона] {line.text}")
                     elif line and line.kind not in LABELS:

@@ -83,12 +83,29 @@ function V.Create(pane)
     note:SetPoint("TOPLEFT", 18, -4)
     note:SetPoint("RIGHT", -18, 0)
     note:SetJustifyH("LEFT")
-    note:SetText("Отмеченные голоса раздаются игрокам (по имени и полу), когда выбраны голоса Windows. "
+    note:SetText("Голоса Windows звучат механически, заметно хуже голосов рас, а для разнообразия их нужно ставить "
+        .. "отдельно (в Windows по умолчанию только Ирина). Они оставлены на всякий случай — если голоса рас отвечают "
+        .. "с большой задержкой или не работают на вашем компьютере. Отмеченные раздаются игрокам (по имени и полу), "
         .. "«>» — послушать.")
+
+    -- where to get more voices: pages the companion opens in the browser (Core.lua ns.OpenLink)
+    local example = window:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    example:SetPoint("TOPLEFT", 18, -62)
+    example:SetText("Скачать дополнительные голоса можно, например, здесь:")
+    local x = example
+    for _, key in ipairs({ "rhvoice", "silero" }) do
+        local link = ns.LINKS[key]
+        local b = UI.Button(window, link[1], 90, function() ns.OpenLink(key) end)
+        b:SetPoint("LEFT", x, "RIGHT", 8, 0)
+        UI.Tooltip(b, ("Страница русских голосов %s для Windows (SAPI 5): скачайте установщик и запустите его, "
+            .. "после установки перезапустите компаньон и сделайте /reload — голоса появятся в списке ниже. Страницу в браузере открывает "
+            .. "компаньон; адрес — %s"):format(link[1], link[2]))
+        x = b
+    end
 
     filter = CreateFrame("EditBox", nil, window, "InputBoxTemplate")
     filter:SetHeight(20)
-    filter:SetPoint("TOPLEFT", 24, -34)
+    filter:SetPoint("TOPLEFT", 24, -90)
     filter:SetWidth(170)
     filter:SetAutoFocus(false)
     local placeholder = filter:CreateFontString(nil, "OVERLAY", "GameFontDisable")
@@ -110,7 +127,7 @@ function V.Create(pane)
     allOff:SetPoint("LEFT", allOn, "RIGHT", 4, 0)
 
     local box = UI.Box(window)
-    box:SetPoint("TOPLEFT", 14, -62)
+    box:SetPoint("TOPLEFT", 14, -118)
     box:SetPoint("BOTTOMRIGHT", -14, 30)
     local scroll = CreateFrame("ScrollFrame", nil, box, "UIPanelScrollFrameTemplate")
     scroll:SetPoint("TOPLEFT", 8, -8)

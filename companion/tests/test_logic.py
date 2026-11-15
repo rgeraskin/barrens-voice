@@ -1,4 +1,5 @@
 """Text, voice assignment and payload parsing (no Windows, no GPU)."""
+import re
 import sys
 import tempfile
 import unittest
@@ -502,6 +503,24 @@ class SavedVoices(unittest.TestCase):
             self.assertIsNone(saved_voices(config))
             (sv / "WowChatVoice.lua").write_text('WowChatVoiceDB = {\n["voices"] = "sapi",\n}\n', encoding="utf-8")
             self.assertEqual(saved_voices(config), "sapi")
+
+
+class Links(unittest.TestCase):
+    """Pages the addon asks the companion to open: only its own list, the same as the addon's."""
+
+    def test_open_known_only(self):
+        from wcv.links import LINKS, open_link
+        opened, log = [], []
+        self.assertEqual(open_link(" rhvoice ", log.append, opened.append), LINKS["rhvoice"])
+        self.assertIsNone(open_link("https://evil.example", log.append, opened.append))
+        self.assertEqual(opened, [LINKS["rhvoice"]])
+
+    def test_same_as_the_addon(self):
+        from wcv.links import LINKS
+        core = (Path(__file__).resolve().parents[2] / "addon" / "WowChatVoice" / "Core.lua").read_text(encoding="utf-8")
+        block = core.split("ns.LINKS = {", 1)[1].split("\n}", 1)[0]
+        addon = dict(re.findall(r'(\w+) = \{ "[^"]+", "([^"]+)" \}', block))
+        self.assertEqual(addon, LINKS)
 
 
 class Yo(unittest.TestCase):
