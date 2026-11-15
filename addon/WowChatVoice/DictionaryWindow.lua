@@ -1,5 +1,5 @@
--- The slang dictionary in a window of its own: the text in a framed box with padding, the "?" help,
--- back to the default, apply (/reload, for the program's regular expressions) and a line to try.
+-- The slang dictionary (the "Словарь" tab of the settings window, Options.lua): the text in a framed
+-- box with padding, the "?" help, back to the default and a line to try.
 local _, ns = ...
 local UI = ns.UI
 
@@ -64,9 +64,9 @@ local function Save(text)
     ns.Dictionary.SetText(text)          -- kept as edits of the default (Dictionary.lua, layers)
 end
 
-local function Build()
-    window = UI.Window("WowChatVoiceDictionary", "Словарь сленга", 580, 620, "FULLSCREEN_DIALOG")
-    window:SetPoint("CENTER", 120, 0)
+--- Build the dictionary into `pane` (a frame the size of the tab).
+function W.Create(pane)
+    window = pane
 
     -- The short rules as a list; the rest is behind "?".
     local RULES = {
@@ -77,7 +77,7 @@ local function Build()
         "Строки с |cffffd100~|r — регулярные выражения, их применяет компаньон",
         "Подробности и примеры — кнопка |cffffd100?|r справа",
     }
-    local y = -34
+    local y = -6
     for _, rule in ipairs(RULES) do
         local line = window:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
         line:SetPoint("TOPLEFT", 20, y)
@@ -87,7 +87,7 @@ local function Build()
         y = y - 18
     end
     local help = UI.Button(window, "?", 26, nil)
-    help:SetPoint("TOPRIGHT", -18, -32)
+    help:SetPoint("TOPRIGHT", -18, -4)
     W.HelpTooltip(help)
 
     -- The text in a framed box, with padding inside.
@@ -148,8 +148,4 @@ local function Build()
     end)
 end
 
-function W.Toggle()
-    if not window then Build() end
-    window:SetShown(not window:IsShown())
-    if window:IsShown() then window:Raise() end
-end
+

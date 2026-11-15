@@ -37,6 +37,7 @@ tinsert = table.insert
 GameTooltip_Hide = function() end
 GetPhysicalScreenSize = function() return 2360, 1640 end
 GetTime = function() return 0 end
+PanelTemplates_SelectTab, PanelTemplates_DeselectTab, PanelTemplates_TabResize = function() end, function() end, function() end
 UnitGUID = function() return "me" end
 BackdropTemplateMixin = {}
 C_Timer = { NewTimer = function(_, f) return { Cancel = function() end } end, NewTicker = function() end,
@@ -59,8 +60,11 @@ ns.Options.Initialize()
 ns.db.volume = 150
 ns.Options.Toggle(); assert(ns.db.volume == 150 and ns.db.rate == 100, "Refresh must keep the settings")
 print("options ok")
-ns.DictionaryWindow.Toggle(); print("dictionary ok")
-ns.VoicesWindow.Toggle(); print("voices ok")
+ns.Options.Open("dictionary"); assert(ns.Options.Current() == "dictionary"); print("dictionary ok")
+ns.Options.Open("voices"); assert(ns.Options.Current() == "voices"); print("voices ok")
+for _, name in ipairs({ "reading", "general", "no such tab" }) do ns.Options.Open(name) end
+assert(ns.Options.Current() == "general", "an unknown tab: the first one")
+print("tabs ok")
 ns.Minimap.Update(); print("minimap ok")
 ns.Send("say", "Ивар Седой-Степи", "Orc", 3, "WARRIOR", "", "всем привет")
 ns.db.sayLastNames = true
@@ -266,7 +270,7 @@ assert(#firsts == 1 and firsts[1]:find("^control\31") and firsts[1]:find("strip=
 assert(#pushed == 1 and pushed[1]:find("strip=100,50,900", 1, true), "and again from the new place")
 assert(ns.db.stripGeometry == "100,50,900,4,2360,1640", "kept for a program started later")
 ns.db.stripPlace = "bottom"
-ns.StripWindow.Toggle()
+ns.Options.Open("general"); ns.Options.Bridge(true)
 local pending = ns.StripWindow.Pending()
 assert(pending.place == "bottom" and pending.x == 0 and pending.y == 1638 and pending.width == 2360,
     ("the fields show the bottom line: %s %s %s"):format(pending.x, pending.y, pending.width))
@@ -280,7 +284,7 @@ pending.x = 1700
 ns.StripWindow.Save()
 assert(ns.db.stripPlace == "custom" and ns.db.stripX == 1700 and ns.db.stripY == 0 and ns.db.stripWidth == 660,
     ("saved: %s %s %s %s"):format(ns.db.stripPlace, ns.db.stripX, ns.db.stripY, ns.db.stripWidth))
-ns.StripWindow.Toggle()
+ns.Options.Open("general"); ns.Options.Bridge(true)
 pending = ns.StripWindow.Pending()
 assert(pending.place == "custom" and pending.x == 1700 and pending.width == 660, "opened again: as saved")
 ns.Strip.Preview("bottom")
@@ -445,6 +449,9 @@ assert(Co.State() == "stopped", "no time at all (the file as shipped): not runni
 Co.SayAtLogin()
 assert(said[2]:find("приложение%-компаньон WoW Chat Voice не запущено — чат будет озвучиваться, как только"), tostring(said[2]))
 assert(Co.Describe():find("не был запущен"), Co.Describe())
+Co.Read({ beat = 1000 }, 1010)
+assert(Co.Describe():find("был запущен") and not Co.Describe():find("не был"), Co.Describe())
+Co.Read(nil, 1100)
 -- not running at login: the transparent chat is hidden all the same (a companion started later reads it)
 ns.db.fadeChat = true
 ChatFrame1:SetAlpha(1)
@@ -578,3 +585,16 @@ ns.MigrateScale(old)
 assert(old.rate == 80, "migrated once")
 ns.db.rate, ns.db.volume = 100, 100
 print("scale ok")
+
+-- channel labels carry the client's own slash commands, the fallback where the client has none
+SLASH_PARTY1, SLASH_PARTY2, SLASH_PARTY3 = "/гр", "/группа", "/p"
+SLASH_RAID1, SLASH_RAID2, SLASH_RAID3 = "/рейд", "/raid", "/р"
+SLASH_GUILD1, SLASH_GUILD2 = "/g", "/gu"
+local CL = ns.Options.ChannelLabel
+assert(CL({ "party", "Группа", "PARTY", "/p" }) == "Группа (/гр)", "the shortest in the client's own letters")
+assert(CL({ "raid", "Рейд", "RAID", "/ra" }) == "Рейд (/р)", CL({ "raid", "Рейд", "RAID", "/ra" }))
+assert(CL({ "guild", "Гильдия", "GUILD", "/g" }) == "Гильдия (/g)", "Latin only: the shortest")
+assert(CL({ "officer", "Офицеры", "OFFICER", "/o" }) == "Офицеры (/o)", "none: the fallback")
+assert(CL({ "self", "Свои сообщения" }) == "Свои сообщения", "no command")
+SLASH_PARTY1, SLASH_PARTY2, SLASH_PARTY3, SLASH_RAID1, SLASH_RAID2, SLASH_RAID3, SLASH_GUILD1, SLASH_GUILD2 = nil
+print("channel labels ok")

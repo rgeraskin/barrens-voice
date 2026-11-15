@@ -40,6 +40,6 @@ end
 
 --- The state as the settings window says it.
 function C.Describe()
-    if C.State() == "running" then return "|cff40ff40работает|r (при входе в игру)" end
-    return "|cffffd100компаньон не был запущен|r при входе в игру — запустили позже: озвучка работает"
+    if C.State() == "running" then return "при входе в игру компаньон |cff40ff40был запущен|r" end
+    return "при входе в игру компаньон |cffffd100не был запущен|r (запустили позже — он читает чат и так)"
 end

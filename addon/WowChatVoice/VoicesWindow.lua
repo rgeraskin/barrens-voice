@@ -1,5 +1,6 @@
 -- "Голоса Windows": which of the program's Windows voices characters get, each with a play button,
--- a filter (name, engine or sex: "silero", "edge", "жен") and on/off for all the voices shown.
+-- a filter (name, engine or sex: "silero", "edge", "жен") and on/off for all the voices shown. It
+-- fills a pane of the settings window (the "Голоса" tab, Options.lua).
 -- The list comes from VoiceList.lua, which the program writes (WoW reads it at start and /reload).
 local _, ns = ...
 local UI = ns.UI
@@ -74,12 +75,12 @@ local function SetAllShown(on)
     Refresh()
 end
 
-local function Build()
-    window = UI.Window("WowChatVoiceVoices", "Голоса Windows", 400, 500, "FULLSCREEN_DIALOG")
-    window:SetPoint("CENTER", 340, 0)
+--- Build the list into `pane` (a frame the size of the tab).
+function V.Create(pane)
+    window = pane
 
     local note = window:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    note:SetPoint("TOPLEFT", 18, -32)
+    note:SetPoint("TOPLEFT", 18, -4)
     note:SetPoint("RIGHT", -18, 0)
     note:SetJustifyH("LEFT")
     note:SetText("Отмеченные голоса раздаются игрокам (по имени и полу), когда выбраны голоса Windows. "
@@ -87,7 +88,7 @@ local function Build()
 
     filter = CreateFrame("EditBox", nil, window, "InputBoxTemplate")
     filter:SetHeight(20)
-    filter:SetPoint("TOPLEFT", 24, -64)
+    filter:SetPoint("TOPLEFT", 24, -34)
     filter:SetWidth(170)
     filter:SetAutoFocus(false)
     local placeholder = filter:CreateFontString(nil, "OVERLAY", "GameFontDisable")
@@ -109,8 +110,8 @@ local function Build()
     allOff:SetPoint("LEFT", allOn, "RIGHT", 4, 0)
 
     local box = UI.Box(window)
-    box:SetPoint("TOPLEFT", 14, -92)
-    box:SetPoint("BOTTOMRIGHT", -14, 36)
+    box:SetPoint("TOPLEFT", 14, -62)
+    box:SetPoint("BOTTOMRIGHT", -14, 30)
     local scroll = CreateFrame("ScrollFrame", nil, box, "UIPanelScrollFrameTemplate")
     scroll:SetPoint("TOPLEFT", 8, -8)
     scroll:SetPoint("BOTTOMRIGHT", -28, 8)
@@ -141,18 +142,14 @@ local function Build()
     end
 
     count = window:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    count:SetPoint("BOTTOMLEFT", 20, 14)
+    count:SetPoint("BOTTOMLEFT", 20, 10)
 
     empty = window:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     empty:SetPoint("CENTER")
-    empty:SetWidth(320)
+    empty:SetWidth(420)
     empty:SetText("Список пуст: запустите приложение-компаньон (оно запишет голоса в аддон) и сделайте /reload.")
 
     window:SetScript("OnShow", Refresh)
 end
 
-function V.Toggle()
-    if not window then Build() end
-    window:SetShown(not window:IsShown())
-    if window:IsShown() then window:Raise() end
-end
+
