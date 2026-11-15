@@ -60,6 +60,7 @@ class Storage(unittest.TestCase):
         forever = Fake({}, {b"B" * 16: b"oggB"})
         self.assertEqual(retail.read_files({1, 2}), {1: b"oggA"})
         self.assertEqual(retail.read_files({1, 2}, others=[forever]), {1: b"oggA", 2: b"oggB"})
+        self.assertEqual((retail.borrowed, retail.missing), (1, []))   # one taken from Forever, none on no disk
 
     def test_product_of(self):
         with tempfile.TemporaryDirectory() as d:
@@ -122,6 +123,34 @@ class Cache(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 gamevoices.build(config, out, print, checker=None)                     # and Whisper is needed
 
+    def test_incomplete_made_again_when_the_storage_grows(self):
+        # retail before its background download is done: some voice files are on no disk yet
+        with tempfile.TemporaryDirectory() as d:
+            install = Path(d) / "World of Warcraft"
+            (install / "Data" / "data").mkdir(parents=True)
+            (install / "_forever_").mkdir()
+            head = "Branch!STRING:0|Active!DEC:1|Build Key!HEX:16|Version!STRING:0|Product!STRING:0\n"
+            (install / ".build.info").write_text(head + "eu|1|" + "a" * 32 + "|1.15.8|wowf\n", encoding="utf-8")
+            config = {"wow_dir": str(install / "_forever_"), "voice_shifts": []}
+            out = Path(d) / "voices"
+            out.mkdir()
+            stamp = gamevoices._stamp(config, [])
+            slot = {"id": "orc-male", "base": "orc-male", "race": "orc", "sex": "male", "shift": 0.0,
+                    "path": "x.wav", "text": "Текст.", "speech": 2.0}
+            archive = install / "Data" / "data" / "data.000"
+            archive.write_bytes(b"x" * 1000)
+            for gap, stale in ((None, False), ({"missing_files": 3, "data_size": 1000}, False)):
+                bank = {"stamp": stamp, "slots": [slot]}
+                if gap:
+                    bank["incomplete"] = gap
+                (out / "bank.json").write_text(json.dumps(bank), encoding="utf-8")
+                self.assertEqual(gamevoices.stale(config, out), stale)
+            with open(archive, "r+b") as f:                    # the download goes on: the storage grows
+                f.truncate(1000 + gamevoices.GROWN + 1)
+            self.assertTrue(gamevoices.stale(config, out), "incomplete and grown: made again")
+            (out / "bank.json").write_text(json.dumps({"stamp": stamp, "slots": [slot]}), encoding="utf-8")
+            self.assertFalse(gamevoices.stale(config, out), "a complete bank stays, whatever the storage does")
+
 
 class Table(unittest.TestCase):
     def test_every_race_and_sex_has_voices(self):
@@ -160,6 +189,7 @@ class Table(unittest.TestCase):
         self.assertEqual({e["race"] for e in forever.values()}, gamevoices.FOREVER_RACES)
         self.assertIn("goblin-male", retail)
         self.assertNotIn("goblin-male", forever)
+        self.assertNotIn("skyborne-male", retail)                       # Forever's own race: not in retail
 
     def test_classify_retail(self):
         sys.path.insert(0, str(gamevoices.TABLE.parents[2] / "tools"))

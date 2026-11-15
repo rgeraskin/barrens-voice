@@ -145,11 +145,15 @@ class Storage:
             if own:
                 chosen[fdid] = next(iter(own))
         have = self.read_ckeys(chosen.values())
+        own = len(have)
         for other in others:
             missing = [ck for ck in chosen.values() if ck not in have]
             if not missing:
                 break
             have.update(other.read_ckeys(missing))
+        # what has a recording of its own for the locale but is on no disk here (not downloaded yet)
+        self.missing = [fdid for fdid, ckey in chosen.items() if ckey not in have]
+        self.borrowed = len(have) - own
         return {fdid: have[ckey] for fdid, ckey in chosen.items() if ckey in have}
 
 

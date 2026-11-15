@@ -35,6 +35,7 @@ JUNK = re.compile(r"продолжение следует|субтитр|спа�
 # The races of WoW Forever (the table also has the ones retail added: Forever's client holds their
 # files too, but no player there speaks with them).
 FOREVER_RACES = {"human", "orc", "dwarf", "nightelf", "scourge", "tauren", "gnome", "troll", "skyborne"}
+FOREVER_ONLY = {"skyborne"}   # Forever's own race: retail has neither the race nor its files
 
 
 @dataclass(frozen=True)
@@ -105,6 +106,8 @@ def voices_for(config: dict) -> dict:
     table = json.loads(TABLE.read_text(encoding="utf-8"))["voices"]
     if game_of(config) == "forever":
         table = {v: e for v, e in table.items() if e["race"] in FOREVER_RACES}
+    else:
+        table = {v: e for v, e in table.items() if e["race"] not in FOREVER_ONLY}
     return table
 
 
@@ -125,12 +128,29 @@ def _stamp(config: dict, shifts) -> dict | None:
             "table": zlib.crc32(json.dumps(voices_for(config), sort_keys=True).encode("utf-8"))}
 
 
+GROWN = 100 * 1024 * 1024   # bytes the game's storage must grow by before an incomplete bank is made again
+
+
+def data_size(install: Path) -> int:
+    """Bytes in the game's storage archives (Data/data/data.NNN): retail downloads the rest of the game
+    in the background after it is playable, so this grows until it has everything."""
+    try:
+        return sum(p.stat().st_size for p in (Path(install) / "Data" / "data").glob("data.*"))
+    except OSError:
+        return 0
+
+
 def load(out: Path, stamp: dict | None) -> list[Slot] | None:
     manifest = out / "bank.json"
     if stamp is None or not manifest.exists():
         return None
     saved = json.loads(manifest.read_text(encoding="utf-8"))
     if saved.get("stamp") != stamp:
+        return None
+    # made while voice files were not on the disk yet (retail before its download finished): made
+    # again once the storage has grown - a complete bank never is, whatever the storage does
+    gap = saved.get("incomplete")
+    if gap and data_size(Path(stamp["install"])) > gap.get("data_size", 0) + GROWN:
         return None
     return [Slot(**s) for s in saved["slots"]]
 
@@ -258,8 +278,9 @@ def build(config: dict, out: Path, log, checker) -> list[Slot]:
     storage = Storage(Path(stamp["install"]), stamp["product"])
     others = other_storages(config, log)
     files = storage.read_files({f[0] for v in table.values() for f in v["files"]}, "ruRU", others)
-    log(f"русских реплик в клиенте: {len(files)}" + (" (недостающие — из другой установленной игры WoW, те же файлы)"
-                                                      if others else ""))
+    borrowed = getattr(storage, "borrowed", 0)
+    log(f"русских реплик в клиенте: {len(files)}" + (f", из них {borrowed} — из другой установленной игры WoW (те же "
+                                                      "файлы: этот клиент их ещё не скачал)" if borrowed else ""))
     out.mkdir(parents=True, exist_ok=True)
     for old in out.glob("*.wav"):
         old.unlink()
@@ -314,7 +335,12 @@ def build(config: dict, out: Path, log, checker) -> list[Slot]:
             # a shifted copy is played faster or slower by the same factor
             slots.append(Slot(slot_id, voice, entry["race"], entry["sex"], shift, str(path), text,
                               round(speech / 2 ** (shift / 12), 3)))
-    (out / "bank.json").write_text(json.dumps({"stamp": stamp, "slots": [s.__dict__ for s in slots]},
+    missing = len(getattr(storage, "missing", []))
+    manifest = {"stamp": stamp, "slots": [s.__dict__ for s in slots]}
+    if missing:
+        manifest["incomplete"] = {"missing_files": missing, "data_size": data_size(Path(stamp["install"]))}
+        log(f"файлов голосов ещё нет на диске: {missing} — банк соберётся заново, когда игра их докачает")
+    (out / "bank.json").write_text(json.dumps(manifest,
                                               ensure_ascii=False, indent=1), encoding="utf-8")
     log(f"голосов рас: {len({s.base for s in slots})}, вариантов с тембром: {len(slots)}"
         + (f"; без голоса (мало реплик): {', '.join(skipped)}" if skipped else ""))
