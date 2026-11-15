@@ -33,6 +33,6 @@ Tools come from mise: `.mise.toml` pins Python, uv and LuaJIT, points uv at mise
 - Name: the display name is "WoW Chat Voice" (addon title, UI, docs); the addon folder and identifiers stay `WowChatVoice` (`WowChatVoiceDB` is tied to the folder name: renaming it would reset players' settings).
 - Markdown: no hard line wraps. A paragraph or list item is one line; the renderer wraps long lines.
 - No local identifiers in the repo: machine names, local paths, account or character names (examples use made-up or lore names).
-- The version lives in `addon/WowChatVoice/WowChatVoice.toc` (`## Version`); CHANGELOG.md sections are `## <version>`. Planned: 0.3.0 retail, 0.4.0 Rust + ONNX Runtime, 0.5.0 distribution, 0.6.0 all game languages.
+- The version lives in `addon/WowChatVoice/WowChatVoice.toc` (`## Version`); CHANGELOG.md sections are `## <version>`. Planned (README «Планы»): 0.3.0 retail, 0.4.0 Rust + ONNX Runtime, 0.5.0 distribution, 0.6.0 Blizzard community, 0.7.0 all game languages, 0.8.0 stress fixes sent to a server automatically (the word only, no chat line).
 - User-facing text (addon UI, README, program log) is Russian; code, comments and CLAUDE.md are English. The WoW client font has no "→" or en dash: use "=", "—" or "-" in addon strings.
 - Reference clips, models and game audio are never committed: they are made or downloaded on the user's machine (F5 model CC BY-NC, game audio Blizzard's). The client is only read, never written, and the game process is never touched.
