@@ -28,7 +28,7 @@ ns.DEFAULTS = {
     debug = false,     -- /wcv debug: why a chat line was not sent, and CatQuest's speech, to the program's log
     self = false,      -- your own lines
     onlyVisible = true, -- only lines a chat window of yours shows (its message types and channels, chat filters)
-    waitForCatQuest = true, -- hold chat lines while CatQuest reads a quest; send them when it is done
+    waitForCatQuest = true, -- hold chat lines while CatQuest or Wayfarer reads a quest; send them when it is done
     cell = 2,          -- strip cell size, physical pixels
     rows = 1,          -- strip rows of cells
     -- the strip's cells start at the "left" edge of it or the "right"
@@ -160,13 +160,18 @@ function ns.Send(kind, sender, race, sex, class, channel, text)
     ns.Deliver(payload)
 end
 
--- CatQuest (a quest voice-over addon) and the chat must not talk over each other: while it reads a
--- quest - a quest the player asked for - chat lines wait here and go to the strip once it is done
--- (the client cannot pause a sound and resume it in the middle, so pausing the quest would restart
--- it after every chat line). A line older than HOLD_MAX by then is dropped: stale chat. CatQuest has
--- no official interface for this; it puts its namespace into the global CatQuestCore, and
--- CatQuestCore.state.playing / .pending tell whether it speaks or is about to - read with care, so
--- that a CatQuest without them simply counts as silent.
+-- The quest voice-over addons (CatQuest, Wayfarer) and the chat must not talk over each other: while
+-- one reads a quest - a quest the player asked for - chat lines wait here and go to the strip once it
+-- is done (the client cannot pause a sound and resume it in the middle, so pausing the quest would
+-- restart it after every chat line). A line older than HOLD_MAX by then is dropped: stale chat.
+-- Neither has an official interface for this; their globals are read with care, so that a version
+-- without the fields simply counts as silent:
+--  * CatQuest: CatQuestCore.state.playing / .pending - it speaks or is about to;
+--  * Wayfarer (WayfarerRU since 1.2.0; the folder and global were "Wayfarer" before): WayfarerRU.Queue,
+--    items[1] the one playing (.handle, .startedAt, .sound.duration) or about to (.waiting: after the
+--    NPC's greeting); .paused - the player paused it. Its radio stories (items with .radio) too: the
+--    player listens to them, the chat must not talk over them (the player asked, 2026-11-15).
+--    Creature barks play outside the queue - a few words, not waited for.
 local HOLD_MAX = 40
 local held, holdTicker = {}, nil
 
@@ -183,15 +188,34 @@ local function CatQuestSpeaking()
     return st.pending ~= nil
 end
 
+local function WayfarerSpeaking()
+    local wf = rawget(_G, "WayfarerRU")
+    local q = type(wf) == "table" and type(wf.Queue) == "table" and wf.Queue
+    if not q or q.paused == true or type(q.items) ~= "table" then return false end
+    local item = q.items[1]
+    if type(item) ~= "table" then return false end
+    if item.waiting == true then return true end
+    if item.handle == nil then return false end
+    -- past its length and a bit: stuck, as with CatQuest
+    local started = tonumber(item.startedAt)
+    local length = type(item.sound) == "table" and tonumber(item.sound.duration)
+    return not (started and length and length > 0 and GetTime() > started + length + 3)
+end
+
+--- Whether a quest voice-over speaks (or is about to): the chat waits.
+local function QuestVoiceSpeaking()
+    return CatQuestSpeaking() or WayfarerSpeaking()
+end
+
 --- Send the waiting chat lines once CatQuest is silent; drop those that waited too long.
 function ns.ReleaseHeld()
-    if CatQuestSpeaking() and ns.db.waitForCatQuest ~= false then
+    if QuestVoiceSpeaking() and ns.db.waitForCatQuest ~= false then
         local now, kept = GetTime(), {}
         for _, h in ipairs(held) do
             if now - h.at <= HOLD_MAX then kept[#kept + 1] = h end
         end
         if #kept < #held then
-            ns.Diag(("пропущено строк: %d — ждали CatQuest дольше %d с"):format(#held - #kept, HOLD_MAX))
+            ns.Diag(("пропущено строк: %d — ждали озвучку квеста дольше %d с"):format(#held - #kept, HOLD_MAX))
         end
         held = kept
         return
@@ -201,7 +225,7 @@ function ns.ReleaseHeld()
         if now - h.at <= HOLD_MAX then ns.Strip.Push(h.payload) else dropped = dropped + 1 end
     end
     held = {}
-    if dropped > 0 then ns.Diag(("пропущено строк: %d — ждали CatQuest дольше %d с"):format(dropped, HOLD_MAX)) end
+    if dropped > 0 then ns.Diag(("пропущено строк: %d — ждали озвучку квеста дольше %d с"):format(dropped, HOLD_MAX)) end
     if holdTicker then holdTicker:Cancel(); holdTicker = nil end
 end
 
@@ -211,7 +235,7 @@ function ns.Diag(text)
 end
 
 -- Debug (/wcv debug): each chat line the addon gets but does not send, with the reason, and when
--- CatQuest starts and stops speaking - notes in the program's log, which has the time the chat lacks.
+-- CatQuest or Wayfarer starts and stops speaking - notes in the program's log, which has the time the chat lacks.
 function ns.Skip(reason, sender, text)
     if not ns.db.debug then return end
     local who = sender and sender:match("^[^-]+") or sender or "?"
@@ -219,45 +243,60 @@ function ns.Skip(reason, sender, text)
     ns.Diag(("не отправлено (%s): %s: %s"):format(reason, who, ns.Protocol.TrimUTF8(text, 90)))
 end
 
-local catQuestSeen
---- The CatQuest state as the debug log tells it ("" when it is silent).
-local function CatQuestState()
+local voiceSeen
+--- The quest voice-overs' state as the debug log tells it ("" when they are silent).
+local function QuestVoiceState()
+    local parts = {}
     local core = rawget(_G, "CatQuestCore")
     local st = type(core) == "table" and type(core.state) == "table" and core.state
-    if not st or not (st.playing == true or st.pending ~= nil) then return "" end
-    local what = st.playing == true and ("играет: %s, %s с"):format(tostring(st.source), tostring(st.duration and math.floor(st.duration + 0.5)))
-        or "ждёт своей очереди (pending)"
-    return what .. (CatQuestSpeaking() and " — чат ждёт" or " — считаем зависшим, чат не ждёт")
+    if st and (st.playing == true or st.pending ~= nil) then
+        local what = st.playing == true and ("CatQuest играет: %s, %s с"):format(tostring(st.source),
+            tostring(st.duration and math.floor(st.duration + 0.5))) or "CatQuest ждёт своей очереди (pending)"
+        parts[#parts + 1] = what .. (CatQuestSpeaking() and " — чат ждёт" or " — считаем зависшим, чат не ждёт")
+    end
+    local wf = rawget(_G, "WayfarerRU")
+    local q = type(wf) == "table" and type(wf.Queue) == "table" and wf.Queue
+    local item = q and type(q.items) == "table" and q.items[1]
+    if type(item) == "table" and (item.handle ~= nil or item.waiting == true) then
+        local length = type(item.sound) == "table" and tonumber(item.sound.duration)
+        local what = item.waiting == true and "Wayfarer ждёт конца приветствия NPC"
+            or ("Wayfarer играет: %s, %s с"):format(item.questID and ("квест " .. tostring(item.questID))
+                or item.radio ~= nil and "путевая история" or item.zone ~= nil and "лор места" or "реплика",
+                tostring(length and math.floor(length + 0.5)))
+        parts[#parts + 1] = what .. (WayfarerSpeaking() and " — чат ждёт"
+            or (q.paused == true and " — на паузе, чат не ждёт") or " — считаем зависшим, чат не ждёт")
+    end
+    return table.concat(parts, "; ")
 end
 
--- While CatQuest speaks the program pauses: the chat line being read is cut and said again from its
--- start once CatQuest is silent, then the queue goes on. nil at first: the first check tells the
+-- While a quest voice-over speaks the program pauses: the chat line being read is cut and said again
+-- from its start once it is silent, then the queue goes on. nil at first: the first check tells the
 -- program the state either way (a /reload during a pause must not leave it paused).
 local pausedForCatQuest
 
---- Every 0.25 s: pause or resume the program with CatQuest's speech; the debug notes.
+--- Every 0.25 s: pause or resume the program with the quest voice-overs' speech; the debug notes.
 function ns.WatchCatQuest()
-    local speaking = ns.db.enabled and ns.db.waitForCatQuest ~= false and CatQuestSpeaking() or false
+    local speaking = ns.db.enabled and ns.db.waitForCatQuest ~= false and QuestVoiceSpeaking() or false
     if speaking ~= pausedForCatQuest then
         pausedForCatQuest = speaking
         ns.Strip.PushFirst(table.concat({ speaking and "pause" or "resume", "", "", "", "", "", ns.LineOptions(), "-" }, SEP))
     end
-    if not ns.db.debug then catQuestSeen = nil; return end
-    local now = CatQuestState()
-    if now ~= catQuestSeen then
-        if catQuestSeen ~= nil or now ~= "" then ns.Diag("CatQuest " .. (now == "" and "замолчал" or now)) end
-        catQuestSeen = now
+    if not ns.db.debug then voiceSeen = nil; return end
+    local now = QuestVoiceState()
+    if now ~= voiceSeen then
+        if voiceSeen ~= nil or now ~= "" then ns.Diag(now == "" and "озвучка квестов замолчала" or now) end
+        voiceSeen = now
     end
 end
 
---- A chat line to the strip - now, or after CatQuest has finished speaking.
+--- A chat line to the strip - now, or after the quest voice-over has finished speaking.
 function ns.Deliver(payload)
-    if ns.db.waitForCatQuest == false or (#held == 0 and not CatQuestSpeaking()) then
+    if ns.db.waitForCatQuest == false or (#held == 0 and not QuestVoiceSpeaking()) then
         ns.Strip.Push(payload)
         return
     end
     held[#held + 1] = { payload = payload, at = GetTime() }
-    if ns.db.debug then ns.Diag(("строка ждёт CatQuest (в очереди %d)"):format(#held)) end
+    if ns.db.debug then ns.Diag(("строка ждёт озвучку квеста (в очереди %d)"):format(#held)) end
     if not holdTicker and C_Timer and C_Timer.NewTicker then
         holdTicker = C_Timer.NewTicker(0.25, ns.ReleaseHeld)
     end
@@ -734,7 +773,7 @@ SlashCmdList.WOWCHATVOICE = function(msg)
     elseif msg == "debug" then
         ns.db.debug = not ns.db.debug
         print(PREFIX .. (ns.db.debug
-            and "отладка включена: строки чата, которые аддон не отправил, с причиной, и речь CatQuest — в журнале компаньона (logs, «диагностика аддона»)."
+            and "отладка включена: строки чата, которые аддон не отправил, с причиной, и речь CatQuest и Wayfarer — в журнале компаньона (logs, «диагностика аддона»)."
             or "отладка выключена."))
     elseif msg == "on" or msg == "off" then
         ns.SetEnabled(msg == "on")

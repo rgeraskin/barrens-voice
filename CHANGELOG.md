@@ -5,6 +5,7 @@
 - Retail WoW: the companion works with one chosen game — `WowChatVoice-Retail.cmd` (or `"game": "retail"`) starts it for retail: retail's folder, Battle.net's «WoW», a voice bank of its own (`voices-retail`). Voice files retail has not downloaded yet are taken from an installed WoW Forever: the same content keys, the same files. The addon's TOC lists both games' interface versions.
 - Retail's races speak with their own voices from the game's Russian voice-over (the character's voice, three variants per sex): blood elves, draenei, goblins, worgen (and in human form), pandaren, dracthyr (and in dragon form), the allied races, earthen and haranir. A race whose recordings the client lacks speaks as its kin. Forever's bank keeps only Forever's races.
 - Retail closes chat to addons in dungeons, raids, boss fights, Mythic+ and PvP (text, sender and GUID come as secret values): such lines are not read and no error is raised; the addon says so once, and the hidden chat window shows them.
+- The chat waits for Wayfarer (WayfarerRU) as for CatQuest: its quests, NPC lines, place lore and radio stories pause the chat, a paused Wayfarer does not. One setting for both: «Ждать озвучку квестов (CatQuest, Wayfarer)».
 
 ## 0.2.1
 

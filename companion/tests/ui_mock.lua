@@ -164,7 +164,7 @@ for _, p in ipairs(sent) do
     if p:find("^diag\31") then diag[#diag + 1] = p else chat[#chat + 1] = p end
 end
 assert(#chat == 1 and chat[1]:find("вторая"), "only the fresh one goes: " .. #chat)
-assert(#diag == 1 and diag[1]:find("CatQuest"), "the dropped one is reported to the program's log")
+assert(#diag == 1 and diag[1]:find("озвучку квеста", 1, true), "the dropped one is reported to the program's log")
 sent = { chat[1] }
 ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "третья")
 assert(#sent == 2, "CatQuest silent: straight to the strip")
@@ -188,16 +188,16 @@ assert(#first == 1 and first[1]:find("^resume\31"), "the first check tells the p
 CatQuestCore.state = { playing = true, source = "pack", startedAt = 300, duration = 34 }
 clock = 301
 ns.WatchCatQuest()
-assert(sent[1] and sent[1]:find("^diag\31") and sent[1]:find("играет: pack, 34 с — чат ждёт", 1, true), sent[1] or "nothing")
+assert(sent[1] and sent[1]:find("^diag\31") and sent[1]:find("CatQuest играет: pack, 34 с — чат ждёт", 1, true), sent[1] or "nothing")
 assert(#first == 2 and first[2]:find("^pause\31"), "CatQuest speaks: the program pauses, ahead of the queue")
 ns.WatchCatQuest()
 assert(#first == 2, "a pause is sent once")
 ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "в очередь")
-assert(sent[2]:find("строка ждёт CatQuest", 1, true), sent[2] or "nothing")
+assert(sent[2]:find("строка ждёт озвучку квеста", 1, true), sent[2] or "nothing")
 CatQuestCore.state = { playing = false }
 ns.WatchCatQuest()
 ns.ReleaseHeld()
-assert(sent[3]:find("CatQuest замолчал", 1, true) and sent[4]:find("в очередь", 1, true), tostring(sent[3]))
+assert(sent[3]:find("озвучка квестов замолчала", 1, true) and sent[4]:find("в очередь", 1, true), tostring(sent[3]))
 assert(#first == 3 and first[3]:find("^resume\31"), "CatQuest silent: the program goes on")
 ns.Skip("свои сообщения выключены", "Вася-Степи", "|cff00ff00привет|r")
 assert(sent[5]:find("не отправлено (свои сообщения выключены): Вася: привет", 1, true), sent[5])
@@ -210,6 +210,39 @@ sent = { 1, 2, 3, 4 }
 CatQuestCore = nil
 ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "без CatQuest")
 assert(#sent == 5, "no CatQuest: straight to the strip")
+-- Wayfarer (WayfarerRU.Queue): the same wait, its radio stories too; not while the player paused it
+clock = 400
+sent = {}
+WayfarerRU = { Queue = { paused = false, items = { { handle = 7, startedAt = 398, sound = { duration = 20 }, questID = 1 } } } }
+ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "во время квеста")
+assert(#sent == 0, "held while Wayfarer reads a quest")
+WayfarerRU.Queue.items[1] = { waiting = true, sound = { duration = 9 } }        -- after the NPC's greeting
+ns.ReleaseHeld()
+assert(#sent == 0, "held while Wayfarer is about to speak")
+WayfarerRU.Queue.paused = true
+ns.ReleaseHeld()
+assert(#sent == 1 and sent[1]:find("во время квеста"), "Wayfarer paused by the player: the chat goes on")
+WayfarerRU.Queue.paused = false
+WayfarerRU.Queue.items[1] = { handle = 8, startedAt = 400, sound = { duration = 90 }, radio = "chronicles" }
+ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "под радио")
+assert(#sent == 1, "held while its radio story plays")
+WayfarerRU.Queue.items = {}
+ns.ReleaseHeld()
+assert(#sent == 2 and sent[2]:find("под радио"), "the radio over: the held line goes")
+WayfarerRU.Queue.items[1] = { handle = 9, startedAt = 380, sound = { duration = 10 }, zone = "Элвиннский лес" }
+ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "после зависшего")
+assert(#sent == 3, "a stuck Wayfarer item does not hold the chat")
+first = {}
+WayfarerRU.Queue.items[1] = { handle = 10, startedAt = 400, sound = { duration = 30 }, zone = "Элвиннский лес" }
+ns.db.debug = true
+ns.WatchCatQuest()
+assert(#first == 1 and first[1]:find("^pause\31"), "Wayfarer speaks: the program pauses")
+assert(sent[#sent]:find("Wayfarer играет: лор места, 30 с — чат ждёт", 1, true), sent[#sent])
+WayfarerRU.Queue.items = {}
+ns.WatchCatQuest()
+assert(#first == 2 and first[2]:find("^resume\31"), "Wayfarer silent: the program goes on")
+ns.db.debug = false
+WayfarerRU = nil
 GetTime = function() return 0 end
 print("catquest ok")
 
