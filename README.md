@@ -87,6 +87,7 @@
 - `hf_home`: папка с моделями (F5-TTS, Vocos, RUAccent, Whisper для сборки банка голосов) — один кэш на всё. По умолчанию папка `hf` рядом с компаньоном; модели скачиваются туда один раз.
 - `launch_wow`, `exit_with_wow`: запускать ли игру и закрываться ли вместе с ней.
 - `question_intonation`: сила вопросительной интонации (0 — выключить).
+- `restore_yo`: ставить «ё», где в чате написали «е» («ждем» → «ждём», «еще» → «ещё»; включено). Только в словах, где «е» быть не может: «все» и «всё», «берет» и «берёт» остаются как написаны.
 - `voice_pace_blend`, `voice_pace_limit`, `character_tempo`: насколько ускорять медленные голоса (0 — как в записях игры, 1 — до темпа быстрой четверти голосов; по умолчанию 0,85, не больше чем в 1,8 раза) и разброс личного темпа персонажей (±8 %).
 - `log_details`, `log_keep_days`: подробность журнала и сколько дней его хранить (90; 0 — всегда).
 
@@ -132,7 +133,7 @@
 - [Wayfarer](https://www.curseforge.com/wow/addons/wayfarer-russian-voiceover) — русская озвучка квестов, мест и книг WoW Forever; чат ждёт и её.
 - [wowdev/wow-listfile](https://github.com/wowdev/wow-listfile) — номера файлов игры, по которым компаньон находит реплики рас.
 - [F5-TTS](https://github.com/SWivid/F5-TTS) и русская модель [Misha24-10/F5-TTS_RUSSIAN](https://huggingface.co/Misha24-10/F5-TTS_RUSSIAN) — синтез голосов рас.
-- [RUAccent](https://github.com/Den4ikAI/ruaccent) — ударения; [pymorphy3](https://github.com/no-plagiarism/pymorphy3) — склонение и согласование чисел; [num2words](https://github.com/savoirfairelinux/num2words) — числа словами.
+- [RUAccent](https://github.com/Den4ikAI/ruaccent) — ударения; [pymorphy3](https://github.com/no-plagiarism/pymorphy3) — склонение и согласование чисел; [num2words](https://github.com/savoirfairelinux/num2words) — числа словами; [eyo-kernel](https://github.com/e2yo/eyo-kernel) — словарь слов с «ё» (MIT).
 - [Parselmouth](https://github.com/YannickJadoul/Parselmouth) (Praat) — вопросительная интонация; [Whisper](https://huggingface.co/openai/whisper-large-v3-turbo) — распознаёт текст реплик для образцов голосов; [windows-capture](https://github.com/NiiightmareXD/windows-capture) — снимок окна игры.
 
 ## Сделано с ИИ

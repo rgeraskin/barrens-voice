@@ -34,6 +34,7 @@ DEFAULT_CONFIG = {
     "players": {},
     "stress": {"rhvoice": "acute", "silero": "plus", "edge": "strip", "other": "strip"},
     "ruaccent": True,
+    "restore_yo": True,
     "declension": True,
     "nfe_step": 16,
     "f5_margin": 1.25,
@@ -260,6 +261,10 @@ def main() -> int:
     dictionary_checked = time.monotonic()
     from .text import Accentor, plain
     from .unmask import unmask
+    from . import yo
+    restore_yo = yo.restore if config.get("restore_yo", True) else (lambda t: t)
+    if config.get("restore_yo", True):
+        log(f"словарь «ё»: {sum(1 for k in yo.table() if k[:1].islower())} форм слов")
     accentor = Accentor(log, config.get("ruaccent", True))
     log("загружаю RUAccent ..." + (" (модели из кэша, без сети)" if offline else ""))
     try:
@@ -429,7 +434,7 @@ def main() -> int:
                         text = inflector.apply(text) if line.declension else strip_marks(text)
                         text = dictionary.apply(text, mark=line.declension)
                         text = inflector.apply(text) if line.declension else strip_marks(text)
-                        text = name + plain(text)
+                        text = name + restore_yo(plain(text))     # «ждем» -> «ждём»; not the name
                         line = dataclasses.replace(line, text=text)
                         speaker = engines.for_line(line)
                         label = LABELS.get(line.kind, line.kind) + (f" {line.channel}" if line.channel else "")

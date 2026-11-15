@@ -508,6 +508,32 @@ class SavedVoices(unittest.TestCase):
             self.assertEqual(saved_voices(config), "sapi")
 
 
+class Yo(unittest.TestCase):
+    """«ё» from eyo-kernel's safe dictionary: only where «е» cannot be meant."""
+
+    def test_restore(self):
+        from wcv.yo import restore
+        self.assertEqual(restore("ждем на утесе, еще учеными"), "ждём на утёсе, ещё учёными")
+        self.assertEqual(restore("Ждем. ЖДЕМ!"), "Ждём. ЖДЁМ!")                # the case typed is kept
+        self.assertEqual(restore("все берет"), "все берет")                      # either reading is a word: left
+        self.assertEqual(restore("пр+опасть, т+ебе"), "пр+опасть, т+ебе")        # the dictionary's stress: left
+        self.assertEqual(restore("уже ждём"), "уже ждём")                       # typed with «ё» already
+
+    def test_dictionary_format(self):
+        # read as eyo-kernel reads it: endings in brackets; «_» - lower case only; a capital - a name only
+        from wcv.yo import load
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "yo.txt"
+            path.write_text("# notice\nберёз(а|ы)\n_киёв\nАксён(|а)\n", encoding="utf-8")
+            t = load(path)
+        self.assertEqual(t["береза"], "берёза")
+        self.assertEqual(t["Березы"], "Берёзы")
+        self.assertEqual(t["киев"], "киёв")
+        self.assertNotIn("Киев", t)
+        self.assertEqual(t["Аксена"], "Аксёна")
+        self.assertNotIn("аксена", t)
+
+
 class Unmasking(unittest.TestCase):
     def test_disguised_letters(self):
         from wcv.unmask import unmask
