@@ -48,6 +48,76 @@ SKY_OUT = {"roar", "cackle", "kiss", "chicken", "applaud", "violin", "charge", "
            "helpme"}
 
 
+# The races retail added (sound/character): their player voices only, no NPC voices (their folders
+# are named by zone and role, not by race and sex). Four ways the files are named:
+# - classic style, one folder per race: bloodelf/bloodelffemale_err_nomana01.ogg, draenei/...;
+# - "pc" folders: pcgoblinmale/vo_pcgoblinmale_errnomana01.ogg (pcgilnean: a worgen in human form);
+# - tagged like Skyborne: dracthyr_visage_male/vo_dracthyr_visage_male_nomana_4737525.ogg;
+# - numbered, allied races and later: pc_-_void_elf_male/vo_735_pc_-_void_elf_male_01_m.ogg - which
+#   number is which line is not known, so all are emotes (2) and Whisper's transcript decides.
+OLD_STYLE = {"bloodelf": "bloodelf", "draenei": "draenei"}
+PC_STYLE = {"goblin": ("goblin", ""), "worgen": ("worgen", ""), "gilnean": ("worgen", "/human"),
+            "pandaren": ("pandaren", "")}
+TAGGED = {"dracthyr_visage": ("dracthyr", ""), "dracthyr_dragonkin": ("dracthyr", "/dragon")}
+NUMBERED = [  # a folder's words -> the race, the voice's kind
+    ("void_elf", "voidelf", ""), ("nightborne_elf", "nightborne", ""),
+    ("highmountain_tauren", "highmountaintauren", ""), ("lightforged_draenei", "lightforgeddraenei", ""),
+    ("dark_iron_dwarf", "darkirondwarf", ""), ("zandalari_troll", "zandalaritroll", ""),
+    ("maghar_orc", "magharorc", ""), ("kul_tiran_human", "kultiran", ""), ("mechagnome", "mechagnome", ""),
+    ("vulpera", "vulpera", ""), ("earthen", "earthendwarf", ""), ("haranir", "haranir", ""),
+    ("dracthyr_female_visage", "dracthyr", ""), ("dracthyr_male_visage", "dracthyr", ""),
+    ("dracthyr_female_dragon", "dracthyr", "/dragon"), ("dracthyr_male_dragon", "dracthyr", "/dragon"),
+]
+
+
+def retail(folder: str, stem: str):
+    """classify() for the races retail added."""
+    sub = folder.removeprefix("sound/character/")
+    if "/" in sub:
+        return None
+    if sub in OLD_STYLE:
+        found = re.fullmatch(rf"{sub}(female|male)_?(.+?)_?", stem)
+        if not found:
+            return None
+        sex, tag = found.groups()
+        voice = f"{OLD_STYLE[sub]}-{sex}"
+        if tag.startswith("err_"):
+            return voice, "error", 1
+        tag = tag.replace("_", "")
+        return (voice, tag, 2) if tag in CALM_EMOTES else (voice, tag, 3) if tag in JOKES else None
+    found = re.fullmatch(r"pc([a-z]+?)(female|male)", sub)
+    if found and found.group(1) in PC_STYLE:
+        race, kind = PC_STYLE[found.group(1)]
+        sex = found.group(2)
+        tag = stem.removeprefix(f"vo_{sub}_")
+        if tag == stem:
+            return None
+        voice = f"{race}-{sex}{kind}"
+        if tag.startswith("err"):
+            return voice, "error", 1
+        return (voice, tag, 2) if tag in CALM_EMOTES else (voice, tag, 3) if tag in JOKES else None
+    found = re.fullmatch(r"([a-z_]+)_(female|male)", sub)
+    if found and found.group(1) in TAGGED:
+        race, kind = TAGGED[found.group(1)]
+        sex = found.group(2)
+        tag = re.fullmatch(rf"vo_{sub}_(.+?)_?", stem)
+        tag = tag.group(1) if tag else ""
+        voice = f"{race}-{sex}{kind}"
+        if not tag or tag in SKY_OUT or tag in {"chuckle", "alliance", "horde", "laugh", "silly"}:
+            return None
+        if tag in SKY_EMOTES:
+            return voice, tag, 2
+        if tag in SKY_JOKES:
+            return voice, tag, 3
+        return voice, "error", 1
+    if re.fullmatch(r"vo_\d+_pc_.+_(female|male)(_[a-z]+)?_\d+_[mf]", stem):   # vo_735_pc_-_void_elf_male_01_m
+        sex = "female" if "female" in sub else "male"
+        for words, race, kind in NUMBERED:
+            if words in sub:
+                return f"{race}-{sex}{kind}", "line", 2
+    return None
+
+
 def listfile() -> Path:
     if not CACHE.exists():
         CACHE.parent.mkdir(parents=True, exist_ok=True)
@@ -78,6 +148,9 @@ def classify(path: str):
         if tag in SKY_JOKES:
             return f"skyborne-{sex}", tag, 3
         return f"skyborne-{sex}", "error", 1
+    found = retail(folder, stem)
+    if found:
+        return found
     for race, (char_dir, npc_prefix) in RACES.items():
         if folder.startswith(f"sound/character/{char_dir}/"):
             sub = folder.rsplit("/", 1)[1]

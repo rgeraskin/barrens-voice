@@ -15,17 +15,16 @@ import time
 import zlib
 from pathlib import Path
 
-# The game's race file names (GetPlayerInfoByGUID's englishRace), lower case, to the races of the
-# voice bank (the classic ones: the client's voices, gamevoices.py); the others speak as their kin.
-RACES = {
-    "human": "human", "orc": "orc", "dwarf": "dwarf", "nightelf": "nightelf", "scourge": "scourge",
-    "undead": "scourge", "tauren": "tauren", "gnome": "gnome", "troll": "troll",
+# The game's race file names (GetPlayerInfoByGUID's englishRace), lower case: a race speaks with its
+# own voices from the bank (gamevoices.py) when the client had them in Russian, else as its kin here,
+# else as a human.
+OWN = {"undead": "scourge", "harronir": "haranir"}   # file names that differ from the bank's
+KIN = {
     "goblin": "gnome", "vulpera": "gnome", "mechagnome": "gnome",
-    "bloodelf": "nightelf", "voidelf": "nightelf", "nightborne": "nightelf", "haranir": "nightelf",
-    "draenei": "human", "lightforgeddraenei": "human", "worgen": "human", "kultiran": "human", "dracthyr": "human",
-    "highmountaintauren": "tauren", "zandalaritroll": "troll", "magharorc": "orc",
+    "bloodelf": "nightelf", "voidelf": "bloodelf", "nightborne": "nightelf", "haranir": "nightelf",
+    "draenei": "human", "lightforgeddraenei": "draenei", "worgen": "human", "kultiran": "human",
+    "dracthyr": "human", "highmountaintauren": "tauren", "zandalaritroll": "troll", "magharorc": "orc",
     "darkirondwarf": "dwarf", "earthendwarf": "dwarf", "pandaren": "dwarf",
-    "skyborne": "skyborne",   # Forever's own race: its own voice when the client has it in Russian, else human
 }
 RECENT = 30 * 60   # seconds: characters heard within this count as "in the conversation"
 FORGET = 60 * 24 * 3600   # seconds: characters not heard for this long are forgotten
@@ -51,9 +50,11 @@ class Assigner:
         atexit.register(self.flush)
 
     def _pool(self, race: str, sex: str):
-        race = RACES.get(race.lower(), "human") if race else "human"
+        race = race.lower() if race else "human"
+        race = OWN.get(race, race)
+        kin = KIN.get(race, "human")
         sex = "female" if sex == "3" else "male"
-        for r in (race, "human"):
+        for r in (race, kin, KIN.get(kin, "human"), "human"):
             pool = [s for s in self.slots if s.race == r and s.sex == sex]
             if pool:
                 return pool

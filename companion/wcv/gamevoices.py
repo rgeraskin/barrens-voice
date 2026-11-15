@@ -14,6 +14,7 @@ from __future__ import annotations
 import io
 import json
 import re
+import zlib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -29,6 +30,11 @@ MIN_SPEECH = 3.0      # seconds: a voice with less usable speech than this gets 
 GOOD = 0.8            # the joined clip heard back by Whisper must match its text at least this well
 # Whisper's hallucinations on short or wordless clips
 JUNK = re.compile(r"продолжение следует|субтитр|спасибо за просмотр|редактор|корректор|подпис", re.I)
+
+
+# The races of WoW Forever (the table also has the ones retail added: Forever's client holds their
+# files too, but no player there speaks with them).
+FOREVER_RACES = {"human", "orc", "dwarf", "nightelf", "scourge", "tauren", "gnome", "troll", "skyborne"}
 
 
 @dataclass(frozen=True)
@@ -93,6 +99,15 @@ def bank_dir(config: dict, home: Path) -> Path:
     return home / ("voices" if game_of(config) == "forever" else "voices-" + game_of(config))
 
 
+def voices_for(config: dict) -> dict:
+    """The voice table's entries for the chosen game's races."""
+    from .dictionary import game_of
+    table = json.loads(TABLE.read_text(encoding="utf-8"))["voices"]
+    if game_of(config) == "forever":
+        table = {v: e for v, e in table.items() if e["race"] in FOREVER_RACES}
+    return table
+
+
 def _stamp(config: dict, shifts) -> dict | None:
     """What the bank depends on; None when no game is found."""
     from .casc import build_info, product_of
@@ -106,7 +121,8 @@ def _stamp(config: dict, shifts) -> dict | None:
     except (LookupError, KeyError, OSError):
         return None
     return {"version": BANK_VERSION, "install": str(install), "product": product, "build": build,
-            "shifts": list(shifts), "table": TABLE.stat().st_size}
+            "shifts": list(shifts),
+            "table": zlib.crc32(json.dumps(voices_for(config), sort_keys=True).encode("utf-8"))}
 
 
 def load(out: Path, stamp: dict | None) -> list[Slot] | None:
@@ -238,7 +254,7 @@ def build(config: dict, out: Path, log, checker) -> list[Slot]:
 
     log(f"готовлю голоса рас из клиента игры ({stamp['install']}, {stamp['product']}) — один раз после "
         "каждого обновления игры, несколько минут ...")
-    table = json.loads(TABLE.read_text(encoding="utf-8"))["voices"]
+    table = voices_for(config)
     storage = Storage(Path(stamp["install"]), stamp["product"])
     others = other_storages(config, log)
     files = storage.read_files({f[0] for v in table.values() for f in v["files"]}, "ruRU", others)
@@ -264,10 +280,15 @@ def build(config: dict, out: Path, log, checker) -> list[Slot]:
             if not 0.9 <= seconds <= 7.5:
                 continue
             text = checker.transcribe(x, SAMPLE_RATE).strip()
+            if _tag == "line" and not text.endswith("."):
+                # a numbered line (retail's allied races: what it is, is not known): a battle cry ("!")
+                # or a joke ("?") makes the whole voice shout or flirt - the calm ones first
+                priority = 3
             if plausible(text, seconds):
                 heard.append({"fdid": fdid, "text": text, "seconds": seconds, "priority": priority})
                 audio[fdid] = x
-            if sum(h["seconds"] for h in heard if h["priority"] == heard[0]["priority"]) >= TARGET[1] * 1.5:
+            # enough of the calmest kind the voice has: stop listening (else on to the end)
+            if sum(h["seconds"] for h in heard if h["priority"] == candidates[0][2]) >= TARGET[1] * 1.5:
                 break
         made = None
         pool = list(heard)

@@ -73,6 +73,16 @@ class Assign(unittest.TestCase):
         b = Assigner(slots(), Path(self.dir.name) / "b.json")         # no Russian Skyborne lines in the client
         self.assertEqual(b.slot_for("Еноты Дикие", "Skyborne", "3", now=1).id, "human-female")
 
+    def test_retail_race_own_voice_or_kin(self):
+        own = [Slot("goblin-female", "goblin-female", "goblin", "female", 0.0, "g.wav", "текст"),
+               Slot("haranir-male", "haranir-male", "haranir", "male", 0.0, "h.wav", "текст"),
+               Slot("orc-female", "orc-female", "orc", "female", 0.0, "o.wav", "текст")]
+        a = Assigner(slots() + own, self.path)
+        self.assertEqual(a.slot_for("Гоблинша", "Goblin", "3", now=1).id, "goblin-female")
+        self.assertEqual(a.slot_for("Корень", "Harronir", "2", now=1).id, "haranir-male")   # the game's name
+        self.assertEqual(a.slot_for("Маг", "MagharOrc", "3", now=1).id, "orc-female")       # no own voice: kin
+        self.assertEqual(a.slot_for("Эльфийка", "VoidElf", "3", now=1).id, "human-female")  # nor kin's: human
+
     def test_stable_and_persisted(self):
         a = Assigner(slots(), self.path)
         first = a.slot_for("Громмаш-Степи", "Orc", "2", now=1).id

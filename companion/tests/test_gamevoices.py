@@ -140,6 +140,46 @@ class Table(unittest.TestCase):
             self.assertGreaterEqual(sum(1 for f in files if f[2] == 1), 20)
             self.assertGreaterEqual(sum(1 for f in files if f[2] == 2), 10)
 
+    def test_retail_races(self):
+        # the races retail added: each its own voice per sex, read from the files retail names four ways
+        table = json.loads(gamevoices.TABLE.read_text(encoding="utf-8"))["voices"]
+        races = ("bloodelf", "draenei", "goblin", "worgen", "pandaren", "dracthyr", "voidelf", "nightborne",
+                 "highmountaintauren", "lightforgeddraenei", "darkirondwarf", "zandalaritroll", "magharorc",
+                 "kultiran", "mechagnome", "vulpera", "earthendwarf", "haranir")
+        for race in races:
+            for sex in ("male", "female"):
+                self.assertGreaterEqual(len(table[f"{race}-{sex}"]["files"]), 50, f"{race}-{sex}")
+        self.assertIn("worgen-male/human", table)                     # a worgen in human form: the Gilnean voice
+        tags = {f[1] for f in table["goblin-female"]["files"]}
+        self.assertIn("error", tags)
+        self.assertNotIn("attack", tags)                              # battle cries left out
+
+    def test_forever_only_its_races(self):
+        forever = gamevoices.voices_for({"game": "forever"})
+        retail = gamevoices.voices_for({"game": "retail"})
+        self.assertEqual({e["race"] for e in forever.values()}, gamevoices.FOREVER_RACES)
+        self.assertIn("goblin-male", retail)
+        self.assertNotIn("goblin-male", forever)
+
+    def test_classify_retail(self):
+        sys.path.insert(0, str(gamevoices.TABLE.parents[2] / "tools"))
+        from game_voices import classify
+        c = "sound/character/"
+        self.assertEqual(classify(c + "bloodelf/bloodelffemale_err_nomana01.ogg"), ("bloodelf-female", "error", 1))
+        self.assertEqual(classify(c + "draenei/draeneimalehello02.ogg"), ("draenei-male", "hello", 2))
+        self.assertIsNone(classify(c + "draenei/draeneimalecharge02.ogg"))
+        self.assertEqual(classify(c + "pcgilneanmale/vo_pcgilneanmale_errlootdidntkill01.ogg"),
+                         ("worgen-male/human", "error", 1))
+        self.assertIsNone(classify(c + "pcworgenmale/vo_pcworgenmale_main_charge01.ogg"))
+        self.assertEqual(classify(c + "dracthyr_visage_male/vo_dracthyr_visage_male_nomana_4737525.ogg"),
+                         ("dracthyr-male", "error", 1))
+        self.assertIsNone(classify(c + "dracthyr_visage_male/vo_dracthyr_visage_male_applaud_4737525.ogg"))
+        self.assertEqual(classify(c + "pc_-_void_elf_male/vo_735_pc_-_void_elf_male_01_m.ogg"),
+                         ("voidelf-male", "line", 2))
+        self.assertIsNone(classify(c + "pc_-_void_elf_male/vo_735_pc_-_void_elf_male_wound01.ogg"))
+        self.assertEqual(classify(c + "pc_haranir_female/vo_120_pc_haranir_female_01_f.ogg"),
+                         ("haranir-female", "line", 2))
+
 
 if __name__ == "__main__":
     unittest.main()
