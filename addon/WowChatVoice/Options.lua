@@ -13,6 +13,15 @@ local TITLE = "WoW Chat Voice"
 ns.BRIDGE_TIP = "Мост — то, через что аддон передаёт строки чата приложению-компаньону WoW Chat Voice, которое читает их вслух: тонкая тёмная линия у края экрана. Компаньон видит окно игры и читает эту линию — другого пути наружу у аддонов WoW нет. Если линию закрывает другой аддон (рисует что-то в том же месте), чат перестаёт читаться — тогда перенесите её."
 
 -- Channels, in two columns: setting, label, tooltip.
+-- The numbered channels, under "Общие каналы": setting, label, tooltip.
+local NUMBERED = {
+    { "chGeneral", "Общий", "Общий чат города или зоны." },
+    { "chTrade", "Торговля", "Торговый канал: продажа, покупка, ремесло." },
+    { "chLfg", "Поиск спутников", "Поиск группы и спутников." },
+    { "chDefense", "Оборона", "Канал обороны: нападения на города и зоны." },
+    { "chOther", "Остальные", "Любые другие номерные каналы, например ваши собственные." },
+}
+
 local CHANNELS = {
     { "party", "Группа", "Сообщения группы и её лидера." },
     { "say", "Сказать (/s)", "Что говорят игроки рядом." },
@@ -29,6 +38,7 @@ local CHANNELS = {
 }
 
 local window, toggle, verb, lastNames, programState
+local numbered = {}   -- the check boxes of the numbered channels (grey while "Общие каналы" is off)
 local checks, radios, sliders = {}, {}, {}
 
 local function Refresh()
@@ -38,6 +48,7 @@ local function Refresh()
         programState:SetText("Озвучка: " .. (ns.Companion and ns.Companion.Describe() or "|cffaaaaaaне проверить|r"))
     end
     for _, c in ipairs(checks) do c.refresh() end
+    for _, c in ipairs(numbered) do UI.SetCheckEnabled(c, ns.db.channels) end
     UI.SetCheckEnabled(verb, ns.db.sayNames)
     UI.SetCheckEnabled(lastNames, ns.db.sayNames)
     for value, r in pairs(radios) do r:SetChecked((ns.db.voices or "f5") == value) end
@@ -94,10 +105,19 @@ local function Build()
     y = UI.Header(window, "Каналы", y)
     for i, item in ipairs(CHANNELS) do
         local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
-        local get, set = Setting(item[1])
+        local get, set = Setting(item[1], item[1] == "channels" and function() Refresh() end or nil)
         checks[#checks + 1] = UI.Check(window, 18 + col * 196, y - row * 24, item[2], item[3], get, set)
     end
     y = y - math.ceil(#CHANNELS / 2) * 24
+    -- which numbered channels, once "Общие каналы" is on
+    for i, item in ipairs(NUMBERED) do
+        local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
+        local get, set = Setting(item[1])
+        local c = UI.Check(window, 42 + col * 180, y - row * 24, item[2], item[3], get, set)
+        checks[#checks + 1] = c
+        numbered[#numbered + 1] = c
+    end
+    y = y - math.ceil(#NUMBERED / 2) * 24 - 4
     get, set = Setting("onlyVisible")
     checks[#checks + 1] = UI.Check(window, 18, y, "Только то, что видно в окнах чата", "Читать строку, только если "
         .. "её показывает какое-нибудь из твоих окон (вкладок) чата: его типы сообщений и каналы из настроек чата, "

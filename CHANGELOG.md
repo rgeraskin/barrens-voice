@@ -23,6 +23,7 @@
 - The dictionary reads «Серёжа» in every case, and «учёный» in its forms, with «ё».
 - «1 место» is read as a count, «одно место» (it was «первое»): in chat it is mostly «1 место в группу»; «15 место» and «на 2 месте» stay ordinal.
 - The dictionary reads «Серёжа» in every case, and «учёный» in its forms, with «ё».
+- Under «Общие каналы» each numbered channel has its own box: General, Trade, Looking for group, Defense and the others — to read General and not Trade, say. All are on by default, so nothing changes until you switch one off.
 
 ## 0.2.0
 

@@ -15,6 +15,11 @@ ns.DEFAULTS = {
     guild = true,
     officer = false,
     channels = false,  -- numbered channels: General, Trade, LookingForGroup, LocalDefense ...
+    chGeneral = true,  -- ... which of them once "channels" is on: General,
+    chTrade = true,    --     Trade,
+    chLfg = true,      --     LookingForGroup,
+    chDefense = true,  --     LocalDefense / WorldDefense,
+    chOther = true,    --     any other numbered channel (a custom one)
     emote = false,     -- /e emotes
     fadeChat = false,  -- chat windows transparent until the mouse is over them (ChatFade.lua)
     skipAddons = true, -- lines other players' addons write for them (Questie, DBM...) are not read
@@ -460,21 +465,49 @@ function ns.AddonLine(text)
     return nil
 end
 
+-- The numbered channels the settings tell apart: setting, a piece of the channel's base name (as the
+-- client sends it, Russian or English; "Общий" is cut to "бщий" and so on so a capital never matters).
+ns.CHANNEL_KINDS = {
+    { "chGeneral", "бщий", "general" },
+    { "chTrade", "орговля", "trade" },
+    { "chLfg", "оиск спутников", "lookingforgroup" },
+    { "chDefense", "борона", "defense" },
+}
+
+--- The setting of the numbered channel a line came from (chOther for a channel not in the list).
+function ns.ChannelSetting(baseName, channelString)
+    local name = tostring(baseName or "")
+    if name == "" then name = tostring(channelString or "") end
+    local lower = name:lower()
+    for _, k in ipairs(ns.CHANNEL_KINDS) do
+        if name:find(k[2], 1, true) or lower:find(k[3], 1, true) then return k[1] end
+    end
+    return "chOther"
+end
+
 --- Whether a chat event's line is one the addon hands to the program (the channel on, not an addon's
 --- line, one's own lines only when they are on) - for the chat windows' fading too (ChatFade.lua).
-function ns.Reads(event, guid, text)
+function ns.Reads(event, guid, text, baseName, channelString)
     local db = ns.db
     local key = EVENTS[event]
     if not (db and db.enabled and key and db[key]) then return false end
+    if event == "CHAT_MSG_CHANNEL" and db[ns.ChannelSetting(baseName, channelString)] == false then return false end
     if db.skipAddons ~= false and ns.AddonLine(text) then return false end
     return db.self or not (guid and guid ~= "" and guid == UnitGUID("player"))
 end
 
-local function OnChat(event, text, sender, _, channelString, _, _, _, _, _, _, _, guid)
+local function OnChat(event, text, sender, _, channelString, _, _, _, _, baseName, _, _, guid)
     local db = ns.db
     local key = EVENTS[event]
     if not (db.enabled and key) then return end
     if not db[key] then ns.Skip("тип чата выключен в настройках: " .. key, sender, text) return end
+    if event == "CHAT_MSG_CHANNEL" then
+        local setting = ns.ChannelSetting(baseName, channelString)
+        if db[setting] == false then
+            ns.Skip("этот канал выключен в настройках: " .. tostring(baseName or channelString), sender, text)
+            return
+        end
+    end
     if guid and guid ~= "" and guid == UnitGUID("player") and not db.self then
         ns.Skip("свои сообщения выключены", sender, text)
         return

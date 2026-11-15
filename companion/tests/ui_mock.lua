@@ -518,3 +518,19 @@ ns.db.history = "broken"
 ns.RestoreHistory()
 assert(type(ns.history) == "table" and #ns.history == 0, "a broken saved value: a fresh history")
 print("history ok")
+
+-- numbered channels one by one (under "Общие каналы")
+local CS = ns.ChannelSetting
+assert(CS("Общий", "1. Общий - Оргриммар") == "chGeneral" and CS("General") == "chGeneral")
+assert(CS("Торговля (локальный)", "") == "chTrade" and CS("Trade - City") == "chTrade")
+assert(CS("Поиск спутников") == "chLfg" and CS("LookingForGroup") == "chLfg")
+assert(CS("Оборона: Оргриммар") == "chDefense" and CS("LocalDefense") == "chDefense" and CS("Оборона мира") == "chDefense")
+assert(CS("МойКанал") == "chOther" and CS(nil, "5. Мой") == "chOther" and CS(nil, "2. Торговля - Степи") == "chTrade", "by the full channel name when no base name")
+ns.db.enabled, ns.db.channels, ns.db.self = true, true, false
+ns.db.chGeneral, ns.db.chTrade, ns.db.chLfg, ns.db.chDefense, ns.db.chOther = true, false, true, true, true
+assert(ns.Reads("CHAT_MSG_CHANNEL", "Player-1-9", "кто в ОП?", "Общий", "1. Общий - Степи"), "General on")
+assert(not ns.Reads("CHAT_MSG_CHANNEL", "Player-1-9", "продам сумки", "Торговля (локальный)", "2. Торговля"), "Trade off")
+ns.db.channels = false
+assert(not ns.Reads("CHAT_MSG_CHANNEL", "Player-1-9", "кто в ОП?", "Общий", "1. Общий"), "channels off: none")
+ns.db.channels, ns.db.chTrade = true, true
+print("numbered channels ok")

@@ -129,7 +129,7 @@ end
 --- The chat filter: never hides a line, only marks the window with whether the addon reads it.
 function F.Filter(frame, event, text, _, ...)
     if ns.askingFilters then return false end    -- Core's "is it visible" check calls the filters too
-    marks[frame] = { read = ns.Reads(event, (select(10, ...)), text), at = GetTime() }
+    marks[frame] = { read = ns.Reads(event, (select(10, ...)), text, (select(7, ...)), (select(2, ...))), at = GetTime() }
     return false
 end
 
