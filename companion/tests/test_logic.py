@@ -825,3 +825,23 @@ class StderrLog(unittest.TestCase):
                 if m._log_file:
                     m._log_file.close()
                 m.LOG_DIR, m._log_file, m._log_day = old_dir, old_file, old_day
+
+class AddonMissing(unittest.TestCase):
+    def test_stops_without_the_addon(self):
+        import tempfile
+        from unittest import mock
+        from wcv import voicelist
+        with tempfile.TemporaryDirectory() as d:
+            game = Path(d) / "_forever_"
+            (game / "Interface" / "AddOns").mkdir(parents=True)
+            with mock.patch("wcv.voicelist.wow_roots", return_value=[game]):
+                message = voicelist.missing_addon({})
+                self.assertIn("не установлен", message)
+                self.assertIn(str(game), message)                 # where it looked
+                addon = game / "Interface" / "AddOns" / "WowChatVoice"
+                addon.mkdir()
+                (addon / "WowChatVoice.toc").write_text("## Title: WoW Chat Voice\n", encoding="utf-8")
+                self.assertIsNone(voicelist.missing_addon({}))
+            with mock.patch("wcv.voicelist.wow_roots", return_value=[Path(d) / "nowhere"]):
+                self.assertIn("папка игры тоже не найдена", voicelist.missing_addon({}))
+

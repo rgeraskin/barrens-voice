@@ -28,6 +28,7 @@
 - Speed and volume: the sliders' 100 % is now the default sound (it used to be 125 % speed and 120 % volume, which sounded better); the speed goes 40–160 % and the volume 0–200 %, so both marks stand in the middle at 100. Saved settings are converted once, so everything sounds as before.
 - `/wcv reset` is gone: handing the race voices out again is the «Перераздать голоса» button, which asks first; a command for a thing done once in a blue moon is one more to remember.
 - The settings window is in the game's own tabs now — «Общее», «Каналы и чтение», «Голоса», «Словарь» — instead of one long window and three more behind buttons. Each tab starts with a line on what is on it, and the window is as high as the tab needs. Speed and volume are on the first tab; the bridge settings are its foldable section; the Windows voices list and the dictionary are tabs of their own. The «Общие каналы» box holds its channels under it, as «Озвучивать имена» does. «Склонять замены после предлогов» and «Только то, что видно в окнах чата» are always on and no longer settings. Channel labels carry this client's own chat commands («Группа (/гр)»), and the settings say plainly whether the companion was running at login.
+- The companion stops at once, saying where it looked and what to do, when the addon is not installed — instead of launching the game and reading nothing.
 
 ## 0.2.0
 

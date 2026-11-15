@@ -18,6 +18,19 @@ def find_addon(config: dict) -> Path | None:
     return None
 
 
+def missing_addon(config: dict) -> str | None:
+    """Why the companion cannot work without the addon, in words for the player - or None when the
+    addon is there. Without it nothing reaches the companion: it stops at once instead of launching
+    the game and waiting for a strip that never comes."""
+    if find_addon(config):
+        return None
+    games = [str(r) for r in wow_roots(config) if (r / "Interface").is_dir() or (r / "Wow.exe").exists()]
+    where = ("в папке игры " + ", ".join(games)) if games else "— папка игры тоже не найдена"
+    return ("аддон WoW Chat Voice не установлен: нет Interface\\AddOns\\WowChatVoice\\WowChatVoice.toc " + where + ". "
+            "Скопируйте папку addon\\WowChatVoice в World of Warcraft\\_forever_\\Interface\\AddOns\\ "
+            "(или укажите wow_dir в config.json, если игра стоит в другом месте) и запустите компаньон снова.")
+
+
 def label(voice) -> str:
     name = voice.description
     for cut in (" - Russian (Russia)", " Online (Natural)", " (Russian)", " - Russian"):

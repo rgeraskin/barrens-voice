@@ -234,7 +234,11 @@ def main() -> int:
     prune_logs(config["log_keep_days"])
     from . import launch
     from .status import Beat, SeenLines
-    from .voicelist import find_addon
+    from .voicelist import find_addon, missing_addon
+    problem = missing_addon(config)
+    if problem:                   # nothing would ever reach the companion: say so and stop
+        log("ОШИБКА: " + problem)
+        return 1
     # "the companion is running", for the addon at login (status.py): from now on, before the game
     # is launched and while the models load
     Beat(find_addon(config), log).start()
