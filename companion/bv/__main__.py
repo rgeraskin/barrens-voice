@@ -330,8 +330,14 @@ def main() -> int:
         return 1
     # "the companion is running", for the addon at login (status.py): from now on, before the game
     # is launched and while the models load
+    # asked before the first beat: is the player already in the world, the addon past its check? (reloadhint)
+    from . import reloadhint
+    needs_reload = reloadhint.needed(config, find_addon(config))
     beat = Beat(find_addon(config), log)
     beat.start()
+    if needs_reload:
+        log("если окно чата не прячется — сделайте в игре /reload: аддон узнаёт о компаньоне при входе и /reload")
+        state.report(reload_hint=True)
     import atexit
     atexit.register(beat.stop)        # any end - the game closed, a crash, the launcher's stop - but a kill
     seen_lines = SeenLines(DATA_DIR / "tmp" / "seen_lines.txt")
@@ -401,8 +407,6 @@ def main() -> int:
         log("полоска (по сохранённым настройкам аддона): " + describe_place(place))
     absent_since, searched = None, 0.0
     state.report(phase="running")
-    watching_since = time.monotonic()  # the strip seen at once: the player was in the world before the companion
-    reload_told = False
     with contextlib.nullcontext():
         while True:
             now = time.monotonic()
@@ -483,14 +487,6 @@ def main() -> int:
                     damaged_told = False
                     log("полоска снова читается")
                     state.report(damaged=False)
-                if not linked and not reload_told and time.monotonic() - watching_since < 5:
-                    # the addon checked for the companion at login (CompanionStatus.lua) - most likely before
-                    # this one ran: a transparent chat stays visible until /reload
-                    from .dictionary import saved_flag
-                    reload_told = True
-                    if saved_flag(config, "fadeChat"):
-                        log("если окно чата не прячется — сделайте в игре /reload: аддон узнаёт о компаньоне при входе и /reload")
-                        state.report(reload_hint=True)
                 if not linked:
                     log("связь с аддоном есть")
                     log(f"    ячейка полоски: {frame.cell} px")

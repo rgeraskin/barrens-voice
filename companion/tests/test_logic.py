@@ -1042,6 +1042,38 @@ class SavedFlag(unittest.TestCase):
             self.assertIsNone(saved_flag(config, "nothing"))
 
 
+class ReloadHint(unittest.TestCase):
+    """The /reload reminder: only for a player already in the world, with the hidden chat on, no restart."""
+
+    def setup(self, d, fade="true", enabled="true", status=None):
+        saved = Path(d) / "_forever_" / "WTF" / "Account" / "X" / "SavedVariables"
+        saved.mkdir(parents=True)
+        (saved / "BarrensVoice.lua").write_text(f'BarrensVoiceDB = {{\n["fadeChat"] = {fade},\n["enabled"] = {enabled},\n}}\n',
+                                                 encoding="utf-8")
+        addon = Path(d) / "_forever_" / "Interface" / "AddOns" / "BarrensVoice"
+        addon.mkdir(parents=True)
+        if status:
+            (addon / "CompanionStatus.lua").write_text(f"BarrensVoiceStatus = {status}\n", encoding="utf-8")
+        return {"game_dirs": {"forever": str(Path(d) / "_forever_")}}, addon
+
+    def test_cases(self):
+        from bv.reloadhint import needed
+        now = 1_000_000
+        cases = [  # (fade, enabled, status file, strip in view) -> remind
+            (("true", "true", None, True), True),
+            (("true", "true", None, False), False),                          # at character select: no
+            (("false", "true", None, True), False),                          # the hidden chat off
+            (("true", "false", None, True), False),                          # the addon switched off
+            (("true", "true", "{ beat = 0, stopped = 999990 }", True), False),   # a restart: the addon saw the last one
+            (("true", "true", "{ beat = 999000 }", True), True),             # an old beat: nobody at login
+        ]
+        for (fade, enabled, status, in_view), want in cases:
+            with self.subTest(fade=fade, enabled=enabled, status=status, in_view=in_view):
+                with tempfile.TemporaryDirectory() as d:
+                    config, addon = self.setup(d, fade, enabled, status)
+                    self.assertEqual(needed(config, addon, in_view=lambda c: in_view, now=now), want)
+
+
 class LogLevels(unittest.TestCase):
     def test_levels(self):
         from bv.logs import level_of
