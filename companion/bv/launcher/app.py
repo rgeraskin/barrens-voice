@@ -529,16 +529,28 @@ class App:
         c.create_text(30, y + 150, anchor="w", fill=DIM, font=p.small,
                       text="Остальное — в config.json (описание в README). Компаньон перезапустится, если он работает.")
 
-        def save():
+        def edited():
+            """The settings as the window has them now; None if the days are not a number."""
             try:
                 days = int(boxes["log_keep_days"].var.get() or 0)
             except ValueError:
-                messagebox.showerror("Barrens Voice", "Дни хранения журналов — целое число.", parent=win)
-                return
+                return None
             changes = {k: boxes[k].var.get().strip() for k in ("wow_dir", "battlenet_exe", "hf_home")}
             changes.update(log_keep_days=days, log_details=flags["details"],
                            f5_end_check="whisper" if flags["whisper"] else "silence")
-            changed = any(cfg.get(k) != v for k, v in changes.items())
+            return changes
+
+        def differs(changes: dict) -> bool:
+            """Whether `changes` differ from the file: an empty field is the same as a key not set."""
+            unset = {"f5_end_check": "silence", "log_details": True, "log_keep_days": 90}
+            return any((cfg.get(k) if cfg.get(k) is not None else unset.get(k, "")) != v for k, v in changes.items())
+
+        def save():
+            changes = edited()
+            if changes is None:
+                messagebox.showerror("Barrens Voice", "Дни хранения журналов — целое число.", parent=win)
+                return
+            changed = differs(changes)
             self.config = model.update_config(**changes)
             self.games = model.find_games(self.config)
             win.destroy()
@@ -555,7 +567,19 @@ class App:
                 self.say(f"не открылся config.json: {e}", "WARN")
         p.button(30, height - 60, 170, height - 26, "Сохранить", "save", save)
         p.button(182, height - 60, 362, height - 26, "Открыть config.json", "file", open_file)
-        p.button(width - 150, height - 60, width - 30, height - 26, "Закрыть", "close", win.destroy)
+        def close():
+            """The cross and «Закрыть»: changes not saved are asked about, not lost silently."""
+            changes = edited()
+            if changes is None or differs(changes):
+                answer = messagebox.askyesnocancel("Barrens Voice", "Сохранить изменения в настройках?", parent=win)
+                if answer is None:
+                    return
+                if answer:
+                    save()
+                    return
+            win.destroy()
+        win.protocol("WM_DELETE_WINDOW", close)
+        p.button(width - 150, height - 60, width - 30, height - 26, "Закрыть", "close", close)
 
     def open_help(self) -> None:
         if self.help_win is not None and self.help_win.winfo_exists():
