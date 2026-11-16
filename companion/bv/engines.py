@@ -40,7 +40,7 @@ class Engines:
             if self.f5 is not None:
                 return
             from .f5engine import F5Speaker
-            self.log("загружаю голоса рас (F5-TTS) ...")
+            self.log("загружаю голоса рас ...")
             state.report(voices="loading")
             speaker = F5Speaker(self.config, self.log, self.home, self.accentor, self.player)
             self.f5, self.ready = speaker, False

@@ -253,14 +253,14 @@ def fetch_models(config: dict) -> int:
     from . import f5engine, whisper_onnx
     from .text import Accentor
     try:
-        log("модели: F5 (ONNX) ...")
+        log("модели: голоса рас (~0,8 ГБ) ...")
         if f5engine.model_dir(config, APP_DIR) is None:
             f5engine.fetch_models(config, log)
         hf_hub_download(f5engine.MODEL_REPO, f5engine.VOCAB_FILE)
-        log("модели: Whisper (~1,5 ГБ) ...")
+        log("модели: распознавание речи для банка голосов (~1,5 ГБ) ...")
         for name in whisper_onnx.FILES:
             hf_hub_download(whisper_onnx.REPO, name)
-        log("модели: RUAccent (~0,7 ГБ) ...")
+        log("модели: ударения (~0,7 ГБ) ...")
         Accentor(log, True).load()
     except Exception as e:  # noqa: BLE001 - the first start tries again
         log(f"модели не скачались: {e} — компаньон докачает их при первом запуске")
@@ -316,7 +316,9 @@ def main() -> int:
     from . import state
     from .dictionary import game_of
     state.init(STATE_FILE, phase="starting", game=game_of(config))
-    log(f"запуск; настройки: {CONFIG_PATH}; игра: {'WoW (ритейл)' if game_of(config) == 'retail' else 'WoW Forever'}")
+    # the launcher says «компаньон запущен (игра)» itself: here only the details, for the full log
+    log(f"компаньон стартует; игра: {'WoW (ритейл)' if game_of(config) == 'retail' else 'WoW Forever'}; "
+        f"настройки: {CONFIG_PATH}", "DEBUG")
     prune_logs(config["log_keep_days"])
     from . import launch
     from .status import Beat, SeenLines
@@ -423,7 +425,7 @@ def main() -> int:
             if window is None or now - window_checked > 2:
                 found = capturer.find()
                 if found != window or first_check:
-                    log(f"окно WoW: {found[1]}" if found else "окно WoW не найдено (или свёрнуто), жду")
+                    log(f"окно WoW: {found[1]}" if found else "окно игры не найдено или свёрнуто — жду")
                     state.report(window=bool(found))
                 window, window_checked, first_check = found, now, False
             if window is None:
@@ -473,7 +475,8 @@ def main() -> int:
                 misses = 0
                 damaged_since = None
                 if not linked:
-                    log(f"связь с аддоном есть (ячейка {frame.cell} px)")
+                    log("связь с аддоном есть")
+                    log(f"    ячейка полоски: {frame.cell} px")
                     linked = True
                     state.report(linked=True)
                 if frame.seq != seen:

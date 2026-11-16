@@ -1031,8 +1031,10 @@ class LogLevels(unittest.TestCase):
     def test_levels(self):
         from bv.logs import level_of
         cases = {
-            "запуск; настройки: x; игра: WoW Forever": "INFO",
-            "окно WoW: (0, 0, 1920, 1080)": "INFO",
+            "игра закрыта — выхожу": "INFO",
+            "окно WoW: (0, 0, 1920, 1080)": "DEBUG",
+            "окно игры не найдено или свёрнуто — жду": "INFO",
+            "Battle.net только что запустился и пропустил команду": "DEBUG",
             "связь с аддоном есть (ячейка 2 px)": "INFO",
             "Голоса рас готовы.": "INFO",
             "[гильдия] Громмаш (Orc, м) → orc-male/standard: всем привет": "CHAT",
