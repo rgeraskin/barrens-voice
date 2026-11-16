@@ -1,13 +1,51 @@
-# The development environment only (tests, tools/make_icon.py), managed by uv through mise; not a
-# package, so no [project] (the version lives in addon/BarrensVoice/BarrensVoice.toc). The companion
-# on the player's Windows machine installs from companion/requirements*.txt instead.
+# Barrens Voice's launcher and companion (companion/bv): what the installer and the updates put on the
+# player's machine, and what the tests run with here. Not a package: the code runs from its version's
+# folder (docs/update-strategy.md). The app's version is here; the addon's own, in its .toc.
+#   player (Windows):  uv sync --frozen --no-dev --extra cuda      (NVIDIA)
+#                      uv sync --frozen --no-dev --extra directml  (other DirectX 12 cards)
+#   development:       uv run --locked python -m unittest discover -s companion/tests  (mise run test)
 
-[dependency-groups]
-dev = [
-    "numpy==2.2.6",
+[project]
+name = "barrens-voice"
+version = "0.4.0"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    # the strip: the game window's pixels, and Windows' own APIs
+    "mss==10.2.0 ; sys_platform == 'win32'",
+    "windows-capture==2.0.1 ; sys_platform == 'win32'",
+    "pywin32==312 ; sys_platform == 'win32'",
+    # the text: numbers, declension, stress
+    "numpy==2.5.4",
+    "num2words==0.5.14",
     "pymorphy3==2.0.6",
     "pymorphy3-dicts-ru==2.4.417150.4580142",
-    "num2words==0.5.14",
-    "pillow==12.3.0",
+    "ruaccent==1.5.8.3",
+    # the race voices: F5 and Whisper in ONNX (ONNX Runtime itself is the extra below)
+    "soundfile==0.14.0",
+    "scipy==1.18.1",
     "praat-parselmouth==0.4.7",
+    "transformers==5.22.2",
+    "tokenizers==0.23.3",
+    "huggingface_hub==1.33.0",
+    # the launcher's tray icon; tools/make_icon.py
+    "pystray==0.19.5",
+    "pillow==12.3.0",
 ]
+
+[project.optional-dependencies]
+# ONNX Runtime for the video card: one of the two (the same Python module, onnxruntime)
+cuda = ["onnxruntime-gpu[cuda,cudnn]==1.32.0 ; sys_platform == 'win32'"]
+directml = ["onnxruntime-directml==1.24.4 ; sys_platform == 'win32'"]
+
+[tool.uv]
+package = false
+conflicts = [[{ extra = "cuda" }, { extra = "directml" }]]
+# RUAccent asks for the CPU-only onnxruntime, which would sit over the video card's build under the
+# same module name: on Windows the extra's build is the one (elsewhere - the tests - the CPU one stays)
+override-dependencies = ["onnxruntime ; sys_platform != 'win32'"]
+# a package version reaches the lock a week after its release, not the day it appears on PyPI (a
+# hijacked release is usually caught within days); an urgent fix: exclude-newer-package
+exclude-newer = "7 days"
+# onnxruntime-gpu 1.32.0 (13.11.2026) is the build the CUDA path was measured with on the test machine:
+# allowed before its week is up; drop this line after 20.11.2026
+exclude-newer-package = { onnxruntime-gpu = false }

@@ -46,6 +46,7 @@
 
 ## Выпуск (CI)
 
+- Каждый шаг CI — задача mise (`mise run test`, `mise run build`, `mise run installer`…), которая так же запускается локально; workflow GitHub только ставит mise (`jdx/mise-action`) и вызывает эти задачи. Установщик (Inno Setup) собирается только на Windows: локально — на тестовой машине.
 - GitHub Actions, только раннер Windows (компаньон — только для Windows; стандартные раннеры бесплатны для публичных репозиториев): тесты Python и Lua на каждый push.
 - На тег: архив `barrens-voice-X.Y.Z.zip` (код, аддон, `pyproject.toml`, `uv.lock`), `manifest.json` (версия, протокол, версия аддона, SHA-256) с подписью ed25519 (публичный ключ — в лаунчере, закрытый — в секретах CI), установщик (Inno Setup), выпуск на GitHub с разделом CHANGELOG.
 - Если менялся аддон — загрузка на CurseForge и Wago (упаковщик BigWigs, `.pkgmeta`). У Forever на CurseForge своя версия игры (1.60.1). Аддон, которому нужна внешняя программа, на CurseForge допустим: так устроены ForeverDubbed и AI Agents Chat.
