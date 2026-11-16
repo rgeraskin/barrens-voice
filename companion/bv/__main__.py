@@ -52,6 +52,7 @@ DEFAULT_CONFIG = {
     "kind_gain_db": {"yell": 3, "whisper": -4},
     "voice_shifts": [-1.5, 1.5],
     "wow_dir": "",
+    "game_dirs": {},              # {"forever": "...\\_forever_"}: the folders the launcher found
     "hf_home": "",
     "launch_wow": True,
     "game": "forever",            # or "retail"; --retail / --forever on the command line override it
@@ -105,10 +106,11 @@ def _write_log_file(line: str, now: datetime) -> None:
             pass
 
 
-def log(message: str) -> None:
-    """To the console and to logs/bv-YYYY-MM-DD.log."""
+def log(message: str, level: str | None = None) -> None:
+    """To the console (the launcher reads it) and to logs/bv-YYYY-MM-DD.log, with its level (bv/logs.py)."""
+    from .logs import level_of
     now = datetime.now()
-    line = f"{now:%H:%M:%S} {message}"
+    line = f"{now:%H:%M:%S} {level or level_of(message):<5} {message}"
     print(line, flush=True)
     _write_log_file(line, now)
 
@@ -122,17 +124,22 @@ class StderrToLog:
         self.console, self.pending = console, ""
 
     def write(self, text: str) -> int:
-        try:
-            self.console.write(text)
-        except (OSError, ValueError):
-            pass
+        launched = bool(os.environ.get(LAUNCHED))      # under the launcher: lines in the log's form only
+        if not launched:
+            try:
+                self.console.write(text)
+            except (OSError, ValueError):
+                pass
         self.pending += text
         while "\n" in self.pending:
             line, self.pending = self.pending.split("\n", 1)
             line = line.split("\r")[-1].rstrip()
             if line:
-                now = datetime.now()
-                _write_log_file(f"{now:%H:%M:%S} [stderr] {line}", now)
+                if launched:
+                    log(f"[stderr] {line}", "DEBUG")
+                else:
+                    now = datetime.now()
+                    _write_log_file(f"{now:%H:%M:%S} DEBUG [stderr] {line}", now)
         if "\r" in self.pending:                       # a bar redrawing itself: only its last state counts
             self.pending = self.pending.rsplit("\r", 1)[-1]
         return len(text)
@@ -170,6 +177,26 @@ def load_config() -> dict:
 
 
 MODELS_READY = APP_DIR / ".models_ready"
+# the launcher (bv.launcher): what the companion does, and its word to stop
+STATE_FILE = APP_DIR / "tmp" / "state.json"
+STOP_FILE = APP_DIR / "tmp" / "stop"
+RESTART = 3               # exit code: start me again (online) - the launcher does it
+ALREADY = 4               # exit code: another companion runs
+LAUNCHED = "BV_LAUNCHER"  # set in the environment of a companion the launcher started
+
+
+def single_instance() -> bool:
+    """True for the only companion on this Windows session (a named mutex, freed when the process
+    ends however it ends); False when another one already runs - two would read the same strip
+    and speak every line twice."""
+    import ctypes
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    global _mutex
+    _mutex = kernel32.CreateMutexW(None, False, "Local\\BarrensVoiceCompanion")
+    return ctypes.get_last_error() != 183          # ERROR_ALREADY_EXISTS
+
+
+_mutex = None
 
 
 def install_crash_logging() -> None:
@@ -200,9 +227,12 @@ def offline_models() -> bool:
 
 
 def restart_online(log) -> None:
-    """A model missing from the cache in offline mode: forget the mark and start again online."""
+    """A model missing from the cache in offline mode: forget the mark and start again online (under
+    the launcher: exit with RESTART, it starts the companion again - so it keeps its process)."""
     MODELS_READY.unlink(missing_ok=True)
     log("в кэше моделей чего-то не хватает — перезапускаюсь с доступом к сети")
+    if os.environ.get(LAUNCHED):
+        os._exit(RESTART)          # from any thread (engines.on_error runs on its own)
     os.execv(sys.executable, [sys.executable, "-m", "bv"] + sys.argv[1:])
 
 
@@ -277,9 +307,15 @@ def main() -> int:
     if "--fetch-models" in sys.argv:
         return fetch_models(config)
     log("=" * 60)
+    if not single_instance():
+        log("компаньон уже запущен — второй не нужен, выхожу")
+        return ALREADY
+    STOP_FILE.unlink(missing_ok=True)
     if config.get("share_with_game", True):
         share.lower_priority(log)
+    from . import state
     from .dictionary import game_of
+    state.init(STATE_FILE, phase="starting", game=game_of(config))
     log(f"запуск; настройки: {CONFIG_PATH}; игра: {'WoW (ритейл)' if game_of(config) == 'retail' else 'WoW Forever'}")
     prune_logs(config["log_keep_days"])
     from . import launch
@@ -288,6 +324,7 @@ def main() -> int:
     problem = missing_addon(config)
     if problem:                   # nothing would ever reach the companion: say so and stop
         log("ОШИБКА: " + problem)
+        state.report(phase="error", error=problem)
         return 1
     # "the companion is running", for the addon at login (status.py): from now on, before the game
     # is launched and while the models load
@@ -296,7 +333,9 @@ def main() -> int:
     import atexit
     atexit.register(beat.stop)        # any end - the game closed, a crash, the launcher's stop - but a kill
     seen_lines = SeenLines(APP_DIR / "tmp" / "seen_lines.txt")
-    if config["launch_wow"] and not launch.wow_running():
+    # --launch / --no-launch: the launcher's Play and its start for a game already running
+    want_launch = "--launch" in sys.argv or (config["launch_wow"] and "--no-launch" not in sys.argv)
+    if want_launch and not launch.wow_running():
         # the race voices come from the client's files: (re)made before the game, after an update
         from .f5engine import prepare_voices
         prepare_voices(config, APP_DIR, log)
@@ -359,12 +398,18 @@ def main() -> int:
         capturer.set_place(place)
         log("полоска (по сохранённым настройкам аддона): " + describe_place(place))
     absent_since, searched = None, 0.0
+    state.report(phase="running")
     with contextlib.nullcontext():
         while True:
             now = time.monotonic()
             if now - dictionary_checked > 2:
                 dictionary.refresh()               # a changed Dictionary.lua works within seconds
                 dictionary_checked = now
+                if STOP_FILE.exists():             # the launcher's "stop" (its window closed, «Выход»)
+                    STOP_FILE.unlink(missing_ok=True)
+                    log("остановлен лаунчером")
+                    state.report(phase="stopped")
+                    return 0
             if config["exit_with_wow"] and now - wow_checked > 2:
                 wow_checked = now
                 if launch.wow_running():
@@ -373,11 +418,13 @@ def main() -> int:
                     wow_gone_since = wow_gone_since or now
                     if now - wow_gone_since > 10:
                         log("игра закрыта — выхожу")
+                        state.report(phase="game_closed")
                         return 0
             if window is None or now - window_checked > 2:
                 found = capturer.find()
                 if found != window or first_check:
                     log(f"окно WoW: {found[1]}" if found else "окно WoW не найдено (или свёрнуто), жду")
+                    state.report(window=bool(found))
                 window, window_checked, first_check = found, now, False
             if window is None:
                 time.sleep(1)
@@ -415,17 +462,20 @@ def main() -> int:
                         log("полоска видна, но кадры не читаются: её что-то перекрывает (миникарта, окно другого "
                             "аддона?) или настройки изображения искажают цвета")
                         damaged_told = True
+                        state.report(damaged=True)
                 else:
                     damaged_since = None
                 if linked and misses == int(5 / config["poll_interval"]):
                     log("полоска аддона пропала (выключен, свёрнут или скрыт интерфейс?)")
                     linked = False
+                    state.report(linked=False)
             else:
                 misses = 0
                 damaged_since = None
                 if not linked:
                     log(f"связь с аддоном есть (ячейка {frame.cell} px)")
                     linked = True
+                    state.report(linked=True)
                 if frame.seq != seen:
                     first = seen is None       # what was up before we started: not news
                     seen = frame.seq

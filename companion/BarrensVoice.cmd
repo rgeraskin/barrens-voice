@@ -1,5 +1,7 @@
 @echo off
-rem Barrens Voice: starts WoW through Battle.net, reads chat lines from the addon's strip and speaks them.
+rem Barrens Voice: prepares the Python environment once, then opens the launcher window.
+rem Any switches go to the launcher: BarrensVoice.cmd --console runs the companion in a console,
+rem BarrensVoice.cmd --help lists them all.
 cd /d "%~dp0"
 if not exist .venv\Scripts\python.exe (
     echo Creating the Python environment...
@@ -23,9 +25,7 @@ rem the models now, while installing, not at the first start (~3 GB once; those 
 echo Downloading the models...
 .venv\Scripts\python.exe -m bv --fetch-models || echo The companion will download them at its first start.
 :run
-title Barrens Voice
-.venv\Scripts\python.exe -m bv %*
-if errorlevel 1 pause
+start "" .venv\Scripts\pythonw.exe BarrensVoice.pyw %*
 exit /b
 :fail
 echo Setup failed.

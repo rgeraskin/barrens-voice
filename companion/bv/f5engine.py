@@ -142,12 +142,24 @@ def fetch_models(config: dict, log) -> Path:
     return Path(snapshot_download(repo, allow_patterns=["*.onnx"]))
 
 
+def gpu_name() -> str:
+    """The video card DirectML runs on (its device 0: the adapter the desktop is on), for people to
+    read; "" if Windows does not say."""
+    try:
+        import win32api
+        return str(win32api.EnumDisplayDevices(None, 0).DeviceString).strip()
+    except Exception:  # noqa: BLE001 - only a label
+        return ""
+
+
 def make_bank(config: dict, home: Path, log) -> list:
     """The voice bank (gamevoices): as it is, or made again from the game client with Whisper
     loaded for it and freed from the GPU afterwards."""
     out = gamevoices.bank_dir(config, home)
     checker = None
     if gamevoices.stale(config, out):
+        from . import state
+        state.report(voices="bank")
         from .whisper_onnx import OnnxChecker
         preload(provider(config))
         checker = OnnxChecker(log, provider(config))
@@ -264,7 +276,7 @@ class F5Speaker:
         self.assigner: Assigner | None = None
         self.onnx = None             # F5Onnx, once loaded
         self.checker = None          # Whisper (whisper_onnx.OnnxChecker), the judge of cut endings
-        self.device = ""
+        self.device = self.card = self.provider = ""
         self.ref_text: dict[str, str] = {}
         self.target_pace = 0.0
 
@@ -309,7 +321,9 @@ class F5Speaker:
             checker = OnnxChecker(self.log, engine)
             self.checker = checker if checker.load() else None
         self.ref_audio: dict[str, object] = {}
-        self.device = f"ONNX Runtime, {engine}, {self.onnx.steps} шагов"
+        self.card = (gpu_name() if engine in ("DmlExecutionProvider", "CUDAExecutionProvider") else "") or engine
+        self.provider = engine
+        self.device = f"{self.card} (ONNX Runtime, {self.onnx.steps} шагов)"
 
     def reference(self, slot, text: str):
         """(clip, its text, its seconds)."""

@@ -980,8 +980,9 @@ class StderrLog(unittest.TestCase):
                 m._log_file.close()
                 text = next(Path(d).glob("bv-*.log")).read_text(encoding="utf-8")
                 lines = [l[9:] for l in text.splitlines()]
-                self.assertEqual(lines, ["[stderr] W1113 torch: a warning",
-                                         "[stderr] Loading weights: 100%|####| 587/587", "[stderr] half a line"])
+                self.assertEqual(lines, ["DEBUG [stderr] W1113 torch: a warning",
+                                         "DEBUG [stderr] Loading weights: 100%|####| 587/587",
+                                         "DEBUG [stderr] half a line"])
             finally:
                 if m._log_file:
                     m._log_file.close()
@@ -1003,6 +1004,34 @@ class RuaccentFiles(unittest.TestCase):
             fresh.mkdir(parents=True)
             keep_koziev(str(fresh), before=True)                        # a new environment gets it back
             self.assertTrue((fresh / "koziev" / "m.bin").exists())
+
+
+class LogLevels(unittest.TestCase):
+    def test_levels(self):
+        from bv.logs import level_of
+        cases = {
+            "запуск; настройки: x; игра: WoW Forever": "INFO",
+            "окно WoW: (0, 0, 1920, 1080)": "INFO",
+            "связь с аддоном есть (ячейка 2 px)": "INFO",
+            "Голоса рас готовы.": "INFO",
+            "[гильдия] Громмаш (Orc, м) → orc-male/standard: всем привет": "CHAT",
+            "    к синтезу: всем прив+ет.": "DEBUG",
+            "[диагностика аддона] строка не отправлена": "DEBUG",
+            "загружаю RUAccent ...": "DEBUG",
+            "словарь (стандартный): записей 251": "DEBUG",
+            "полоска аддона пропала (выключен, свёрнут или скрыт интерфейс?)": "WARN",
+            "Голоса рас недоступны, читаю голосами Windows.": "WARN",
+            "ОШИБКА (программа): KeyError: 1": "ERROR",
+            "F5-TTS: CUDA out of memory": "ERROR",
+        }
+        for message, level in cases.items():
+            self.assertEqual(level_of(message), level, message)
+
+    def test_parse(self):
+        from bv.logs import parse
+        self.assertEqual(parse("03:12:01 INFO  окно WoW: x"), ("03:12:01", "INFO", "окно WoW: x"))
+        self.assertEqual(parse("03:12:01 CHAT  [гильдия] a: b"), ("03:12:01", "CHAT", "[гильдия] a: b"))
+        self.assertEqual(parse("Traceback (most recent call last):"), ("", "DEBUG", "Traceback (most recent call last):"))
 
 
 class AddonMissing(unittest.TestCase):

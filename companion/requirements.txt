@@ -1,4 +1,4 @@
-# Versions the companion was tested with (a newer huggingface_hub, 2.x, breaks RUAccent's offline load)
+# The versions the companion was tested with: an install months later gets the same libraries
 mss==10.2.0
 pywin32==312
 numpy==2.5.4
@@ -15,3 +15,6 @@ scipy==1.18.1
 transformers==5.22.2
 tokenizers==0.23.3
 huggingface_hub==1.33.0
+# the launcher's tray icon
+pystray==0.19.5
+pillow==12.3.0

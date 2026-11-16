@@ -6,6 +6,7 @@ from __future__ import annotations
 import threading
 from pathlib import Path
 
+from . import state
 from .protocol import Line
 
 NOTICE_SENDER = "Barrens Voice"
@@ -40,6 +41,7 @@ class Engines:
                 return
             from .f5engine import F5Speaker
             self.log("загружаю голоса рас (F5-TTS) ...")
+            state.report(voices="loading")
             speaker = F5Speaker(self.config, self.log, self.home, self.accentor, self.player)
             self.f5, self.ready = speaker, False
             speaker.start()
@@ -56,11 +58,13 @@ class Engines:
             else:
                 self.ready, error = True, None
         if error:
+            state.report(voices="error", voices_error=error)
             self.notice("Голоса рас недоступны, читаю голосами Windows.")
             self.log(f"  причина: {error}")
             if self.on_error:
                 self.on_error(error)
         else:
+            state.report(voices="ready", device=getattr(speaker, "card", ""), provider=getattr(speaker, "provider", ""))
             self.notice("Голоса рас готовы.")
             if self.on_ready:
                 self.on_ready()
@@ -71,6 +75,7 @@ class Engines:
             self.f5, self.ready = None, False
         if speaker is None:
             return
+        state.report(voices="off")
         speaker.shutdown()
         if was_ready:
             self.notice("Голоса рас выгружены.")

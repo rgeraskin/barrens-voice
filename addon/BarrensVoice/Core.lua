@@ -821,7 +821,7 @@ SlashCmdList.BARRENSVOICE = function(msg)
     elseif msg == "debug" then
         ns.db.debug = not ns.db.debug
         print(PREFIX .. (ns.db.debug
-            and "отладка включена: строки чата, которые аддон не отправил, с причиной, и речь CatQuest и Wayfarer — в журнале компаньона (logs, «диагностика аддона»)."
+            and "отладка включена: строки чата, которые аддон не отправил, с причиной, и речь CatQuest и Wayfarer — в журнале компаньона (кнопка «Журнал» в окне Barrens Voice, строки «диагностика аддона»)."
             or "отладка выключена."))
     elseif msg == "on" or msg == "off" then
         ns.SetEnabled(msg == "on")

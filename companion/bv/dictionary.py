@@ -47,16 +47,39 @@ def game_of(config: dict) -> str:
     return game if game in GAMES else "forever"
 
 
+def fixed_drives() -> list[str]:
+    """The letters of the computer's local disks (not network, CD or USB sticks); C-H off Windows."""
+    try:
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        mask = kernel32.GetLogicalDrives()
+        return [d for i, d in enumerate("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+                if mask >> i & 1 and kernel32.GetDriveTypeW(f"{d}:\\") == 3]      # DRIVE_FIXED
+    except (AttributeError, OSError):
+        return list("CDEFGH")
+
+
+COMMON = ("World of Warcraft", "Games/World of Warcraft", "Program Files (x86)/World of Warcraft",
+          "Program Files/World of Warcraft", "Blizzard/World of Warcraft", "Battle.net/World of Warcraft")
+
+
 def wow_roots(config: dict) -> list[Path]:
-    """The game folder (_forever_ or _retail_, as `game` says) of the configured and the usual WoW
-    installs - only that game's: with both installed, the other one's addon and saved variables must
-    not be taken for this one's."""
-    flavor = GAMES[game_of(config)]
-    roots = [Path(config["wow_dir"])] if config.get("wow_dir") else []
-    for drive in "CDEFGH":
-        for base in (f"{drive}:/World of Warcraft", f"{drive}:/Games/World of Warcraft",
-                     f"{drive}:/Program Files (x86)/World of Warcraft"):
-            roots.append(Path(base) / flavor)
+    """The folders where this game (_forever_ or _retail_, as `game` says) may be, best first: the
+    one the launcher found (`game_dirs`), `wow_dir` (the game folder or the World of Warcraft folder
+    above it), then the usual places on every local disk - only this game's: with both installed,
+    the other one's addon and saved variables must not be taken for this one's."""
+    game = game_of(config)
+    flavor = GAMES[game]
+    roots = []
+    known = (config.get("game_dirs") or {}).get(game)
+    if known:
+        roots.append(Path(known))
+    if config.get("wow_dir"):
+        given = Path(config["wow_dir"])
+        roots.append(given.parent / flavor if given.name.lower().startswith("_") else given / flavor)
+    for drive in fixed_drives():
+        for base in COMMON:
+            roots.append(Path(f"{drive}:/") / base / flavor)
     return roots
 
 

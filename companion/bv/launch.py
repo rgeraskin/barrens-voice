@@ -34,8 +34,56 @@ def process_names() -> set[str]:
     return names
 
 
+def is_wow(name: str) -> bool:
+    name = name.lower()
+    return name.startswith("wow") and name.endswith(".exe") and "voice" not in name
+
+
 def wow_running() -> bool:
-    return any(n.startswith("wow") and n.endswith(".exe") and "voice" not in n for n in process_names())
+    return any(is_wow(n) for n in process_names())
+
+
+def process_paths(match) -> list[str]:
+    """Full paths of the running programs whose file name `match` accepts (those this user may ask
+    about: the game, run by the same user, is one of them)."""
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    snapshot = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+    entry = PROCESSENTRY32W()
+    entry.dwSize = ctypes.sizeof(entry)
+    paths = []
+    try:
+        ok = kernel32.Process32FirstW(snapshot, ctypes.byref(entry))
+        while ok:
+            if match(entry.szExeFile):
+                handle = kernel32.OpenProcess(0x1000, False, entry.th32ProcessID)   # QUERY_LIMITED_INFORMATION
+                if handle:
+                    buf = ctypes.create_unicode_buffer(1024)
+                    size = wintypes.DWORD(len(buf))
+                    if kernel32.QueryFullProcessImageNameW(handle, 0, buf, ctypes.byref(size)):
+                        paths.append(buf.value)
+                    kernel32.CloseHandle(handle)
+            ok = kernel32.Process32NextW(snapshot, ctypes.byref(entry))
+    finally:
+        kernel32.CloseHandle(snapshot)
+    return paths
+
+
+def game_of_path(path: str) -> str | None:
+    """Which game a Wow.exe belongs to, by its folder (…\\_forever_\\Wow.exe → "forever")."""
+    from .dictionary import GAMES
+    folder = Path(path).parent.name.lower()
+    return next((game for game, name in GAMES.items() if name == folder), None)
+
+
+def running_game() -> tuple[str, Path] | tuple[None, None]:
+    """The game whose Wow.exe runs now and its folder (("forever", …\\_forever_)), or (None, None)."""
+    for path in process_paths(is_wow):
+        game = game_of_path(path)
+        if game:
+            return game, Path(path).parent
+    return None, None
 
 
 def find_battlenet(config: dict) -> Path | None:
