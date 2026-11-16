@@ -467,6 +467,9 @@ def main() -> int:
                         state.report(damaged=True)
                 else:
                     damaged_since = None
+                    if damaged_told:             # gone, not covered: its own state now (minimized, hidden UI)
+                        damaged_told = False
+                        state.report(damaged=False)
                 if linked and misses == int(5 / config["poll_interval"]):
                     log("полоска аддона пропала (выключен, свёрнут или скрыт интерфейс?)")
                     linked = False
@@ -474,6 +477,10 @@ def main() -> int:
             else:
                 misses = 0
                 damaged_since = None
+                if damaged_told:                 # readable again: a later cover is told again
+                    damaged_told = False
+                    log("полоска снова читается")
+                    state.report(damaged=False)
                 if not linked:
                     log("связь с аддоном есть")
                     log(f"    ячейка полоски: {frame.cell} px")
