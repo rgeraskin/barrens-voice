@@ -15,6 +15,51 @@ LEVELS = (("INFO", "Ход работы"), ("CHAT", "Чат"), ("DEBUG", "Под
 COLORS = {"DEBUG": "#8a7a66", "CHAT": "#e8d8b0", "INFO": "#f0dcae", "WARN": "#e0b33a", "ERROR": "#ff6a5a"}
 BG, PANEL = "#0d0906", "#1a120b"
 KEEP = 20000                       # lines in the view at most: the oldest go first
+TIPS = {
+    "Копировать": "Выделенное, а без выделения — все строки журнала по выбранным галочкам и поиску.",
+    "Копировать для отчёта": "Для сообщения об ошибке: версия Barrens Voice, Windows, видеокарта, игры, состояние "
+                             "голосов рас и изменённые настройки, затем последние 300 строк журнала всех уровней. "
+                             "Пути к папкам и учётная запись WoW скрыты, а строки чата попадут как есть — "
+                             "при желании уберите их перед отправкой. Куда писать — вкладка «Помощь» в настройках аддона.",
+    "Открыть файл за сегодня": "Весь журнал за сегодня — в программе, которая открывает файлы .log (обычно Блокнот).",
+    "Папка журналов": "Папка logs: журнал по файлу на день, старые удаляются сами.",
+    "В конец ↓": "К последним строкам; окно снова будет прокручиваться за новыми.",
+}
+
+
+class Tip:
+    """A hint over a widget after the mouse rests on it (tkinter has none of its own)."""
+
+    def __init__(self, widget, text: str, font, width: int):
+        self.widget, self.text, self.font, self.width = widget, text, font, width
+        self.win = self.job = None
+        widget.bind("<Enter>", self._schedule, add="+")
+        widget.bind("<Leave>", self._hide, add="+")
+        widget.bind("<ButtonPress>", self._hide, add="+")
+
+    def _schedule(self, _event=None) -> None:
+        self._hide()
+        self.job = self.widget.after(500, self._show)
+
+    def _show(self) -> None:
+        self.job = None
+        self.win = tip = tk.Toplevel(self.widget)
+        tip.wm_overrideredirect(True)
+        tip.attributes("-topmost", True)
+        tk.Label(tip, text=self.text, justify="left", wraplength=self.width, font=self.font, bg="#23170d",
+                 fg=PARCHMENT, relief="solid", bd=1, padx=8, pady=5).pack()
+        tip.update_idletasks()
+        x = min(self.widget.winfo_rootx(), self.widget.winfo_screenwidth() - tip.winfo_width() - 8)
+        y = self.widget.winfo_rooty() - tip.winfo_height() - 6        # above: the buttons are at the bottom
+        tip.wm_geometry(f"+{max(0, x)}+{max(0, y)}")
+
+    def _hide(self, _event=None) -> None:
+        if self.job:
+            self.widget.after_cancel(self.job)
+            self.job = None
+        if self.win is not None:
+            self.win.destroy()
+            self.win = None
 
 
 class LogWindow:
@@ -65,10 +110,14 @@ class LogWindow:
 
         foot = tk.Frame(self.win, bg=PANEL)
         foot.pack(fill="x", padx=px(10), pady=px(8))
-        for label, action in (("Копировать показанное", self.copy_shown), ("Копировать для отчёта", self.copy_report),
+        for label, action in (("Копировать", self.copy_shown), ("Копировать для отчёта", self.copy_report),
                               ("Открыть файл за сегодня", self.open_file), ("Папка журналов", self.open_folder)):
-            self._button(foot, label, action, ui, px).pack(side="left", padx=(0, px(8)))
-        self._button(foot, "В конец ↓", lambda: self.text.see("end"), ui, px).pack(side="right")
+            button = self._button(foot, label, action, ui, px)
+            button.pack(side="left", padx=(0, px(8)))
+            Tip(button, TIPS[label], ui, px(360))
+        end = self._button(foot, "В конец ↓", lambda: self.text.see("end"), ui, px)
+        end.pack(side="right")
+        Tip(end, TIPS["В конец ↓"], ui, px(360))
         self.status = tk.Label(foot, text="", font=ui, bg=PANEL, fg=DIM)
         self.status.pack(side="right", padx=px(10))
         self.rebuild()
@@ -151,7 +200,11 @@ class LogWindow:
         self.status.config(text=f"скопировано: {what}")
 
     def copy_shown(self) -> None:
-        self._clip(self.text.get("1.0", "end-1c"), "показанные строки")
+        """The selection; without one, every line the filters show."""
+        if self.text.tag_ranges("sel"):
+            self._clip(self.text.get("sel.first", "sel.last"), "выделенное")
+            return
+        self._clip(self.text.get("1.0", "end-1c"), "все показанные строки")
 
     def copy_report(self) -> None:
         """For a bug report: versions, the card and the settings changed (`header`), then the last 300
