@@ -34,3 +34,7 @@ run = "uv run --locked python tools/make_icon.py"
 [tasks.voices-table]
 description = "Regenerate companion/bv/game_voices.json (which game files hold each race voice) from the community listfile"
 run = "uv run --locked python tools/game_voices.py"
+
+[tasks.build]
+description = "Release archive and manifest.json into dist/ (tools/release.py)"
+run = "uv run --locked python tools/release.py"

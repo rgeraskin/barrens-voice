@@ -1,4 +1,5 @@
 """The launcher's logic without its window: games and addon, versions, settings, state lines."""
+import os
 import json
 import tempfile
 import unittest
@@ -246,3 +247,34 @@ class Report(unittest.TestCase):
         self.assertIn("Видеокарты: RTX", stopped)                       # from the state when Windows lists none
         self.assertIn("Компаньон: не запущен (в прошлый раз: stopped)", stopped)
         self.assertIn("Настройки не по умолчанию: нет", stopped)
+
+
+class Install(unittest.TestCase):
+    """bv.install: a release unpacked beside, made current through app/current, old ones pruned."""
+
+    def release(self, d: Path, version: str) -> Path:
+        import zipfile
+        archive = d / f"barrens-voice-{version}.zip"
+        with zipfile.ZipFile(archive, "w") as z:
+            z.writestr("pyproject.toml", f'[project]\nname = "barrens-voice"\nversion = "{version}"\n')
+            z.writestr("uv.lock", "version = 1\n")
+            z.writestr("companion/bv/__init__.py", "")
+        return archive
+
+    def test_install_switch_prune(self):
+        from unittest import mock
+        from bv import install
+        from bv.paths import layout
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            root = d / "BarrensVoice"
+            with mock.patch("bv.install.build") as build:
+                for version in ("0.4.0", "0.4.1", "0.4.2"):
+                    self.assertEqual(install.install(root, self.release(d, version), "cuda", d / "uv.exe", log=lambda *a: None), version)
+            self.assertEqual(build.call_args[0][2], "cuda")
+            self.assertEqual(install.current_version(root), "0.4.2")
+            code = Path(os.path.realpath(root / "app" / "current" / "companion"))
+            self.assertEqual(layout(code, {})["root"], root.resolve())          # the code knows it is installed
+            self.assertEqual(install.prune(root), ["0.4.0"])                   # current + one to go back to
+            self.assertEqual(sorted(p.name for p in (root / "app").iterdir()), ["0.4.1", "0.4.2", "current"])
+            self.assertFalse(any(p.name.endswith(".part") for p in (root / "app").iterdir()))

@@ -16,3 +16,6 @@ __pycache__/
 
 # tools/game_voices.py keeps the downloaded listfile here
 tools/.cache/
+
+# release builds (mise run build)
+dist/
