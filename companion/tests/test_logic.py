@@ -1046,3 +1046,19 @@ class GameChoice(unittest.TestCase):
             self.assertIn("--exec=launch WoW", popen.call_args[0][0])
             launch.launch({}, lambda *a: None)
             self.assertIn("--exec=launch WoWF", popen.call_args[0][0])
+
+
+class EndingHeard(unittest.TestCase):
+    def test_cut_and_whole(self):
+        from bv.f5engine import ending_heard
+        self.assertTrue(ending_heard("Всем пока.", " Всем пока!"))
+        self.assertTrue(ending_heard("Ищу группу на мёртвые к+опи.", "Ищу группу на мертвые копии."))   # letters added
+        self.assertTrue(ending_heard("Нужен танк в ульдам+ан.", "Нужен танк вульдаман."))             # run together
+        self.assertTrue(ending_heard("Продам за пять тысяч.", "Продам за 5000."))                      # digits
+        self.assertFalse(ending_heard("Ладно, я пошёл спать, всем пока.", "Ладно, я пошёл спать. Всем по-"))
+        self.assertTrue(ending_heard("Г+о в р+ейд.", "Говрейт."))                     # spelled as heard
+        self.assertTrue(ending_heard("Агр на мн+е, х+ильте.", "Агр на мне, Хильти."))
+        self.assertFalse(ending_heard("Окей.", "Ак"))
+        self.assertFalse(ending_heard("Ладно, я пошёл спать, всем пока.", "Ладно, я пошёл спать. Всем по"))
+        self.assertFalse(ending_heard("да", ""))
+        self.assertTrue(ending_heard("", "что-то"))

@@ -179,7 +179,35 @@ def prepare_voices(config: dict, home: Path, log) -> None:
         log(f"голоса рас из клиента: {e}")
 
 
-CUT_TAIL = 0.06   # seconds of quiet after the last sound below which the ending did not fit
+CUT_TAIL = 0.06   # seconds of quiet after the last sound below which the ending may not have fit
+
+
+def ending_heard(expected: str, heard: str) -> bool:
+    """Whether Whisper heard the line's last word in a take: the judge of a cut ending.
+
+    Whole: the last word as written; or Whisper's run-together of the last two («в ульдаман» ->
+    «вульдаман»); or the word with letters added at its end («копи» -> «копии»: a cut takes sounds
+    away, it does not add them); a last word in digits (Whisper writes numbers so, the line has
+    them in words). Whisper also writes a word as it hears it - «рейд» as «рейт», an unknown
+    «хильте» as «хильти», three words as one: then the ending counts when the letters before it are
+    not fewer (a cut word is shorter: «всем по-» for «всем пока») and the last word's length of
+    letters at the end is alike."""
+    from difflib import SequenceMatcher
+
+    from .refcheck import words
+
+    want, got = words(expected), words(heard)
+    if not want:
+        return True
+    if not got:
+        return False
+    last = got[-1]
+    if any(ch.isdigit() for ch in last):
+        return True
+    if last.startswith(want[-1]) or last == "".join(want[-2:]):
+        return True
+    expected, said, k = "".join(want), "".join(got), len(want[-1])
+    return len(said) >= len(expected) - 1 and SequenceMatcher(None, expected[-k:], said[-k:]).ratio() >= 0.6
 
 
 def line_seconds(pace: float, target_pace: float, text_bytes: int, rate: int, character: str,
@@ -235,6 +263,7 @@ class F5Speaker:
         self.accentor = accentor or Accentor(log, config.get("ruaccent", True))
         self.assigner: Assigner | None = None
         self.onnx = None             # F5Onnx, once loaded
+        self.checker = None          # Whisper (whisper_onnx.OnnxChecker), the judge of cut endings
         self.device = ""
         self.ref_text: dict[str, str] = {}
         self.target_pace = 0.0
@@ -275,6 +304,10 @@ class F5Speaker:
         from .f5onnx import F5Onnx
         self.onnx = F5Onnx(models, Path(hf_hub_download(MODEL_REPO, VOCAB_FILE)), engine, self.log)
         self.onnx.load()
+        if self.config.get("f5_end_check") == "whisper":
+            from .whisper_onnx import OnnxChecker
+            checker = OnnxChecker(self.log, engine)
+            self.checker = checker if checker.load() else None
         self.ref_audio: dict[str, object] = {}
         self.device = f"ONNX Runtime, {engine}, {self.onnx.steps} шагов"
 
@@ -291,9 +324,11 @@ class F5Speaker:
                                   self.config)
 
     def _synth(self, slot, text: str, rate: int, character: str = ""):
-        """The line in `slot`'s voice. When the speech runs to the very end of the length given (the
-        last syllable did not fit: F5 is random, and one line in ten did that), it is made once
-        more with a quarter more length - that brought it to one in sixty."""
+        """The line in `slot`'s voice. F5 fits the speech into the length it is given, and sometimes
+        the last syllable does not fit. A take whose speech runs to its very end (`silence_after`
+        under CUT_TAIL: one line in eight, most of them whole) is made once more with a quarter
+        more length: always (`f5_end_check` "silence", the default), or only when Whisper does not
+        hear the last word ("whisper": a second saved on such lines for 1.5 GB of video memory)."""
         ref_file, ref_text, ref = self.reference(slot, text)
         total = self.duration(slot, text, rate, character)
         if ref_file not in self.ref_audio:
@@ -303,10 +338,24 @@ class F5Speaker:
             self.ref_audio[ref_file] = resample(data.mean(axis=1), sr_in, self.onnx.in_rate)
         for attempt in range(2):
             wav, sr = self.onnx.synth(self.ref_audio[ref_file], ref_text, text, total)
-            if attempt or silence_after(wav, sr) >= CUT_TAIL:
+            if attempt or silence_after(wav, sr) >= CUT_TAIL or self._whole(wav, sr, text):
                 break
             total = ref + (total - ref) * 1.25
         return wav, sr
+
+    def _whole(self, wav, sr: int, text: str) -> bool:
+        """Whether Whisper hears the take's last word (no Whisper: assumed cut, made again)."""
+        if self.checker is None:
+            return False
+        try:
+            heard = self.checker.transcribe(wav, sr)
+        except Exception as e:  # noqa: BLE001 - a judge that fails must not lose the line
+            self.log(f"    Whisper: {e}")
+            return False
+        whole = ending_heard(text, heard)
+        if self.config.get("log_details"):
+            self.log(f"    конец {'цел' if whole else 'обрезан, ещё раз длиннее'} (Whisper: «{heard.strip()}»)")
+        return whole
 
     # --- threads ----------------------------------------------------------------------------
 
@@ -329,7 +378,7 @@ class F5Speaker:
             line = self.lines.get()
             self.working = True
             if line is None:                 # shutdown: free the model and the GPU memory
-                self.onnx = None
+                self.onnx = self.checker = None
                 import gc
                 gc.collect()
                 return
