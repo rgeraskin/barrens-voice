@@ -1,5 +1,7 @@
 """Draws the addon icon: a golden speech bubble with sound waves on a dark arcane background.
-Writes addon/BarrensVoice/Icon.tga (64x64, what the game reads) and tools/icon_preview.png.
+Writes addon/BarrensVoice/Icon.tga (64x64, what the game reads), the launcher's window, tray and
+shortcut icon companion/bv/launcher/icon.ico (16-256 px), tools/icon_preview.png, and the smiley
+of the «Помощь» texts, addon/BarrensVoice/Media/smile.tga (the game's fonts have no emoji).
 Run: mise run icon"""
 import math
 from pathlib import Path
@@ -62,8 +64,26 @@ def main():
     icon = img.resize((64, 64), Image.LANCZOS)
     icon.save(ROOT / "addon" / "BarrensVoice" / "Icon.tga")
     img.resize((256, 256), Image.LANCZOS).save(ROOT / "tools" / "icon_preview.png")
+    # each size scaled from the large drawing (Pillow would scale the 256 one down itself, less sharply)
+    sizes = [16, 20, 24, 32, 40, 48, 64, 128, 256]
+    frames = [img.resize((n, n), Image.LANCZOS) for n in sizes]
+    frames[-1].save(ROOT / "companion" / "bv" / "launcher" / "icon.ico", sizes=[(n, n) for n in sizes],
+                    append_images=frames[:-1])
     print("ok")
 
 
+def smile():
+    """A small yellow smiley, drawn large and scaled down (32x32, as the game wants a power of two)."""
+    n = 256
+    img = Image.new("RGBA", (n, n), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    d.ellipse([8, 8, n - 8, n - 8], fill=(255, 204, 77, 255), outline=(120, 80, 10, 255), width=10)
+    for cx in (92, 164):                                   # the eyes
+        d.ellipse([cx - 14, 82, cx + 14, 124], fill=(70, 45, 10, 255))
+    d.arc([64, 84, 192, 196], start=25, end=155, fill=(70, 45, 10, 255), width=16)   # the smile
+    img.resize((32, 32), Image.LANCZOS).save(ROOT / "addon" / "BarrensVoice" / "Media" / "smile.tga", rle=False)
+
+
 if __name__ == "__main__":
+    smile()
     main()

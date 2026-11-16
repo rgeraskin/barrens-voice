@@ -75,31 +75,31 @@ local function SetAllShown(on)
     Refresh()
 end
 
---- Build the list into `pane` (a frame the size of the tab).
-function V.Create(pane)
+--- Build the list into `pane` (a frame the size of the tab), its texts `width` wide; returns the height
+--- of what is above the list (the list takes the rest of the pane).
+function V.Create(pane, width)
     window = pane
+    width = width or 536
+    local GAP = 14
 
-    local note = window:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    note:SetPoint("TOPLEFT", 18, -4)
-    note:SetPoint("RIGHT", -18, 0)
-    note:SetJustifyH("LEFT")
-    note:SetText("Голоса Windows звучат механически, заметно хуже голосов рас, а для разнообразия их нужно ставить "
+    local _, h = UI.Text(window, "GameFontHighlight", 22, 0, width,
+        "Голоса Windows звучат механически, заметно хуже голосов рас, а для разнообразия их нужно ставить "
         .. "отдельно (в Windows по умолчанию только Ирина). Они оставлены на всякий случай — если голоса рас отвечают "
         .. "с большой задержкой или не работают на вашем компьютере. Отмеченные раздаются игрокам (по имени и полу), "
         .. "«>» — послушать.")
+    local y = -h - GAP
 
     -- where to get more voices: the address to copy, and «Копировать» / «Открыть» (UI.LinkRow)
-    local example = window:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    example:SetPoint("TOPLEFT", 18, -62)
-    example:SetText("Скачать дополнительные голоса можно, например, здесь:")
-    local y = -78
+    local _, eh = UI.Text(window, "GameFontHighlight", 22, y, width, "Скачать дополнительные голоса можно, например, здесь:")
+    y = y - eh - 6
     for _, key in ipairs({ "rhvoice", "silero" }) do
         y = y - UI.LinkRow(window, 22, y, 580 - 44, key)
     end
+    y = y + 4 - GAP                                   -- the last row's air, then the gap
 
     filter = CreateFrame("EditBox", nil, window, "InputBoxTemplate")
     filter:SetHeight(20)
-    filter:SetPoint("TOPLEFT", 24, -140)
+    filter:SetPoint("TOPLEFT", 24, y)
     filter:SetWidth(170)
     filter:SetAutoFocus(false)
     local placeholder = filter:CreateFontString(nil, "OVERLAY", "GameFontDisable")
@@ -121,19 +121,21 @@ function V.Create(pane)
     allOff:SetPoint("LEFT", allOn, "RIGHT", 4, 0)
 
     local box = UI.Box(window)
-    box:SetPoint("TOPLEFT", 14, -168)
+    box:SetPoint("TOPLEFT", 14, y - 28)
     box:SetPoint("BOTTOMRIGHT", -14, 30)
     local scroll = CreateFrame("ScrollFrame", nil, box, "UIPanelScrollFrameTemplate")
     scroll:SetPoint("TOPLEFT", 8, -8)
     scroll:SetPoint("BOTTOMRIGHT", -28, 8)
     content = CreateFrame("Frame", nil, scroll)
-    content:SetSize(320, 10)
+    content:SetSize(516, 10)                    -- the scroll area's width (580 - 2 * 14 - 8 - 28); kept in step below
     scroll:SetScrollChild(content)
+    scroll:SetScript("OnSizeChanged", function(_, w) if w and w > 0 then content:SetWidth(w) end end)
 
     for i = 1, #List() do
         local row = CreateFrame("Frame", nil, content)
-        row:SetSize(330, ROW)
+        row:SetHeight(ROW)
         row:SetPoint("TOPLEFT", 0, -(i - 1) * ROW)
+        row:SetPoint("RIGHT", content, "RIGHT", -6, 0)   -- sex and «>» at the right edge, by the scroll bar
         row.check = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
         row.check:SetSize(22, 22)
         row.check:SetPoint("LEFT", 0, 0)
@@ -161,6 +163,7 @@ function V.Create(pane)
     empty:SetText("Список пуст: запустите приложение-компаньон (оно запишет голоса в аддон) и сделайте /reload.")
 
     window:SetScript("OnShow", Refresh)
+    return -(y - 28)
 end
 
 

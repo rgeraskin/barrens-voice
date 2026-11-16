@@ -10,7 +10,7 @@ Tools come from mise: `.mise.toml` pins Python, uv and LuaJIT, points uv at mise
 
 - `mise run test` — every test: Python (numpy, pymorphy3, num2words installed, so nothing is skipped) and Lua
 - `mise run test-py` / `mise run test-lua` — one side only; a single Python test: `mise exec -- uv run --locked python -m unittest discover -s companion/tests -k NumberAgreement`
-- `mise run icon` — regenerate `addon/BarrensVoice/Icon.tga` (and `tools/icon_preview.png`) from `tools/make_icon.py`
+- `mise run icon` — regenerate `addon/BarrensVoice/Icon.tga`, the launcher's `companion/bv/launcher/icon.ico` (and `tools/icon_preview.png`) from `tools/make_icon.py`
 - `mise run voices-table` — regenerate `companion/bv/game_voices.json` (FileDataIDs of each race voice's lines) from the community listfile (`tools/game_voices.py`, cached in `tools/.cache/`)
 - The Lua tests `loadfile` the addon's files by relative path, so `test-lua` runs in `addon/BarrensVoice`; `test_protocol.py` runs the addon's `Protocol.lua` encoder with `luajit`.
 - The companion runs only on Windows (`companion/BarrensVoice.cmd` makes `.venv`, installs `requirements.txt` and swaps RUAccent's `onnxruntime` for `onnxruntime-directml`, runs `python -m bv`; `--selftest` / `--selftest-f5` render test audio to files). Development happens on macOS; testing is on a Windows machine with the game, over SSH: copy `addon/BarrensVoice/*` (except `VoiceList.lua`, which the companion writes) into the client's `Interface\AddOns\BarrensVoice\` and `companion/bv/*.py` into the program's folder; the addon picks changes up on `/reload`, the program on restart. Screen capture can only be tested in the user's desktop session, never from SSH. Never launch or kill the game while someone plays.

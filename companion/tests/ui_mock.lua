@@ -5,6 +5,10 @@ local function widget()
         if k == "GetText" then return function(self) return self._text end end
         if k == "SetText" then return function(self, v) self._text = v or "" end end
         if k == "GetHeight" or k == "GetWidth" or k == "GetStringWidth" then return function() return 100 end end
+        if k == "GetStringHeight" then return function(self)
+            local _, breaks = tostring(self._text):gsub("\n", "")
+            return 14 * (breaks + 1)
+        end end
         if k == "GetChecked" then return function(self) return self._checked end end
         if k == "SetChecked" then return function(self, v) self._checked = v end end
         if k == "IsShown" then return function(self) return self._shown end end

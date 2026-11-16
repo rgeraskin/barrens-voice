@@ -28,7 +28,7 @@ run = [
 ]
 
 [tasks.icon]
-description = "Redraw addon/BarrensVoice/Icon.tga and tools/icon_preview.png"
+description = "Redraw the addon icon (Icon.tga), the launcher icon (icon.ico) and tools/icon_preview.png"
 run = "uv run --locked python tools/make_icon.py"
 
 [tasks.voices-table]

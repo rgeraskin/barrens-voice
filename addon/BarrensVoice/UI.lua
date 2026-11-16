@@ -37,6 +37,17 @@ function UI.Window(name, title, width, height, strata)
     return w
 end
 
+--- A block of text `width` wide from (x, y), wrapped; returns it and its height - so what comes below
+--- starts under its last line, however many lines the text took (FontString:GetStringHeight).
+function UI.Text(parent, font, x, y, width, text)
+    local s = parent:CreateFontString(nil, "OVERLAY", font)
+    s:SetPoint("TOPLEFT", x, y)
+    s:SetWidth(width)
+    s:SetJustifyH("LEFT")
+    s:SetText(text)
+    return s, s:GetStringHeight() or 12
+end
+
 --- A section title in gold with a thin rule to the right edge; returns the y below it.
 function UI.Header(parent, text, y)
     local label = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -108,10 +119,10 @@ function UI.LinkRow(parent, x, y, width, key, icon)
     name:SetText(link[1])
     local open = UI.Button(parent, "Открыть", 76, function() ns.OpenLink(key) end)
     open:SetPoint("TOPLEFT", x + width - 76, y)
-    UI.Tooltip(open, "Компаньон откроет страницу в браузере (сам аддон этого не может).")
+    UI.Tooltip(open, "Компаньон откроет страницу в браузере: аддону игра браузер не даёт.")
     local copy = UI.Button(parent, "Копировать", 96, function() ns.CopyLink(key) end)
     copy:SetPoint("RIGHT", open, "LEFT", -4, 0)
-    UI.Tooltip(copy, "Компаньон положит адрес в буфер обмена. Без компаньона — щёлкните по адресу и нажмите Ctrl+C.")
+    UI.Tooltip(copy, "Компаньон положит адрес в буфер обмена: аддону игра буфер обмена не даёт. Без компаньона — щёлкните по адресу и нажмите Ctrl+C.")
     local box = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
     box:SetHeight(20)
     box:SetAutoFocus(false)
@@ -126,6 +137,7 @@ function UI.LinkRow(parent, x, y, width, key, icon)
     box:SetScript("OnMouseUp", function(self) self:SetFocus(); self:HighlightText() end)
     box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
     box:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+    UI.Tooltip(box, "Щелчок выделяет адрес, Ctrl+C копирует.")
     return 26
 end
 

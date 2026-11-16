@@ -64,6 +64,8 @@ O.ChannelLabel = ChannelLabel
 
 local LEFT, RIGHT_COL, SUB = 18, 300, 26    -- the grid of every tab
 local CHROME = 40                             -- the window's height beyond a tab's own: the title bar and the edge
+local TOP, GAP = -14, 14                      -- the first text under the title bar; between a tab's blocks
+local TEXT_W = 580 - 2 * LEFT - 8             -- the width of a tab's texts
 
 local window, toggle, verb, lastNames, programState
 local fadeSubs = {}   -- its sub-options: grey while the chat is not hidden
@@ -78,8 +80,8 @@ local TABS = {
     { "reading", "Каналы и чтение", "Какие каналы и строки читать вслух и как произносить имена." },
     { "voices", "Голоса", "Чем читать: голоса рас или голоса Windows, и какие голоса Windows раздавать игрокам." },
     { "dictionary", "Словарь", "Как читать сленг и сокращения: WTS = продам, дд = дамагер, ОП = Огненная пропасть." },
-    { "help", "Помощь", "Ошибки, улучшения, предложения или что-то прочитано неправильно — пишите в Discord или "
-        .. "Telegram, или сразу заведите issue на GitHub." },
+    { "help", "Помощь", "Ошибки, улучшения, предложения, или что-то прочитано неправильно — пишите в Discord или Telegram.\n\n"
+        .. "Или сразу заведите issue на GitHub |TInterface\\AddOns\\BarrensVoice\\Media\\smile:14:14|t" },
 }
 
 local function Refresh()
@@ -137,12 +139,8 @@ end
 
 --- A line at the top of a tab on what is on it; returns the y the tab's content starts at.
 local function Describe(tab, text)
-    local line = tab:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    line:SetPoint("TOPLEFT", LEFT + 4, -8)
-    line:SetPoint("RIGHT", -LEFT, 0)
-    line:SetJustifyH("LEFT")
-    line:SetText(text)
-    return -30
+    local _, height = UI.Text(tab, "GameFontDisable", LEFT + 4, TOP, TEXT_W, text)
+    return TOP - height - GAP
 end
 
 -- "Общее": the main switch, trying the voices, whether the companion runs, speed and volume, the chat
@@ -221,7 +219,6 @@ local function BuildGeneral(tab, description)
         "Скорость чтения для всех голосов, от 40 до 160 %.")
     Slider("volume", "Громкость", 0, 200, 5,
         "Громкость озвучки, от 0 до 200 %: действует со следующей строки.")
-    y = y - 8
 
     y = UI.Header(tab, "Окно чата", y)
     get, set = Setting("fadeChat", function() if ns.ChatFade then ns.ChatFade.Apply() end Refresh() end)
@@ -238,7 +235,7 @@ local function BuildGeneral(tab, description)
         checks[#checks + 1] = c
         fadeSubs[#fadeSubs + 1] = c
     end
-    y = y - 58
+    y = y - 54
 
     -- "Мост к компаньону": folded, as it is needed rarely - when another addon covers the line.
     y = UI.Header(tab, "Дополнительно", y)
@@ -306,7 +303,7 @@ local function BuildReading(tab, description)
             .. "Без этих аддонов ничего не меняет.", get, set)
         row = row + 1
     end
-    y = y - 24 * row - 4
+    y = y - 24 * row - 6
 
     y = UI.Header(tab, "Каналы", y)
     for i, item in ipairs(CHANNELS) do
@@ -359,29 +356,28 @@ local function BuildVoices(tab, description)
         .. "их нужно искать и ставить отдельно: в Windows по умолчанию только Ирина. Оставлены на всякий случай — если голоса "
         .. "рас отвечают с большой задержкой или не работают на вашем компьютере. Какие раздавать — список ниже.", 190)
     local pane = CreateFrame("Frame", nil, tab)
-    pane:SetPoint("TOPLEFT", 0, y - 30)
+    pane:SetPoint("TOPLEFT", 0, y - 22 - GAP)
     pane:SetPoint("BOTTOMRIGHT", 0, 0)
-    ns.VoicesWindow.Create(pane)
-    return 570
+    -- the texts and links above the list, then the list at least LIST high
+    local LIST = 320
+    return -(y - 22 - GAP) + ns.VoicesWindow.Create(pane, TEXT_W) + LIST
 end
 
 -- "Помощь": where to write about bugs, ideas and words read wrong.
 local MEDIA = "Interface\\AddOns\\BarrensVoice\\Media\\"
 local function BuildHelp(tab, description)
+    -- three blocks a GAP apart, and the window ending a GAP under the last: the description, the
+    -- links, what to send
     local y = Describe(tab, description)
-    for _, item in ipairs({ { "discord", "discord" }, { "telegram", "telegram" }, { "github", "github" } }) do
-        y = y - UI.LinkRow(tab, LEFT, y, 580 - 2 * LEFT - 4, item[1], MEDIA .. item[2])
+    for i, item in ipairs({ "discord", "telegram", "github" }) do
+        local h = UI.LinkRow(tab, LEFT, y, 580 - 2 * LEFT - 4, item, MEDIA .. item)
+        y = y - (i < 3 and h or 22)                 -- the last row: its buttons' height, not the row's air
     end
-    y = y - 8
-    local note = tab:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    note:SetPoint("TOPLEFT", LEFT + 4, y)
-    note:SetPoint("RIGHT", -LEFT, 0)
-    note:SetJustifyH("LEFT")
-    note:SetText("Что прислать: что прозвучало и как надо, а лучше — строку из журнала компаньона (папка logs рядом с ним). "
-        .. "Неверное ударение можно сразу поправить себе на вкладке «Словарь».\n\n"
-        .. "Адрес можно выделить щелчком и скопировать (Ctrl+C). «Копировать» и «Открыть» выполняет компаньон: "
-        .. "аддону игра не даёт ни браузер, ни буфер обмена.")
-    return -(y - 90)
+    y = y - GAP
+    local _, height = UI.Text(tab, "GameFontHighlight", LEFT + 4, y, TEXT_W,
+        "Что прислать: что прозвучало и как надо, а лучше — строку из журнала компаньона (кнопка «Журнал» "
+        .. "в окне Barrens Voice). Неверное ударение можно сразу поправить себе на вкладке «Словарь».")
+    return -(y - height - (GAP - 8))                -- the tab is 8 px taller than its height (CHROME)
 end
 
 -- "Словарь": the editor (DictionaryWindow.lua).
