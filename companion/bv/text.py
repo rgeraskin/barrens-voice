@@ -2,8 +2,10 @@
 and stress marks in the form each engine takes."""
 from __future__ import annotations
 
+import os
 import re
 import threading
+from pathlib import Path
 
 STRESS = re.compile(r"\+([аеёиоуыэюяАЕЁИОУЫЭЮЯ])")
 WORD = re.compile(r"[\w+]+")
@@ -274,8 +276,36 @@ def numbers_to_words(text: str) -> str:
     return "".join(out)
 
 
+def ruaccent_dir() -> Path:
+    """Where RUAccent keeps its dictionary and models: in the model cache (HF_HOME, set by main), not in
+    its own package folder - its default, which a new Python environment (an update, the installer)
+    starts without, and then RUAccent asks the hub even with the cache marked complete (offline)."""
+    return Path(os.environ.get("HF_HOME") or Path.home() / ".cache" / "huggingface") / "ruaccent"
+
+
+def keep_koziev(package: str | None, before: bool) -> None:
+    """RUAccent puts one model, `koziev`, into its own package folder whatever `workdir` says: a new
+    environment lacks it and RUAccent goes online for it. So a copy lives in `ruaccent_dir` too:
+    put back into the package before loading, saved from it after."""
+    import shutil
+    if package is None:
+        import importlib.util
+        spec = importlib.util.find_spec("ruaccent")
+        if spec is None or not spec.origin:
+            return
+        package = str(Path(spec.origin).parent)
+    inside, kept = Path(package) / "koziev", ruaccent_dir() / "koziev"
+    try:
+        if before and not inside.exists() and kept.is_dir():
+            shutil.copytree(kept, inside)
+        elif not before and inside.is_dir() and not kept.exists():
+            shutil.copytree(inside, kept)
+    except OSError:
+        pass                                        # RUAccent goes online for it, as before
+
+
 class Accentor:
-    """RUAccent, loaded on first use (about 10 s; the models are cached by Hugging Face)."""
+    """RUAccent, loaded on first use (about 10 s; its files in `ruaccent_dir`)."""
 
     def __init__(self, log, enabled: bool = True):
         self.log, self.enabled, self.model = log, enabled, None
@@ -296,7 +326,9 @@ class Accentor:
             self.enabled = False
             return
         model = RUAccent()
-        model.load(omograph_model_size="turbo3.1", use_dictionary=True, tiny_mode=False)
+        keep_koziev(model.module_path if hasattr(model, "module_path") else None, before=True)
+        model.load(omograph_model_size="turbo3.1", use_dictionary=True, tiny_mode=False, workdir=str(ruaccent_dir()))
+        keep_koziev(getattr(model, "module_path", None), before=False)
         # This ruaccent does not feed token_type_ids, which its downloaded ONNX models want: zeros.
         for part in vars(model).values():
             session = getattr(part, "session", None)

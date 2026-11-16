@@ -963,6 +963,23 @@ class StderrLog(unittest.TestCase):
                 m.LOG_DIR, m._log_file, m._log_day = old_dir, old_file, old_day
 
 
+class RuaccentFiles(unittest.TestCase):
+    def test_koziev_kept_in_the_cache(self):
+        import os
+        from unittest import mock
+        from bv.text import keep_koziev
+        with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {"HF_HOME": str(Path(d) / "hf")}):
+            package = Path(d) / "site" / "ruaccent"
+            (package / "koziev").mkdir(parents=True)
+            (package / "koziev" / "m.bin").write_bytes(b"x")
+            keep_koziev(str(package), before=False)                     # saved from the package after a load
+            self.assertTrue((Path(d) / "hf" / "ruaccent" / "koziev" / "m.bin").exists())
+            fresh = Path(d) / "new-env" / "ruaccent"
+            fresh.mkdir(parents=True)
+            keep_koziev(str(fresh), before=True)                        # a new environment gets it back
+            self.assertTrue((fresh / "koziev" / "m.bin").exists())
+
+
 class AddonMissing(unittest.TestCase):
     def test_stops_without_the_addon(self):
         import tempfile
