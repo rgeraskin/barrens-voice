@@ -16,9 +16,9 @@ from datetime import datetime
 from pathlib import Path
 
 from . import protocol
+from .paths import CACHE_DIR, DATA_DIR      # the data's folder, apart from the code's (bv/paths.py)
 
-APP_DIR = Path(__file__).resolve().parent.parent
-CONFIG_PATH = APP_DIR / "config.json"
+CONFIG_PATH = DATA_DIR / "config.json"
 DEFAULT_CONFIG = {
     "_help": "rate -10..10, volume 0..100. exclude: voices left out (part of the name). "
              "gender_overrides: voices whose gender SAPI does not know. players: {\"Name\": \"part of a voice name\"}. "
@@ -81,7 +81,7 @@ LABELS = {"party": "группа", "raid": "рейд", "warning": "объявл�
           "notice": "программа"}
 
 
-LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
+LOG_DIR = DATA_DIR / "logs"
 _log_file = None
 _log_day = None
 
@@ -176,10 +176,10 @@ def load_config() -> dict:
     return config
 
 
-MODELS_READY = APP_DIR / ".models_ready"
+MODELS_READY = DATA_DIR / ".models_ready"
 # the launcher (bv.launcher): what the companion does, and its word to stop
-STATE_FILE = APP_DIR / "tmp" / "state.json"
-STOP_FILE = APP_DIR / "tmp" / "stop"
+STATE_FILE = DATA_DIR / "tmp" / "state.json"
+STOP_FILE = DATA_DIR / "tmp" / "stop"
 RESTART = 3               # exit code: start me again (online) - the launcher does it
 ALREADY = 4               # exit code: another companion runs
 LAUNCHED = "BV_LAUNCHER"  # set in the environment of a companion the launcher started
@@ -254,7 +254,7 @@ def fetch_models(config: dict) -> int:
     from .text import Accentor
     try:
         log("модели: голоса рас (~0,8 ГБ) ...")
-        if f5engine.model_dir(config, APP_DIR) is None:
+        if f5engine.model_dir(config, DATA_DIR) is None:
             f5engine.fetch_models(config, log)
         hf_hub_download(f5engine.MODEL_REPO, f5engine.VOCAB_FILE)
         log("модели: распознавание речи для банка голосов (~1,5 ГБ) ...")
@@ -289,7 +289,7 @@ def main() -> int:
             config["game"] = game
     # one Hugging Face cache for every model (F5, Vocos, RUAccent, Whisper): hf_home in config.json,
     # else the hf folder next to the program - before anything of Hugging Face is imported
-    os.environ["HF_HOME"] = config.get("hf_home") or str(APP_DIR / "hf")
+    os.environ["HF_HOME"] = config.get("hf_home") or str(CACHE_DIR / "hf")
     # transformers (Whisper's features and tokenizer, RUAccent) says at import that it found no
     # PyTorch - on purpose since 0.4.0: only its errors are worth the log
     os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
@@ -303,7 +303,7 @@ def main() -> int:
         return 0
     if "--selftest-f5" in sys.argv:
         from .f5engine import selftest as f5_selftest
-        return f5_selftest(config, log, APP_DIR)
+        return f5_selftest(config, log, DATA_DIR)
     if "--fetch-models" in sys.argv:
         return fetch_models(config)
     log("=" * 60)
@@ -334,13 +334,13 @@ def main() -> int:
     beat.start()
     import atexit
     atexit.register(beat.stop)        # any end - the game closed, a crash, the launcher's stop - but a kill
-    seen_lines = SeenLines(APP_DIR / "tmp" / "seen_lines.txt")
+    seen_lines = SeenLines(DATA_DIR / "tmp" / "seen_lines.txt")
     # --launch / --no-launch: the launcher's Play and its start for a game already running
     want_launch = "--launch" in sys.argv or (config["launch_wow"] and "--no-launch" not in sys.argv)
     if want_launch and not launch.wow_running():
         # the race voices come from the client's files: (re)made before the game, after an update
         from .f5engine import prepare_voices
-        prepare_voices(config, APP_DIR, log)
+        prepare_voices(config, DATA_DIR, log)
         launch.launch(config, log)   # the game starts while the voices load
     from .dictionary import Dictionary
     dictionary = Dictionary(config, log, find_addon(config))
@@ -365,7 +365,7 @@ def main() -> int:
     inflector = Inflector(log, config.get("declension", True))
     inflector.load()
     from .audio import Player
-    player = Player(config["max_queue"], APP_DIR / "tmp", log=log)
+    player = Player(config["max_queue"], DATA_DIR / "tmp", log=log)
     player.start()
     sapi = Speaker(config, log, accentor, player)
     sapi.start()
@@ -374,7 +374,7 @@ def main() -> int:
     from . import voicelist
     voicelist.write(config, sapi.all_voices, sapi.default_off, log)
     from .engines import Engines
-    engines = Engines(config, log, APP_DIR, sapi, accentor, player)
+    engines = Engines(config, log, DATA_DIR, sapi, accentor, player)
     engines.on_ready = lambda: MODELS_READY.touch()
     engines.on_error = (lambda error: restart_online(log)) if offline else None
     # The race voices load while the game starts, not when its first chat line comes - unless the

@@ -76,6 +76,30 @@ class Games(unittest.TestCase):
                                     "VoiceList.lua"])                          # the old version's own gone
 
 
+class Paths(unittest.TestCase):
+    """The installer's starter sets BV_DATA, BV_CACHE and BV_STARTER; without them, the companion's folder."""
+
+    def run_paths(self, env):
+        import os
+        import subprocess
+        import sys
+        code = ("from bv import paths; print(paths.CODE_DIR); print(paths.DATA_DIR); print(paths.CACHE_DIR); "
+                "print(paths.starter())")
+        clean = {k: v for k, v in os.environ.items() if not k.startswith("BV_")}
+        out = subprocess.run([sys.executable, "-c", code], env={**clean, **env}, capture_output=True, text=True,
+                             cwd=Path(__file__).resolve().parents[1], check=True).stdout.splitlines()
+        return [Path(x) for x in out[:3]] + [out[3]]
+
+    def test_installed_and_not(self):
+        code, data, cache, start = self.run_paths({})
+        self.assertEqual((data, cache), (code, code))                   # as before the installer
+        self.assertTrue(start.endswith('BarrensVoice.pyw"'))
+        with tempfile.TemporaryDirectory() as d:
+            code, data, cache, start = self.run_paths({"BV_DATA": f"{d}/data", "BV_CACHE": f"{d}/cache",
+                                                       "BV_STARTER": '"py" "start.pyw"'})
+            self.assertEqual((data, cache, start), (Path(d) / "data", Path(d) / "cache", '"py" "start.pyw"'))
+
+
 class Config(unittest.TestCase):
     def test_update_keeps_the_rest(self):
         from bv.launcher.model import read_config, update_config

@@ -23,6 +23,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox
 
 from . import model
+from ..paths import DATA_DIR
 from .model import APP_DIR, GAME_NAMES
 from .paint import DIM, GOLD, PARCHMENT, Painter, ScaledCanvas, register_font, window_icon
 from ..logs import parse
@@ -34,8 +35,8 @@ LX0, LX1, RX0, RX1 = 22, 462, 478, W - 22       # left column (state, log), righ
 TOP, GAP, ROW1 = 100, 14, 140                   # State and Start: one height
 MAIN_LEVELS = ("INFO", "WARN", "ERROR")          # the main window's log: how things go, not every detail
 MAIN_COLORS = {"WARN": "#e0b33a", "ERROR": "#ff6a5a"}
-SHOW_FILE = APP_DIR / "tmp" / "launcher.show"   # a second launcher asks the first to show itself
-LAUNCHER_LOG = APP_DIR / "logs" / "launcher.log"
+SHOW_FILE = DATA_DIR / "tmp" / "launcher.show"   # a second launcher asks the first to show itself
+LAUNCHER_LOG = DATA_DIR / "logs" / "launcher.log"
 TICK_MS = 400
 UPDATE_EVERY = 6 * 3600
 
@@ -256,7 +257,7 @@ class App:
             self.log_window.lift()
             return
         from .logwindow import LogWindow
-        self.log_window = LogWindow(self.root, self.lines, self.scale, APP_DIR / "logs",
+        self.log_window = LogWindow(self.root, self.lines, self.scale, DATA_DIR / "logs",
                                     on_close=lambda: setattr(self, "log_window", None), header=self.report_header)
 
     def report_header(self) -> str:

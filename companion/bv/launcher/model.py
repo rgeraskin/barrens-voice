@@ -13,8 +13,9 @@ from pathlib import Path
 
 from ..dictionary import GAMES, wow_roots
 
-APP_DIR = Path(__file__).resolve().parents[2]          # the companion's folder: bv/, config.json, logs/
-CONFIG_PATH = APP_DIR / "config.json"
+from ..paths import CODE_DIR, DATA_DIR, starter
+APP_DIR = CODE_DIR                                       # the companion's folder: bv/, the addon beside it
+CONFIG_PATH = DATA_DIR / "config.json"
 REPO = "rgeraskin/barrens-voice"
 GAME_NAMES = {"forever": "WoW Forever", "retail": "WoW Retail"}
 ADDON = "BarrensVoice"
@@ -304,10 +305,10 @@ def parse_args(argv: list[str]) -> dict:
 
 # --- starting with Windows ----------------------------------------------------------------------
 
-def launcher_command(app_dir: Path = APP_DIR) -> str:
-    """How Windows starts the launcher at sign-in: quietly into the tray."""
-    pythonw = Path(sys.executable).with_name("pythonw.exe")
-    return f'"{pythonw}" "{app_dir / "BarrensVoice.pyw"}" --tray'
+def launcher_command() -> str:
+    """How Windows starts the launcher at sign-in: quietly into the tray (the installed starter, so a
+    later version starts, not this one)."""
+    return f"{starter()} --tray"
 
 
 def autostart() -> bool:
