@@ -42,3 +42,7 @@ run = "uv run --locked python tools/release.py"
 [tasks.sign]
 description = "Sign dist/manifest.json (tools/sign.py): BV_SIGNING_KEY or ~/.config/barrens-voice/release-signing.key"
 run = "uv run --locked python tools/sign.py sign"
+
+[tasks.installer]
+description = "Windows: release archive, uv.exe and dist/BarrensVoice-Setup-<version>.exe (tools/installer.py, Inno Setup 6)"
+run = "uv run --locked python tools/installer.py"

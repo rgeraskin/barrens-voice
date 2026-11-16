@@ -1,0 +1,13 @@
+# Every step is a mise task, run the same way locally (docs/update-strategy.md).
+name: CI
+on:
+  push:
+    branches: [master]
+  pull_request:
+jobs:
+  test:
+    runs-on: windows-latest          # the companion is Windows-only; standard runners are free for public repos
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+      - run: mise run test

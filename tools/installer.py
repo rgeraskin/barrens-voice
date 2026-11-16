@@ -1,0 +1,58 @@
+"""Build the installer (`mise run installer`, Windows): dist/BarrensVoice-Setup-<version>.exe.
+
+Takes uv.exe of UV_VERSION from its GitHub release (checked against the release's own SHA-256), the
+release archive from tools/release.py, and compiles installer/BarrensVoice.iss with Inno Setup 6
+(ISCC.exe: on GitHub's Windows runners it is preinstalled; locally - installed, or INNO_ISCC).
+"""
+from __future__ import annotations
+
+import hashlib
+import io
+import os
+import subprocess
+import sys
+import urllib.request
+import zipfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+DIST = ROOT / "dist"
+UV_VERSION = "0.13.7"           # the uv the installer ships; the updates use it too
+UV_ZIP = f"https://github.com/astral-sh/uv/releases/download/{UV_VERSION}/uv-x86_64-pc-windows-msvc.zip"
+ISCC = [os.environ.get("INNO_ISCC", ""), r"C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+        str(Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Inno Setup 6" / "ISCC.exe")]
+
+
+def fetch(url: str) -> bytes:
+    with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "barrens-voice-build"}), timeout=60) as r:  # noqa: S310
+        return r.read()
+
+
+def uv_exe() -> Path:
+    target = DIST / "uv.exe"
+    data = fetch(UV_ZIP)
+    expected = fetch(UV_ZIP + ".sha256").decode().split()[0]
+    if hashlib.sha256(data).hexdigest() != expected:
+        sys.exit("uv: the archive does not match its published SHA-256")
+    with zipfile.ZipFile(io.BytesIO(data)) as z:
+        target.write_bytes(z.read("uv.exe"))
+    print(f"uv {UV_VERSION}: {target.stat().st_size / 1e6:.1f} MB")
+    return target
+
+
+def main() -> int:
+    sys.path.insert(0, str(ROOT / "tools"))
+    import release
+    archive = release.build()
+    version = archive.stem.removeprefix("barrens-voice-")
+    uv_exe()
+    iscc = next((p for p in ISCC if p and Path(p).is_file()), None)
+    if iscc is None:
+        sys.exit("Inno Setup 6 (ISCC.exe) not found: install it or set INNO_ISCC")
+    subprocess.run([iscc, f"/DAppVersion={version}", str(ROOT / "installer" / "BarrensVoice.iss")], check=True)
+    print(f"dist/BarrensVoice-Setup-{version}.exe")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import sys
 import tomllib
@@ -43,8 +44,18 @@ def versions() -> dict:
             "protocol": int(proto.group(1))}
 
 
+def notes(version: str) -> str:
+    """The release's notes: its CHANGELOG.md section (## <version>, «(в работе)» and all)."""
+    text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    m = re.search(rf"^## {re.escape(version)}\b[^\n]*\n(.*?)(?=^## |\Z)", text, re.M | re.S)
+    return (m.group(1).strip() if m else "") + "\n\nУстановка: скачайте `BarrensVoice-Setup-*.exe` и запустите его.\n"
+
+
 def build() -> Path:
     info = versions()
+    tag = os.environ.get("RELEASE_TAG", "")
+    if tag and tag.lstrip("v").split("-")[0] != info["version"]:
+        sys.exit(f"the tag {tag} and pyproject.toml's version {info['version']} differ")
     DIST.mkdir(exist_ok=True)
     archive = DIST / f"barrens-voice-{info['version']}.zip"
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as z:
@@ -55,6 +66,7 @@ def build() -> Path:
     data = archive.read_bytes()
     manifest = {**info, "archive": archive.name, "size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
     (DIST / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (DIST / "notes.md").write_text(notes(info["version"]), encoding="utf-8")
     print(f"{archive.name}: {len(data) / 1e6:.1f} MB; manifest: {manifest}")
     return archive
 

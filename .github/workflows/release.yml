@@ -1,0 +1,30 @@
+# A tag vX.Y.Z (vX.Y.Z-beta.N: a pre-release, the test channel) makes a GitHub release: the installer,
+# the archive the updater installs, and its signed manifest. Every step is a mise task.
+name: Release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: windows-latest          # Inno Setup 6 is preinstalled there
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+      - run: mise run test
+      - run: mise run installer      # dist/: archive, manifest.json, notes.md, uv.exe, BarrensVoice-Setup-<version>.exe
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+      - run: mise run sign           # dist/manifest.json.sig
+        env:
+          BV_SIGNING_KEY: ${{ secrets.BV_SIGNING_KEY }}
+      - name: GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          flags=""
+          case "$GITHUB_REF_NAME" in *-*) flags="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" $flags --title "Barrens Voice ${GITHUB_REF_NAME#v}" --notes-file dist/notes.md \
+            dist/BarrensVoice-Setup-*.exe dist/barrens-voice-*.zip dist/manifest.json dist/manifest.json.sig
