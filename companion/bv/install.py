@@ -79,8 +79,10 @@ def point_current(root: Path, version_dir: Path) -> None:
     elif current.exists():
         shutil.rmtree(current)
     if sys.platform == "win32":
-        import _winapi
-        _winapi.CreateJunction(str(version_dir), str(current))
+        # mklink /J: Windows' own way to make a junction, no administrator needed. (Junctions made in the
+        # desktop session do not open over ssh on the test machine - check an install from the desktop.)
+        subprocess.run(["cmd", "/c", "mklink", "/J", str(current), str(version_dir)], check=True,
+                       capture_output=True)
     else:
         current.symlink_to(version_dir, target_is_directory=True)
 
