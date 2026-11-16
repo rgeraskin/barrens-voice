@@ -337,6 +337,13 @@ class DictionaryInCompanion(unittest.TestCase):
         self.assertEqual(split_name("Лок\x05 смеётся"), ("Лок", " смеётся", False))
         self.assertEqual(split_name("привет"), ("", "привет", False))
         self.assertEqual(without_repeated_name("Лок\x05 смеётся", True), "Лок смеётся")   # an emote keeps it
+        from bv.protocol import with_name
+        from bv.text import plain
+        name, rest, _ = split_name("Лок пишет:\x04 привет")
+        self.assertEqual(with_name(name, plain(rest)), "Лок пишет: привет")      # plain strips the space
+        name, rest, _ = split_name("Лок\x05 смеётся")
+        self.assertEqual(with_name(name, plain(rest)), "Лок смеётся")            # not «Локсмеётся»
+        self.assertEqual(with_name("", "привет"), "привет")                      # the name dropped
 
 
 class PlayerStop(unittest.TestCase):

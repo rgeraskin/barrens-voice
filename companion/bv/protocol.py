@@ -190,6 +190,13 @@ def split_name(text: str) -> tuple[str, str, bool]:
     return "", text, False
 
 
+def with_name(name: str, text: str) -> str:
+    """The name the addon put before the line and the line, a space between («Вася пишет: привет»,
+    «Вася смеётся»): the line's own leading space goes on the way (text.plain strips it)."""
+    name, text = name.rstrip(), text.lstrip()
+    return f"{name} {text}" if name and text else name or text
+
+
 def without_repeated_name(text: str, continuing: bool) -> str:
     """The line to say: the name the addon put before it dropped when the same character goes on
     (their previous line still being said, or just said), else kept; the mark removed either way."""

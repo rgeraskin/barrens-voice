@@ -538,7 +538,7 @@ def main() -> int:
                         text = inflector.apply(text) if line.declension else strip_marks(text)
                         text = dictionary.apply(text, mark=line.declension)
                         text = inflector.apply(text) if line.declension else strip_marks(text)
-                        text = name + restore_yo(plain(text))     # «ждем» -> «ждём»; not the name
+                        text = protocol.with_name(name, restore_yo(plain(text)))   # «ждем» -> «ждём»; not the name
                         line = dataclasses.replace(line, text=text)
                         speaker = engines.for_line(line)
                         label = LABELS.get(line.kind, line.kind) + (f" {line.channel}" if line.channel else "")
