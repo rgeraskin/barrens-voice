@@ -1027,6 +1027,21 @@ class RuaccentFiles(unittest.TestCase):
             self.assertTrue((fresh / "koziev" / "m.bin").exists())
 
 
+class SavedFlag(unittest.TestCase):
+    def test_reads_the_addon_setting(self):
+        from bv.dictionary import saved_flag
+        with tempfile.TemporaryDirectory() as d:
+            saved = Path(d) / "_forever_" / "WTF" / "Account" / "X" / "SavedVariables"
+            saved.mkdir(parents=True)
+            config = {"game_dirs": {"forever": str(Path(d) / "_forever_")}}
+            self.assertIsNone(saved_flag(config, "fadeChat"))                      # no saved variables yet
+            (saved / "BarrensVoice.lua").write_text('BarrensVoiceDB = {\n["fadeChat"] = true,\n["enabled"] = false,\n}\n',
+                                                     encoding="utf-8")
+            self.assertTrue(saved_flag(config, "fadeChat"))
+            self.assertFalse(saved_flag(config, "enabled"))
+            self.assertIsNone(saved_flag(config, "nothing"))
+
+
 class LogLevels(unittest.TestCase):
     def test_levels(self):
         from bv.logs import level_of

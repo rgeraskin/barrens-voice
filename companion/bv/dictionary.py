@@ -103,6 +103,16 @@ def saved_voices(config: dict) -> str | None:
     return match.group(1) if match else None
 
 
+def saved_flag(config: dict, name: str) -> bool | None:
+    """An on/off setting of the addon (`fadeChat`, ...) as its saved variables keep it - as of the last
+    logout or /reload; None when there is none."""
+    path = find_saved(config)
+    if path is None:
+        return None
+    match = re.search(r'\["' + re.escape(name) + r'"\]\s*=\s*(true|false)', path.read_text(encoding="utf-8", errors="replace"))
+    return None if match is None else match.group(1) == "true"
+
+
 PLURAL = re.compile(r"(\d+)(\s*)\[([^\[\]|]+)\|([^\[\]|]+)\|([^\[\]|]+)\]")
 
 

@@ -107,6 +107,7 @@ class App:
         self.has_tray = self.tray.start()
         self.checked = {"game": 0.0, "games": 0.0, "update": 0.0}
         self.closed = False              # quit() ran: the window is destroyed
+        self.reload_told = False         # the /reload hint of this companion's run shown
 
         root.protocol("WM_DELETE_WINDOW", self.close)
         self.say(f"Barrens Voice {self.version}" + (", ждёт игру в трее" if resident else ""))
@@ -156,6 +157,7 @@ class App:
             self.config = model.update_config(game=self.selected)
         self.companion_game = self.selected
         self.exit_seen = False
+        self.reload_told = False
         launch_flags = {"--launch", "--no-launch"}
         extra = [a for a in self.extra if not (launch_flags & set(args or []) and a in launch_flags)]
         self.companion.start(extra + list(args or []))
@@ -374,6 +376,10 @@ class App:
         if now - self.checked["update"] > UPDATE_EVERY:
             self.checked["update"] = now
             threading.Thread(target=self._check_update, daemon=True, name="update-check").start()
+        if self.companion.running and not self.reload_told and self.companion.state().get("reload_hint"):
+            self.reload_told = True          # started after the player entered the world: say it outside the game too
+            self.tray.notify("Озвучка включена. Если окно чата не прячется — сделайте в игре /reload: аддон узнаёт "
+                             "о Barrens Voice при входе в игру и /reload.")
         if not self.exit_seen and not self.busy and not self.companion.running:
             self.companion_ended(self.companion.poll())
         # the game started from Battle.net while the companion is not running (waiting in the tray, or
