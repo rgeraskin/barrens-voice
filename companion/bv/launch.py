@@ -4,6 +4,8 @@ from __future__ import annotations
 import ctypes
 import os
 import subprocess
+import threading
+import time
 from ctypes import wintypes
 from pathlib import Path
 
@@ -117,7 +119,68 @@ def launch(config: dict, log) -> bool:
     from .dictionary import game_of
     product = (config.get("launch_product_retail", "WoW") if game_of(config) == "retail"
                else config.get("launch_product", "WoWF"))
-    subprocess.Popen([str(exe), f"--exec=launch {product}"], close_fds=True,
-                     creationflags=getattr(subprocess, "DETACHED_PROCESS", 0))
-    log(f"запускаю игру через Battle.net ({product}) ...")
+    command = [str(exe), f"--exec=launch {product}"]
+    cold = not battlenet_running()
+
+    def send() -> None:
+        subprocess.Popen(command, close_fds=True, creationflags=getattr(subprocess, "DETACHED_PROCESS", 0))
+    send()
+    log("запускаю игру через Battle.net ...")
+    log(f"    Battle.net: --exec=launch {product}")
+    if cold:          # Battle.net was not running: this first command only starts it (see follow_cold_start)
+        threading.Thread(target=follow_cold_start, args=(send, log), daemon=True, name="battlenet-cold").start()
     return True
+
+
+def battlenet_running() -> bool:
+    """Is Battle.net running? True when it cannot be told (off Windows): then nothing is sent again."""
+    try:
+        return "battle.net.exe" in process_names()
+    except (AttributeError, OSError):
+        return True
+
+
+def battlenet_window() -> bool:
+    """Is Battle.net's main window up (visible, titled «Battle.net»): logged in, it takes commands."""
+    try:
+        import win32gui
+        import win32process
+    except ImportError:
+        return False
+    found = []
+
+    def check(hwnd, _):
+        if win32gui.IsWindowVisible(hwnd) and win32gui.GetWindowText(hwnd) == "Battle.net":
+            _, pid = win32process.GetWindowThreadProcessId(hwnd)
+            found.append(pid)
+    try:
+        win32gui.EnumWindows(check, None)
+    except Exception:  # noqa: BLE001 - only a hint
+        return False
+    return bool(found)
+
+
+def follow_cold_start(send, log, game_running=None, ready=None, sleep=time.sleep, clock=time.monotonic,
+                      limit: float = 120.0) -> bool:
+    """Battle.net started by `--exec=launch` itself drops that command while it loads and logs in:
+    the window opens and the game does not start. So: wait for the game; once Battle.net's window is up
+    (or after a minute: it may start minimized to the tray) with no game, send the command once more -
+    only once: a command sent to a Battle.net that took the first one may start a second game. True
+    when the game came."""
+    game_running = game_running or wow_running
+    ready = ready or battlenet_window
+    start, resent = clock(), False
+    while clock() - start < limit:
+        if game_running():
+            return True
+        if not resent and (ready() or clock() - start > 60):
+            sleep(5)                       # the window is drawn a moment before it takes commands
+            if game_running():
+                return True
+            send()
+            resent = True
+            log("Battle.net только что запустился и пропустил команду — прошу запустить игру ещё раз")
+        sleep(1)
+    if not game_running():
+        log("Battle.net не запустил игру — нажмите «Играть» в нём")
+    return game_running()

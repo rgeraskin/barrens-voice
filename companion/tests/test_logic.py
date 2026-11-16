@@ -1098,6 +1098,39 @@ class GameChoice(unittest.TestCase):
             self.assertIn("--exec=launch WoWF", popen.call_args[0][0])
 
 
+class ColdBattlenet(unittest.TestCase):
+    """Battle.net started by the launch command drops it: sent once more when its window is up."""
+
+    def run_case(self, game_at=None, window_at=None):
+        from bv.launch import follow_cold_start
+        clock, sent, said = [0.0], [], []
+
+        def sleep(s):
+            clock[0] += s
+        ok = follow_cold_start(lambda: sent.append(clock[0]), said.append,
+                               game_running=lambda: game_at is not None and clock[0] >= game_at,
+                               ready=lambda: window_at is not None and clock[0] >= window_at,
+                               sleep=sleep, clock=lambda: clock[0])
+        return ok, sent, said
+
+    def test_resent_once_when_the_window_is_up(self):
+        ok, sent, said = self.run_case(game_at=40, window_at=20)
+        self.assertTrue(ok)
+        self.assertEqual(sent, [25.0])                         # 5 s after the window, once
+        self.assertIn("пропустил команду", said[0])
+
+    def test_game_came_by_itself(self):
+        ok, sent, _ = self.run_case(game_at=10, window_at=8)
+        self.assertTrue(ok)
+        self.assertEqual(sent, [])                             # it came during the 5 s wait: nothing sent
+
+    def test_no_window_a_minute_then_once(self):
+        ok, sent, said = self.run_case()
+        self.assertFalse(ok)
+        self.assertEqual(len(sent), 1)                         # never twice: a second game is worse
+        self.assertIn("не запустил игру", said[-1])
+
+
 class EndingHeard(unittest.TestCase):
     def test_cut_and_whole(self):
         from bv.f5engine import ending_heard
