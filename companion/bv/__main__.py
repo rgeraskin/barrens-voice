@@ -247,7 +247,10 @@ def main() -> int:
         return 1
     # "the companion is running", for the addon at login (status.py): from now on, before the game
     # is launched and while the models load
-    Beat(find_addon(config), log).start()
+    beat = Beat(find_addon(config), log)
+    beat.start()
+    import atexit
+    atexit.register(beat.stop)        # any end - the game closed, a crash, the launcher's stop - but a kill
     seen_lines = SeenLines(APP_DIR / "tmp" / "seen_lines.txt")
     if config["launch_wow"] and not launch.wow_running():
         # the race voices come from the client's files: (re)made before the game, after an update

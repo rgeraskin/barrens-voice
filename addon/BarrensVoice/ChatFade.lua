@@ -3,7 +3,9 @@
 -- the classic chat style it is always up and not inside the window) - stay transparent until
 -- the mouse is over them or the player types. A line the program does not read shows its window
 -- for REVEAL seconds: a system message, loot, a channel switched off, one's own line, an addon's
--- print - what is not heard must still be seen.
+-- print - what is not heard must still be seen. Only while the companion was running at login (or
+-- the last /reload): hidden and not read aloud, a line would be lost - a companion started later
+-- makes the chat transparent at the next /reload.
 --
 -- Transparency is SetAlpha on the chat frames and on the dock (GENERAL_CHAT_DOCK): the game sets
 -- the alpha of their textures, tabs and buttons, never of the frames themselves, so nothing fights
@@ -189,10 +191,15 @@ local function ShowAll()
     wipe(hiddenFor)
 end
 
---- Start or stop fading as the setting (and the addon's main switch) says.
+--- Was the companion reading the chat at login or the last /reload (Companion.lua)?
+function F.Voiced()
+    return not ns.Companion or ns.Companion.State() == "running"
+end
+
+--- Start or stop fading as the setting (and the addon's main switch) says - and the companion.
 function F.Apply()
     if not driver then return end
-    if ns.db.fadeChat and ns.db.enabled then
+    if ns.db.fadeChat and ns.db.enabled and F.Voiced() then
         driver:SetScript("OnUpdate", F.Update)
     else
         driver:SetScript("OnUpdate", nil)

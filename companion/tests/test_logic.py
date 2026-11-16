@@ -852,6 +852,9 @@ class CompanionStatus(unittest.TestCase):
             self.assertTrue(status.write(Path(d), now=1234567890))
             text = (Path(d) / status.FILE).read_text(encoding="utf-8")
             self.assertRegex(text, r"\nBarrensVoiceStatus = \{ beat = 1234567890 \}\n")
+            self.assertTrue(status.write(Path(d), now=1234567999, stopped=True))
+            self.assertIn("BarrensVoiceStatus = { beat = 0, stopped = 1234567999 }",
+                          (Path(d) / "CompanionStatus.lua").read_text(encoding="utf-8"))
             self.assertFalse((Path(d) / "CompanionStatus.tmp").exists())          # written whole, then swapped in
 
     def test_shipped_file_matches(self):

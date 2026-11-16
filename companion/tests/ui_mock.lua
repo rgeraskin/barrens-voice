@@ -509,16 +509,23 @@ assert(said[2]:find("приложение%-компаньон Barrens Voice не
 assert(Co.Describe():find("не был запущен"), Co.Describe())
 Co.Read({ beat = 1000 }, 1010)
 assert(Co.Describe():find("был запущен") and not Co.Describe():find("не был"), Co.Describe())
-Co.Read(nil, 1100)
--- not running at login: the transparent chat is hidden all the same (a companion started later reads it)
+Co.Read({ beat = 0, stopped = 1090 }, 1100)
+assert(Co.State() == "stopped", "the companion said it ended (a crash a moment ago): not running")
+-- not running at login: the transparent chat stays visible - hidden and not read, a line would be lost
 ns.db.fadeChat = true
 ChatFrame1:SetAlpha(1)
+ns.ChatFade.Apply()
 now = now + 20                               -- past the 10 s the last line not read showed the window for
+assert(not ns.ChatFade.Voiced())
+assert(ChatFrame1:GetAlpha() == 1, "no companion: the chat is not faded")
+Co.SayAtLogin()
+assert(said[#said]:find("Прозрачный чат пока выключен"), tostring(said[#said]))
+Co.Read({ beat = 1000 }, 1010)
+ns.ChatFade.Apply()
 for _ = 1, 10 do ns.ChatFade.Update(nil, 0.3) end
-assert(ChatFrame1:GetAlpha() == 0, "the setting decides, not a state that may be old")
+assert(ChatFrame1:GetAlpha() == 0, "running at login: faded")
 ns.db.fadeChat = false
 ns.ChatFade.Apply()
-Co.Read({ beat = 1000 }, 1010)
 print = realPrint
 print("companion ok")
 

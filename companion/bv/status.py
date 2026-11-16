@@ -22,13 +22,17 @@ EVERY = 15.0                      # seconds between writes (the addon's Companio
 FILE = "CompanionStatus.lua"
 
 
-def write(addon: Path, now: float | None = None) -> bool:
-    """The status file with the time now (epoch seconds, as the game's time()); False if it failed."""
+def write(addon: Path, now: float | None = None, stopped: bool = False) -> bool:
+    """The status file with the time now (epoch seconds, as the game's time()); False if it failed.
+    `stopped`: the companion has ended - beat 0, so an addon loading now does not take a beat from
+    the last seconds for a running companion (it would say «озвучка чата работает» and fade the chat
+    that nobody reads aloud)."""
     now = int(time.time() if now is None else now)
     path = Path(addon) / FILE
-    text = ("-- Written by the Barrens Voice companion app every 15 seconds while it runs; the addon reads it\n"
-            "-- at login and /reload (Companion.lua).\n"
-            f"BarrensVoiceStatus = {{ beat = {now} }}\n")
+    body = f"{{ beat = 0, stopped = {now} }}" if stopped else f"{{ beat = {now} }}"
+    text = ("-- Written by the Barrens Voice companion app every 15 seconds while it runs, and once when it\n"
+            "-- ends; the addon reads it at login and /reload (Companion.lua).\n"
+            f"BarrensVoiceStatus = {body}\n")
     tmp = path.with_suffix(".tmp")
     try:
         tmp.write_text(text, encoding="utf-8")
@@ -56,7 +60,10 @@ class Beat(threading.Thread):
                 return
 
     def stop(self) -> None:
+        """No more beats, and the file says the companion has ended (at exit, after a crash too)."""
         self.stopped.set()
+        if self.addon is not None:
+            write(self.addon, stopped=True)
 
 
 class SeenLines:
