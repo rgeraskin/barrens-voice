@@ -56,10 +56,24 @@ class Games(unittest.TestCase):
             (source / "Media" / "README.md").write_text("x", encoding="utf-8")
             (source / "Media" / "icon.tga").write_bytes(b"tga")
             game = make_game(Path(d) / "_forever_", "0.3.0")
+            old = game / "Interface" / "AddOns" / ADDON
+            (old / "Removed.lua").write_text("-- gone from the new version", encoding="utf-8")
+            (old / "Old").mkdir()
+            (old / "Old" / "x.tga").write_bytes(b"tga")
+            (old / "._Core.lua").write_text("mac", encoding="utf-8")
+            (old / "VoiceList.lua").write_text("BarrensVoiceVoiceList = { 'Irina' }", encoding="utf-8")
+            (source / "VoiceList.lua").write_text("BarrensVoiceVoiceList = BarrensVoiceVoiceList or {}", encoding="utf-8")
+            (source / "CompanionStatus.lua").write_text("BarrensVoiceStatus = nil", encoding="utf-8")
             target = install_addon(source, game)
+            # the companion's list of voices kept; the status file, not there before, comes from the addon
+            self.assertIn("Irina", (target / "VoiceList.lua").read_text(encoding="utf-8"))
+            self.assertTrue((target / "CompanionStatus.lua").exists())
             self.assertEqual(toc_version(target), "0.4.0")
             self.assertTrue((target / "Media" / "icon.tga").exists())
             self.assertFalse((target / "Media" / "README.md").exists())
+            left = sorted(p.relative_to(target).as_posix() for p in target.rglob("*"))
+            self.assertEqual(left, ["BarrensVoice.toc", "CompanionStatus.lua", "Media", "Media/icon.tga",
+                                    "VoiceList.lua"])                          # the old version's own gone
 
 
 class Config(unittest.TestCase):

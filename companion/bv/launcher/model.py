@@ -60,12 +60,30 @@ def newer(candidate: str, current: str) -> bool:
     return version_key(candidate) > version_key(current)
 
 
+SKIP = ("*.md", "._*")      # notes for the repository, macOS copy litter: not for the game
+# written by the companion into the addon's folder (bv/voicelist.py, bv/status.py) and shipped only as
+# empty stand-ins: an install keeps the companion's own, or the voice list goes empty and the addon says
+# the companion is not running until the companion writes them again
+GENERATED = ("VoiceList.lua", "CompanionStatus.lua")
+
+
 def install_addon(source: Path, game_root: Path) -> Path:
-    """Copy the addon into the game's Interface/AddOns (over the old one; the player's settings live
-    in WTF, not here). Returns the addon's folder in the game."""
+    """Put the addon into the game's Interface/AddOns as `source` has it: copied over the old one, and
+    what the old one had and this one does not removed (the player's settings live in WTF, not here).
+    Returns the addon's folder in the game."""
     target = Path(game_root) / "Interface" / "AddOns" / ADDON
     target.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(source, target, dirs_exist_ok=True, ignore=shutil.ignore_patterns("*.md"))
+    kept = [name for name in GENERATED if (target / name).is_file()]
+    shutil.copytree(source, target, dirs_exist_ok=True,
+                    ignore=shutil.ignore_patterns(*SKIP, *kept))
+    wanted = {p.relative_to(source) for p in source.rglob("*")
+              if not any(p.match(pattern) for pattern in SKIP)}
+    for path in sorted(target.rglob("*"), key=lambda p: len(p.parts), reverse=True):   # files before their folders
+        if path.relative_to(target) not in wanted:
+            if path.is_dir():
+                shutil.rmtree(path, ignore_errors=True)
+            else:
+                path.unlink(missing_ok=True)
     return target
 
 
