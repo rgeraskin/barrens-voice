@@ -90,6 +90,19 @@ class Paths(unittest.TestCase):
                              cwd=Path(__file__).resolve().parents[1], check=True).stdout.splitlines()
         return [Path(x) for x in out[:3]] + [out[3]]
 
+    def test_install_layout(self):
+        from bv.paths import INSTALL_MARK, layout
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            code = root / "app" / "0.4.1" / "companion"
+            code.mkdir(parents=True)
+            self.assertIsNone(layout(code, {})["root"])                     # no mark: not an install
+            (root / INSTALL_MARK).write_text("", encoding="utf-8")
+            got = layout(code, {})
+            self.assertEqual((got["root"], got["data"], got["cache"]), (root, root / "data", root / "cache"))
+            self.assertIn(str(root / "app" / "current" / ".venv"), got["starter"])   # through the junction
+            self.assertEqual(layout(code, {"BV_DATA": "x"})["data"], Path("x"))
+
     def test_installed_and_not(self):
         code, data, cache, start = self.run_paths({})
         self.assertEqual((data, cache), (code, code))                   # as before the installer
