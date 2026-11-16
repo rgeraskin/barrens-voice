@@ -38,3 +38,7 @@ run = "uv run --locked python tools/game_voices.py"
 [tasks.build]
 description = "Release archive and manifest.json into dist/ (tools/release.py)"
 run = "uv run --locked python tools/release.py"
+
+[tasks.sign]
+description = "Sign dist/manifest.json (tools/sign.py): BV_SIGNING_KEY or ~/.config/barrens-voice/release-signing.key"
+run = "uv run --locked python tools/sign.py sign"

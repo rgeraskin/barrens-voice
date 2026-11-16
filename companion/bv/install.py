@@ -35,6 +35,15 @@ def uv_env(root: Path, version_dir: Path) -> dict:
             "UV_NO_CONFIG": "1"}
 
 
+def runtime_of(root: Path) -> str:
+    """The ONNX Runtime build this install was made with (its mark file), for its updates."""
+    import json
+    try:
+        return json.loads((root / INSTALL_MARK).read_text(encoding="utf-8")).get("runtime") or runtime_for_this_pc()
+    except (OSError, ValueError):
+        return runtime_for_this_pc()
+
+
 def runtime_for_this_pc() -> str:
     """ONNX Runtime's build for the video card: "cuda" with an NVIDIA driver, else "directml"."""
     return "cuda" if shutil.which("nvidia-smi") else "directml"
@@ -66,7 +75,15 @@ def build(root: Path, version_dir: Path, runtime: str, uv: Path, log=print) -> N
     command = [str(uv), "sync", "--frozen", "--no-dev", "--extra", runtime, "--python", PYTHON,
                "--project", str(version_dir)]
     log("окружение: " + " ".join(command[1:]))
-    subprocess.run(command, env=uv_env(root, version_dir), check=True)
+    # no console window of its own (the launcher is pythonw); its lines go to the log instead
+    proc = subprocess.Popen(command, env=uv_env(root, version_dir), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            text=True, encoding="utf-8", errors="replace",
+                            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    for line in proc.stdout:
+        if line.strip():
+            log("    " + line.rstrip())
+    if proc.wait():
+        raise RuntimeError(f"uv sync завершился с кодом {proc.returncode}")
 
 
 def point_current(root: Path, version_dir: Path) -> None:
@@ -119,12 +136,14 @@ def prune(root: Path, keep: int = KEEP) -> list[str]:
 
 def install(root: Path, archive: Path, runtime: str | None, uv: Path, log=print) -> str:
     """Unpack, build and make current; returns the version."""
+    import json
     root.mkdir(parents=True, exist_ok=True)
-    (root / INSTALL_MARK).write_text("Barrens Voice\n", encoding="utf-8")
+    runtime = runtime or runtime_for_this_pc()
+    (root / INSTALL_MARK).write_text(json.dumps({"app": "Barrens Voice", "runtime": runtime}) + "\n", encoding="utf-8")
     for sub in ("app", "data", "cache"):
         (root / sub).mkdir(exist_ok=True)
     version, folder = unpack(archive, root)
-    build(root, folder, runtime or runtime_for_this_pc(), uv, log)
+    build(root, folder, runtime, uv, log)
     point_current(root, folder)
     log(f"Barrens Voice {version} установлен в {root}")
     return version

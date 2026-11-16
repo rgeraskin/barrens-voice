@@ -278,3 +278,64 @@ class Install(unittest.TestCase):
             self.assertEqual(install.prune(root), ["0.4.0"])                   # current + one to go back to
             self.assertEqual(sorted(p.name for p in (root / "app").iterdir()), ["0.4.1", "0.4.2", "current"])
             self.assertFalse(any(p.name.endswith(".part") for p in (root / "app").iterdir()))
+
+
+class Update(unittest.TestCase):
+    """bv.update: only a signed manifest, only an archive matching it, back to the previous on early failures."""
+
+    def keys(self):
+        import base64
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+        key = Ed25519PrivateKey.generate()
+        raw = serialization.Encoding.Raw
+        public = base64.b64encode(key.public_key().public_bytes(raw, serialization.PublicFormat.Raw)).decode()
+        return key, public
+
+    def test_signature(self):
+        import base64
+        from bv import update
+        key, public = self.keys()
+        manifest = b'{"version": "0.4.1"}'
+        sig = base64.b64encode(key.sign(manifest)).decode()
+        self.assertTrue(update.verify(manifest, sig, public))
+        self.assertFalse(update.verify(manifest.replace(b"0.4.1", b"0.4.2"), sig, public))   # changed: refused
+        self.assertFalse(update.verify(manifest, sig, self.keys()[1]))                     # another key: refused
+        self.assertFalse(update.verify(manifest, "not base64!", public))
+
+    def test_download_checks_the_archive(self):
+        import hashlib
+        import io
+        from bv import update
+        data = b"release bytes" * 1000
+
+        class Response(io.BytesIO):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+        manifest = {"base": "https://x/", "archive": "barrens-voice-0.4.1.zip", "size": len(data),
+                    "sha256": hashlib.sha256(data).hexdigest()}
+        with tempfile.TemporaryDirectory() as d:
+            got = update.download(manifest, Path(d), fetch_stream=lambda *a, **k: Response(data))
+            self.assertEqual(got.read_bytes(), data)
+            with self.assertRaises(ValueError):
+                update.download({**manifest, "sha256": "0" * 64}, Path(d), fetch_stream=lambda *a, **k: Response(data))
+            self.assertFalse((Path(d) / "barrens-voice-0.4.1.part").exists())
+
+    def test_back_to_the_previous_after_two_early_failures(self):
+        from bv import install, update
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            for v in ("0.4.0", "0.4.1"):
+                (root / "app" / v).mkdir(parents=True)
+            install.point_current(root, root / "app" / "0.4.0")
+            update.apply(root, "0.4.1")
+            self.assertEqual(install.current_version(root), "0.4.1")
+            self.assertIsNone(update.record_start(root, 5, failed=True))                  # one failure: wait
+            self.assertEqual(update.record_start(root, 5, failed=True), "0.4.0")         # two: back
+            self.assertEqual(install.current_version(root), "0.4.0")
+            update.apply(root, "0.4.1")
+            self.assertIsNone(update.record_start(root, 300, failed=True))               # ran a while: not a start failure
+            self.assertFalse(update.state_path(root).exists())

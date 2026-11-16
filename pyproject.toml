@@ -27,6 +27,8 @@ dependencies = [
     "transformers==5.22.2",
     "tokenizers==0.23.3",
     "huggingface_hub==1.33.0",
+    # updates: the release manifest's ed25519 signature (bv/update.py, tools/sign.py)
+    "cryptography==50.0.2",
     # the launcher's tray icon; tools/make_icon.py
     "pystray==0.19.5",
     "pillow==12.3.0",
