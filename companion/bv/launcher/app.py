@@ -91,6 +91,7 @@ class App:
         self.tray = Tray(self.events)
         self.has_tray = self.tray.start()
         self.checked = {"game": 0.0, "games": 0.0, "update": 0.0}
+        self.closed = False              # quit() ran: the window is destroyed
 
         root.protocol("WM_DELETE_WINDOW", self.close)
         self.say(f"Barrens Voice {self.version}" + (", ждёт игру в трее" if resident else ""))
@@ -295,6 +296,7 @@ class App:
         self.root.focus_force()
 
     def quit(self) -> None:
+        self.closed = True               # quit may come from inside a tick: nothing is drawn after it
         self.root.withdraw()
         self.tray.stop()
         if self.companion.running:
@@ -304,12 +306,17 @@ class App:
     # --- the loop -------------------------------------------------------------------------------
 
     def tick(self) -> None:
+        if self.closed:
+            return
         try:
             self._tick()
         except Exception as e:  # noqa: BLE001 - the window must live on; the error goes to the file
+            if self.closed:              # the window went away during this tick: nothing to report
+                return
             import traceback
             launcher_log("ошибка: " + "".join(traceback.format_exception(e)))
-        self.root.after(TICK_MS, self.tick)
+        if not self.closed:
+            self.root.after(TICK_MS, self.tick)
 
     def _tick(self) -> None:
         now = time.monotonic()
@@ -385,6 +392,8 @@ class App:
                 self.config.get("launch_wow"), self.config.get("exit_with_wow"), self.autostart)
 
     def redraw(self) -> None:
+        if self.closed:
+            return
         snap = self.snapshot()
         if snap == self.drawn:
             return
