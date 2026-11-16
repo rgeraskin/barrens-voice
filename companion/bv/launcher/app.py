@@ -101,7 +101,12 @@ class App:
             from .. import launch
             if sys.platform == "win32":
                 self.running_game = launch.running_game()[0]
-            self.start_companion()
+            # the companion (and the race voices in video memory) only with the game: started now when it
+            # runs or the launcher starts it; else when it appears (tick) or on «Играть»
+            if self.running_game or self.config.get("launch_wow"):
+                self.start_companion()
+            else:
+                self.say("ждёт игру: «Играть» или запуск из Battle.net")
             if self.config.get("launch_wow") and self.companion.running and not self.running_game:
                 self.hide(told="Barrens Voice запускает игру и ждёт её в трее — щёлкните значок, чтобы открыть окно.")
         if args["open"]:                           # --open settings|help: straight to that window
