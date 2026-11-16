@@ -1,8 +1,9 @@
 """F5-TTS (Russian fine-tune) speaking chat lines in race voices from the game client, on the GPU.
 
 One thread synthesises, another plays, so the next line is ready while one is being said. F5 runs
-through ONNX Runtime on DirectML (bv/f5onnx.py): any DirectX 12 card. Up to 0.3.0 it ran through
-torch on CUDA (NVIDIA only, gigabytes to install); that code was removed in the commit "F5: torch
+through ONNX Runtime (bv/f5onnx.py): on CUDA with an NVIDIA card, on DirectML with any other DirectX 12
+card (it holds the GPU for a whole step, so the game's frames wait: DEVELOPMENT.md). Up to 0.3.0 it ran
+through torch on CUDA (gigabytes to install); that code was removed in the commit "F5: torch
 removed, ONNX Runtime only" - `git revert` it to bring torch back (DEVELOPMENT.md).
 """
 from __future__ import annotations
@@ -42,7 +43,10 @@ def sentence_groups(text: str) -> list[str]:
 
 MODEL_REPO = "Misha24-10/F5-TTS_RUSSIAN"   # the vocabulary; the model itself is our ONNX export of it
 VOCAB_FILE = "F5TTS_v1_Base/vocab.txt"
-PROVIDER = "DmlExecutionProvider"
+# the video card, best first: CUDA (NVIDIA; onnxruntime-gpu) leaves the game alone - DirectML (any DirectX 12
+# card; onnxruntime-directml) holds the card for a whole denoising step, and the game's frames wait (DEVELOPMENT.md)
+PREFERRED = ("CUDAExecutionProvider", "DmlExecutionProvider")
+PROVIDER = PREFERRED[0]
 
 
 TARGET_RMS = 0.08     # about -22 dBFS: every voice about as loud as the others
@@ -93,9 +97,26 @@ def wav_bytes(samples, rate: int, volume: float, gain_db: float = 0.0) -> bytes:
     return wav((np.clip(samples, -1, 1) * 32767).astype("<i2").tobytes(), rate)
 
 
-def provider(config: dict) -> str:
-    """ONNX Runtime's execution provider for F5 and Whisper: DirectML unless config.json says else."""
-    return config.get("f5_onnx_provider") or PROVIDER
+def provider(config: dict, available: list[str] | None = None) -> str:
+    """ONNX Runtime's execution provider for F5 and Whisper: `f5_onnx_provider`, else the first of
+    PREFERRED this ONNX Runtime has (CUDA in onnxruntime-gpu, DirectML in onnxruntime-directml)."""
+    if config.get("f5_onnx_provider"):
+        return config["f5_onnx_provider"]
+    if available is None:
+        try:
+            import onnxruntime
+            available = onnxruntime.get_available_providers()
+        except ImportError:
+            available = []
+    return next((p for p in PREFERRED if p in available), "CPUExecutionProvider")
+
+
+def preload(engine: str) -> None:
+    """CUDA and cuDNN from their pip packages (onnxruntime-gpu[cuda,cudnn]) before a CUDA session."""
+    if engine == "CUDAExecutionProvider":
+        import onnxruntime
+        if hasattr(onnxruntime, "preload_dlls"):
+            onnxruntime.preload_dlls()
 
 
 def model_dir(config: dict, home: Path) -> Path:
@@ -110,6 +131,7 @@ def make_bank(config: dict, home: Path, log) -> list:
     checker = None
     if gamevoices.stale(config, out):
         from .whisper_onnx import OnnxChecker
+        preload(provider(config))
         checker = OnnxChecker(log, provider(config))
         if not checker.load():
             checker = None
@@ -130,7 +152,7 @@ def prepare_voices(config: dict, home: Path, log) -> None:
         if not gamevoices.stale(config, gamevoices.bank_dir(config, home)):
             return
         import onnxruntime
-        if provider(config) not in onnxruntime.get_available_providers():
+        if provider(config) not in onnxruntime.get_available_providers() or provider(config) == "CPUExecutionProvider":
             return
         make_bank(config, home, log)
     except ImportError:
@@ -219,8 +241,9 @@ class F5Speaker:
         import onnxruntime
 
         engine = provider(self.config)
-        if engine not in onnxruntime.get_available_providers():
-            raise RuntimeError(f"ONNX Runtime без {engine} (нужна видеокарта с DirectX 12)")
+        preload(engine)
+        if engine not in onnxruntime.get_available_providers() or engine == "CPUExecutionProvider":
+            raise RuntimeError(f"ONNX Runtime без видеокарты ({engine}): нужна NVIDIA (CUDA) или DirectX 12")
         models = model_dir(self.config, self.home)
         if not (models / "F5_Metadata.onnx").exists():
             raise RuntimeError(f"нет моделей F5 в ONNX: {models} (f5_onnx_dir в config.json)")

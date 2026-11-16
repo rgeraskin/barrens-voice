@@ -61,9 +61,10 @@ class OnnxChecker:
             self.begin_suppress = np.array(gen.get("begin_suppress_tokens") or [], dtype=np.int64)
             options = ort.SessionOptions()
             providers = ["CPUExecutionProvider"]
-            if self.provider == "DmlExecutionProvider":
+            if self.provider == "DmlExecutionProvider":      # DirectML asks for these two
                 options.enable_mem_pattern = False
                 options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+            if self.provider in ("DmlExecutionProvider", "CUDAExecutionProvider"):
                 providers = [self.provider, "CPUExecutionProvider"]
             self.encoder = ort.InferenceSession(paths["onnx/encoder_model_fp16.onnx"], options, providers=providers)
             self.decoder = ort.InferenceSession(paths["onnx/decoder_model_fp16.onnx"], options, providers=providers)

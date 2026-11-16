@@ -533,11 +533,29 @@ class OnnxParts(unittest.TestCase):
         self.assertEqual(len(clean_tail(x[:100], 256, 24000)), 0)
 
     def test_provider_and_models(self):
-        from bv.f5engine import PROVIDER, model_dir, provider
-        self.assertEqual(provider({}), PROVIDER)
-        self.assertEqual(provider({"f5_onnx_provider": "CPUExecutionProvider"}), "CPUExecutionProvider")
-        self.assertEqual(model_dir({}, Path("app")), Path("app") / "models" / "f5-onnx")
+        from bv.f5engine import model_dir, provider
+        cpu = "CPUExecutionProvider"
+        self.assertEqual(provider({}, ["CUDAExecutionProvider", cpu]), "CUDAExecutionProvider")   # NVIDIA first
+        self.assertEqual(provider({}, ["DmlExecutionProvider", cpu]), "DmlExecutionProvider")
+        self.assertEqual(provider({}, [cpu]), cpu)
+        self.assertEqual(provider({"f5_onnx_provider": cpu}, ["CUDAExecutionProvider"]), cpu)
         self.assertEqual(model_dir({"f5_onnx_dir": "E:/m"}, Path("app")), Path("E:/m"))
+    def test_share_with_game(self):
+        from bv.share import tune
+
+        class Options:
+            def __init__(self):
+                self.intra_op_num_threads = self.inter_op_num_threads = 0
+                self.config = {}
+
+            def add_session_config_entry(self, key, value):
+                self.config[key] = value
+        o = tune(None, 2, Options)
+        self.assertEqual((o.intra_op_num_threads, o.inter_op_num_threads), (2, 1))
+        self.assertEqual(o.config, {"session.intra_op.allow_spinning": "0", "session.inter_op.allow_spinning": "0"})
+        mine = Options()
+        mine.intra_op_num_threads = 6
+        self.assertEqual(tune(mine, 2, Options).intra_op_num_threads, 6)       # set on purpose: kept
 
     def test_resample(self):
         import numpy as np

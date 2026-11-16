@@ -62,6 +62,9 @@ DEFAULT_CONFIG = {
     "same_speaker_gap": 5.0,
     "log_details": True,
     "log_keep_days": 90,
+    # the game first (bv/share.py): ONNX threads few and sleeping, the companion's priority below normal
+    "share_with_game": True,
+    "onnx_threads": 2,
     "debug": False,
     "poll_interval": 0.05,
     "capture_height": 16,
@@ -227,6 +230,13 @@ def main() -> int:
     # one Hugging Face cache for every model (F5, Vocos, RUAccent, Whisper): hf_home in config.json,
     # else the hf folder next to the program - before anything of Hugging Face is imported
     os.environ["HF_HOME"] = config.get("hf_home") or str(APP_DIR / "hf")
+    # transformers (Whisper's features and tokenizer, RUAccent) says at import that it found no
+    # PyTorch - on purpose since 0.4.0: only its errors are worth the log
+    os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
+    # the game first: ONNX Runtime's threads few and sleeping, the companion below normal (bv/share.py)
+    from . import share
+    if config.get("share_with_game", True):
+        share.limit_onnx(int(config.get("onnx_threads", 2)))
     if "--selftest" in sys.argv:
         from .speech import selftest
         selftest(config, log)
@@ -235,6 +245,8 @@ def main() -> int:
         from .f5engine import selftest as f5_selftest
         return f5_selftest(config, log, APP_DIR)
     log("=" * 60)
+    if config.get("share_with_game", True):
+        share.lower_priority(log)
     from .dictionary import game_of
     log(f"запуск; настройки: {CONFIG_PATH}; игра: {'WoW (ритейл)' if game_of(config) == 'retail' else 'WoW Forever'}")
     prune_logs(config["log_keep_days"])

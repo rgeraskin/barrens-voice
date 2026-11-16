@@ -53,6 +53,9 @@ def clean_tail(samples: np.ndarray, hop: int, rate: int) -> np.ndarray:
     return out
 
 
+DEVICES = {"DmlExecutionProvider": "dml", "CUDAExecutionProvider": "cuda"}
+
+
 class F5Onnx:
     def __init__(self, model_dir: Path, vocab_path: Path, provider: str = "DmlExecutionProvider", log=print,
                  session_config: dict | None = None):
@@ -89,7 +92,7 @@ class F5Onnx:
         types = {"tensor(float)": np.float32, "tensor(float16)": np.float16, "tensor(int16)": np.int16}
         self.audio_type = types[self.pre.get_inputs()[0].type]
         self.vocab = read_vocab(self.vocab_path)
-        self.device = "dml" if self.provider == "DmlExecutionProvider" else "cpu"
+        self.device = DEVICES.get(self.provider, "cpu")     # where IO binding keeps the noise between steps
         self.loaded = True
         self.log(f"F5 (ONNX, {self.net.get_providers()[0]}) готов: {self.steps} шагов")
 
