@@ -66,6 +66,10 @@ DEFAULT_CONFIG = {
     "same_speaker_gap": 5.0,
     "log_details": True,
     "log_keep_days": 90,
+    # updates of an installed Barrens Voice (bv/update.py): prepared and applied by themselves; "beta" -
+    # pre-releases too
+    "auto_update": True,
+    "update_channel": "stable",
     # the game first (bv/share.py): ONNX threads few and sleeping, the companion's priority below normal
     "share_with_game": True,
     "onnx_threads": 2,

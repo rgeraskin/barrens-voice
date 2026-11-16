@@ -12,6 +12,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import os
 import time
 import urllib.request
 from pathlib import Path
@@ -20,7 +21,8 @@ from . import install
 
 REPO = "rgeraskin/barrens-voice"
 PUBLIC_KEY = "6X3H4Ucf9JQriY67zjH+PABhyztH1VJyWXvuRMPOw3M="
-STABLE = f"https://github.com/{REPO}/releases/latest/download/"
+# BV_UPDATE_BASE: another place of the latest release (a test: file:///E:/release/) - signed all the same
+STABLE = os.environ.get("BV_UPDATE_BASE") or f"https://github.com/{REPO}/releases/latest/download/"
 RELEASES = f"https://api.github.com/repos/{REPO}/releases?per_page=10"
 AGENT = "BarrensVoice-launcher"
 EARLY = 60.0          # seconds: a companion ending with an error sooner than this after its start "failed to start"

@@ -48,7 +48,18 @@ def toc_version(folder: Path | None) -> str | None:
     return match.group(1) if match else "?"
 
 
-def app_version() -> str:
+def app_version(code_dir: Path = APP_DIR) -> str:
+    """The launcher's and companion's version: pyproject.toml beside the code (the release's root, or
+    the repository's); the addon has its own, in its .toc (addon_version)."""
+    import tomllib
+    try:
+        return tomllib.loads((code_dir.parent / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
+    except (OSError, ValueError, KeyError):
+        return "?"
+
+
+def addon_version() -> str:
+    """The version of the addon that comes with this launcher (what «установить/обновить» puts in the game)."""
     return toc_version(addon_source()) or "?"
 
 

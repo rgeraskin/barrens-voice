@@ -23,7 +23,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox
 
 from . import model
-from ..paths import DATA_DIR
+from ..paths import DATA_DIR, INSTALL_DIR, starter
 from .model import APP_DIR, GAME_NAMES
 from .paint import DIM, GOLD, PARCHMENT, Painter, ScaledCanvas, register_font, window_icon
 from ..logs import parse
@@ -52,7 +52,7 @@ TIPS = {
 SHOW_FILE = DATA_DIR / "tmp" / "launcher.show"   # a second launcher asks the first to show itself
 LAUNCHER_LOG = DATA_DIR / "logs" / "launcher.log"
 TICK_MS = 400
-UPDATE_EVERY = 6 * 3600
+UPDATE_EVERY = 3600          # an hour; and at every start
 
 
 def launcher_log(message: str) -> None:
@@ -80,6 +80,10 @@ class App:
 
         self.config = model.read_config()
         self.version = model.app_version()
+        self.addon_version = model.addon_version()
+        self.updating = ""               # an update of an install: "downloading", "preparing", "ready", "error"
+        self.update_ready: str | None = None
+        self.companion_started = 0.0
         self.games = model.find_games(self.config)
         keys = [g.key for g in self.games]
         self.selected = self.config.get("game") if self.config.get("game") in keys else (keys[0] if keys else None)
@@ -105,7 +109,7 @@ class App:
         self.settings_win = self.help_win = None
         self.tray = Tray(self.events)
         self.has_tray = self.tray.start()
-        self.checked = {"game": 0.0, "games": 0.0, "update": 0.0}
+        self.checked = {"game": 0.0, "games": 0.0, "update": -UPDATE_EVERY}   # the first check at once
         self.closed = False              # quit() ran: the window is destroyed
         self.reload_told = False         # the /reload hint of this companion's run shown
 
@@ -156,6 +160,7 @@ class App:
         if self.config.get("game") != self.selected:
             self.config = model.update_config(game=self.selected)
         self.companion_game = self.selected
+        self.companion_started = time.monotonic()
         self.exit_seen = False
         self.reload_told = False
         launch_flags = {"--launch", "--no-launch"}
@@ -184,6 +189,16 @@ class App:
     def companion_ended(self, code: int | None) -> None:
         self.exit_seen = True
         self.last_code = code
+        if INSTALL_DIR is not None and self.companion_started:
+            from .. import update
+            failed = code not in (0, None, Companion.RESTART, 4)       # 4: another companion runs - not its fault
+            back = update.record_start(INSTALL_DIR, time.monotonic() - self.companion_started, failed)
+            if back:
+                self.say(f"версия {self.version} не запускается — вернулся на {back}", "ERROR")
+                self.tray.notify(f"Новая версия Barrens Voice не запустилась, вернулся на {back}. "
+                                 "Подробности — в журнале.")
+                self.relaunch()
+                return
         g = self.game(self.companion_game)
         if g is not None and g.addon is not None:      # killed or crashed hard: it could not say so itself
             from ..status import write
@@ -249,7 +264,7 @@ class App:
         except OSError as e:
             self.say(f"аддон не установлен: {e}", "WARN")
             return False
-        self.say(f"аддон {self.version} установлен в {g.name}" + (" — в игре нужен /reload" if self.running_game == g.key else ""))
+        self.say(f"аддон {self.addon_version} установлен в {g.name}" + (" — в игре нужен /reload" if self.running_game == g.key else ""))
         self.games = model.find_games(self.config)
         self.redraw()
         return True
@@ -373,6 +388,9 @@ class App:
         if now - self.checked["games"] > 15:
             self.checked["games"] = now
             self.games = model.find_games(self.config)
+        self.apply_update_when_idle()
+        if self.closed:
+            return
         if now - self.checked["update"] > UPDATE_EVERY:
             self.checked["update"] = now
             threading.Thread(target=self._check_update, daemon=True, name="update-check").start()
@@ -391,10 +409,72 @@ class App:
         self.redraw()
 
     def _check_update(self) -> None:
-        found = model.latest_release()
-        if found and model.newer(found["version"], self.version):
-            self.update = found
-            launcher_log(f"вышла версия {found['version']}")
+        if INSTALL_DIR is None:                       # run from the source: only tell
+            found = model.latest_release()
+            if found and model.newer(found["version"], self.version):
+                self.update = found
+                launcher_log(f"вышла версия {found['version']}")
+            return
+        from .. import update
+        try:
+            found = update.latest(self.config.get("update_channel", "stable"))
+        except Exception as e:  # noqa: BLE001 - offline, GitHub down: next hour
+            launcher_log(f"проверка обновлений: {e}")
+            return
+        if found is None:
+            launcher_log("проверка обновлений: описание выпуска без верной подписи — пропускаю")
+            return
+        if not update.newer(found["version"], self.version) or self.updating:
+            return
+        self.update = {"version": found["version"], "manifest": found,
+                       "url": f"https://github.com/{update.REPO}/releases/tag/v{found['version']}"}
+        self.say(f"вышла версия {found['version']}")
+        if self.config.get("auto_update", True):
+            self._prepare_update()
+
+    def start_update(self) -> None:
+        """«Обновить»: prepare the new version now (installs); from the source - its release page."""
+        if INSTALL_DIR is None or not self.update or "manifest" not in self.update:
+            webbrowser.open(self.update["url"] if self.update else f"https://github.com/{model.REPO}/releases")
+            return
+        if not self.updating:
+            threading.Thread(target=self._prepare_update, daemon=True, name="update").start()
+
+    def _prepare_update(self) -> None:
+        """Download, check and build the new version beside the current one (on its own thread)."""
+        from .. import update
+        found = self.update["manifest"]
+        try:
+            self.updating = "downloading"
+            self.say(f"скачиваю версию {found['version']} ...")
+            archive = update.download(found, INSTALL_DIR / "cache" / "downloads")
+            self.updating = "preparing"
+            self.say(f"готовлю версию {found['version']} (библиотеки — из кэша, новые скачиваются) ...")
+            version = update.prepare(INSTALL_DIR, archive, log=lambda m: self.incoming.put(
+                f"{datetime.now():%H:%M:%S} DEBUG [обновление] {m}"))
+            self.update_ready, self.updating = version, "ready"
+            self.say(f"версия {version} готова — включится, когда игра и озвучка не запущены")
+        except Exception as e:  # noqa: BLE001 - the current version goes on
+            self.updating = "error"
+            self.say(f"обновление не удалось: {e}", "WARN")
+
+    def apply_update_when_idle(self) -> None:
+        """A prepared version becomes current while no game and no companion run; the launcher restarts into it."""
+        if (self.update_ready and not self.running_game and not self.companion.running and not self.busy
+                and INSTALL_DIR is not None):
+            from .. import update
+            version, self.update_ready = self.update_ready, None
+            update.apply(INSTALL_DIR, version)
+            self.say(f"перехожу на версию {version}")
+            self.relaunch()
+
+    def relaunch(self) -> None:
+        """Start the launcher anew through app\\current (a moment after this one has gone) and end this one."""
+        import subprocess
+        command = starter() + (" --tray" if self.resident else "")
+        subprocess.Popen(f'cmd /c ping -n 3 127.0.0.1 >nul & start "" {command}',
+                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        self.quit()
 
     # --- drawing --------------------------------------------------------------------------------
 
@@ -408,7 +488,7 @@ class App:
         show_update = bool(self.update) and self.config.get("launcher_dismissed") != self.update["version"]
         games = tuple((g.key, g.addon, str(g.root)) for g in self.games)
         progress = tuple(item for item in list(self.lines)[-400:] if item[1] in MAIN_LEVELS)[-14:]
-        return (tuple(lines), progress, games, self.selected, self.running_game, show_update,
+        return (tuple(lines), progress, games, self.selected, self.running_game, show_update, self.updating,
                 self.companion.running,
                 self.config.get("launch_wow"), self.config.get("exit_with_wow"), self.autostart)
 
@@ -471,8 +551,8 @@ class App:
             if g.addon is None:
                 p.link(RX1 - 26, y0 + 15, "установить аддон", f"inst{i}", lambda g=g: self.install_addon(g), anchor="e",
                        tip=TIPS["install"])
-            elif model.newer(self.version, g.addon):
-                p.link(RX1 - 26, y0 + 15, f"обновить аддон {g.addon} → {self.version}", f"inst{i}",
+            elif model.newer(self.addon_version, g.addon):
+                p.link(RX1 - 26, y0 + 15, f"обновить аддон {g.addon} → {self.addon_version}", f"inst{i}",
                        lambda g=g: self.install_addon(g), anchor="e", tip=TIPS["update"])
             else:
                 c.create_text(RX1 - 26, y0 + 15, text=f"аддон {g.addon}", anchor="e", fill=DIM, font=p.small, tags=tag)
@@ -498,7 +578,12 @@ class App:
             c.create_text(36, y + 24, text=f"Вышла версия {u['version']}", anchor="w", fill=GOLD, font=(self.title_font, -18))
             c.create_text(200, y + 24, text="— аддон и компаньон", anchor="w", fill=PARCHMENT, font=p.body)
             p.button(W - 236, y + 9, W - 136, y + 39, "Что нового", "news", lambda: webbrowser.open(u["url"]))
-            p.button(W - 128, y + 9, W - 58, y + 39, "Обновить", "update", lambda: webbrowser.open(u["url"]))
+            if self.updating in ("downloading", "preparing", "ready"):
+                c.create_text(W - 58, y + 24, anchor="e", fill=PARCHMENT, font=p.small,
+                              text={"downloading": "скачивается…", "preparing": "готовится…",
+                                    "ready": "включится после игры"}[self.updating])
+            else:
+                p.button(W - 128, y + 9, W - 58, y + 39, "Обновить", "update", self.start_update)
             p.button(W - 50, y + 9, W - 30, y + 39, "×", "dismiss", self.dismiss_update)
         c.create_text(W - 24, h - 16, text=f"версия {self.version}", anchor="e", fill=DIM, font=p.small)
         self.tray.tooltip("Barrens Voice — " + lines[0][1])
@@ -523,7 +608,7 @@ class App:
         if self.settings_win is not None and self.settings_win.winfo_exists():
             self.settings_win.lift()
             return
-        width, height = 600, 580
+        width, height = 600, 650
         win, c, p = self._child("Настройки", width, height)
         self.settings_win = win
         cfg = model.read_config()
@@ -544,7 +629,8 @@ class App:
                         boxes[k].var.set(os.path.normpath(got))
                 p.button(width - 120, y + 13, width - 30, y + 39, "Выбрать…", f"pick{key}", choose)
             y += 66
-        flags = {"details": bool(cfg.get("log_details")), "whisper": cfg.get("f5_end_check") == "whisper"}
+        flags = {"details": bool(cfg.get("log_details")), "whisper": cfg.get("f5_end_check") == "whisper",
+                 "auto": cfg.get("auto_update", True) is not False, "beta": cfg.get("update_channel") == "beta"}
 
         def draw_check(key, y, label):
             c.delete(key)
@@ -557,8 +643,15 @@ class App:
                            "договорённая впритык (примерно каждая восьмая), синтезируется ещё раз — на секунду "
                            "дольше. Включено: Whisper сначала слушает её конец и переделывает только при обрыве, "
                            "но занимает около 1,5 ГБ видеопамяти и пару секунд при загрузке голосов.")
-        c.create_text(30, y + 150, anchor="w", fill=DIM, font=p.small,
-                      text="Остальное — в config.json (описание в README). Компаньон перезапустится, если он работает.")
+        draw_check("auto", y + 150, "Обновлять автоматически")
+        p.tips["auto"] = ("Новая версия скачивается и готовится сама и включается, когда игра и озвучка не запущены. "
+                          "Выключено — внизу окна появится «Вышла версия…» с кнопкой «Обновить».")
+        draw_check("beta", y + 178, "Получать тестовые версии")
+        p.tips["beta"] = ("Тестовые версии выходят раньше и могут быть с ошибками — для тех, кто готов проверять "
+                          "сборки и писать о найденном. Выключите — останетесь на тестовой, пока не выйдет "
+                          "стабильная новее.")
+        c.create_text(30, y + 216, anchor="w", fill=DIM, font=p.small,
+                      text="Остальное — в config.json (описание в docs/config.md). Компаньон перезапустится, если он работает.")
 
         def edited():
             """The settings as the window has them now; None if the days are not a number."""
@@ -568,12 +661,14 @@ class App:
                 return None
             changes = {k: boxes[k].var.get().strip() for k in ("wow_dir", "battlenet_exe", "hf_home")}
             changes.update(log_keep_days=days, log_details=flags["details"],
-                           f5_end_check="whisper" if flags["whisper"] else "silence")
+                           f5_end_check="whisper" if flags["whisper"] else "silence",
+                           auto_update=flags["auto"], update_channel="beta" if flags["beta"] else "stable")
             return changes
 
         def differs(changes: dict) -> bool:
             """Whether `changes` differ from the file: an empty field is the same as a key not set."""
-            unset = {"f5_end_check": "silence", "log_details": True, "log_keep_days": 90}
+            unset = {"f5_end_check": "silence", "log_details": True, "log_keep_days": 90, "auto_update": True,
+                     "update_channel": "stable"}
             return any((cfg.get(k) if cfg.get(k) is not None else unset.get(k, "")) != v for k, v in changes.items())
 
         def save():
@@ -587,7 +682,8 @@ class App:
             win.destroy()
             if changed:
                 self.say("настройки сохранены")
-                if self.companion.running:
+                own = {k: v for k, v in changes.items() if k not in ("auto_update", "update_channel")}
+                if self.companion.running and differs(own):     # the update settings are the launcher's own
                     self.restart_companion(["--no-launch"])
             self.redraw()
 

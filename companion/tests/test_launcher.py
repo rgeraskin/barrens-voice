@@ -24,10 +24,14 @@ class Versions(unittest.TestCase):
         self.assertFalse(newer("v0.4.0", "0.4.0"))
         self.assertFalse(newer("", "0.4.0"))
 
-    def test_app_version_is_the_toc(self):
-        from bv.launcher.model import addon_source, app_version
+    def test_app_and_addon_versions(self):
+        # the app's version is pyproject.toml's; the addon's, its own .toc's (raised only when it changes)
+        import tomllib
+        from bv.launcher.model import addon_source, addon_version, app_version
+        root = Path(__file__).resolve().parents[2]
+        self.assertEqual(app_version(), tomllib.loads((root / "pyproject.toml").read_text())["project"]["version"])
         toc = (addon_source() / "BarrensVoice.toc").read_text(encoding="utf-8")
-        self.assertIn(f"## Version: {app_version()}", toc)
+        self.assertIn(f"## Version: {addon_version()}", toc)
 
 
 class Games(unittest.TestCase):
