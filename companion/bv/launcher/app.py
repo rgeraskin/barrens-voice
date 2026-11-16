@@ -35,6 +35,20 @@ LX0, LX1, RX0, RX1 = 22, 462, 478, W - 22       # left column (state, log), righ
 TOP, GAP, ROW1 = 100, 14, 140                   # State and Start: one height
 MAIN_LEVELS = ("INFO", "WARN", "ERROR")          # the main window's log: how things go, not every detail
 MAIN_COLORS = {"WARN": "#e0b33a", "ERROR": "#ff6a5a"}
+# hints on the main window's checks and links (what the window does not show by itself)
+TIPS = {
+    "launch_wow": "Открыли Barrens Voice ярлыком — он сразу запускает игру через Battle.net и уходит в трей. "
+                  "При входе в Windows игра сама не запускается.",
+    "exit_with_wow": "Игра закрылась — озвучка выключается и освобождает память (если Barrens Voice запущен при входе "
+                     "в Windows, он остаётся ждать игру в трее). Выключено — озвучка остаётся включённой до следующей "
+                     "игры, голоса рас занимают видеопамять.",
+    "autostart": "Barrens Voice запускается при входе в Windows и ждёт в трее (значок у часов). Озвучка включается "
+                 "сама, когда вы запустите игру; до этого ничего не загружается и видеопамять свободна.",
+    "install": "Скопировать аддон Barrens Voice в папку игры (Interface\\AddOns\\BarrensVoice). "
+               "Если игра запущена — потом /reload.",
+    "update": "Заменить аддон в игре версией, которая пришла с Barrens Voice. Ваши настройки аддона сохранятся. "
+              "Если игра запущена — потом /reload.",
+}
 SHOW_FILE = DATA_DIR / "tmp" / "launcher.show"   # a second launcher asks the first to show itself
 LAUNCHER_LOG = DATA_DIR / "logs" / "launcher.log"
 TICK_MS = 400
@@ -422,7 +436,7 @@ class App:
         for i, (key, text, on) in enumerate((("launch_wow", "Запускать игру вместе с Barrens Voice", launch_wow),
                                              ("exit_with_wow", "Закрываться вместе с игрой", exit_with_wow),
                                              ("autostart", "Запускать при входе в Windows", autostart))):
-            p.check(RX0 + 14, TOP + 48 + i * 24, text, bool(on), f"check{i}", lambda k=key: self.toggle(k))
+            p.check(RX0 + 14, TOP + 48 + i * 24, text, bool(on), f"check{i}", lambda k=key: self.toggle(k), tip=TIPS[key])
 
         # row 2: the log | Game
         p.panel(LX0, y2, LX1, y2 + row2, "Журнал")
@@ -449,10 +463,11 @@ class App:
                           font=p.small, tags=tag)
             p.click(tag, lambda k=g.key: self.choose_game(k))
             if g.addon is None:
-                p.link(RX1 - 26, y0 + 15, "установить аддон", f"inst{i}", lambda g=g: self.install_addon(g), anchor="e")
+                p.link(RX1 - 26, y0 + 15, "установить аддон", f"inst{i}", lambda g=g: self.install_addon(g), anchor="e",
+                       tip=TIPS["install"])
             elif model.newer(self.version, g.addon):
                 p.link(RX1 - 26, y0 + 15, f"обновить аддон {g.addon} → {self.version}", f"inst{i}",
-                       lambda g=g: self.install_addon(g), anchor="e")
+                       lambda g=g: self.install_addon(g), anchor="e", tip=TIPS["update"])
             else:
                 c.create_text(RX1 - 26, y0 + 15, text=f"аддон {g.addon}", anchor="e", fill=DIM, font=p.small, tags=tag)
         c.create_text(RX0 + 14, y2 + 36 + n * 56, anchor="nw", width=RX1 - RX0 - 28, fill=DIM, font=p.small,

@@ -102,6 +102,8 @@ class Painter:
         self.mono = ("Consolas", -11) if win else ("Menlo", -11)
         self.hover_cursor = "hand2"
         self._fonts: dict = {}                                    # for fit: measuring fonts, made once
+        self.tips: dict[str, str] = {}                            # tag -> its hint, shown on a rest of the mouse
+        self._tip = self._tip_job = None
 
     def background(self, w: int, h: int) -> None:
         c = self.c
@@ -134,12 +136,45 @@ class Painter:
                                tags=tag or ())
 
     def hover(self, tag: str, on, off) -> None:
-        self.c.tag_bind(tag, "<Enter>", lambda e: (on(), self.c.config(cursor=self.hover_cursor)))
-        self.c.tag_bind(tag, "<Leave>", lambda e: (off(), self.c.config(cursor="")))
+        self.c.tag_bind(tag, "<Enter>", lambda e: (on(), self.c.config(cursor=self.hover_cursor), self._tip_soon(tag)))
+        self.c.tag_bind(tag, "<Leave>", lambda e: (off(), self.c.config(cursor=""), self.hide_tip()))
 
     def click(self, tag: str, action) -> None:
         if action:
-            self.c.tag_bind(tag, "<Button-1>", lambda e: action())
+            self.c.tag_bind(tag, "<Button-1>", lambda e: (self.hide_tip(), action()))
+
+    # --- hints: a small window by the mouse after it rests half a second on an item with a tip ---------
+
+    def _tip_soon(self, tag: str) -> None:
+        self.hide_tip()
+        if tag in self.tips:
+            self._tip_job = self.c.after(500, lambda: self._show_tip(self.tips.get(tag)))
+
+    def _show_tip(self, text: str | None) -> None:
+        self._tip_job = None
+        if not text:
+            return
+        s = getattr(self.c, "s", 1.0)
+        self._tip = tip = tk.Toplevel(self.c)
+        tip.wm_overrideredirect(True)
+        tip.attributes("-topmost", True)
+        font = self.c.font(self.small) if hasattr(self.c, "font") else self.small
+        tk.Label(tip, text=text, justify="left", wraplength=round(330 * s), font=font, bg="#23170d", fg=PARCHMENT,
+                 relief="solid", bd=1, padx=round(8 * s), pady=round(5 * s)).pack()
+        tip.update_idletasks()
+        x = min(self.c.winfo_pointerx() + 14, self.c.winfo_screenwidth() - tip.winfo_width() - 8)
+        y = self.c.winfo_pointery() + 20
+        if y + tip.winfo_height() > self.c.winfo_screenheight() - 40:
+            y = self.c.winfo_pointery() - tip.winfo_height() - 10
+        tip.wm_geometry(f"+{max(0, x)}+{max(0, y)}")
+
+    def hide_tip(self) -> None:
+        if self._tip_job:
+            self.c.after_cancel(self._tip_job)
+            self._tip_job = None
+        if self._tip is not None:
+            self._tip.destroy()
+            self._tip = None
 
     def lacquer(self, x0, y0, x1, y1, top, bottom, tag) -> None:
         """Red lacquer in round corners: gradient lines clipped to the rounding, under the gold edge."""
@@ -176,13 +211,17 @@ class Painter:
                    lambda: (self.c.itemconfig(tag + "box", outline=EDGE), self.c.itemconfig(tag + "text", fill=PARCHMENT)))
         self.click(tag, action)
 
-    def link(self, x, y, text, tag, action, anchor="w", font=None) -> None:
+    def link(self, x, y, text, tag, action, anchor="w", font=None, tip=None) -> None:
         """Gold text that acts as a button."""
+        if tip:
+            self.tips[tag] = tip
         self.c.create_text(x, y, text=text, anchor=anchor, fill=GOLD, font=font or self.small, tags=tag)
         self.hover(tag, lambda: self.c.itemconfig(tag, fill="#fff2a8"), lambda: self.c.itemconfig(tag, fill=GOLD))
         self.click(tag, action)
 
-    def check(self, x, y, text, on: bool, tag, action) -> None:
+    def check(self, x, y, text, on: bool, tag, action, tip=None) -> None:
+        if tip:
+            self.tips[tag] = tip
         self.rounded(x, y - 8, x + 16, y + 8, r=3, fill="#1b120a", outline="#b8862b", tags=(tag, tag + "box"))
         if on:
             self.c.create_line(x + 3, y, x + 7, y + 5, x + 14, y - 6, fill=GOLD, width=3, tags=tag)
