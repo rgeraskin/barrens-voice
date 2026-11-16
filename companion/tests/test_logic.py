@@ -233,6 +233,20 @@ class DictionaryInCompanion(unittest.TestCase):
         def read(text):
             return inf.apply(d.apply(inf.apply(d.apply_words(text)), mark=True))
         self.assertEqual(read("встречаемся в РЛ"), "встречаемся в ру+ины Лордер+она")
+
+    def test_percent_and_kach(self):
+        from bv.morph import Inflector
+        d, inf = self.book(), Inflector(print)
+
+        def read(text):
+            return inf.apply(d.apply(inf.apply(d.apply_words(text)), mark=True))
+        self.assertEqual(read("здоровья 95%"), "здоровья 95 процентов")
+        self.assertEqual(read("осталось 1%"), "осталось 1 процент")
+        self.assertEqual(read("на 2 % больше"), "на 2 процента больше")
+        self.assertEqual(read("кача нет"), "к+ача нет")
+        self.assertEqual(read("из ЛИ лут"), "из Лабиринтов Иглошкурых л+ут")       # «ЛИ» in capitals only
+        self.assertEqual(read("есть ли танк?"), "есть ли т+анк?")                     # the particle stays
+        self.assertEqual(read("ну пздц"), "ну пиздец")
         self.assertEqual(read("у РЛ стоим"), "у ру+ин Лордер+она стоим")
         self.assertEqual(read("нужен РЛ на МК"), "нужен рейд-лидер на МК")
         self.assertEqual(read("РЛ сказал ждать"), "рейд-лидер сказал ждать")
