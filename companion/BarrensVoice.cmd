@@ -19,6 +19,9 @@ where nvidia-smi >nul 2>&1 && (
     .venv\Scripts\python.exe -m pip install -q --force-reinstall --no-deps onnxruntime-directml==1.24.4 || goto :fail
 )
 copy /y requirements.txt .venv\requirements.txt >nul
+rem the models now, while installing, not at the first start (~3 GB once; those in the cache are skipped)
+echo Downloading the models...
+.venv\Scripts\python.exe -m bv --fetch-models || echo The companion will download them at its first start.
 :run
 title Barrens Voice
 .venv\Scripts\python.exe -m bv %*

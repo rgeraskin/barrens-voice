@@ -540,6 +540,13 @@ class OnnxParts(unittest.TestCase):
         self.assertEqual(provider({}, [cpu]), cpu)
         self.assertEqual(provider({"f5_onnx_provider": cpu}, ["CUDAExecutionProvider"]), cpu)
         self.assertEqual(model_dir({"f5_onnx_dir": "E:/m"}, Path("app")), Path("E:/m"))
+        with tempfile.TemporaryDirectory() as d:
+            self.assertIsNone(model_dir({}, Path(d)))                           # none here: from Hugging Face
+            local = Path(d) / "models" / "f5-onnx"
+            local.mkdir(parents=True)
+            (local / "F5_Metadata.onnx").write_bytes(b"")
+            self.assertEqual(model_dir({}, Path(d)), local)
+
     def test_share_with_game(self):
         from bv.share import tune
 

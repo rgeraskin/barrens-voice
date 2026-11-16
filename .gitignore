@@ -4,6 +4,10 @@ config.json
 logs/
 tmp/
 voices/
+voices-retail/
+models/
+companion/hf/
+f5test/
 assignments.json
 .models_ready
 

@@ -209,11 +209,38 @@ def describe_place(place) -> str:
     return f"{where}, x {x}, y {y}, ширина {w} (экран {sw}×{sh})"
 
 
+def fetch_models(config: dict) -> int:
+    """Everything the race voices need from the network, downloaded now - BarrensVoice.cmd runs this
+    right after installing, so the first start neither waits for ~3 GB nor needs the network: F5 in
+    ONNX and its vocabulary, Whisper (it builds the voice bank from the game's files), RUAccent.
+    Models already in the cache are not downloaded again."""
+    os.environ.setdefault("HF_HUB_VERBOSITY", "error")     # no "unauthenticated requests" notice; bars stay
+    from huggingface_hub import hf_hub_download
+
+    from . import f5engine, whisper_onnx
+    from .text import Accentor
+    try:
+        log("модели: F5 (ONNX) ...")
+        if f5engine.model_dir(config, APP_DIR) is None:
+            f5engine.fetch_models(config, log)
+        hf_hub_download(f5engine.MODEL_REPO, f5engine.VOCAB_FILE)
+        log("модели: Whisper (~1,5 ГБ) ...")
+        for name in whisper_onnx.FILES:
+            hf_hub_download(whisper_onnx.REPO, name)
+        log("модели: RUAccent (~0,7 ГБ) ...")
+        Accentor(log, True).load()
+    except Exception as e:  # noqa: BLE001 - the first start tries again
+        log(f"модели не скачались: {e} — компаньон докачает их при первом запуске")
+        return 1
+    log("модели скачаны")
+    return 0
+
+
 def main() -> int:
     if sys.platform != "win32":
         print("Windows only")
         return 1
-    offline = offline_models()
+    offline = offline_models() if "--fetch-models" not in sys.argv else False
     install_crash_logging()
     if not isinstance(sys.stderr, StderrToLog):
         sys.stderr = StderrToLog(sys.stderr)
@@ -244,6 +271,8 @@ def main() -> int:
     if "--selftest-f5" in sys.argv:
         from .f5engine import selftest as f5_selftest
         return f5_selftest(config, log, APP_DIR)
+    if "--fetch-models" in sys.argv:
+        return fetch_models(config)
     log("=" * 60)
     if config.get("share_with_game", True):
         share.lower_priority(log)

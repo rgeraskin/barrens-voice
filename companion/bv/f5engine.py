@@ -8,6 +8,7 @@ removed, ONNX Runtime only" - `git revert` it to bring torch back (DEVELOPMENT.m
 """
 from __future__ import annotations
 
+import os
 import re
 import queue
 import threading
@@ -47,6 +48,9 @@ VOCAB_FILE = "F5TTS_v1_Base/vocab.txt"
 # card; onnxruntime-directml) holds the card for a whole denoising step, and the game's frames wait (DEVELOPMENT.md)
 PREFERRED = ("CUDAExecutionProvider", "DmlExecutionProvider")
 PROVIDER = PREFERRED[0]
+# our ONNX export of that model (10 steps; Hugging Face, CC BY-NC 4.0 as the model), downloaded into
+# the model cache at the first start unless the graphs are in models/f5-onnx or `f5_onnx_dir`
+ONNX_REPO = "rgeraskin/barrens-voice-f5-onnx"
 
 
 TARGET_RMS = 0.08     # about -22 dBFS: every voice about as loud as the others
@@ -119,9 +123,23 @@ def preload(engine: str) -> None:
             onnxruntime.preload_dlls()
 
 
-def model_dir(config: dict, home: Path) -> Path:
-    """The folder of F5's ONNX graphs: `f5_onnx_dir`, else models/f5-onnx next to the program."""
-    return Path(config.get("f5_onnx_dir") or home / "models" / "f5-onnx")
+def model_dir(config: dict, home: Path) -> Path | None:
+    """The folder of F5's ONNX graphs on this computer: `f5_onnx_dir`, else models/f5-onnx next to
+    the program when they are there; None means: from Hugging Face (`fetch_models`)."""
+    if config.get("f5_onnx_dir"):
+        return Path(config["f5_onnx_dir"])
+    local = home / "models" / "f5-onnx"
+    return local if (local / "F5_Metadata.onnx").exists() else None
+
+
+def fetch_models(config: dict, log) -> Path:
+    """F5's ONNX graphs from Hugging Face into the model cache (~760 MB once; then from the cache,
+    offline like the other models)."""
+    from huggingface_hub import snapshot_download
+    repo = config.get("f5_onnx_repo") or ONNX_REPO
+    if os.environ.get("HF_HUB_OFFLINE") != "1":
+        log(f"модели F5 (ONNX): {repo} — в первый раз скачивается ~760 МБ ...")
+    return Path(snapshot_download(repo, allow_patterns=["*.onnx"]))
 
 
 def make_bank(config: dict, home: Path, log) -> list:
@@ -244,7 +262,7 @@ class F5Speaker:
         preload(engine)
         if engine not in onnxruntime.get_available_providers() or engine == "CPUExecutionProvider":
             raise RuntimeError(f"ONNX Runtime без видеокарты ({engine}): нужна NVIDIA (CUDA) или DirectX 12")
-        models = model_dir(self.config, self.home)
+        models = model_dir(self.config, self.home) or fetch_models(self.config, self.log)
         if not (models / "F5_Metadata.onnx").exists():
             raise RuntimeError(f"нет моделей F5 в ONNX: {models} (f5_onnx_dir в config.json)")
         slots = make_bank(self.config, self.home, self.log)
