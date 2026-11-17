@@ -471,15 +471,15 @@ class App:
             return
 
         def switch():
-            self.updater.apply()
-            self.relaunch()
+            if self.updater.apply():                # failed: the version stays ready, the companion comes back (tick)
+                self.relaunch()
         self.stop_companion(switch, why="stopping")
 
     def apply_update_when_idle(self) -> None:
         """A prepared version becomes current while no game and no companion run; the launcher restarts into it."""
         if self.updater is not None and self.updater.due(bool(self.running_game), self.companion.running, bool(self.busy)):
-            self.updater.apply()
-            self.relaunch()
+            if self.updater.apply():
+                self.relaunch()
 
     def relaunch(self) -> None:
         """Start the launcher anew through the install's starter (a moment after this one has gone); end this one."""

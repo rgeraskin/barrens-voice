@@ -214,6 +214,7 @@ class Updater:
         self.found: dict | None = None
         self.status = ""
         self.ready: str | None = None
+        self.apply_failed: str | None = None    # the prepared version whose switch failed: not tried by itself again
 
     def check(self) -> dict | None:
         """The newer release found now (None when there is none, or it is being made ready already)."""
@@ -264,14 +265,24 @@ class Updater:
             return None
 
     def due(self, game_running: bool, companion_running: bool, busy: bool) -> bool:
-        """Whether the prepared version may become current now: never under a running game or voice-over."""
-        return bool(self.ready) and not game_running and not companion_running and not busy
+        """Whether the prepared version may become current now: never under a running game or voice-over, and
+        not again by itself after its switch failed (the next start of the launcher tries it anew)."""
+        return (bool(self.ready) and self.ready != self.apply_failed and not game_running and not companion_running
+                and not busy)
 
-    def apply(self) -> str:
-        """app\\current -> the prepared version (the launcher restarts into it: relaunch_command)."""
-        version, self.ready = self.ready, None
-        apply(self.root, version)
-        self.status = ""
+    def apply(self) -> str | None:
+        """app\\current -> the prepared version (the launcher restarts into it: relaunch_command); None when the
+        switch failed - the current version stays and the prepared one stays ready."""
+        version = self.ready
+        if not version:
+            return None
+        try:
+            apply(self.root, version)
+        except Exception as e:  # noqa: BLE001 - the current version goes on
+            self.apply_failed = version
+            self.say(f"не получилось перейти на версию {install.display_version(version)}: {e}", "WARN")
+            return None
+        self.ready, self.status = None, ""
         self.say(f"перехожу на версию {install.display_version(version)}")
         return version
 

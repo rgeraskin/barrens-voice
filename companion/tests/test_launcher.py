@@ -477,6 +477,68 @@ class Install(unittest.TestCase):
             self.assertEqual(sorted(p.name for p in (root / "app").iterdir()), ["0.4.1", "0.4.2", "current"])
             self.assertFalse(any(p.name.endswith(".part") for p in (root / "app").iterdir()))
 
+    def test_switch_never_leaves_no_current(self):
+        # the new link is made beside and renamed in: a failure on the way keeps the old current
+        from unittest import mock
+        from bv import install
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            for v in ("0.4.0", "0.4.1"):
+                (root / "app" / v).mkdir(parents=True)
+            install.point_current(root, root / "app" / "0.4.0")
+            with mock.patch("bv.install.make_link", side_effect=OSError("mklink failed")), self.assertRaises(OSError):
+                install.point_current(root, root / "app" / "0.4.1")
+            self.assertEqual(install.current_version(root), "0.4.0")
+            real = os.rename
+
+            def second_fails(a, b):
+                if Path(a).name == "current.new":
+                    raise OSError("in use")
+                real(a, b)
+            with mock.patch("os.rename", side_effect=second_fails), self.assertRaises(OSError):
+                install.point_current(root, root / "app" / "0.4.1")
+            self.assertEqual(install.current_version(root), "0.4.0")                     # renamed back
+            self.assertEqual(sorted(p.name for p in (root / "app").iterdir()), ["0.4.0", "0.4.1", "current"])
+            install.make_link(root / "app" / "current.old", root / "app" / "0.4.0")     # a swap cut short before
+            install.point_current(root, root / "app" / "0.4.1")
+            self.assertEqual(install.current_version(root), "0.4.1")
+            self.assertEqual(sorted(p.name for p in (root / "app").iterdir()), ["0.4.0", "0.4.1", "current"])
+            self.assertEqual(install.prune(root, keep=1), ["0.4.0"])                   # links are never pruned
+            self.assertTrue((root / "app" / "0.4.1").is_dir())
+
+
+    def test_junction_on_windows(self):
+        # Windows only, so with fakes: _winapi.CreateJunction first; when it is missing or fails, mklink with
+        # both paths quoted in one string (a folder named with "&" split the old list2cmdline command)
+        import sys
+        import types
+        from unittest import mock
+        from bv import install
+        link, target = Path(r"C:\Tom & Jerry\BV\app\current.new"), Path(r"C:\Tom & Jerry\BV\app\0.4.1")
+        made, ran = [], []
+        ok = mock.patch.multiple("os.path", isjunction=lambda p: p in made, realpath=lambda p: str(target))
+        winapi = types.SimpleNamespace(CreateJunction=lambda src, dst: made.append(Path(dst)))
+        with mock.patch.object(sys, "platform", "win32"), mock.patch.dict(sys.modules, {"_winapi": winapi}), ok, \
+                mock.patch("subprocess.run", side_effect=lambda *a, **k: ran.append(a[0])):
+            install.make_link(link, target)
+        self.assertEqual((made, ran), ([link], []))
+        made.clear()
+
+        def fails(src, dst):
+            raise OSError("no")
+
+        def mklink(command, **k):
+            ran.append(command)
+            made.append(link)
+        with mock.patch.object(sys, "platform", "win32"), mock.patch.dict(sys.modules, {"_winapi": types.SimpleNamespace(CreateJunction=fails)}), \
+                ok, mock.patch("os.path.isdir", return_value=False), mock.patch("subprocess.run", side_effect=mklink):
+            install.make_link(link, target)
+        self.assertEqual(ran, [f'cmd /c mklink /J "{link}" "{target}"'])
+        made.clear()
+        with mock.patch.object(sys, "platform", "win32"), mock.patch.dict(sys.modules, {"_winapi": types.SimpleNamespace()}), \
+                ok, mock.patch("os.path.isdir", return_value=False), mock.patch("subprocess.run"), self.assertRaises(OSError):
+            install.make_link(link, target)                                             # nothing made: an error
+
 
 class Update(unittest.TestCase):
     """bv.update: only a signed manifest, only an archive matching it, back to the previous on early failures."""
@@ -854,6 +916,21 @@ class UpdaterFlow(unittest.TestCase):
                          'cmd /c ping -n 3 127.0.0.1 >nul & start "" "C:\\BV\\Barrens Voice.exe" --tray')
         self.assertTrue(relaunch_command('"x.exe"', resident=False).endswith('start "" "x.exe"'))
 
+    def test_failed_switch_keeps_the_prepared_version(self):
+        from unittest import mock
+        from bv import install, update
+        self.publish(update.STABLE, "0.4.1")
+        u = self.updater()
+        u.check()
+        with mock.patch("bv.install.make_link", side_effect=OSError("mklink failed")):
+            self.assertIsNone(u.apply())
+        self.assertEqual((u.status, u.ready), ("ready", "0.4.1"))                      # «Установить сейчас» still there
+        self.assertEqual(install.current_version(self.root), "0.4.0")
+        self.assertFalse(u.due(game_running=False, companion_running=False, busy=False))   # not every tick
+        self.assertEqual(u.apply(), "0.4.1")                                           # by hand: tried again
+        self.assertEqual(install.current_version(self.root), "0.4.1")
+        self.assertIsNone(u.apply())                                                   # nothing prepared: nothing
+
 
 class ReleaseBuild(unittest.TestCase):
     """tools/release.py: what CI publishes is what bv.install puts in place."""
@@ -1080,7 +1157,7 @@ class UpdateInWindow(unittest.TestCase):
     def test_install_now(self):
         from unittest import mock
         done = []
-        self.win.updater.apply = lambda: done.append("apply")
+        self.win.updater.apply = lambda: done.append("apply") or "0.4.1"
         self.win.relaunch = lambda: done.append("relaunch")
         self.win.root = None
         self.win.stop_companion = lambda then, why: (done.append("stop"), then())
@@ -1091,6 +1168,11 @@ class UpdateInWindow(unittest.TestCase):
         with mock.patch.object(self.app.messagebox, "askyesno", return_value=True):
             self.app.App.install_update_now(self.win)
         self.assertEqual(done, ["stop", "apply", "relaunch"])                          # stopped first, then switched
+        done.clear()
+        self.win.updater.apply = lambda: done.append("apply")                          # the switch failed: no restart
+        with mock.patch.object(self.app.messagebox, "askyesno", return_value=True):
+            self.app.App.install_update_now(self.win)
+        self.assertEqual(done, ["stop", "apply"])
         done.clear()
         self.win.updater.ready = None
         self.app.App.install_update_now(self.win)

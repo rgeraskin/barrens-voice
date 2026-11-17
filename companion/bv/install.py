@@ -87,22 +87,63 @@ def build(root: Path, version_dir: Path, runtime: str, uv: Path, log=print) -> N
 
 
 def point_current(root: Path, version_dir: Path) -> None:
-    """app\\current -> this version (a junction on Windows: no administrator needed)."""
-    current = root / "app" / "current"
-    if current.is_junction():
-        os.rmdir(current)                               # the link only, not the version behind it
-    elif current.is_symlink():
-        current.unlink()
-    elif current.exists():
-        shutil.rmtree(current)
-    if sys.platform == "win32":
-        # mklink /J: Windows' own way to make a junction, no administrator needed. (Junctions made in the
-        # desktop session do not open over ssh on the test machine - check an install from the desktop.)
-        subprocess.run(["cmd", "/c", "mklink", "/J", str(current), str(version_dir)], check=True,
-                       capture_output=True)
-    else:
-        current.symlink_to(version_dir, target_is_directory=True)
+    """app\\current -> this version (a junction on Windows: no administrator needed). The new link is made
+    beside as current.new and swapped in by two renames: a failure on the way leaves the old current in place
+    (before, current was removed first and a failed mklink left none - «установлен не до конца»)."""
+    app = root / "app"
+    current, fresh, old = app / "current", app / "current.new", app / "current.old"
+    for leftover in (fresh, old):                       # a swap cut short last time
+        remove_link(leftover)
+    make_link(fresh, version_dir)
+    if os.path.lexists(current):
+        try:
+            os.rename(current, old)
+        except OSError:
+            remove_link(fresh)
+            raise
+    try:
+        os.rename(fresh, current)
+    except OSError:
+        if os.path.lexists(old) and not os.path.lexists(current):
+            os.rename(old, current)                     # back as it was
+        remove_link(fresh)
+        raise
+    remove_link(old)
     place_starter(root, version_dir)
+
+
+def make_link(link: Path, target: Path) -> None:
+    """`link` -> the folder `target`: a junction on Windows, a symlink elsewhere (the tests)."""
+    if sys.platform != "win32":
+        link.symlink_to(target, target_is_directory=True)
+        return
+    try:
+        # CPython's private helper (in _winapi since 3.5, for its own tests; there in 3.13): no shell, so no
+        # quoting of the path. It may report the error of its privilege step after making the link: checked below.
+        import _winapi
+        _winapi.CreateJunction(str(target), str(link))
+    except (ImportError, AttributeError, OSError):
+        if not os.path.isjunction(link):
+            if os.path.isdir(link):
+                os.rmdir(link)                          # its empty folder, the link not set
+            # mklink /J: Windows' own way. One string, both paths quoted: cmd would split a folder named
+            # with "&" (list2cmdline quotes only for spaces). (Junctions made in the desktop session do not
+            # open over ssh on the test machine - check an install from the desktop.)
+            subprocess.run(f'cmd /c mklink /J "{link}" "{target}"', check=True, capture_output=True)
+    if not os.path.isjunction(link) or Path(os.path.realpath(link)) != Path(os.path.realpath(target)):
+        raise OSError(f"не получилось связать {link} с {target}")
+
+
+def remove_link(path: Path) -> None:
+    """A link (junction or symlink) removed, not what it points at; a real folder in its place removed whole."""
+    if os.path.isjunction(path):
+        os.rmdir(path)
+    elif os.path.islink(path):
+        os.unlink(path)
+    elif os.path.isdir(path):
+        shutil.rmtree(path)
+    elif os.path.lexists(path):
+        os.unlink(path)
 
 
 STARTER = "Barrens Voice.exe"
@@ -160,8 +201,9 @@ def prune(root: Path, keep: int = KEEP) -> list[str]:
     """Old versions removed, the current one and the newest others kept; what is in use stays (Windows
     will not delete a loaded file) and goes next time."""
     current = current_version(root)
-    versions = sorted((p for p in (root / "app").iterdir() if p.is_dir() and p.name not in ("current",)
-                       and not p.name.endswith(".part")), key=lambda p: version_key(p.name), reverse=True)
+    versions = sorted((p for p in (root / "app").iterdir() if p.is_dir() and not p.name.startswith("current")
+                       and not p.is_symlink() and not p.is_junction() and not p.name.endswith(".part")),
+                      key=lambda p: version_key(p.name), reverse=True)
     kept = [v for v in versions if v.name == current][:1]
     kept += [v for v in versions if v.name != current][: max(0, keep - len(kept))]
     removed = []
