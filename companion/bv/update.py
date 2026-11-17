@@ -23,7 +23,7 @@ REPO = "rgeraskin/barrens-voice"
 PUBLIC_KEY = "6X3H4Ucf9JQriY67zjH+PABhyztH1VJyWXvuRMPOw3M="
 # BV_UPDATE_BASE: another place of the latest release (a test: file:///E:/release/) - signed all the same
 STABLE = os.environ.get("BV_UPDATE_BASE") or f"https://github.com/{REPO}/releases/latest/download/"
-RELEASES = f"https://api.github.com/repos/{REPO}/releases?per_page=10"
+RELEASES = f"https://api.github.com/repos/{REPO}/releases?per_page=100"
 AGENT = "BarrensVoice-launcher"
 EARLY = 60.0          # seconds: a companion ending with an error sooner than this after its start "failed to start"
 
@@ -54,16 +54,16 @@ def signed_manifest(base: str, fetch=get, public: str = PUBLIC_KEY) -> dict | No
 
 def latest(channel: str = "stable", fetch=get, public: str = PUBLIC_KEY) -> dict | None:
     """The newest signed release of the channel: "stable" (the latest release) or "beta" (pre-releases too:
-    the newest release in GitHub's list that carries a manifest; drafts skipped)."""
+    of the releases that carry a manifest, drafts skipped, the one with the highest version by its tag - GitHub
+    lists them by the tag as text, so v0.4.0-beta.10 came after beta.2 and beta 9 was taken for the newest)."""
     if channel != "beta":
         return signed_manifest(STABLE, fetch, public)
-    for release in json.loads(fetch(RELEASES)):
-        if release.get("draft"):
-            continue
-        names = {a.get("name") for a in release.get("assets", [])}
-        if {"manifest.json", "manifest.json.sig"} <= names:
-            return signed_manifest(f"https://github.com/{REPO}/releases/download/{release['tag_name']}/", fetch, public)
-    return None
+    tags = [r["tag_name"] for r in json.loads(fetch(RELEASES)) if not r.get("draft")
+            and {"manifest.json", "manifest.json.sig"} <= {a.get("name") for a in r.get("assets", [])}]
+    if not tags:
+        return None
+    newest = max(tags, key=install.version_key)
+    return signed_manifest(f"https://github.com/{REPO}/releases/download/{newest}/", fetch, public)
 
 
 def newer(candidate: str, current: str) -> bool:

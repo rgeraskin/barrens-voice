@@ -802,6 +802,18 @@ class UpdaterFlow(unittest.TestCase):
         self.assertEqual(u.check()["version"], "0.4.1b2")
         self.assertEqual(u.url(), f"https://github.com/{update.REPO}/releases/tag/v0.4.1-beta.2")
 
+    def test_beta_channel_in_githubs_order(self):
+        # GitHub lists releases by the tag as text: beta.9 ... beta.2, beta.10, beta.1 - the highest version wins
+        import json
+        from bv import update
+        self.settings["update_channel"] = "beta"
+        base = f"https://github.com/{update.REPO}/releases/download/"
+        self.publish(base + "v0.4.0-beta.10/", "0.4.0b10")
+        has = [{"name": "manifest.json"}, {"name": "manifest.json.sig"}]
+        listing = [{"tag_name": f"v0.4.0-beta.{n}", "draft": False, "assets": has} for n in (9, 8, 2, 10, 1)]
+        self.files[update.RELEASES] = json.dumps(listing).encode()
+        self.assertEqual(self.updater(current="0.4.0b9").check()["version"], "0.4.0b10")
+
     def test_relaunch_command(self):
         from bv.update import relaunch_command
         self.assertEqual(relaunch_command('"C:\\BV\\Barrens Voice.exe"', resident=True),
