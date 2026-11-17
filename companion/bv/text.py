@@ -146,6 +146,11 @@ GOVERNS = {**dict.fromkeys(("с", "со"), {"gent", "ablt"}),
            **dict.fromkeys(("в", "во", "на", "о", "об", "при"), {"loct"}),
            **dict.fromkeys(("за", "под", "над", "перед"), {"ablt"})}
 OBLIQUE = {"gent", "datv", "ablt", "loct"}
+# a mass measured out, not counted: its singular after a number is an amount in any case ("до 200 опыта",
+# "без 50 маны"), never an ordinal; pymorphy marks some of them Sgtm, not these
+MEASURED = {"опыт", "урон", "здоровье", "мана", "золото", "серебро", "медь", "энергия", "ярость", "репутация"}
+# a time of day: "до 5 утра", "с 8 вечера" - the hour counted, not "до пятого утра"
+DAYTIME = {"утро", "день", "вечер", "ночь"}   # "до 2 дня" - "до двух дня" (an event's day would be "второго")
 _morph = None
 _morph_lock = threading.Lock()
 
@@ -226,8 +231,11 @@ def agree(n: int, spoken: str, following: str, morph, before: str = "") -> str:
 def ordinal(n: int, before: str, following: str, morph) -> str | None:
     """`n` as an ordinal agreeing with the word after it, when only an ordinal fits the phrase:
     "с 15 уровня" -> "пятнадцатого", "на 2 этаже" -> "втором", "15 уровень" -> "пятнадцатый"
-    (a count wants a plural there: "15 уровней"); None when a count may be meant ("200 опыта" -
-    "сколько", "за 2 часа", "5 раз", slang pymorphy does not know).
+    (a count wants a plural there: "15 уровней"); in the case a preposition asks, a count of 2 or
+    more takes the plural, so a singular there is an ordinal even when the word has a plural of the
+    same spelling ("до 15 места", "с 2 места"; "2 места в рейд" is a count). None when a count may
+    be meant ("200 опыта" - "сколько", "до 200 опыта" - a mass, "за 2 часа", "5 раз", slang
+    pymorphy does not know).
     A word that numbers rather than counts (NUMBERED) settles what the grammar leaves open: after
     a number ending in 1 ("с 21 уровня" - "двадцать первого", where "по 1 золотому" stays "одному")
     and in the genitive without a preposition ("хил 15 уровня", where "200 опыта" stays "двести")."""
@@ -236,16 +244,25 @@ def ordinal(n: int, before: str, following: str, morph) -> str | None:
     if not morph.word_is_known(word):
         return None
     parses = [p for p in morph.parse(word) if p.tag.POS == "NOUN"]
+    if any(p.normal_form in MEASURED or "Sgtm" in p.tag for p in parses):
+        return None                                    # "до 200 опыта", "из 100 золота": an amount
+    if any(p.normal_form in DAYTIME and p.tag.case == "gent" for p in parses):
+        return None                                    # "до 3 ночи": an hour
     numbered = any(p.normal_form in NUMBERED for p in parses)
+    asked = GOVERNS.get(before.lower(), set())
+    governed = [p for p in parses if p.tag.case in asked]
     if numbered:
         parses = [p for p in parses if p.tag.number == "sing"]   # "с 3 фазы", not "3 фазы" (plural)
+    elif governed:                                     # "до 15 места": not the plural "места" (nominative)
+        if any(p.tag.number != "sing" for p in governed):
+            return None                                # "до 2 часов": a count in the genitive
+        parses = governed
     elif any(p.tag.number != "sing" for p in parses):
         return None
     if not parses:
         return None
     if n % 10 == 1 and n % 100 != 11 and not numbered:
         return None                                    # "по 1 золотому", "без 1 руки": a count reads so too
-    asked = GOVERNS.get(before.lower(), set())
     few = 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14
     if any(p.tag.case == "nomn" for p in parses):
         tag = next(p.tag for p in parses if p.tag.case == "nomn")
@@ -288,6 +305,26 @@ def ending_form(n: int, ending: str, before: str, morph) -> str | None:
     best = next((f for f in forms if f.tag.case in asked), forms[0])
     parts[-1] = best.word
     return " ".join(parts)
+
+
+# a preposition said in its long form before the number's word: "со второго", "со ста", "во втором",
+# "ко второму", "об одном"
+LONG_PREPOSITION = re.compile(r"(?<![\w'+-])([сСвВкКоО])(\s+)$")
+LONG_BEFORE = {"с": re.compile(r"[вфсзшжщ][^аеёиоуыэюя]"), "в": re.compile(r"[вф][^аеёиоуыэюя]"),
+               "к": re.compile(r"в[^аеёиоуыэюя]"), "о": re.compile(r"[аеиоуыэ]")}
+LONG_FORM = {"с": "о", "в": "о", "к": "о", "о": "б"}
+
+
+def long_preposition(before: str, spoken: str) -> str:
+    """`before` (the text up to a number) with its last word, a one-letter preposition, in the form
+    the number's word asks: "с 2 места" - "со второго места", "о 11 боссах" - "об одиннадцати"."""
+    m = LONG_PREPOSITION.search(before)
+    if not m:
+        return before
+    letter = m.group(1).lower()
+    if not LONG_BEFORE[letter].match(spoken.lower()):
+        return before
+    return before[:m.start()] + m.group(1) + LONG_FORM[letter] + m.group(2)
 
 
 def numbers_to_words(text: str) -> str:
@@ -353,7 +390,7 @@ def numbers_to_words(text: str) -> str:
         if m.start() < pos:
             continue                                   # inside a word taken with the number before
         spoken, end = spell(m)
-        out += [text[pos:m.start()], spoken]
+        out += [long_preposition(text[pos:m.start()], spoken), spoken]
         pos = end
     out.append(text[pos:])
     return "".join(out)
