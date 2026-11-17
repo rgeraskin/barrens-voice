@@ -102,6 +102,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   Battle.net drops the launch command while it starts and logs in, so the game did not start. The command is sent once more when its window is up (or after a minute) — only once: a second one may start a second game.
 
+- Numbers in chat are read as meant
+
+  A number before «+» (the addon says it as «плюс») was taken for an ordinal of the noun «плюс»: «От 50+ лвл» was «от пятидесятый плюс уровень», «18+» — «восемнадцатый плюс». Now «от пятидесяти плюс», «восемнадцать плюс», «на три плюс человек». An ordinal's ending typed with the number is read with it: «с 2007го» — «с две тысячи седьмого», «после 40го» — «сорокового», «на 4м этаже» — «на четвёртом», «идём в 4м» — «вчетвером», «из 2х» — «из двух». Letters glued to a number are read apart: «200ХП» — «двести ХП». «+-» is «плюс-минус».
+
+- Slang taken for a place name is not declined
+
+  «для кача» was read «для качи»: the declension knows «Кача» as a town and declined the dictionary's «к+ача» as its name. A word it knows only as a name, written in small letters, stays as typed.
+
+- Discord's emoji codes are not read out
+
+  «:handshake:» and the like are left out of the speech.
+
 - A space between the speaker's name and the line
 
   «Вася пишет:привет» in the log and to the synthesis, and an emote said «Васясмеётся»: `text.plain` stripped the line's leading space. `protocol.with_name` joins them with one.

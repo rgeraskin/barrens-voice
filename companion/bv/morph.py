@@ -25,6 +25,9 @@ CASES = {
     "о": "loct", "об": "loct", "при": "loct",
 }
 DECLINABLE = {"ADJF", "PRTF", "NOUN"}
+# names pymorphy knows: a word it knows only as one, written in small letters, is slang it took for a name
+# («кача», as the town Кача: «для кача» became «для качи») - left as typed
+PROPER = ("Geox", "Name", "Surn", "Patr", "Orgn", "Trad")
 CONJUNCTIONS = {"и", "или", "либо", "да"}   # "с танком и чернокнижником": the case carries over
 
 
@@ -117,6 +120,10 @@ class Inflector:
             return None
         options = self.morph.parse(plain)
         if not options:
+            return None
+        if plain[:1].islower() and self.morph.word_is_known(plain.lower()) and \
+                all(any(g in o.tag for g in PROPER) for o in options if o.tag.POS == "NOUN") and \
+                any(o.tag.POS == "NOUN" for o in options):
             return None
         nominative = [o for o in options if o.tag.case == "nomn" and o.tag.POS in DECLINABLE]
         if adjective_first:

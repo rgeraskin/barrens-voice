@@ -106,6 +106,9 @@ def _capitals(match) -> str:
     return spell(word)
 
 
+EMOJI_CODE = re.compile(r"(?<![\w:]):[a-z][a-z0-9_+-]*:(?![\w:])")   # ":handshake:" (Discord's): not read out
+
+
 def plain(text: str) -> str:
     """Text as it is said: a quest level tag ("[24]" before a quest name) and a quest's number at the
     end of its name ("(3513)]", as quest addons write it) go, other brackets left
@@ -113,7 +116,7 @@ def plain(text: str) -> str:
     letters or more is lowered, or RUAccent stresses it as an abbreviation ("РАЗ+ЫСКИВАЕТСЯ"); an
     abbreviation the dictionary did not expand is spelt when it cannot be said as syllables ("ППС" -
     "пэ-пэ-+эс", "США"), see `_capitals`."""
-    text = BRACKETS.sub(" ", LEVEL_TAG.sub(" ", QUEST_ID.sub("", text)))
+    text = EMOJI_CODE.sub(" ", BRACKETS.sub(" ", LEVEL_TAG.sub(" ", QUEST_ID.sub("", text))))
     text = SHOUTED.sub(lambda m: m.group().lower(), CAPITALS.sub(_capitals, text))
     return re.sub(r"\s+([,.!?:;…])", r"\1", re.sub(r"\s{2,}", " ", text)).strip()
 
@@ -233,6 +236,33 @@ def ordinal(n: int, before: str, following: str, morph) -> str | None:
     return " ".join(parts)
 
 
+# "+" and "-" typed after a number: the addon says "+" as the word "плюс" ("50+ лвл" - "50 плюс лвл"),
+# which is not a noun the number counts or numbers ("пятидесятый плюс"): a cardinal, in the preposition's case
+SIGNS = {"плюс", "минус"}
+# an ordinal's ending glued to its number: "40го", "2007-го", "на 4м этаже" - the ordinal in that form
+ENDING = re.compile(r"-?(ого|его|ому|ему|ыми|ими|ым|им|ом|ем|ый|ий|ой|ая|яя|ое|ее|ую|юю|ых|их|ые|ие|ух|ех|го|му|м|й|я|е|ю|х)"
+                    r"(?![а-яёa-z])", re.IGNORECASE)
+LETTERS_AFTER = re.compile(r"[а-яёa-z]{2,}", re.IGNORECASE)   # "200ХП": letters glued to a number, read apart
+# "идём в 4м" (and no noun after it): together, so many of us - not "в четвёртом"
+TOGETHER = re.compile(r"\b([вВ])\s*([2-9]|10)\s*-?м\b(?!\s*[а-яёa-z])")
+COLLECTIVE = {2: "двоём", 3: "троём", 4: "четвером", 5: "пятером", 6: "шестером", 7: "семером", 8: "восьмером",
+              9: "девятером", 10: "десятером"}
+
+
+def ending_form(n: int, ending: str, before: str, morph) -> str | None:
+    """`n` as the ordinal whose form ends in `ending` ("40го" - "сорокового"), the case the preposition
+    before it asks for preferred ("в 4м" - "четвёртом", "с 4м" - "четвёртым"); None when none ends so."""
+    from num2words import num2words
+    parts = num2words(n, lang="ru", to="ordinal").split()
+    asked = GOVERNS.get(before.lower(), set()) | ({"accs"} if before.lower() in ("в", "во", "на", "за", "про") else set())
+    forms = [f for f in morph.parse(parts[-1])[0].lexeme if f.word.endswith(ending.lower())]
+    if not forms:
+        return None
+    best = next((f for f in forms if f.tag.case in asked), forms[0])
+    parts[-1] = best.word
+    return " ".join(parts)
+
+
 def numbers_to_words(text: str) -> str:
     """Digits as Russian words, agreeing with the word after them where pymorphy3 can tell how."""
     try:
@@ -240,6 +270,7 @@ def numbers_to_words(text: str) -> str:
     except ImportError:
         return text
     morph = _analyzer()
+    text = TOGETHER.sub(lambda m: m.group(1) + COLLECTIVE[int(m.group(2))], text)
 
     def spell(m) -> tuple[str, int]:
         """The number in words, and where the text it stands for ends (past the word after it
@@ -248,11 +279,35 @@ def numbers_to_words(text: str) -> str:
             return m.group(), m.end()
         n = int(m.group())
         spoken = num2words(n, lang="ru")
+        before = PREV_WORD.search(m.string, 0, m.start())
+        before = before.group(1) if before else ""
+        glued = ENDING.match(m.string, m.end())
+        if glued and morph is not None:
+            ending = glued.group(1).lower()
+            if ending in ("х", "ух", "ех"):              # "из 2х", "3х": a count in the genitive - "двух", "трёх"
+                words = [(morph.parse(w)[0].inflect({"gent"}) or morph.parse(w)[0]).word for w in spoken.split()]
+                return " ".join(words), glued.end()
+            # a lone "м" is an ordinal only after a preposition ("на 4м этаже"); "через 5м" is minutes or metres
+            if ending != "м" or before.lower() in GOVERNS:
+                as_ordinal = ending_form(n, glued.group(1), before, morph)
+                if as_ordinal:
+                    return as_ordinal, glued.end()
+        if LETTERS_AFTER.match(m.string, m.end()):
+            return spoken + " ", m.end()                # "200ХП" - "двести ХП"
         following = NEXT_WORD.match(m.string, m.end())
+        if morph is not None and following and following.group(1).lower() in SIGNS:
+            # "от 50+" - "от пятидесяти плюс"; "на 3+ человек" stays "на три плюс" (the accusative)
+            case = "gent" if "gent" in GOVERNS.get(before.lower(), set()) else None
+            if case:
+                words = []
+                for w in spoken.split():
+                    form = morph.parse(w)[0].inflect({case})
+                    words.append(form.word if form else w)
+                spoken = " ".join(words)
+            return spoken, m.end()
         if morph is not None and following:
-            before = PREV_WORD.search(m.string, 0, m.start())
             try:
-                as_ordinal = ordinal(n, before.group(1) if before else "", following.group(1), morph)
+                as_ordinal = ordinal(n, before, following.group(1), morph)
                 if as_ordinal:
                     word = following.group(1)
                     stressed = SINGULAR_STRESS.get(word.lower())

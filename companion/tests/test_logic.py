@@ -1200,3 +1200,28 @@ class EndingHeard(unittest.TestCase):
         self.assertFalse(ending_heard("Ладно, я пошёл спать, всем пока.", "Ладно, я пошёл спать. Всем по"))
         self.assertFalse(ending_heard("да", ""))
         self.assertTrue(ending_heard("", "что-то"))
+
+
+class ChatNumbers(unittest.TestCase):
+    """Lines read wrong in a game session (17.11.2026), as the addon sends them («+» is the word «плюс»)."""
+
+    def test_numbers(self):
+        from bv.text import numbers_to_words as f
+        self.assertEqual(f("От 50 плюс уровень"), "От пятидесяти плюс уровень")
+        self.assertEqual(f("на 3 плюс человек"), "на три плюс человек")
+        self.assertEqual(f("18 плюс"), "восемнадцать плюс")
+        self.assertEqual(f("с 2007го"), "с две тысячи седьмого")
+        self.assertEqual(f("После 40го"), "После сорокового")
+        self.assertEqual(f("идем в 4м"), "идем вчетвером")
+        self.assertEqual(f("на 4м этаже"), "на четвёртом этаже")
+        self.assertEqual(f("из 2х"), "из двух")
+        self.assertEqual(f("за 200ХП?"), "за двести ХП?")
+
+    def test_emoji_code_and_stress_only_entry(self):
+        from bv.text import plain
+        self.assertEqual(plain("ок :handshake:"), "ок")
+        from bv.morph import Inflector
+        inflector = Inflector(print)
+        self.assertEqual(inflector.apply("для \x02к+ача\x03"), "для к+ача")        # slang, not the town Кача
+        self.assertEqual(inflector.apply("в \x02Огненная пр+опасть\x03"), "в Огненную пр+опасть")
+        self.assertEqual(inflector.apply("для \x02дам+агер\x03"), "для дам+агера")
