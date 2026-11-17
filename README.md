@@ -122,7 +122,7 @@
 
 ## Ошибки и идеи
 
-Что-то читается не так, или есть идея? Пишите в [сообщество Barrens Voice в Battle.net](https://launch.battle.net/invite/N9KR2WNHDgW) (оно же — во внутриигровых «Сообществах»), в [issues](https://github.com/rgeraskin/barrens-voice/issues) или в чат моих модов — [Discord](https://discord.gg/hxpuTQF2Bb) или [Telegram](https://t.me/+NwReoOS9x7hhYjgy).
+Что-то читается не так, или есть идея? Пишите в [игровое сообщество Barrens Voice](https://launch.battle.net/invite/N9KR2WNHDgW), в [issues](https://github.com/rgeraskin/barrens-voice/issues) или в чаты моих модов в [Discord](https://discord.gg/hxpuTQF2Bb) и [Telegram](https://t.me/+NwReoOS9x7hhYjgy).
 
 Те же ссылки есть на вкладке «Помощь» в настройках аддона. Приложите строку из журнала («Журнал» в окне Barrens Voice): в ней видно, что было написано и как прочитано.
 
