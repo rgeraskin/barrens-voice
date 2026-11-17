@@ -540,6 +540,7 @@ function ns.SetEnabled(enabled)
     else
         -- the stop has to be on the strip long enough to be read before the strip goes
         ns.Stop()
+        ns.DropHeld()                 -- lines waiting for a quest voice-over are not read later either
         if C_Timer then
             C_Timer.After(0.5, function() if not ns.db.enabled then ns.Strip.SetShown(false) end end)
         else

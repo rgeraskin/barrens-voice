@@ -346,6 +346,20 @@ ns.WatchCatQuest()
 assert(#first == 2 and first[2]:find("^resume\31"), "Wayfarer silent: the program goes on")
 ns.db.debug = false
 WayfarerRU = nil
+-- /bv off forgets the lines held for a quest voice-over: they are not read after /bv on
+ns.db.cell, ns.db.rows = 2, 1                 -- /bv on sends the settings, the strip's place with them
+CatQuestCore = { state = { playing = true } }
+ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "до выключения")
+local print0 = print
+print = function() end
+ns.SetEnabled(false)
+ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "пока выключено")   -- the dictionary window's «Озвучить»
+ns.SetEnabled(true)
+print = print0
+CatQuestCore = nil
+sent = {}
+ns.ReleaseHeld()
+assert(#sent == 0, "nothing held over /bv off: " .. tostring(sent[1]))
 GetTime = function() return 0 end
 print("catquest ok")
 

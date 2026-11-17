@@ -117,8 +117,16 @@ function ns.WatchCatQuest()
     end
 end
 
---- A chat line to the strip - now, or after the quest voice-over has finished speaking.
+--- Forget the lines waiting for a quest voice-over (/bv off: they must not be read at the next /bv on).
+function ns.DropHeld()
+    held = {}
+    if holdTicker then holdTicker:Cancel(); holdTicker = nil end
+end
+
+--- A chat line to the strip - now, or after the quest voice-over has finished speaking. None while
+--- the addon is off: the strip takes nothing then, and a held line would wait for the next /bv on.
 function ns.Deliver(payload)
+    if not ns.db.enabled then return end
     if ns.db.waitForCatQuest == false or (#held == 0 and not QuestVoiceSpeaking()) then
         ns.Strip.Push(payload)
         return
