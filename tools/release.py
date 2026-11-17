@@ -61,7 +61,7 @@ def notes(version: str) -> str:
     up to the next version or the link lines at the bottom."""
     text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     m = re.search(rf"^## \[{re.escape(version)}\][^\n]*\n(.*?)(?=^## |^\[[^\]\n]+\]: |\Z)", text, re.M | re.S)
-    return (m.group(1).strip() if m else "") + "\n\nУстановка: скачайте `BarrensVoice-Setup-*.exe` и запустите его.\n"
+    return (m.group(1).strip() if m else "") + "\n\nУстановка: скачайте `BarrensVoice-Setup.exe` и запустите его.\n"
 
 
 def version_of(tag: str, base: str) -> str:

@@ -1,4 +1,5 @@
-"""Build the installer (`mise run installer`, Windows): dist/BarrensVoice-Setup-<version>.exe.
+"""Build the installer (`mise run installer`, Windows): dist/BarrensVoice-Setup.exe (one name for
+every version: README links the latest release's file directly).
 
 Takes uv.exe of UV_VERSION from its GitHub release (checked against the release's own SHA-256), the
 release archive from tools/release.py, and compiles installer/BarrensVoice.iss with Inno Setup 6
@@ -69,7 +70,7 @@ def main() -> int:
     if iscc is None:
         sys.exit("Inno Setup 6 (ISCC.exe) not found: install it or set INNO_ISCC")
     subprocess.run([iscc, f"/DAppVersion={version}", str(ROOT / "installer" / "BarrensVoice.iss")], check=True)
-    print(f"dist/BarrensVoice-Setup-{version}.exe")
+    print(f"dist/BarrensVoice-Setup.exe ({version})")
     return 0
 
 

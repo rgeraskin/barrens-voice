@@ -23,7 +23,8 @@ PrivilegesRequired=lowest
 ; installers from junctions planted by a lesser user; this one runs as that same user in that user's folder.
 RedirectionGuard=no
 OutputDir=..\dist
-OutputBaseFilename=BarrensVoice-Setup-{#AppVersion}
+; one name for every version: README links releases/latest/download/BarrensVoice-Setup.exe (the version is the release's)
+OutputBaseFilename=BarrensVoice-Setup
 SetupIconFile=..\companion\bv\launcher\icon.ico
 UninstallDisplayIcon={app}\Barrens Voice.exe
 UninstallDisplayName=Barrens Voice

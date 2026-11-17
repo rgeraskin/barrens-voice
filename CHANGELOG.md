@@ -14,7 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - An installer
 
-  `BarrensVoice-Setup-<version>.exe` on GitHub Releases installs for the current Windows user, without administrator rights, into one folder (by default `%LOCALAPPDATA%\BarrensVoice`): the program, `data` (settings, the voice bank, logs) and `cache` (models). While installing it downloads Python and the libraries through uv — the CUDA build with an NVIDIA card, DirectML otherwise — and the models (~3 GB): about 6 GB on disk with NVIDIA, 4 GB otherwise. The folder has «Barrens Voice.exe» with the app's icon, which starts the current version; the shortcuts and the start at Windows sign-in go through it. Uninstalling stops it and asks whether to delete the settings, the voice bank and the models too. `BarrensVoice.cmd` stays for running from the source, and downloads the models too (`python -m bv --fetch-models`).
+  `BarrensVoice-Setup.exe` from the latest GitHub release installs for the current Windows user, without administrator rights, into one folder (by default `%LOCALAPPDATA%\BarrensVoice`): the program, `data` (settings, the voice bank, logs) and `cache` (models). While installing it downloads Python and the libraries through uv — the CUDA build with an NVIDIA card, DirectML otherwise — and the models (~3 GB): about 6 GB on disk with NVIDIA, 4 GB otherwise. The folder has «Barrens Voice.exe» with the app's icon, which starts the current version; the shortcuts and the start at Windows sign-in go through it. Uninstalling stops it and asks whether to delete the settings, the voice bank and the models too. `BarrensVoice.cmd` stays for running from the source, and downloads the models too (`python -m bv --fetch-models`).
 
 - Updates by themselves
 
