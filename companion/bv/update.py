@@ -70,6 +70,12 @@ def newer(candidate: str, current: str) -> bool:
     return install.version_key(candidate) > install.version_key(current)
 
 
+def test_build(version: str) -> bool:
+    """Whether a version is a test build ("0.4.1b1"): the stable channel never takes one."""
+    key = install.version_key(version)
+    return len(key) > 3 and key[-2] == 0
+
+
 def download(manifest: dict, folder: Path, progress=None, fetch_stream=None) -> Path:
     """The release archive into `folder`, checked against the manifest's size and SHA-256."""
     folder.mkdir(parents=True, exist_ok=True)
@@ -219,8 +225,9 @@ class Updater:
     def check(self) -> dict | None:
         """The newer release found now (None when there is none, or it is being made ready already)."""
         settings = self.settings()
+        channel = settings.get("update_channel", "stable")
         try:
-            found = latest(settings.get("update_channel", "stable"), self.fetch, self.public)
+            found = latest(channel, self.fetch, self.public)
         except Exception as e:  # noqa: BLE001 - offline, GitHub down: the next check
             if getattr(e, "code", None) != 404:          # 404: no release in this channel yet
                 self.detail(f"проверка обновлений: {e}")
@@ -228,6 +235,8 @@ class Updater:
         if found is None:
             self.say("описание выпуска без верной подписи — не обновляюсь", "WARN")
             return None
+        if channel != "beta" and test_build(found["version"]):
+            return None                                 # releases/latest serving a test build: not for this channel
         if not newer(found["version"], self.current) or self.status in BUSY:
             return None
         if self.found is None or self.found["version"] != found["version"]:

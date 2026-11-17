@@ -916,6 +916,14 @@ class UpdaterFlow(unittest.TestCase):
                          'cmd /c ping -n 3 127.0.0.1 >nul & start "" "C:\\BV\\Barrens Voice.exe" --tray')
         self.assertTrue(relaunch_command('"x.exe"', resident=False).endswith('start "" "x.exe"'))
 
+    def test_stable_channel_takes_no_test_build(self):
+        from bv import update
+        self.publish(update.STABLE, "0.4.1b1")                                         # releases/latest served one
+        self.assertIsNone(self.updater().check())
+        self.build.assert_not_called()
+        self.assertTrue(update.test_build("0.4.1b1") and update.test_build("v0.4.1-beta.1"))
+        self.assertFalse(update.test_build("0.4.1") or update.test_build("0.4.10") or update.test_build(""))
+
     def test_failed_switch_keeps_the_prepared_version(self):
         from unittest import mock
         from bv import install, update
