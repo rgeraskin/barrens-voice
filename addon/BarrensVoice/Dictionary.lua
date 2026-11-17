@@ -419,6 +419,7 @@ end
 --- line that is no entry.
 function D.KeyOf(line)
     local trimmed = line:match("^%s*(.-)%s*$")
+    if trimmed:sub(1, 1) == "#" then return nil end      -- a comment, "=" or not (as the companion's key_of)
     if trimmed:sub(1, 1) == "~" then
         return ((trimmed:match("^(.*)=") or trimmed):match("^(.-)%s*$"))
     end

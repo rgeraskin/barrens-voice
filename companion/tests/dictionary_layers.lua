@@ -23,6 +23,7 @@ assert(D.KeyOf("хардкор*=хардк+ор*") == "хардкор*")
 assert(D.KeyOf(GOLD) == GOLD_KEY, D.KeyOf(GOLD))
 assert(D.KeyOf("~(?<=через )(\\d+)\\s*с\\b=\\1 сек") == "~(?<=через )(\\d+)\\s*с\\b", "a regex with '=' inside")
 assert(D.KeyOf("# комментарий") == nil and D.KeyOf("просто текст") == nil)
+assert(D.KeyOf("# слово=как читать") == nil, "a comment with \"=\" is no entry either")
 
 -- no edits yet: the default; saving it unchanged stores nothing
 D.Migrate(ns.db)
