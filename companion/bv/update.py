@@ -138,7 +138,9 @@ class WontStart(RuntimeError):
 def version_runs(version_dir: Path, python: Path | None = None) -> str | None:
     """Whether a built version can start at all: its Python imports the launcher, the companion and this
     updater, and Tk works. A release whose launcher fails at its start would never be rolled back (the rollback
-    counts the companion's failures, and the launcher is what updates). None when it runs, else the error."""
+    counts the companion's failures, and the launcher is what updates). None when it runs, else the error the
+    check ended with. When the check itself could not run (no Python there, a timeout: an antivirus scan, a slow
+    disk) RuntimeError - that says nothing of the version, the next check tries again."""
     import subprocess
     if python is None:
         python = version_dir / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
@@ -149,7 +151,7 @@ def version_runs(version_dir: Path, python: Path | None = None) -> str | None:
                               encoding="utf-8", errors="replace", timeout=180,
                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     except (OSError, subprocess.SubprocessError) as e:
-        return str(e)
+        raise RuntimeError(f"не получилось проверить, запускается ли версия: {e}") from e
     if done.returncode:
         lines = [line.strip() for line in (done.stderr or "").splitlines() if line.strip()]
         return lines[-1] if lines else f"код {done.returncode}"
@@ -211,9 +213,10 @@ def refused_path(root: Path) -> Path:
 def refused(root: Path) -> str | None:
     """The version that failed here (went back from, or would not start): not prepared by itself again."""
     try:
-        return json.loads(refused_path(root).read_text(encoding="utf-8")).get("version") or None
+        version = json.loads(refused_path(root).read_text(encoding="utf-8")).get("version")
     except (OSError, ValueError, AttributeError):
         return None
+    return version if isinstance(version, str) and version else None
 
 
 def refuse(root: Path, version: str | None) -> None:
@@ -278,7 +281,8 @@ class Updater:
     `check` finds a newer release of the channel and, with automatic updates on, `prepare`s it; `due`
     says when the prepared version may become current (no game, no voice-over, nothing else on the way);
     `apply` makes it so. `status`: "" | "downloading" | "preparing" | "ready" | "error" (an error is tried
-    again at the next check)."""
+    again at the next check - but a version that was built and does not start (WontStart) is refused: only
+    «Обновить» or a newer version tries again)."""
 
     def __init__(self, root: Path, current: str, settings, say, detail=None, fetch=get, fetch_stream=None,
                  public: str = PUBLIC_KEY):
@@ -308,10 +312,11 @@ class Updater:
         if not newer(found["version"], self.current) or self.status in BUSY:
             return None
         name = install.display_version(found["version"])
-        bad = refused(self.root)
-        if bad and newer(found["version"], bad):
+        refused_version = refused(self.root)
+        if refused_version and newer(found["version"], refused_version):
             refuse(self.root, None)                     # a newer one than the version that failed: as usual
-            bad = None
+        # only that very version (an older one - another channel's - is not the one that failed here)
+        bad = refused_version == found["version"]
         told = self.found is not None and self.found["version"] == found["version"]
         if not told:
             self.say(f"вышла версия {name}")

@@ -718,7 +718,8 @@ class Update(unittest.TestCase):
             (bv / "launcher" / "app.py").write_text("import no_such_module\n", encoding="utf-8")
             why = update.version_runs(Path(d), python=Path(sys.executable))
             self.assertIn("no_such_module", why)
-            self.assertIsNotNone(update.version_runs(Path(d)))                          # no environment: an error
+            with self.assertRaises(RuntimeError):                                       # no environment: the check
+                update.version_runs(Path(d))                                            # could not run, not a verdict
 
 
 class WindowCode(unittest.TestCase):
@@ -1059,6 +1060,33 @@ class UpdaterFlow(unittest.TestCase):
         self.build.reset_mock()
         self.assertEqual(self.updater().check()["version"], "0.4.1")
         self.build.assert_not_called()                                                 # not rebuilt every hour
+
+    def test_check_that_could_not_run_refuses_nothing(self):
+        # a timeout or an OSError of the check (an antivirus scan, a slow disk) is not the version's: tried again
+        from bv import update
+        self.runs.side_effect = RuntimeError("не получилось проверить, запускается ли версия: timed out")
+        self.publish(update.STABLE, "0.4.1")
+        u = self.updater()
+        u.check()
+        self.assertEqual((u.status, u.ready), ("error", None))
+        self.assertIsNone(update.refused(self.root))
+        self.runs.side_effect = None
+        u.check()
+        self.assertEqual((u.status, u.ready), ("ready", "0.4.1"))
+
+    def test_only_the_refused_version_is_refused(self):
+        # a tester sent back from 0.5.0b1 who leaves the test channel: the stable 0.4.2 installs as usual
+        from bv import update
+        update.refuse(self.root, "0.5.0b1")
+        self.publish(update.STABLE, "0.4.2")
+        u = self.updater()
+        self.assertEqual(u.check()["version"], "0.4.2")
+        self.assertEqual((u.status, u.ready), ("ready", "0.4.2"))
+        self.assertFalse(any("не запустилась" in m for _, m in self.said))
+        self.assertEqual(update.refused(self.root), "0.5.0b1")                         # kept for the test channel
+        for text in ("", "[]", '"0.4.2"', '{"version": 42}', '{"version": null}'):      # a damaged file: nothing refused
+            update.refused_path(self.root).write_text(text, encoding="utf-8")
+            self.assertIsNone(update.refused(self.root), text)
 
     def test_rolled_back_version_not_prepared_again(self):
         # two failed starts sent the launcher back: the same release is only told about, «Обновить» tries it
