@@ -102,6 +102,26 @@ def point_current(root: Path, version_dir: Path) -> None:
                        capture_output=True)
     else:
         current.symlink_to(version_dir, target_is_directory=True)
+    place_starter(root, version_dir)
+
+
+STARTER = "Barrens Voice.exe"
+
+
+def place_starter(root: Path, version_dir: Path) -> bool:
+    """The version's Barrens Voice.exe (in its release archive) to the install's root, where a player finds
+    it and the shortcuts point: put there when missing or changed, so updates keep it too. False when it
+    could not be (an old release without it, or the file in use: the one there goes on working)."""
+    source, target = version_dir / STARTER, root / STARTER
+    if not source.is_file():
+        return False
+    try:
+        if target.is_file() and target.read_bytes() == source.read_bytes():
+            return True
+        shutil.copyfile(source, target)
+        return True
+    except OSError:
+        return False
 
 
 def current_version(root: Path) -> str | None:

@@ -1,7 +1,7 @@
 """Build a release into dist/: barrens-voice-<version>.zip and manifest.json (`mise run build`).
 
 The archive is what bv/install.py puts into <install>\\app\\<version>: companion/ (the code, without the
-tests), addon/BarrensVoice, pyproject.toml, uv.lock, LICENSE. The manifest tells the launcher's updater
+tests), addon/BarrensVoice, pyproject.toml, uv.lock, LICENSE, and Barrens Voice.exe when built (on Windows). The manifest tells the launcher's updater
 what is there: the app's version, the strip protocol, the addon's version, the archive's name, size
 and SHA-256 (`mise run sign` adds a signature).
 """
@@ -69,7 +69,8 @@ def build() -> Path:
     DIST.mkdir(exist_ok=True)
     archive = DIST / f"barrens-voice-{info['version']}.zip"
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as z:
-        for source, name in sorted(files(), key=lambda f: f[1]):
+        extra = [(DIST / "Barrens Voice.exe", "Barrens Voice.exe")] if (DIST / "Barrens Voice.exe").is_file() else []
+        for source, name in sorted(files() + extra, key=lambda f: f[1]):   # the starter: built first on Windows
             info_ = zipfile.ZipInfo(name, date_time=(2026, 1, 1, 0, 0, 0))   # the same bytes from the same tree
             info_.compress_type = zipfile.ZIP_DEFLATED
             data = source.read_bytes()

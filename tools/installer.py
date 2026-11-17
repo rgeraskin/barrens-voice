@@ -60,10 +60,11 @@ def launcher_exe() -> Path:
 def main() -> int:
     sys.path.insert(0, str(ROOT / "tools"))
     import release
+    DIST.mkdir(exist_ok=True)
+    launcher_exe()                       # first: the release archive carries it too, for updates
     archive = release.build()
     version = archive.stem.removeprefix("barrens-voice-")
     uv_exe()
-    launcher_exe()
     iscc = next((p for p in ISCC if p and Path(p).is_file()), None)
     if iscc is None:
         sys.exit("Inno Setup 6 (ISCC.exe) not found: install it or set INNO_ISCC")

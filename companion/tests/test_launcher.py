@@ -399,3 +399,34 @@ class Wrap(unittest.TestCase):
             self.assertEqual(" ".join(x.strip() for x in lines), long.strip())     # nothing lost
         finally:
             root.destroy()
+
+
+class Starter(unittest.TestCase):
+    """Barrens Voice.exe comes with each release and follows the current version (installs and updates)."""
+
+    def test_follows_the_version(self):
+        import zipfile
+        from unittest import mock
+        from bv import install, update
+
+        def release(d, version, exe):
+            archive = d / f"barrens-voice-{version}.zip"
+            with zipfile.ZipFile(archive, "w") as z:
+                z.writestr("pyproject.toml", f'[project]\nname = "barrens-voice"\nversion = "{version}"\n')
+                z.writestr("uv.lock", "version = 1\n")
+                if exe is not None:
+                    z.writestr("Barrens Voice.exe", exe)
+            return archive
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            root = d / "BarrensVoice"
+            starter = root / "Barrens Voice.exe"
+            with mock.patch("bv.install.build"):
+                install.install(root, release(d, "0.4.0", b"v1"), "cuda", d / "uv.exe", log=lambda *a: None)
+                self.assertEqual(starter.read_bytes(), b"v1")                       # put there by the install
+                v = update.prepare(root, release(d, "0.4.1", b"v2"))
+                update.apply(root, v)
+                self.assertEqual(starter.read_bytes(), b"v2")                       # an update brings the new one
+                v = update.prepare(root, release(d, "0.4.2", None))
+                update.apply(root, v)
+                self.assertEqual(starter.read_bytes(), b"v2")                       # a release without it: kept
