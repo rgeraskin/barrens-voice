@@ -69,6 +69,81 @@ class LoadConfig(unittest.TestCase):
         self.assertEqual({level_of(m) for m in logged}, {"WARN"})
 
 
+class LiveSettings(unittest.TestCase):
+    """`LiveConfig`: the launcher's «Закрываться вместе с игрой» taken while the companion runs, whatever
+    the file is like at the moment it is looked at."""
+
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.path = Path(self.dir.name) / "config.json"
+        self.tick = 0
+
+    def tearDown(self):
+        self.dir.cleanup()
+
+    def write(self, text: str, encoding: str = "utf-8"):
+        import os
+        self.path.write_text(text, encoding=encoding)
+        self.tick += 10
+        os.utime(self.path, (self.tick, self.tick))        # a new stamp, whatever the clock's grain
+
+    def loaded(self):
+        self.write(json.dumps(dict(companion.DEFAULT_CONFIG, exit_with_wow=True)))
+        config, stamp = companion.load_config_stamped(self.path, lambda *a: None)
+        self.assertIsNotNone(stamp)                         # nothing new written: the file's own stamp
+        return config, stamp
+
+    def test_a_read_that_fails_is_tried_again(self):
+        # the stamp was kept before the read: one sharing violation lost the change until the next one
+        from unittest import mock
+        config, stamp = self.loaded()
+        live = companion.LiveConfig(config, self.path, stamp)
+        self.write(json.dumps({"exit_with_wow": False}))
+        with mock.patch.object(Path, "read_text", side_effect=PermissionError("sharing violation")):
+            live.refresh()
+        self.assertTrue(config["exit_with_wow"])
+        live.refresh()
+        self.assertFalse(config["exit_with_wow"])
+
+    def test_a_file_that_is_no_settings_is_left_alone(self):
+        # null or 5 raised TypeError in the main loop: the running companion died
+        config, stamp = self.loaded()
+        live = companion.LiveConfig(config, self.path, stamp)
+        for text in ("null", "5", "true", '"exit_with_wow"', "[]", '{"exit_with_wow": fal', '{"exit_with_wow": "false"}'):
+            self.write(text)
+            live.refresh()
+            self.assertTrue(config["exit_with_wow"], text)
+        self.write('{"exit_with_wow": false}')               # saved whole at last: taken
+        live.refresh()
+        self.assertFalse(config["exit_with_wow"])
+
+    def test_a_change_before_the_first_look(self):
+        # the stamp was first taken after the voice bank and the game's launch: a box unchecked meanwhile
+        # was never seen
+        config, stamp = self.loaded()
+        self.write(json.dumps(dict(companion.DEFAULT_CONFIG, exit_with_wow=False)))
+        live = companion.LiveConfig(config, self.path, stamp)
+        live.refresh()
+        self.assertFalse(config["exit_with_wow"])
+
+    def test_a_file_the_companion_wrote_is_read_at_the_first_look(self):
+        # new settings written in: the stamp is that of our own write, which may hide the launcher's
+        self.write('{"exit_with_wow": false}')
+        config, stamp = companion.load_config_stamped(self.path, lambda *a: None)
+        self.assertIsNone(stamp)
+        config["exit_with_wow"] = True
+        companion.LiveConfig(config, self.path, stamp).refresh()
+        self.assertFalse(config["exit_with_wow"])
+
+    def test_bom(self):
+        # Notepad's «UTF-8 with BOM»
+        config, stamp = self.loaded()
+        live = companion.LiveConfig(config, self.path, stamp)
+        self.write('{"exit_with_wow": false}', encoding="utf-8-sig")
+        live.refresh()
+        self.assertFalse(config["exit_with_wow"])
+
+
 class ServiceFrames(unittest.TestCase):
     """Frames that are not chat: state counts even in the frame that was up at the start, a command
     or a click only in a new one - and none of them is «строки типа … не озвучиваю»."""

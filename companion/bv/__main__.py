@@ -218,14 +218,20 @@ def _write_config(path: Path, config: dict) -> None:
     os.replace(tmp, path)
 
 
-def load_config(path: Path | None = None, log=log) -> dict:
-    """DEFAULT_CONFIG with config.json over it; settings new to the file written into it. Raises
-    ConfigError when the file is not JSON of settings (the launcher shows why)."""
-    path = path or CONFIG_PATH
-    config = dict(DEFAULT_CONFIG)
-    if not path.exists():
-        _write_config(path, config)
-        return config
+def _stamp(path: Path):
+    """What tells one state of config.json from another (None: no file, or it cannot be looked at)."""
+    try:
+        info = path.stat()
+    except OSError:
+        return None
+    return info.st_mtime_ns, info.st_size
+
+
+def read_config(path: Path) -> tuple[object, dict]:
+    """(stamp, settings) of config.json. The stamp is taken before the read: a change made while it is read
+    gets a newer stamp and is read again. Raises ConfigError when the file is not JSON of settings, OSError
+    when it cannot be read."""
+    stamp = _stamp(path)
     try:
         saved = json.loads(path.read_text(encoding="utf-8-sig"))   # -sig: Notepad's BOM is no error
     except json.JSONDecodeError as e:
@@ -234,39 +240,52 @@ def load_config(path: Path | None = None, log=log) -> dict:
         raise ConfigError(f"config.json не читается: {e}") from e
     if not isinstance(saved, dict):
         raise ConfigError("config.json не читается: в нём должны быть настройки в фигурных скобках { }")
+    return stamp, saved
+
+
+def load_config_stamped(path: Path | None = None, log=log) -> tuple[dict, object]:
+    """`load_config` and the stamp of the file it read (`LiveConfig` starts from it); None when the companion
+    wrote the file itself, so that the first look reads it again."""
+    path = path or CONFIG_PATH
+    config = dict(DEFAULT_CONFIG)
+    if not path.exists():
+        _write_config(path, config)
+        return config, None
+    stamp, saved = read_config(path)
     config.update(saved)
     settle_numbers(config, log)
     if any(key not in saved for key in DEFAULT_CONFIG):   # new settings: write them in
         _write_config(path, config)
-    return config
+        stamp = None
+    return config, stamp
+
+
+def load_config(path: Path | None = None, log=log) -> dict:
+    """DEFAULT_CONFIG with config.json over it; settings new to the file written into it. Raises
+    ConfigError when the file is not JSON of settings (the launcher shows why)."""
+    return load_config_stamped(path, log)[0]
 
 
 class LiveConfig:
     """Settings the launcher changes while the companion runs, taken from config.json again when it changes:
-    «Закрываться вместе с игрой» unchecked during the game must keep the companion when the game closes."""
+    «Закрываться вместе с игрой» unchecked during the game must keep the companion when the game closes.
+    `stamp` is the file's as `load_config_stamped` read it, so a change made since (while the voice bank is
+    built, the game launched) is taken at the first look; None reads the file then."""
     KEYS = ("exit_with_wow",)
 
-    def __init__(self, config: dict, path: Path = CONFIG_PATH):
-        self.config, self.path = config, path
-        self.stamp = self._stamp()
-
-    def _stamp(self):
-        try:
-            return self.path.stat().st_mtime
-        except OSError:
-            return None
+    def __init__(self, config: dict, path: Path = CONFIG_PATH, stamp=None):
+        self.config, self.path, self.stamp = config, path, stamp
 
     def refresh(self) -> None:
-        stamp = self._stamp()
-        if stamp == self.stamp:
+        if _stamp(self.path) == self.stamp:
             return
-        self.stamp = stamp
         try:
-            saved = json.loads(self.path.read_text(encoding="utf-8-sig"))
-        except (OSError, ValueError):
+            stamp, saved = read_config(self.path)
+        except (OSError, ConfigError):   # being written, held by an antivirus, broken: the next look tries again
             return
-        for key in self.KEYS:
-            if key in saved:
+        self.stamp = stamp                # only a read that worked counts as seen
+        for key in self.KEYS:            # of the default's type: "false" typed as text is no False
+            if isinstance(saved.get(key), type(DEFAULT_CONFIG[key])):
                 self.config[key] = saved[key]
 
 
@@ -506,7 +525,7 @@ def main() -> int:
     make_dpi_aware()
 
     try:
-        config = load_config()
+        config, config_stamp = load_config_stamped()
     except (ConfigError, OSError) as e:                 # before anything else: nothing works without it
         log(f"ОШИБКА: {e}")
         log("    исправьте файл или удалите его — компаньон создаст новый с настройками по умолчанию")
@@ -575,6 +594,7 @@ def main() -> int:
     seen_lines = SeenLines(DATA_DIR / "tmp" / "seen_lines.txt")
     # --launch / --no-launch: the launcher's Play and its start for a game already running
     want_launch = "--launch" in sys.argv or (config["launch_wow"] and "--no-launch" not in sys.argv)
+    live = LiveConfig(config, CONFIG_PATH, config_stamp)   # from the file as read: a change from now on is seen
     if want_launch and not launch.wow_running():
         # the race voices come from the client's files: (re)made before the game, after an update
         from . import gamevoices
@@ -587,7 +607,6 @@ def main() -> int:
     dictionary = Dictionary(config, log, find_addon(config))
     dictionary.refresh()
     dictionary_checked = time.monotonic()
-    live = LiveConfig(config)
     # the dictionary online (bv/online_dictionary.py): on in an install, off run from the source (where the
     # addon's own Dictionary.lua is being edited); config.json "dictionary_online" says otherwise
     from . import online_dictionary
