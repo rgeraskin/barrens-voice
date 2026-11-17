@@ -182,17 +182,25 @@ local function OnUpdate()
     idle = false
 end
 
---- Queue a payload (UTF-8 text) for the strip. Returns the payload as it will be sent (trimmed).
+-- A hidden strip (the addon switched off) runs no OnUpdate: what was queued then would all play at
+-- the next /bv on (old test lines, a link clicked an hour ago). It takes nothing while hidden; the
+-- addon sends fresh settings and the dictionary layer when it is switched on (ns.SetEnabled).
+local function Taking()
+    return frame ~= nil and frame:IsShown()
+end
+
+--- Queue a payload (UTF-8 text) for the strip (dropped while it is hidden).
 function S.Push(payload)
+    if not Taking() then return end
     seq = (seq + 1) % 65536
-    local cells, sent = P.Encode(seq, payload, total)
+    local cells = P.Encode(seq, payload, total)
     queue[#queue + 1] = cells
     while #queue > MAX_QUEUE do table.remove(queue, 1) end
-    return sent
 end
 
 --- Put a payload ahead of everything queued and show it now (a stop must not wait its turn).
 function S.PushNow(payload)
+    if not Taking() then return end
     seq = (seq + 1) % 65536
     local cells = P.Encode(seq, payload, total)
     queue = { cells }
@@ -202,14 +210,17 @@ end
 --- Put a payload ahead of the queued ones, keeping them (a pause for CatQuest must not wait behind
 --- chat lines, nor drop them as PushNow does).
 function S.PushFirst(payload)
+    if not Taking() then return end
     seq = (seq + 1) % 65536
     local cells = P.Encode(seq, payload, total)
     table.insert(queue, 1, cells)
     while #queue > MAX_QUEUE do table.remove(queue, 2) end
 end
 
-function S.SetShown(shown)
-    if frame then frame:SetShown(shown) end
+function S.SetShown(on)
+    if not frame then return end
+    frame:SetShown(on)
+    if not on then queue = {} end
 end
 
 --- For the tests: how many frames wait, and the cells on the strip now.

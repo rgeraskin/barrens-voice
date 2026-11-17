@@ -831,3 +831,19 @@ ns.db.stripPlace, ns.db.stripFrom = "bottom", "left"
 SQ.Layout()
 print("strip queue ok")
 
+-- switched off: the hidden strip takes nothing (its OnUpdate does not run, all would play at /bv on)
+local quiet3 = print
+print = function() end
+step(1)
+ns.SetEnabled(false)
+assert(not strip:IsShown() and waiting() == 0, "/bv off: hidden, nothing waiting")
+for _ = 1, 30 do ns.SendControl() end
+ns.OpenLink("discord")
+ns.Test()
+SQ.PushFirst("x"); SQ.PushNow("y")
+assert(waiting() == 0, "nothing queued while off: " .. waiting())
+ns.SetEnabled(true)
+print = quiet3
+assert(strip:IsShown() and step(0):find("^control\31"), "/bv on: fresh settings first")
+assert(step(0.25):find("^dict\31"), "and the dictionary layer")
+print("strip off ok")

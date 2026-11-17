@@ -693,6 +693,10 @@ local TESTS = {
 }
 
 function ns.Test()
+    if not ns.db.enabled then
+        print(PREFIX .. "озвучка выключена, включите её: /bv on.")
+        return
+    end
     for _, t in ipairs(TESTS) do ns.Send("test", t[1], t[2], t[3], t[4], "", t[5]) end
     print("|cff66ccffBarrens Voice|r: отправлено " .. #TESTS .. " тестовых строки.")
 end
@@ -757,7 +761,10 @@ end
 function ns.SetEnabled(enabled)
     ns.db.enabled = enabled and true or false
     if ns.db.enabled then
+        -- the hidden strip took nothing: the settings and the dictionary layer afresh
         ns.Strip.SetShown(true)
+        ns.SendControl()
+        ns.SendDictionary(true)
     else
         -- the stop has to be on the strip long enough to be read before the strip goes
         ns.Stop()
