@@ -296,6 +296,18 @@ class OnCard(unittest.TestCase):
             on_card(Session("CPUExecutionProvider"), "DmlExecutionProvider")
         self.assertIn("DirectX 12", str(told.exception))
 
+    def test_card_session(self):
+        # F5 and Whisper (the voice bank) set their sessions up in one place: the same card, DirectML's needs
+        from bv.f5engine import card_session
+        options, providers = card_session("DmlExecutionProvider")
+        self.assertFalse(options.enable_mem_pattern)
+        self.assertEqual(providers, [("DmlExecutionProvider", {"device_id": 0, "performance_preference": "high_performance"}),
+                                     "CPUExecutionProvider"])
+        options, providers = card_session("CUDAExecutionProvider")
+        self.assertTrue(options.enable_mem_pattern)
+        self.assertEqual(providers, ["CUDAExecutionProvider", "CPUExecutionProvider"])
+        self.assertEqual(card_session("CPUExecutionProvider")[1], ["CPUExecutionProvider"])
+
 
 if __name__ == "__main__":
     unittest.main()

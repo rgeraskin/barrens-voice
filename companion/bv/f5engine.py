@@ -123,6 +123,24 @@ def on_card(session, engine: str) -> None:
                            "нужна NVIDIA (CUDA) или видеокарта с DirectX 12")
 
 
+def card_session(engine: str):
+    """(SessionOptions, providers) for a graph on the video card, F5's and Whisper's alike: DirectML's
+    own requirements (no memory pattern, one node at a time) and its fastest card; the processor last,
+    as ONNX Runtime's fallback (`on_card` refuses a session that fell back). Any other engine: the
+    processor alone."""
+    import onnxruntime as ort
+    options = ort.SessionOptions()
+    options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+    if engine == "DmlExecutionProvider":
+        options.enable_mem_pattern = False
+        options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+        return options, [(engine, {"device_id": 0, "performance_preference": "high_performance"}),
+                         "CPUExecutionProvider"]
+    if engine in PREFERRED:
+        return options, [engine, "CPUExecutionProvider"]
+    return options, ["CPUExecutionProvider"]
+
+
 def preload(engine: str) -> None:
     """CUDA and cuDNN from their pip packages (onnxruntime-gpu[cuda,cudnn]) before a CUDA session."""
     if engine == "CUDAExecutionProvider":

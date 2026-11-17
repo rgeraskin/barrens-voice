@@ -59,15 +59,9 @@ class OnnxChecker:
             self.eos = gen["eos_token_id"]
             self.suppress = np.array(gen.get("suppress_tokens") or [], dtype=np.int64)
             self.begin_suppress = np.array(gen.get("begin_suppress_tokens") or [], dtype=np.int64)
-            options = ort.SessionOptions()
-            providers = ["CPUExecutionProvider"]
-            if self.provider == "DmlExecutionProvider":      # DirectML asks for these two
-                options.enable_mem_pattern = False
-                options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
-            if self.provider in ("DmlExecutionProvider", "CUDAExecutionProvider"):
-                providers = [self.provider, "CPUExecutionProvider"]
+            from .f5engine import card_session, on_card
+            options, providers = card_session(self.provider)    # the same card as F5's
             self.encoder = ort.InferenceSession(paths["onnx/encoder_model_fp16.onnx"], options, providers=providers)
-            from .f5engine import on_card
             on_card(self.encoder, self.provider)            # not quietly on the processor: the bank would take ages
             self.decoder = ort.InferenceSession(paths["onnx/decoder_model_fp16.onnx"], options, providers=providers)
             self.feature_type = np.float16 if "float16" in self.encoder.get_inputs()[0].type else np.float32

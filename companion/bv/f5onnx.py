@@ -75,17 +75,11 @@ class F5Onnx:
         self.hop = int(meta["hop_length"])
         self.steps = int(meta["nfe_step"])
         self.max_frames = int(meta["max_signal_length"])
-        options = ort.SessionOptions()
-        options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-        if self.provider == "DmlExecutionProvider":
-            options.enable_mem_pattern = False           # DirectML's own requirements
-            options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
-        card = [(self.provider, {"device_id": 0, "performance_preference": "high_performance"})
-                if self.provider == "DmlExecutionProvider" else self.provider, "CPUExecutionProvider"]
+        from .f5engine import card_session, on_card
+        options, card = card_session(self.provider)
         cpu = ["CPUExecutionProvider"]
         self.pre = ort.InferenceSession(str(self.model_dir / meta["model_file_name_preprocess"]), options, providers=card)
         self.net = ort.InferenceSession(str(self.model_dir / meta["model_file_name_transformer"]), options, providers=card)
-        from .f5engine import on_card
         on_card(self.net, self.provider)
         self.dec = ort.InferenceSession(str(self.model_dir / meta["model_file_name_decode"]), providers=cpu)
         types = {"tensor(float)": np.float32, "tensor(float16)": np.float16, "tensor(int16)": np.int16}
