@@ -135,6 +135,9 @@ function W.Create(pane)
     local function Say()
         local _, class = UnitClass("player")
         local _, race = UnitRace("player")
+        -- an edit of the last 2 s is still waiting to be sent (Core.lua ns.DictionaryChanged): it goes
+        -- first, so the line is read with the dictionary as it is now
+        ns.SendDictionary(false)
         ns.Send("test", UnitName("player"), race, UnitSex("player"), class, "", try:GetText())
         try:ClearFocus()
     end

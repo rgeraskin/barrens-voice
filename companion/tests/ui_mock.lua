@@ -206,6 +206,25 @@ sent = {}
 ns.SendDictionary(true)
 assert(#sent >= 1 and sent[1]:find("^dict\31"), sent[1] or "nothing sent")
 print("dictionary to the program ok")
+-- «Озвучить» right after an edit: the edit goes before the line (not 2 s later, after it)
+UnitName, UnitClass, UnitRace, UnitSex = function() return "Громмаш" end, function() return "Воин", "WARRIOR" end,
+    function() return "Орк", "Orc" end, function() return 2 end
+local tryBox
+for _, f in ipairs(frames) do
+    if f._scripts.OnEnterPressed and f._text == "WTS сумки, нужен дд в ОП" then tryBox = f end
+end
+assert(tryBox, "the line to try")
+ns.Dictionary.SetText(ns.Dictionary.Text() .. "зюзябра=проверка\n")
+sent = {}
+tryBox._scripts.OnEnterPressed(tryBox)
+assert(#sent >= 2 and sent[1]:find("^dict\31") and sent[1]:find("зюзябра=проверка", 1, true), sent[1] or "nothing")
+assert(sent[#sent]:find("^test\31"), "then the line")
+sent = {}
+tryBox._scripts.OnEnterPressed(tryBox)
+assert(#sent == 1 and sent[1]:find("^test\31"), "the layer unchanged since: not sent again")
+ns.Dictionary.Reset()
+UnitName, UnitClass, UnitRace, UnitSex = nil, nil, nil, nil
+print("try a line ok")
 
 -- while CatQuest reads a quest, chat lines wait; they go when it is done; stale ones are dropped
 local clock = 100
