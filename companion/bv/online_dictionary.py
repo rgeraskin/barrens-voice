@@ -168,13 +168,9 @@ def write_addon(addon: Path | None, data: dict, log) -> bool:
     """DictionaryOnline.lua in the addon's folder (only when it changes); whether it was written."""
     if addon is None or not addon.is_dir():
         return False
-    path = addon / "DictionaryOnline.lua"
-    text = lua(data)
+    from .paths import write_if_changed
     try:
-        if path.exists() and path.read_text(encoding="utf-8") == text:
-            return False
-        path.write_text(text, encoding="utf-8")
+        return write_if_changed(addon / "DictionaryOnline.lua", lua(data))
     except OSError as e:
         log(f"словарь онлайн: не записан в аддон ({e})")
         return False
-    return True

@@ -55,9 +55,11 @@ def write(config: dict, voices, default_off, log) -> None:
     if addon is None:
         log("аддон не найден: список голосов Windows не записан")
         return
-    path = addon / "VoiceList.lua"
-    text = render(voices, default_off)
-    if path.exists() and path.read_text(encoding="utf-8") == text:
+    from .paths import write_if_changed
+    try:
+        if not write_if_changed(addon / "VoiceList.lua", render(voices, default_off)):
+            return
+    except OSError as e:          # the game holds the file: the addon keeps the list it has
+        log(f"не удалось записать список голосов Windows в аддон: {e}")
         return
-    path.write_text(text, encoding="utf-8")
     log(f"список голосов Windows записан в аддон ({len(voices)}); в игре он появится после /reload")

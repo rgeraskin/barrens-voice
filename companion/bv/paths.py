@@ -51,3 +51,19 @@ CACHE_DIR: Path = _LAYOUT["cache"]
 def starter() -> str:
     """The command line that starts the launcher (without its switches)."""
     return _LAYOUT["starter"]
+
+
+def write_if_changed(path: Path, text: str) -> bool:
+    """`text` into `path` unless the file already holds it; whether it was written. Through a
+    temporary file: the game (or the launcher) reading the file at that moment gets the old one or the
+    new one, never half. Raises OSError (a file the game holds open, a folder gone)."""
+    path = Path(path)
+    try:
+        if path.read_text(encoding="utf-8") == text:
+            return False
+    except (OSError, ValueError):
+        pass
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(text, encoding="utf-8")
+    os.replace(tmp, path)
+    return True

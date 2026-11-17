@@ -13,7 +13,6 @@ launch as playable, whatever is in it - so it tells nothing.
 """
 from __future__ import annotations
 
-import os
 import threading
 import time
 from pathlib import Path
@@ -33,10 +32,9 @@ def write(addon: Path, now: float | None = None, stopped: bool = False) -> bool:
     text = ("-- Written by the Barrens Voice companion app every 15 seconds while it runs, and once when it\n"
             "-- ends; the addon reads it at login and /reload (Companion.lua).\n"
             f"BarrensVoiceStatus = {body}\n")
-    tmp = path.with_suffix(".tmp")
+    from .paths import write_if_changed
     try:
-        tmp.write_text(text, encoding="utf-8")
-        os.replace(tmp, path)
+        write_if_changed(path, text)
         return True
     except OSError:               # the game reading it this very moment: next time
         return False

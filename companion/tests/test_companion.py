@@ -1,4 +1,4 @@
-"""The companion's own plumbing (bv/__main__.py) that runs without Windows: config.json."""
+"""The companion's own plumbing that runs without Windows: config.json, the files it writes into the addon."""
 import json
 import sys
 import tempfile
@@ -59,6 +59,37 @@ class LoadConfig(unittest.TestCase):
         self.assertEqual(len(logged), 3, logged)
         from bv.logs import level_of
         self.assertEqual({level_of(m) for m in logged}, {"WARN"})
+
+
+class AddonFiles(unittest.TestCase):
+    """VoiceList.lua, CompanionStatus.lua and DictionaryOnline.lua: written whole or not at all."""
+
+    def test_write_if_changed(self):
+        from bv.paths import write_if_changed
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "VoiceList.lua"
+            self.assertTrue(write_if_changed(path, "a = 1\n"))
+            self.assertFalse(write_if_changed(path, "a = 1\n"))           # the same: not written again
+            self.assertTrue(write_if_changed(path, "a = 2\n"))
+            self.assertEqual(path.read_text(encoding="utf-8"), "a = 2\n")
+            self.assertEqual([p.name for p in Path(d).iterdir()], ["VoiceList.lua"])
+            with self.assertRaises(OSError):
+                write_if_changed(Path(d) / "gone" / "VoiceList.lua", "x")
+
+    def test_a_voice_list_that_cannot_be_written_does_not_stop_the_companion(self):
+        # voicelist.write ran bare at the start: a locked VoiceList.lua ended the companion
+        from unittest import mock
+
+        from bv import voicelist
+        logged = []
+        with tempfile.TemporaryDirectory() as d, \
+                mock.patch.object(voicelist, "find_addon", return_value=Path(d)), \
+                mock.patch("bv.paths.write_if_changed", side_effect=PermissionError("locked")):
+            voicelist.write({}, [], lambda v: False, logged.append)
+        self.assertEqual(logged, ["не удалось записать список голосов Windows в аддон: locked"])
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(voicelist, "find_addon", return_value=Path(d)):
+            voicelist.write({}, [], lambda v: False, logged.append)
+            self.assertTrue((Path(d) / "VoiceList.lua").is_file())
 
 
 if __name__ == "__main__":
