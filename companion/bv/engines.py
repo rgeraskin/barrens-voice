@@ -4,23 +4,28 @@ program's window; spoken only with "spoken_notices" (the program cannot write in
 from __future__ import annotations
 
 import threading
+import time
 from pathlib import Path
 
 from . import state
 from .protocol import Line
 
 NOTICE_SENDER = "Barrens Voice"
+# seconds after a failed load before a line asking for the race voices loads them again (a switch to
+# Windows voices and back in the addon tries at once)
+RETRY_AFTER = 600.0
 
 
 class Engines:
-    def __init__(self, config: dict, log, home: Path, sapi, accentor, player=None):
-        self.config, self.log, self.home = config, log, home
+    def __init__(self, config: dict, log, home: Path, sapi, accentor, player=None, clock=time.monotonic):
+        self.config, self.log, self.home, self.clock = config, log, home, clock
         self.player = player
         self.sapi, self.accentor = sapi, accentor
         self.f5 = None
         self.ready = False
         self.on_ready = None    # called once F5 is loaded (all models are in the cache by then)
         self.on_error = None    # called with the error when F5 fails to load
+        self.failed_at = None   # clock() of the last failed load: not tried again for RETRY_AFTER
         self.lock = threading.Lock()
 
     def notice(self, text: str) -> None:
@@ -33,11 +38,16 @@ class Engines:
         if voice == "f5":
             self._load()
         elif voice == "sapi":
+            with self.lock:
+                self.failed_at = None       # switched away: switching back tries again at once
             self._unload()
 
     def _load(self) -> None:
         with self.lock:
             if self.f5 is not None:
+                return
+            # every frame and chat line asks for F5: a failed load is not started again for each
+            if self.failed_at is not None and self.clock() - self.failed_at < RETRY_AFTER:
                 return
             from .f5engine import F5Speaker
             self.log("загружаю голоса рас ...")
@@ -53,7 +63,7 @@ class Engines:
             if self.f5 is not speaker:
                 return                      # unloaded meanwhile
             if speaker.error is not None:
-                self.f5 = None
+                self.f5, self.failed_at = None, self.clock()
                 error = speaker.error
             else:
                 self.ready, error = True, None

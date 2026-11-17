@@ -13,11 +13,19 @@ from bv.protocol import Line  # noqa: E402
 
 class FakeF5:
     fail = None
+    made = 0
 
     def __init__(self, *a):
+        FakeF5.made += 1
         self.ready = threading.Event()
         self.error = None
         self.stopped = False
+        self.cleared = False
+        self.assigner = None
+        self.lines = __import__("queue").Queue()
+
+    def clear(self):
+        self.cleared = True
 
     def start(self):
         self.error = FakeF5.fail
@@ -34,6 +42,9 @@ class FakeSapi:
 
     def say(self, line):
         self.said.append(line.text)
+
+    def clear(self):
+        pass
 
 
 from bv.engines import Engines  # noqa: E402
@@ -55,9 +66,11 @@ class EnginesTest(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    def make(self):
+    def make(self, home=Path("."), clock=None):
         self.sapi = FakeSapi()
-        return Engines({"engine": "f5", "spoken_notices": True}, lambda *a: None, Path("."), self.sapi, None)
+        self.logged = []
+        return Engines({"engine": "f5", "spoken_notices": True}, self.logged.append, home, self.sapi, None,
+                       **({"clock": clock} if clock else {}))
 
     def test_load_on_demand_then_unload(self):
         FakeF5.fail = None
@@ -95,6 +108,51 @@ class EnginesTest(unittest.TestCase):
         self.assertNotIn("Голоса рас готовы.", self.sapi.said)
         line = Line("say", "Орк", "Orc", "2", "", "", "текст", 100, "f5")
         self.assertIs(e.for_line(line), self.sapi)
+
+
+    def test_a_failed_load_is_not_started_again_for_every_line(self):
+        from bv import engines
+        FakeF5.fail, FakeF5.made = "нет CUDA", 0
+        now = [0.0]
+        e = self.make(clock=lambda: now[0])
+        line = Line("say", "Орк", "Orc", "2", "", "", "текст", 100, "f5")
+        for _ in range(5):                                  # each frame and line asks for F5
+            e.want("f5")
+            self.assertIs(e.for_line(line), self.sapi)
+            wait()
+        self.assertEqual(FakeF5.made, 1)
+        self.assertEqual(self.sapi.said.count("Голоса рас недоступны, читаю голосами Windows."), 1)
+        now[0] = engines.RETRY_AFTER + 1                    # a while later: tried once more
+        e.want("f5")
+        wait()
+        e.want("f5")
+        wait()
+        self.assertEqual(FakeF5.made, 2)
+        e.want("sapi")                                      # the addon switched to Windows voices and back
+        e.want("f5")
+        wait()
+        self.assertEqual(FakeF5.made, 3)
+
+    def test_unloaded_stopped_or_reset_while_loading(self):
+        import tempfile
+        FakeF5.fail = None
+        with tempfile.TemporaryDirectory() as d:
+            e = self.make(home=Path(d))
+            e.want("f5")
+            loading = e.f5
+            e.stop()                                        # a stop while loading: its queue is dropped
+            self.assertTrue(loading.cleared)
+            (Path(d) / "assignments.json").write_text("{}", encoding="utf-8")
+            e.reset_assignments()                           # no assigner yet: the file is forgotten
+            self.assertFalse((Path(d) / "assignments.json").exists())
+            e.want("sapi")                                  # unloaded before it was ready
+            self.assertTrue(loading.stopped)
+            self.assertIn("загрузка голосов рас отменена", self.logged)
+            loading.ready.set()                             # its load ends after all: nobody listens
+            wait()
+            self.assertFalse(e.ready)
+            self.assertIsNone(e.f5)
+            self.assertNotIn("Голоса рас готовы.", self.sapi.said)
 
 
 class Accent:
