@@ -75,10 +75,7 @@ ChatFrameUtil = {
     end,
 }
 local ns = {}
-for _, f in ipairs({ "Protocol.lua", "Strip.lua", "Dictionary.lua", "VoiceList.lua", "Text.lua", "QuestVoice.lua", "Core.lua", "ChatFade.lua", "CompanionStatus.lua", "Companion.lua", "UI.lua",
-                     "DictionaryWindow.lua", "StripWindow.lua", "Options.lua", "VoicesWindow.lua", "Minimap.lua" }) do
-    assert(loadfile(f))("BarrensVoice", ns)
-end
+dofile("../../companion/tests/toc.lua")(ns)   -- every file, in the .toc's order
 BarrensVoiceVoiceList = { { name = "Anna", label = "Anna (RHVoice)", gender = "Female", on = true },
                           { name = "Aidar (Russian)", label = "Aidar (Silero)", gender = "Male", on = true } }
 ns.db = setmetatable({ rate = 100, voices = "f5", enabled = true,
