@@ -274,16 +274,21 @@ class App:
         if code not in (0, None):
             self.say(f"компаньон остановился (код {code}) — подробности в «Журнале»", "ERROR")
 
-    def start_failed(self, code: int | None) -> bool:
-        """Whether the companion's end counts against a freshly applied version: an error, but not 4 (another
-        companion runs), not 5 (config.json cannot be read) nor an error this very run explained itself
-        (state.json's phase "error" with its pid: no addon, say) - the version is not at fault and going back
-        would not help."""
-        if code in (0, None, Companion.RESTART, Companion.ALREADY, Companion.CONFIG_ERROR):
+    def start_failed(self, code: int | None) -> bool | None:
+        """How the companion's end counts for a freshly applied version (update.record_start): True - an error,
+        the version's failed start; False - a good end (0); None - no verdict: 3 (started again online), 4
+        (another companion runs), 5 (config.json cannot be read) or an error this very run explained itself
+        (state.json's phase "error" with its pid: no addon, say). Those say nothing of the version either way:
+        going back would not help, and taking them for a good run settled a version that had not started yet."""
+        if code == 0:
             return False
+        if code in (None, Companion.RESTART, Companion.ALREADY, Companion.CONFIG_ERROR):
+            return None
         state = self.companion.state()
         proc = getattr(self.companion, "proc", None)
-        return not (state.get("phase") == "error" and proc is not None and state.get("pid") == proc.pid)
+        if state.get("phase") == "error" and proc is not None and state.get("pid") == proc.pid:
+            return None
+        return True
 
     # --- actions --------------------------------------------------------------------------------
 

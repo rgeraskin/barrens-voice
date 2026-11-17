@@ -664,23 +664,31 @@ class Update(unittest.TestCase):
             self.assertFalse(update.state_path(root).exists())
 
     def test_config_error_does_not_go_back(self):
-        # the companion's exit 5 (config.json cannot be read): the launcher passes failed=False - no rollback
+        # exit 3 (start again online), 4 (another companion), 5 (config.json cannot be read), an error the run
+        # explained: no verdict - no rollback, but nothing settled either (update.json kept, nothing pruned), so
+        # the version's own failed starts after them still send the launcher back
         from types import SimpleNamespace
         from unittest import mock
         from bv import install, update
         from bv.launcher import app
-        win = SimpleNamespace(companion=SimpleNamespace(state=lambda: {}, proc=SimpleNamespace(pid=7)))
-        with tempfile.TemporaryDirectory() as d:
-            root = Path(d)
-            for v in ("0.4.0", "0.4.1"):
-                (root / "app" / v).mkdir(parents=True)
-            install.point_current(root, root / "app" / "0.4.0")
-            update.apply(root, "0.4.1")
-            with mock.patch("bv.install.prune"):
-                for _ in range(3):
-                    self.assertIsNone(update.record_start(root, 5, failed=app.App.start_failed(win, 5)))
-            self.assertEqual(install.current_version(root), "0.4.1")
-            self.assertIsNone(update.refused(root))
+        explained = {"phase": "error", "error": "аддон не установлен", "pid": 7}
+        for code, state in ((3, {}), (4, {}), (5, {}), (1, explained)):
+            win = SimpleNamespace(companion=SimpleNamespace(state=lambda s=state: s, proc=SimpleNamespace(pid=7)))
+            with self.subTest(code=code), tempfile.TemporaryDirectory() as d:
+                root = Path(d)
+                for v in ("0.3.9", "0.4.0", "0.4.1"):
+                    (root / "app" / v).mkdir(parents=True)
+                install.point_current(root, root / "app" / "0.4.0")
+                update.apply(root, "0.4.1")
+                with mock.patch("bv.install.prune") as prune:
+                    for _ in range(3):
+                        self.assertIsNone(update.record_start(root, 5, failed=app.App.start_failed(win, code)))
+                prune.assert_not_called()
+                self.assertTrue(update.state_path(root).is_file())                   # still watched
+                self.assertEqual(install.current_version(root), "0.4.1")
+                self.assertIsNone(update.refused(root))
+                self.assertIsNone(update.record_start(root, 5, failed=True))           # then it really fails
+                self.assertEqual(update.record_start(root, 5, failed=True), "0.4.0")  # twice: back
 
     def test_settled_start_prunes(self):
         from bv import install, update
@@ -1353,10 +1361,11 @@ class UpdateInWindow(unittest.TestCase):
         state = {}
         win = self.ns(companion=self.ns(state=lambda: state, proc=self.ns(pid=7)))
         failed = lambda code: self.app.App.start_failed(win, code)                    # noqa: E731
-        self.assertEqual([failed(c) for c in (0, None, 3, 4, 5)], [False] * 5)        # 5: config.json unreadable
+        self.assertFalse(failed(0))                                                    # a good end
+        self.assertEqual([failed(c) for c in (None, 3, 4, 5)], [None] * 4)            # no verdict either way
         self.assertTrue(failed(1))                                                     # died: the version's fault
         state.update(phase="error", error="аддон не установлен", pid=7)
-        self.assertFalse(failed(1))                                                    # this run said why itself
+        self.assertIsNone(failed(1))                                                   # this run said why itself
         state["pid"] = 6
         self.assertTrue(failed(1))                                                     # an earlier run's state
 
