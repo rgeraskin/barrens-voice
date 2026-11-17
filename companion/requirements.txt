@@ -18,3 +18,5 @@ huggingface_hub==1.33.0
 # the launcher's tray icon
 pystray==0.19.5
 pillow==12.3.0
+# the updates and the dictionary online check signatures (bv/update.py)
+cryptography==50.0.2
