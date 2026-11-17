@@ -64,7 +64,7 @@
 - GitHub Actions, только раннер Windows (компаньон — только для Windows; стандартные раннеры бесплатны для публичных репозиториев): тесты Python и Lua на каждый push.
 - На тег: архив `barrens-voice-X.Y.Z.zip` (код, аддон, `pyproject.toml`, `uv.lock`), `manifest.json` (версия, протокол, версия аддона, SHA-256) с подписью ed25519 (публичный ключ — в лаунчере, закрытый — в секретах CI), установщик (Inno Setup), выпуск на GitHub с разделом CHANGELOG.
 - Если менялся аддон — загрузка на CurseForge и Wago (упаковщик BigWigs, `.pkgmeta`). У Forever на CurseForge своя версия игры (1.60.1). Аддон, которому нужна внешняя программа, на CurseForge допустим: так устроены ForeverDubbed и AI Agents Chat.
-- Словарь онлайн: после тестов на master CI кладёт `dictionary.json` (с подписью и номером формата, минимальной версией компаньона) в отдельную ветку `dictionary`; компаньон читает его с `raw.githubusercontent.com/rgeraskin/barrens-voice/dictionary/dictionary.json`. Подпись нужна: регулярки словаря исполняет компаньон.
+- Словарь онлайн (сделано): после тестов на master CI собирает `dictionary.json` (`mise run dictionary`: стандарт и `D.RENAMED` из `Dictionary.lua`, формат, ревизия — время последнего коммита, менявшего `Dictionary.lua`), подписывает ключом выпусков и кладёт в ветку `dictionary`, только если словарь изменился. Компаньон читает его с `raw.githubusercontent.com/rgeraskin/barrens-voice/dictionary/dictionary.json` при запуске и раз в час. Подробно — DEVELOPMENT, «Словарь на слоях».
 
 ## Подпись установщика
 

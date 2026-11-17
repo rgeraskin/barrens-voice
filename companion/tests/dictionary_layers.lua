@@ -73,3 +73,30 @@ D.DEFAULT = saved
 D.Invalidate()
 
 print("dictionary layers ok")
+
+-- the dictionary online (DictionaryOnline.lua, loaded before Dictionary.lua): the newer default wins
+local function loaded(online)
+    BarrensVoiceDictionaryOnline = online
+    local other = { db = {} }
+    assert(loadfile("Protocol.lua"))("BarrensVoice", other)
+    assert(loadfile("Dictionary.lua"))("BarrensVoice", other)
+    BarrensVoiceDictionaryOnline = nil
+    return other.Dictionary
+end
+local newer = loaded({ revision = 5, renamed = { ["~old"] = "~new" }, text = "\nзюзябра=тест\n" })
+assert(newer.DEFAULT:find("зюзябра=тест", 1, true) and newer.REVISION == 5 and newer.RENAMED["~old"] == "~new")
+local same = loaded({ revision = 0, text = "\nзюзябра=тест\n" })                -- not newer than the addon's own
+assert(not same.DEFAULT:find("зюзябра=тест", 1, true) and same.REVISION == 0)
+assert(not loaded(nil).DEFAULT:find("зюзябра", 1, true))                         -- nothing fetched yet
+-- an entry the newer default no longer has: the window keeps it only for who changed it (their own line)
+local fewer = loaded({ revision = 5, text = "\nкд=кулд+аун\n" })
+assert(fewer.Text():find("кд=кулд+аун", 1, true) and not fewer.Text():find("имба=", 1, true), "untouched: gone")
+local db = { dictionaryEdits = { lines = { ["имба"] = "имба=имба" }, removed = {} } }
+BarrensVoiceDictionaryOnline = { revision = 5, text = "\nкд=кулд+аун\n" }
+local mine = { db = db }
+assert(loadfile("Protocol.lua"))("BarrensVoice", mine)
+assert(loadfile("Dictionary.lua"))("BarrensVoice", mine)
+BarrensVoiceDictionaryOnline = nil
+mine.Dictionary.Migrate(db)
+assert(mine.Dictionary.Text():find("имба=имба", 1, true), "changed by the player: kept as theirs")
+print("dictionary online ok")

@@ -556,6 +556,18 @@ end
 -- deleted the old entry keeps their choice: the new default entry does not appear beside it.
 D.RENAMED = {}
 
+-- Which default this is: the time of the last commit that changed this file (tools/release.py sets it in a
+-- release; 0 here, in the repository). The program fetches a fresher default from GitHub (the dictionary
+-- online, bv/online_dictionary.py) and writes it into DictionaryOnline.lua, loaded before this file: the
+-- newer of the two is the default, so a later addon update with a newer dictionary is not hidden by an
+-- older download.
+D.REVISION = 0
+local online = BarrensVoiceDictionaryOnline
+if type(online) == "table" and type(online.text) == "string" and (tonumber(online.revision) or 0) > D.REVISION then
+    D.DEFAULT, D.REVISION = online.text, tonumber(online.revision)
+    for old, new in pairs(type(online.renamed) == "table" and online.renamed or {}) do D.RENAMED[old] = new end
+end
+
 --- Once per load: the edits' tables in place, and renamed default entries (D.RENAMED) carrying
 --- over the player's choice.
 function D.Migrate(db)

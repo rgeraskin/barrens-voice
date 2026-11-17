@@ -3,8 +3,9 @@
     python tools/sign.py keygen [KEY_FILE]   a new key pair: the private key to KEY_FILE (default
                                              ~/.config/barrens-voice/release-signing.key, owner-only), the
                                              public one printed - it goes into bv/update.py PUBLIC_KEY
-    python tools/sign.py sign                dist/manifest.json -> dist/manifest.json.sig (`mise run sign`);
-                                             the key from BV_SIGNING_KEY (base64, CI's secret) or KEY_FILE
+    python tools/sign.py sign [FILE]         FILE (default dist/manifest.json) -> FILE.sig (`mise run sign`;
+                                             dist/dictionary.json for the dictionary online); the key from
+                                             BV_SIGNING_KEY (base64, CI's secret) or KEY_FILE
 
 The launcher's updater installs nothing whose manifest does not verify with PUBLIC_KEY, and nothing
 whose archive does not match the manifest's SHA-256.
@@ -58,6 +59,6 @@ if __name__ == "__main__":
     if command == "keygen":
         keygen(Path(sys.argv[2]) if len(sys.argv) > 2 else KEY_FILE)
     elif command == "sign":
-        sign(ROOT / "dist" / "manifest.json")
+        sign(Path(sys.argv[2]).resolve() if len(sys.argv) > 2 else ROOT / "dist" / "manifest.json")
     else:
         sys.exit(__doc__)

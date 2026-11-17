@@ -72,6 +72,8 @@ class Games(unittest.TestCase):
             (old / "VoiceList.lua").write_text("BarrensVoiceVoiceList = { 'Irina' }", encoding="utf-8")
             (source / "VoiceList.lua").write_text("BarrensVoiceVoiceList = BarrensVoiceVoiceList or {}", encoding="utf-8")
             (source / "CompanionStatus.lua").write_text("BarrensVoiceStatus = nil", encoding="utf-8")
+            (source / "DictionaryOnline.lua").write_text("BarrensVoiceDictionaryOnline = nil", encoding="utf-8")
+            (old / "DictionaryOnline.lua").write_text("BarrensVoiceDictionaryOnline = { revision = 5 }", encoding="utf-8")
             target = install_addon(source, game)
             # the companion's list of voices kept; the status file, not there before, comes from the addon
             self.assertIn("Irina", (target / "VoiceList.lua").read_text(encoding="utf-8"))
@@ -80,8 +82,9 @@ class Games(unittest.TestCase):
             self.assertTrue((target / "Media" / "icon.tga").exists())
             self.assertFalse((target / "Media" / "README.md").exists())
             left = sorted(p.relative_to(target).as_posix() for p in target.rglob("*"))
-            self.assertEqual(left, ["BarrensVoice.toc", "CompanionStatus.lua", "Media", "Media/icon.tga",
-                                    "VoiceList.lua"])                          # the old version's own gone
+            self.assertEqual(left, ["BarrensVoice.toc", "CompanionStatus.lua", "DictionaryOnline.lua", "Media",
+                                    "Media/icon.tga", "VoiceList.lua"])        # the old version's own gone
+            self.assertIn("revision = 5", (target / "DictionaryOnline.lua").read_text(encoding="utf-8"))  # the companion's kept
 
 
 class Paths(unittest.TestCase):

@@ -365,6 +365,18 @@ def main() -> int:
     dictionary = Dictionary(config, log, find_addon(config))
     dictionary.refresh()
     dictionary_checked = time.monotonic()
+    # the dictionary online (bv/online_dictionary.py): on in an install, off run from the source (where the
+    # addon's own Dictionary.lua is being edited); config.json "dictionary_online" says otherwise
+    from . import online_dictionary
+    from .paths import INSTALL_DIR
+    online = None
+    if config.get("dictionary_online", INSTALL_DIR is not None):
+        online = online_dictionary.Online(DATA_DIR, log)
+        if online.cached():
+            dictionary.use_online(online.current)
+            if online.current["revision"] > dictionary.revision:
+                online_dictionary.write_addon(dictionary.addon, online.current, log)
+        online.start()
     from .text import Accentor, plain
     from .unmask import unmask
     from . import yo
@@ -427,6 +439,11 @@ def main() -> int:
             if now - dictionary_checked > 2:
                 dictionary.refresh()               # a changed Dictionary.lua works within seconds
                 dictionary_checked = now
+                fresh = online.take() if online else None
+                if fresh and fresh["revision"] > dictionary.revision:      # applied here, between chat lines
+                    dictionary.use_online(fresh)
+                    online_dictionary.write_addon(dictionary.addon, fresh, log)
+                    log("свежий словарь с GitHub — в окне словаря после /reload")
                 if STOP_FILE.exists():             # the launcher's "stop" (its window closed, «Выход»)
                     STOP_FILE.unlink(missing_ok=True)
                     log("остановлен лаунчером")

@@ -74,10 +74,10 @@ def newer(candidate: str, current: str) -> bool:
 
 
 SKIP = ("*.md", "._*")      # notes for the repository, macOS copy litter: not for the game
-# written by the companion into the addon's folder (bv/voicelist.py, bv/status.py) and shipped only as
+# written by the companion into the addon's folder (bv/voicelist.py, bv/status.py, bv/online_dictionary.py) and shipped only as
 # empty stand-ins: an install keeps the companion's own, or the voice list goes empty and the addon says
 # the companion is not running until the companion writes them again
-GENERATED = ("VoiceList.lua", "CompanionStatus.lua")
+GENERATED = ("VoiceList.lua", "CompanionStatus.lua", "DictionaryOnline.lua")
 
 
 def install_addon(source: Path, game_root: Path) -> Path:

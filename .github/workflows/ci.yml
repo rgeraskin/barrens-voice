@@ -11,3 +11,35 @@ jobs:
       - uses: actions/checkout@v7
       - uses: jdx/mise-action@v5
       - run: mise run test
+  # The dictionary online (bv/online_dictionary.py): after the tests pass on master, the addon's default
+  # dictionary, signed, into the branch `dictionary` - only when it changed. Companions fetch it from there.
+  dictionary:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0               # revision: the time of the last commit that changed Dictionary.lua
+      - uses: jdx/mise-action@v5
+      - run: mise run dictionary
+        env:
+          BV_SIGNING_KEY: ${{ secrets.BV_SIGNING_KEY }}
+      - name: Publish to the branch `dictionary` when the dictionary changed
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir pub && cp dist/dictionary.json dist/dictionary.json.sig pub/
+          if git fetch --depth 1 origin dictionary 2>/dev/null && git show FETCH_HEAD:dictionary.json > old.json 2>/dev/null \
+              && cmp -s old.json pub/dictionary.json; then
+            echo "the dictionary did not change"; exit 0
+          fi
+          cd pub
+          git init -q -b dictionary
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add . && git commit -qm "Dictionary from ${GITHUB_SHA::7}"
+          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:dictionary

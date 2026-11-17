@@ -9,6 +9,7 @@
 
 Protocol.lua
 Strip.lua
+DictionaryOnline.lua
 Dictionary.lua
 VoiceList.lua
 Core.lua

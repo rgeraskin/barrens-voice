@@ -5,7 +5,8 @@ The default dictionary is read straight from the addon's Dictionary.lua (its `D.
 and read again as soon as that file changes - so a change to the default works at once, with no
 /reload (the client reads an addon's files only when it loads it). The player's own edits - their
 layer over the default: entries changed or added, and default entries deleted - come from the addon
-over the strip (kind "dict", in parts), and until then from its saved variables.
+over the strip (kind "dict", in parts), and until then from its saved variables. A fresher default from
+GitHub (bv/online_dictionary.py) replaces the addon's when its revision is newer (`use_online`).
 """
 from __future__ import annotations
 
@@ -16,6 +17,7 @@ SAVED = "BarrensVoice.lua"
 # The player's layer the addon keeps for us in its saved variables (as it sends it over the strip).
 LUA_USER = re.compile(r'\["dictionaryUser"\]\s*=\s*"((?:[^"\\]|\\.)*)"', re.S)
 DEFAULT_BLOCK = re.compile(r"D\.DEFAULT\s*=\s*\[\[(.*?)\]\]", re.S)
+REVISION = re.compile(r"^D\.REVISION\s*=\s*(\d+)", re.M)      # the default's revision (tools/release.py)
 WORD = re.compile(r"[^\W_]+")
 LUA_ESCAPE = re.compile(r'\\(\d{1,3}|.)', re.S)
 SIMPLE = {"n": "\n", "t": "\t", "r": "\r", "a": "\a", "b": "\b", "f": "\f", "v": "\v"}
@@ -177,14 +179,17 @@ def key_of(line: str) -> str | None:
     return " ".join(words) + ("*" if star else "") if words else None
 
 
-def merged(default: str, user: str) -> list[str]:
+def merged(default: str, user: str, renamed: dict | None = None) -> list[str]:
     """The entry lines of the player's dictionary: the default's, with the player's layer on top -
     its lines replace the default's of the same key or add new ones, and a line "!<default line>"
-    deletes that default entry."""
+    deletes that default entry. `renamed` (old key -> new key of a default entry, as the addon's
+    D.RENAMED): who edited or deleted the old entry does not get the new one beside it."""
+    touched = {key_of(line.strip()[1:] if line.strip().startswith("!") else line) for line in user.splitlines()}
+    gone = {new for old, new in (renamed or {}).items() if old in touched}
     lines: dict[str, list[str]] = {}
     for line in default.splitlines():
         key = key_of(line)
-        if key:
+        if key and key not in gone:
             lines.setdefault(key, []).append(line.strip())
     own: dict[str, list[str]] = {}
     for line in user.splitlines():
@@ -204,6 +209,8 @@ class Dictionary:
         self.config, self.log = config, log
         self.addon = addon                         # the addon's folder (found by the caller)
         self.default, self.default_stamp = "", None
+        self.revision = 0                          # the addon's default's (D.REVISION)
+        self.online: dict | None = None            # the default from GitHub (online_dictionary), if newer
         self.user, self.user_path, self.user_stamp = "", None, None
         self.rules: list[tuple[re.Pattern, str]] = []
         self.exact: dict[str, str] = {}
@@ -240,9 +247,12 @@ class Dictionary:
         if lua and lua.exists():
             stamp = lua.stat().st_mtime
             if stamp != self.default_stamp:
-                match = DEFAULT_BLOCK.search(lua.read_text(encoding="utf-8", errors="replace"))
+                text = lua.read_text(encoding="utf-8", errors="replace")
+                match = DEFAULT_BLOCK.search(text)
                 if match:
+                    revision = REVISION.search(text)
                     self.default, self.default_stamp = match.group(1), stamp
+                    self.revision = int(revision.group(1)) if revision else 0
                     changed.append("стандартный")
         if not self.from_addon:
             path = self.user_path if self.user_path and self.user_path.exists() else find_saved(self.config)
@@ -260,8 +270,20 @@ class Dictionary:
         if changed:
             self._rebuild(" и ".join(changed))
 
+    def use_online(self, data: dict) -> None:
+        """The default from GitHub (online_dictionary.load): used while it is newer than the addon's."""
+        self.online = data
+        self._rebuild(f"онлайн, {data.get('date') or data['revision']}")
+
+    def base(self) -> tuple[str, dict]:
+        """The default in use and its renamed keys: the online one when newer than the addon's."""
+        if self.online and self.online["revision"] > self.revision:
+            return self.online["text"], self.online.get("renamed", {})
+        return self.default, {}
+
     def _rebuild(self, why: str) -> None:
-        lines = merged(self.default, self.user)
+        default, renamed = self.base()
+        lines = merged(default, self.user, renamed)
         self.rules = parse("\n".join(line for line in lines if line.startswith("~")), self.log)
         self.exact, self.stems, self.phrases = {}, [], {}
         for line in lines:

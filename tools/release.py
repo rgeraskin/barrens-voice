@@ -64,6 +64,18 @@ def notes(version: str) -> str:
     return (m.group(1).strip() if m else "") + "\n\nУстановка: скачайте `BarrensVoice-Setup.exe` и запустите его.\n"
 
 
+def dictionary_revision() -> int:
+    """The time of the last commit that changed Dictionary.lua (tools/dictionary_json.py gives the online one
+    the same), 0 outside git."""
+    import subprocess
+    try:
+        out = subprocess.run(["git", "log", "-1", "--format=%ct", "--", "addon/BarrensVoice/Dictionary.lua"], cwd=ROOT,
+                             capture_output=True, text=True, check=True).stdout.strip()
+        return int(out or 0)
+    except (OSError, subprocess.CalledProcessError, ValueError):
+        return 0
+
+
 def version_of(tag: str, base: str) -> str:
     """The release's version from its tag: "v0.4.0" -> "0.4.0", "v0.4.0-beta.5" -> "0.4.0b5" (a test build,
     older than 0.4.0 for the updater). The tag must name pyproject.toml's version."""
@@ -89,6 +101,8 @@ def build() -> Path:
             data = source.read_bytes()
             if name == "pyproject.toml" and info["version"] != base:     # the build's own version, beta and all
                 data = re.sub(rb'(?m)^version = "[^"]*"', f'version = "{info["version"]}"'.encode(), data, count=1)
+            if name == "addon/BarrensVoice/Dictionary.lua":                # which default this is (the dictionary online)
+                data = re.sub(rb"(?m)^D\.REVISION = \d+", f"D.REVISION = {dictionary_revision()}".encode(), data, count=1)
             z.writestr(info_, data)
     data = archive.read_bytes()
     manifest = {**info, "archive": archive.name, "size": len(data), "sha256": hashlib.sha256(data).hexdigest(),
