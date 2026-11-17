@@ -79,7 +79,9 @@ local PREFIX = "|cff66ccffBarrens Voice|r: "
 --- exclamation mark or ellipsis anywhere, and it ends with "?". The voices rise at a question mark
 --- unevenly, so such a line is announced "спрашивает" - the ear gets it from the verb.
 function ns.IsQuestion(text)
-    return type(text) == "string" and text:find("%?%s*$") ~= nil and not text:find("[%.!…]")
+    -- "…" is three bytes: in a [set] each would be a loose byte of other letters ("р", "Ц")
+    return type(text) == "string" and text:find("%?%s*$") ~= nil and not text:find("[%.!]")
+        and not text:find("…", 1, true)
 end
 
 --- Chat text without the client's markup: colours, links (their visible text kept), textures,
