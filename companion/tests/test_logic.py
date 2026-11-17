@@ -464,6 +464,12 @@ class Pipeline(unittest.TestCase):
             "с 100 игроков": "со ста игроков", "с 2 магами": "с двумя магами",
         })
 
+    def test_raid_leader_after_a_number(self):
+        # «рл» after a number is the raid leader, not the ruins of Lordaeron
+        self.check({"нужен 1 рл": "нужен один рейд-лидер", "нужно 2 рл": "нужно два рейд-лидера",
+                    "нужно 5 рл": "нужно пять рейд-лидеров", "у 2 рл": "у двух рейд-лидеров",
+                    "идём в рл": "идём в ру+ины Лордер+она"})
+
 
 class PlayerStop(unittest.TestCase):
     def test_stop_drops_queued_and_late_lines(self):
