@@ -304,14 +304,35 @@ def offline_models() -> bool:
     return False
 
 
+_restart = threading.Event()   # set by restart_online off the main thread: the main loop restarts
+
+
 def restart_online(log) -> None:
     """A model missing from the cache in offline mode: forget the mark and start again online (under
-    the launcher: exit with RESTART, it starts the companion again - so it keeps its process)."""
+    the launcher: exit with RESTART, it starts the companion again - so it keeps its process). In the
+    console the companion runs itself again and waits for it, so the console waits too (os.execv on
+    Windows started a separate process and did not quote a path with a space); off the main thread
+    (engines.on_error) the main loop does that, so that it stops reading the strip first."""
     MODELS_READY.unlink(missing_ok=True)
     log("в кэше моделей не всё — перезапускаюсь с сетью")
     if os.environ.get(LAUNCHED):
         os._exit(RESTART)          # from any thread (engines.on_error runs on its own)
-    os.execv(sys.executable, [sys.executable, "-m", "bv"] + sys.argv[1:])
+    if threading.current_thread() is not threading.main_thread():
+        _restart.set()
+        return
+    run_again()
+
+
+def run_again() -> None:
+    """The console's restart: this companion's mutex freed, the same command run as a child, its exit
+    code this process's."""
+    global _mutex
+    if _mutex:
+        import ctypes
+        ctypes.WinDLL("kernel32").CloseHandle(_mutex)
+        _mutex = None
+    import subprocess
+    os._exit(subprocess.call([sys.executable, "-m", "bv"] + sys.argv[1:]))
 
 
 def describe_place(place) -> str:
@@ -562,6 +583,8 @@ def main() -> int:
     state.report(phase="running")
     with contextlib.nullcontext():
         while True:
+            if _restart.is_set():                  # restart_online from another thread
+                run_again()
             now = time.monotonic()
             if now - dictionary_checked > 2:
                 dictionary.refresh()               # a changed Dictionary.lua works within seconds

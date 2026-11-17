@@ -109,6 +109,51 @@ class ServiceFrames(unittest.TestCase):
         self.assertTrue(logged[0].startswith("полоска: верх"), logged)
 
 
+class RestartOnline(unittest.TestCase):
+    """A model missing from the offline cache: the companion starts again with the network."""
+
+    def test_how_it_starts_again(self):
+        import threading
+        from unittest import mock
+        exits, calls = [], []
+
+        class Exited(Exception):
+            pass
+
+        def exit_(code):
+            exits.append(code)
+            raise Exited
+
+        def call(args):
+            calls.append(args)
+            return 7
+        with tempfile.TemporaryDirectory() as d, \
+                mock.patch.object(companion, "MODELS_READY", Path(d) / ".models_ready"), \
+                mock.patch.object(companion.os, "_exit", exit_), \
+                mock.patch("subprocess.call", call), \
+                mock.patch.object(companion.sys, "argv", ["bv", "--forever"]), \
+                mock.patch.dict(companion.os.environ, {companion.LAUNCHED: "1"}):
+            (Path(d) / ".models_ready").touch()
+            with self.assertRaises(Exited):
+                companion.restart_online(lambda *a: None)       # under the launcher: its exit code
+            self.assertEqual(exits, [companion.RESTART])
+            self.assertFalse((Path(d) / ".models_ready").exists())
+            del companion.os.environ[companion.LAUNCHED]
+            # in the console: the same command as a child (arguments as a list - quoted by subprocess,
+            # not joined as os.execv does on Windows), waited for, its exit code
+            with self.assertRaises(Exited):
+                companion.restart_online(lambda *a: None)
+            self.assertEqual(calls, [[companion.sys.executable, "-m", "bv", "--forever"]])
+            self.assertEqual(exits[-1], 7)
+            # off the main thread: left to the main loop, which first stops reading the strip
+            worker = threading.Thread(target=companion.restart_online, args=(lambda *a: None,))
+            worker.start()
+            worker.join()
+            self.assertEqual(len(calls), 1)
+            self.assertTrue(companion._restart.is_set())
+            companion._restart.clear()
+
+
 class AddonFiles(unittest.TestCase):
     """VoiceList.lua, CompanionStatus.lua and DictionaryOnline.lua: written whole or not at all."""
 
