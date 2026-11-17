@@ -1,4 +1,5 @@
-"""The companion's own plumbing that runs without Windows: config.json, the files it writes into the addon."""
+"""The companion's own plumbing that runs without Windows: config.json, service frames and chat lines,
+the files it writes into the addon."""
 import json
 import sys
 import tempfile
@@ -107,6 +108,129 @@ class ServiceFrames(unittest.TestCase):
         calls, logged = self.run_frame("control", True, options={"strip": "0,0,1920,16,1920,1080"})
         self.assertEqual(calls, ["set_place"])
         self.assertTrue(logged[0].startswith("полоска: верх"), logged)
+
+
+class ChatLines(unittest.TestCase):
+    """`Lines`: what a new frame's line does - settings for the engines, service frames, chat lines
+    spoken with the speaker's name or without it, repeats and unknown kinds left unread."""
+
+    class Engines:
+        def __init__(self, test):
+            self.test, self.followed, self.quiet, self.stopped = test, [], 0.0, 0
+
+        def follow(self, line):
+            self.followed.append(line.kind)
+
+        def quiet_for(self):
+            return self.quiet
+
+        def for_line(self, line):
+            return self.test.speaker
+
+        def stop(self):
+            self.stopped += 1
+
+    class Speaker:
+        def __init__(self):
+            self.said = []
+
+        def describe(self, line):
+            return "orc-male"
+
+        def say(self, line):
+            self.said.append(line)
+
+    class Seen:
+        def __init__(self):
+            self.ids = set()
+
+        def seen(self, line_id):
+            if line_id and line_id in self.ids:
+                return True
+            self.ids.add(line_id)
+            return False
+
+    def setUp(self):
+        from unittest import mock
+        self.logged, self.disabled, self.texts = [], [], []
+        self.engines, self.speaker, self.seen = self.Engines(self), self.Speaker(), self.Seen()
+        sapi = mock.Mock()
+        sapi.set_disabled.side_effect = self.disabled.append
+        self.config = {"same_speaker_gap": 5.0, "log_details": True}
+        self.lines = companion.Lines(self.config, self.logged.append, self.engines, sapi, None, "dictionary",
+                                     None, "inflector", "restore_yo", self.seen)
+
+        def speech_text(text, dictionary, inflector, declension, restore_yo):
+            self.texts.append((text, dictionary, inflector, declension, restore_yo))
+            return text.strip().upper()
+        for patch in (mock.patch.object(companion, "speech_text", speech_text),
+                      mock.patch.object(companion, "log", self.logged.append)):     # service()'s own
+            patch.start()
+            self.addCleanup(patch.stop)
+
+    def line(self, text, kind="party", sender="Тралл", channel="", first=False, **options):
+        from bv.protocol import Line
+        raw = options.pop("raw", "")
+        decl = options.get("decl", "1") != "0"
+        line = Line(kind, sender, "Orc", "2", "SHAMAN", channel, text, off=options.get("off"), declension=decl,
+                    options=options, raw=raw)
+        self.lines.handle(line, first)
+        return line
+
+    def spoken(self):
+        return [line.text for line in self.speaker.said]
+
+    def test_a_chat_line(self):
+        self.line("Тралл:\x04 привет", raw="привет!", decl="0")
+        self.assertEqual(self.spoken(), ["Тралл: ПРИВЕТ"])               # the rules on the line, not the name
+        self.assertEqual(self.texts, [(" привет", "dictionary", "inflector", False, "restore_yo")])
+        self.assertEqual(self.logged, ["[группа] Тралл (Orc, м) → orc-male: Тралл: ПРИВЕТ",
+                                       "    исходно:   привет!"])
+        self.logged.clear()
+        self.line("Тралл:\x04 ещё", kind="channels", channel="Торговля", sender="Джайна")
+        self.assertEqual(self.logged, ["[канал Торговля] Джайна (Orc, м) → orc-male: Тралл: ЕЩЁ"])
+        self.logged.clear()
+        self.line("ОК", raw="ОК")                                        # the same as spoken: no second line
+        self.assertEqual(len(self.logged), 1)
+        self.config["log_details"] = False
+        self.line("Тралл:\x04 и ещё", raw="и ещё!")
+        self.assertNotIn("    исходно:   и ещё!", self.logged)
+
+    def test_the_same_character_goes_on_without_the_name(self):
+        self.line("Тралл:\x04 раз")
+        self.line("Тралл:\x04 два")                                       # within same_speaker_gap
+        self.engines.quiet = 5.1
+        self.line("Тралл:\x04 три")                                       # heard a while ago: named again
+        self.engines.quiet = 0
+        self.line("Джайна:\x04 четыре", sender="Джайна")                  # another character
+        self.line("Джайна:\x04 пять", sender="Джайна", kind="say")        # another chat
+        self.line("Джайна\x05 смеётся", sender="Джайна", kind="say")      # an emote's name is kept
+        self.line("Джайна\x05 машет", sender="Джайна", kind="say")
+        self.assertEqual(self.spoken(), ["Тралл: РАЗ", "ДВА", "Тралл: ТРИ", "Джайна: ЧЕТЫРЕ", "Джайна: ПЯТЬ",
+                                         "Джайна СМЕЁТСЯ", "Джайна МАШЕТ"])
+
+    def test_not_spoken(self):
+        self.line("Тралл:\x04 было", first=True)                        # up before the start: not news
+        self.line("", kind="party")                                       # nothing to say
+        self.line("Тралл:\x04 раз", id="17")
+        self.line("Тралл:\x04 раз", id="17")                              # sent again
+        self.line("что-то", kind="future")
+        self.line("что-то ещё", kind="future")
+        self.assertEqual(self.spoken(), ["Тралл: РАЗ"])
+        self.assertEqual(self.logged[1:], ["строка 17 уже прочитана — пропускаю повтор",
+                                           "строки типа «future» не озвучиваю (аддон новее программы?)"])
+        self.assertEqual(self.engines.followed, ["party", "party", "party", "party", "future", "future"])
+        self.lines.handle(None, False)                                    # a frame that is no line
+        self.assertEqual(len(self.engines.followed), 6)
+
+    def test_settings_and_service_frames(self):
+        self.line("", kind="control", off="Irina|Pavel|")
+        self.line("", kind="control", off="")
+        self.line("", kind="stop", first=True)                            # a command only in a new frame
+        self.line("", kind="stop")
+        self.assertEqual(self.disabled, [{"Irina", "Pavel"}, set()])
+        self.assertEqual((self.engines.followed, self.engines.stopped), (["control", "control", "stop", "stop"], 1))
+        self.assertEqual((self.spoken(), self.logged), ([], ["стоп: замолкаю"]))
 
 
 class RestartOnline(unittest.TestCase):

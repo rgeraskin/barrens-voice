@@ -399,6 +399,65 @@ def service(line, first: bool, engines, player, dictionary, capturer) -> None:
         log(f"[диагностика аддона] {line.text}")
 
 
+class Lines:
+    """What a new frame's line does: the addon's settings for the engines, a frame of SERVICE_KINDS
+    (`service`), and a chat line spoken - its text through `speech_text`, its speaker's name left out
+    when the same character goes on (`same_speaker_gap`), logged, queued on its engine. `first` is the
+    frame that was up before the companion started: its chat line is not news."""
+
+    def __init__(self, config: dict, log, engines, sapi, player, dictionary, capturer, inflector,
+                 restore_yo, seen_lines):
+        self.config, self.log = config, log
+        self.engines, self.sapi, self.player = engines, sapi, player
+        self.dictionary, self.capturer, self.inflector, self.restore_yo = dictionary, capturer, inflector, restore_yo
+        self.seen_lines = seen_lines
+        self.last_speaker = None              # (kind, sender, channel) of the last chat line passed on
+        self.unknown_kinds: set[str] = set()
+
+    def handle(self, line, first: bool) -> None:
+        """A parsed frame (protocol.parse; None when it is no line)."""
+        if line is None:
+            return
+        if line.off is not None:
+            self.sapi.set_disabled({n for n in line.off.split("|") if n})
+        self.engines.follow(line)
+        if line.kind in SERVICE_KINDS:
+            service(line, first, self.engines, self.player, self.dictionary, self.capturer)
+        elif line.kind not in LABELS:
+            # a service line of a newer addon: never read aloud what is not chat
+            if line.kind not in self.unknown_kinds:
+                self.unknown_kinds.add(line.kind)
+                self.log(f"строки типа «{line.kind}» не озвучиваю (аддон новее программы?)")
+        elif not line.text or first:
+            return
+        elif self.seen_lines.seen(line.options.get("id", "")):
+            # a line the addon sent again: this one was read already
+            self.log(f"строка {line.options.get('id')} уже прочитана — пропускаю повтор")
+        else:
+            self.speak(line)
+
+    def speak(self, line) -> None:
+        speaker_key = (line.kind, line.sender, line.channel)
+        continuing = (speaker_key == self.last_speaker
+                      and self.engines.quiet_for() <= self.config["same_speaker_gap"])
+        self.last_speaker = speaker_key
+        name, text, droppable = protocol.split_name(line.text)
+        if continuing and droppable:
+            name, text = "", text.lstrip()
+        # the name is left as it is
+        text = protocol.with_name(name, speech_text(text, self.dictionary, self.inflector, line.declension,
+                                                    self.restore_yo))
+        line = dataclasses.replace(line, text=text)
+        speaker = self.engines.for_line(line)
+        label = LABELS.get(line.kind, line.kind) + (f" {line.channel}" if line.channel else "")
+        self.log(f"[{label}] {line.sender} ({line.race or '?'}"
+                 f"{', м' if line.sex == '2' else ', ж' if line.sex == '3' else ''})"
+                 f" → {speaker.describe(line)}: {text}")
+        if self.config["log_details"] and line.raw and line.raw != text:
+            self.log(f"    исходно:   {line.raw}")
+        speaker.say(line)
+
+
 def fetch_models(config: dict) -> int:
     """Everything the race voices need from the network, downloaded now - BarrensVoice.cmd runs this
     right after installing, so the first start neither waits for ~3 GB nor needs the network: F5 in
@@ -579,8 +638,6 @@ def main() -> int:
     if "--f5" in sys.argv or (saved_voices(config) or config["engine"]) == "f5":
         engines.want("f5")
 
-    last_speaker = None       # (kind, sender, channel) of the last chat line passed on
-    unknown_kinds: set[str] = set()
     wow_seen, wow_gone_since, wow_checked = False, None, 0.0
     capturer = Capturer(config, log)
     from . import locate
@@ -590,6 +647,7 @@ def main() -> int:
         log("полоска (по сохранённым настройкам аддона): " + describe_place(place))
     from .bridge import StripReader
     strip = StripReader(capturer, config, log, state.report)
+    lines = Lines(config, log, engines, sapi, player, dictionary, capturer, inflector, restore_yo, seen_lines)
     state.report(phase="running")
     while True:
         if _restart.is_set():                  # restart_online from another thread
@@ -621,41 +679,7 @@ def main() -> int:
                     return 0
         step = strip.poll(now)
         if step.frame is not None:
-            first = step.first
-            line = protocol.parse(step.frame.payload)
-            if line and line.off is not None:
-                sapi.set_disabled({n for n in line.off.split("|") if n})
-            if line:
-                engines.follow(line)
-            if line and line.kind in SERVICE_KINDS:
-                service(line, first, engines, player, dictionary, capturer)
-            elif line and line.kind not in LABELS:
-                # a service line of a newer addon: never read aloud what is not chat
-                if line.kind not in unknown_kinds:
-                    unknown_kinds.add(line.kind)
-                    log(f"строки типа «{line.kind}» не озвучиваю (аддон новее программы?)")
-            elif line and line.text and not first and seen_lines.seen(line.options.get("id", "")):
-                # a line the addon sent again: this one was read already
-                log(f"строка {line.options.get('id')} уже прочитана — пропускаю повтор")
-            elif line and line.text and not first:
-                speaker_key = (line.kind, line.sender, line.channel)
-                continuing = (speaker_key == last_speaker
-                              and engines.quiet_for() <= config["same_speaker_gap"])
-                last_speaker = speaker_key
-                name, text, droppable = protocol.split_name(line.text)
-                if continuing and droppable:
-                    name, text = "", text.lstrip()
-                # the name is left as it is
-                text = protocol.with_name(name, speech_text(text, dictionary, inflector, line.declension, restore_yo))
-                line = dataclasses.replace(line, text=text)
-                speaker = engines.for_line(line)
-                label = LABELS.get(line.kind, line.kind) + (f" {line.channel}" if line.channel else "")
-                log(f"[{label}] {line.sender} ({line.race or '?'}"
-                    f"{', м' if line.sex == '2' else ', ж' if line.sex == '3' else ''})"
-                    f" → {speaker.describe(line)}: {text}")
-                if config["log_details"] and line.raw and line.raw != text:
-                    log(f"    исходно:   {line.raw}")
-                speaker.say(line)
+            lines.handle(protocol.parse(step.frame.payload), step.first)
         time.sleep(step.pause)
 
 
