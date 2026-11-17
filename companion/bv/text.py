@@ -99,7 +99,7 @@ def unpronounceable(word: str) -> bool:
 
 def _capitals(match) -> str:
     word = match.group()
-    morph = _analyzer()
+    morph = analyzer()
     if morph is not None and morph.word_is_known(word.lower()) and \
             not any("Abbr" in p.tag for p in morph.parse(word.lower())):
         return word.lower()                            # a word written in capitals
@@ -148,8 +148,9 @@ _morph = None
 _morph_lock = threading.Lock()
 
 
-def _analyzer():
-    """pymorphy3's analyzer, loaded once (None without pymorphy3)."""
+def analyzer():
+    """pymorphy3's analyzer, loaded once (None without pymorphy3) and shared: the numbers here and the
+    declension (morph.Inflector) - each one is about 24 MB."""
     global _morph
     with _morph_lock:
         if _morph is None:
@@ -277,7 +278,7 @@ def numbers_to_words(text: str) -> str:
         from num2words import num2words
     except ImportError:
         return text
-    morph = _analyzer()
+    morph = analyzer()
     text = TOGETHER.sub(lambda m: m.group(1) + COLLECTIVE[int(m.group(2))], text)
 
     def spell(m) -> tuple[str, int]:

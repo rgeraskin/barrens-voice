@@ -54,6 +54,13 @@ class Declension(unittest.TestCase):
         self.check("с " + m("рейд-лидер"), "с рейд-лидером")
         self.check("для " + m("рейд-лидер"), "для рейд-лидера")
 
+    def test_one_analyzer(self):
+        # pymorphy3 loaded once for the declension and the numbers (about 24 MB each)
+        from bv.text import analyzer
+        inf = Inflector(print)
+        inf.load()
+        self.assertIs(inf.morph, analyzer())
+
     def test_whole_word_before(self):
         # a unit glued to a number is no preposition: "10к хп", "5с кд"
         self.check("у босса 10к " + m("здоровье"), "у босса 10к здоровье")

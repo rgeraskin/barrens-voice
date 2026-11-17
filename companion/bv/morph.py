@@ -47,13 +47,11 @@ class Inflector:
     def load(self) -> None:
         if not self.enabled or self.morph is not None:
             return
-        try:
-            import pymorphy3
-        except ImportError:
+        from .text import analyzer
+        self.morph = analyzer()                      # the one the numbers use too
+        if self.morph is None:
             self.log("pymorphy3 не установлен: замены словаря не склоняются")
             self.enabled = False
-            return
-        self.morph = pymorphy3.MorphAnalyzer()
 
     def apply(self, text: str) -> str:
         """`text` with each marked replacement declined after its preposition, marks removed."""
