@@ -156,6 +156,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   «осталось 100 хп» is «сто здоровья», not «сотое здоровье», «нужно 5 рейд-лидеров» keeps its count, and «20:00 сбор» no longer reads «двадцать:нулевой».
 
+- Numbers after «у», «до», «без» and other prepositions of the genitive
+
+  A count stayed in the nominative: «у 5 игроков» was «у пять игроков», «без 2 танков» «без два танков», «до 5 утра» «до пять утра». Now «у пяти игроков», «без двух танков», «из-за двадцати двух боссов», «до пяти утра», «с восьми вечера», «с пяти до десяти», «нет пяти игроков». A singular noun in the case the preposition asks is an ordinal: «до 15 места» — «до пятнадцатого места», «с 2 места» — «со второго места» (с, в, к and о take their long form before the number's word: «во второй сумке», «об одиннадцати боссах»). An amount stays an amount: «до 200 опыта» — «до двухсот опыта», «без 50 маны». The dictionary's number forms follow: «для 2 танк» — «для двух т+анков», «до 2%» — «до двух процентов». «рл» after a number is the raid leader: «нужен 1 рл» — «один рейд-лидер», «нужно 2 рл» — «два рейд-лидера» (it was «руины Лордерона»).
+
 - Spelt abbreviations keep their stress on a vowel
 
   «МВД» was «эм-вэ-+дэ», and Windows voices that do not take stress marks read the «+» aloud. Now «эм-вэ-д+э».
