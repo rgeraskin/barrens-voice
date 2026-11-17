@@ -315,9 +315,9 @@ WSG=Ущелье Песни Войны
 ]]
 
 
--- Sorting: Russian keys first, then Latin, then digits and other symbols, regexes (~) last;
--- within a group alphabetically (case and ё/е ignored). Comments travel with the entry below them;
--- the comment block at the top stays the header.
+-- Sorting (D.Text): Russian keys first, then Latin, then digits and other symbols, regexes (~)
+-- last; within a group alphabetically (case and ё/е ignored). Comments travel with the entry below
+-- them; the comment block at the top stays the header.
 local function SortKey(entry)
     if entry:sub(1, 1) == "~" then return 4, entry end
     local key = D.Norm(entry:match("^(.-)%s*=") or entry)
@@ -325,34 +325,6 @@ local function SortKey(entry)
     if first >= 0xC0 then return 1, key end
     if key:match("^%a") then return 2, key end
     return 3, key
-end
-
-function D.Sort(text)
-    local header, items, pending, top = {}, {}, {}, true
-    for line in ((text or "") .. "\n"):gmatch("(.-)\r?\n") do
-        local trimmed = line:match("^%s*(.-)%s*$")
-        if trimmed:sub(1, 1) == "#" then
-            if top then header[#header + 1] = trimmed else pending[#pending + 1] = trimmed end
-        elseif trimmed ~= "" then
-            top = false
-            local group, key = SortKey(trimmed)
-            items[#items + 1] = { line = trimmed, comments = pending, group = group, key = key, order = #items }
-            pending = {}
-        end
-    end
-    table.sort(items, function(a, b)
-        if a.group ~= b.group then return a.group < b.group end
-        if a.key ~= b.key then return a.key < b.key end
-        return a.order < b.order
-    end)
-    local out = {}
-    for _, line in ipairs(header) do out[#out + 1] = line end
-    for _, item in ipairs(items) do
-        for _, c in ipairs(item.comments) do out[#out + 1] = c end
-        out[#out + 1] = item.line
-    end
-    for _, c in ipairs(pending) do out[#out + 1] = c end
-    return table.concat(out, "\n") .. "\n"
 end
 
 --- Lower case for ASCII and Russian letters, with ё as е (UTF-8; Lua's lower() knows ASCII only).
@@ -372,25 +344,6 @@ local WORD = "[%w\128-\255]+"
 local function Words(s)
     local out = {}
     for w in s:gmatch(WORD) do out[#out + 1] = D.Norm(w) end
-    return out
-end
-
---- Entries of `text`: { words = { normalised }, star = true when the last word ends in "*",
---- value = replacement }.
-function D.Parse(text)
-    local out = {}
-    for line in (text or ""):gmatch("[^\r\n]+") do
-        if not line:match("^%s*#") then
-            local key, value = line:match("^%s*(.-)%s*=%s*(.-)%s*$")
-            if line:match("^%s*~") then
-                out[#out + 1] = { regex = line:match("^%s*(.-)%s*$"), words = {} }
-            elseif key and key ~= "" then
-                local star = key:sub(-1) == "*"
-                local words = Words(star and key:sub(1, -2) or key)
-                if #words > 0 then out[#out + 1] = { words = words, star = star, value = value } end
-            end
-        end
-    end
     return out
 end
 
@@ -474,9 +427,8 @@ local function Edits()
     return e
 end
 
---- The player's dictionary: the default with their edits, sorted as D.Sort sorts (the blocks
---- sorted here, not by D.Sort: it would take the comments of whichever block came first for the
---- header).
+--- The player's dictionary: the default with their edits, sorted block by block (the comments
+--- above an entry go with it; the header stays on top).
 function D.Text()
     if merged then return merged end
     local def, e = Default(), Edits()
@@ -506,14 +458,14 @@ function D.Text()
     return merged
 end
 
---- The edits that make the default into `text`. `same(key, mine, theirs)` says whether an entry
---- is unchanged (by default: its block, comments included, is the default's).
-local function Diff(text, same)
+--- The edits that make the default into `text`: an entry is unchanged when its block, comments
+--- included, is the default's.
+local function Diff(text)
     local def, mine = Default(), Blocks(text)
     local e = { lines = {}, removed = {} }
     if mine.header ~= def.header then e.header = mine.header end
     for key, block in pairs(mine.blocks) do
-        if not (def.blocks[key] and same(key, mine, def)) then e.lines[key] = block end
+        if def.blocks[key] ~= block then e.lines[key] = block end
     end
     for key in pairs(def.blocks) do
         if not mine.blocks[key] then e.removed[key] = true end
@@ -521,11 +473,9 @@ local function Diff(text, same)
     return e
 end
 
-local function SameBlock(key, mine, def) return mine.blocks[key] == def.blocks[key] end
-
 --- The dictionary window's text, saved as edits of the default.
 function D.SetText(text)
-    ns.db.dictionaryEdits = Diff(text, SameBlock)
+    ns.db.dictionaryEdits = Diff(text)
     merged = nil
     D.Rebuild()
 end
@@ -588,4 +538,3 @@ function D.Migrate(db)
     merged = nil
 end
 
-D.DEFAULT = D.Sort(D.DEFAULT)

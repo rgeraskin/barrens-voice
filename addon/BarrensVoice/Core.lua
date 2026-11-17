@@ -135,7 +135,6 @@ local lineCount = 0
 function ns.Send(kind, sender, race, sex, class, channel, text)
     local raw = (text or ""):gsub(SEP, " ")
     text = ns.Clean(text or "")          -- the dictionary is the program's (it reads Dictionary.lua itself)
-    text = text:gsub("%s+", " "):gsub("^ ", ""):gsub(" $", "")
     if text == "" then ns.Skip("пусто после очистки разметки", sender, raw) return end
     if ns.db.sayNames and sender and sender ~= "" then
         local name = Ambiguate and Ambiguate(sender, "none") or sender:match("^[^-]+")
