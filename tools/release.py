@@ -51,22 +51,35 @@ def notes(version: str) -> str:
     return (m.group(1).strip() if m else "") + "\n\nУстановка: скачайте `BarrensVoice-Setup-*.exe` и запустите его.\n"
 
 
+def version_of(tag: str, base: str) -> str:
+    """The release's version from its tag: "v0.4.0" -> "0.4.0", "v0.4.0-beta.5" -> "0.4.0b5" (a test build,
+    older than 0.4.0 for the updater). The tag must name pyproject.toml's version."""
+    m = re.fullmatch(r"v(\d+\.\d+\.\d+)(?:-beta\.(\d+))?", tag)
+    if not m or m.group(1) != base:
+        sys.exit(f"the tag {tag} and pyproject.toml's version {base} differ (tags: vX.Y.Z or vX.Y.Z-beta.N)")
+    return f"{base}b{m.group(2)}" if m.group(2) else base
+
+
 def build() -> Path:
     info = versions()
+    base = info["version"]
     tag = os.environ.get("RELEASE_TAG", "")
-    if tag and tag.lstrip("v").split("-")[0] != info["version"]:
-        sys.exit(f"the tag {tag} and pyproject.toml's version {info['version']} differ")
+    if tag:
+        info["version"] = version_of(tag, base)
     DIST.mkdir(exist_ok=True)
     archive = DIST / f"barrens-voice-{info['version']}.zip"
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as z:
         for source, name in sorted(files(), key=lambda f: f[1]):
             info_ = zipfile.ZipInfo(name, date_time=(2026, 1, 1, 0, 0, 0))   # the same bytes from the same tree
             info_.compress_type = zipfile.ZIP_DEFLATED
-            z.writestr(info_, source.read_bytes())
+            data = source.read_bytes()
+            if name == "pyproject.toml" and info["version"] != base:     # the build's own version, beta and all
+                data = re.sub(rb'(?m)^version = "[^"]*"', f'version = "{info["version"]}"'.encode(), data, count=1)
+            z.writestr(info_, data)
     data = archive.read_bytes()
     manifest = {**info, "archive": archive.name, "size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
     (DIST / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    (DIST / "notes.md").write_text(notes(info["version"]), encoding="utf-8")
+    (DIST / "notes.md").write_text(notes(base), encoding="utf-8")
     print(f"{archive.name}: {len(data) / 1e6:.1f} MB; manifest: {manifest}")
     return archive
 

@@ -19,8 +19,11 @@ def make_game(root: Path, addon_version: str | None = None) -> Path:
 class Versions(unittest.TestCase):
     def test_compare(self):
         from bv.launcher.model import newer, version_key
-        self.assertEqual(version_key("v0.4.1"), (0, 4, 1))
+        self.assertEqual(version_key("v0.4.1"), version_key("0.4.1"))
         self.assertTrue(newer("0.4.10", "0.4.9"))
+        # a test build is older than its release and newer than the one before; betas in their order
+        self.assertTrue(newer("0.4.0", "0.4.0b5") and newer("0.4.0b5", "0.3.0") and newer("0.4.0b10", "0.4.0b9"))
+        self.assertEqual(version_key("v0.4.0-beta.5"), version_key("0.4.0b5"))
         self.assertFalse(newer("v0.4.0", "0.4.0"))
         self.assertFalse(newer("", "0.4.0"))
 

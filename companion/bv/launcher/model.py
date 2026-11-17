@@ -64,8 +64,9 @@ def addon_version() -> str:
 
 
 def version_key(version: str) -> tuple:
-    """"v0.4.1" → (0, 4, 1); anything that is not numbers sorts first."""
-    return tuple(int(n) for n in re.findall(r"\d+", version or "")) or (0,)
+    """Versions in order, a test build before its release (bv/install.py version_key)."""
+    from ..install import version_key as key
+    return key(version)
 
 
 def newer(candidate: str, current: str) -> bool:

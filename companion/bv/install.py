@@ -113,8 +113,27 @@ def current_version(root: Path) -> str | None:
 
 
 def version_key(version: str) -> tuple:
+    """Versions in order, a test build before its release: "0.4.0b5" (or "v0.4.0-beta.5") < "0.4.0" <
+    "0.4.1". Anything without numbers sorts first."""
     import re
-    return tuple(int(n) for n in re.findall(r"\d+", version)) or (0,)
+    m = re.match(r"v?(\d+(?:\.\d+)*)(?:-?(?:b|beta)\.?(\d+))?", (version or "").strip())
+    if not m:
+        return (0,)
+    numbers = tuple(int(n) for n in m.group(1).split("."))
+    numbers += (0,) * (3 - len(numbers))
+    return numbers + ((0, int(m.group(2))) if m.group(2) else (1, 0))
+
+
+def display_version(version: str) -> str:
+    """For people: "0.4.0b5" -> "0.4.0 beta 5"."""
+    import re
+    return re.sub(r"b(\d+)$", r" beta \1", version or "?")
+
+
+def release_tag(version: str) -> str:
+    """The git tag of a version: "0.4.0b5" -> "v0.4.0-beta.5", "0.4.0" -> "v0.4.0"."""
+    import re
+    return "v" + re.sub(r"b(\d+)$", r"-beta.\1", version)
 
 
 def prune(root: Path, keep: int = KEEP) -> list[str]:
