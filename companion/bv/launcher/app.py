@@ -560,17 +560,18 @@ class App:
                         lambda t=tag: c.itemconfig(t + "box", outline="#5a4220"))
             title = g.name + ("  •  запущена" if g.key == self.running_game else "")
             c.create_text(RX0 + 26, y0 + 15, text=title, anchor="w", fill=PARCHMENT, font=p.body, tags=tag)
-            c.create_text(RX0 + 26, y0 + 34, text=p.fit(str(g.root), p.small, 200), anchor="w", fill=DIM,
-                          font=p.small, tags=tag)
             p.click(tag, lambda k=g.key: self.choose_game(k))
+            # the addon, right of the title: short words, the versions in the hint
             if g.addon is None:
                 p.link(RX1 - 26, y0 + 15, "установить аддон", f"inst{i}", lambda g=g: self.install_addon(g), anchor="e",
                        tip=TIPS["install"])
             elif model.newer(self.addon_version, g.addon):
-                p.link(RX1 - 26, y0 + 15, f"обновить аддон {g.addon} → {self.addon_version}", f"inst{i}",
-                       lambda g=g: self.install_addon(g), anchor="e", tip=TIPS["update"])
+                p.link(RX1 - 26, y0 + 15, "обновить аддон", f"inst{i}", lambda g=g: self.install_addon(g), anchor="e",
+                       tip=f"Аддон {g.addon} → {self.addon_version}. " + TIPS["update"])
             else:
                 c.create_text(RX1 - 26, y0 + 15, text=f"аддон {g.addon}", anchor="e", fill=DIM, font=p.small, tags=tag)
+            c.create_text(RX0 + 26, y0 + 34, text=p.fit(str(g.root), p.small, RX1 - RX0 - 52), anchor="w", fill=DIM,
+                          font=p.small, tags=tag)
         c.create_text(RX0 + 14, y2 + 36 + n * 56, anchor="nw", width=RX1 - RX0 - 28, fill=DIM, font=p.small,
                       text="Запустили игру сами из Battle.net — компаньон подхватит её сам.")
 
