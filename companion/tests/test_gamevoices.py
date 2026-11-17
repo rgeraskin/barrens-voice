@@ -39,6 +39,22 @@ class Storage(unittest.TestCase):
         with self.assertRaises(ValueError):
             casc.blte(b"BLTE" + b"\0\0\0\0" + b"Esecret")
 
+    def test_a_block_cut_short_is_a_missing_file(self):
+        # a truncated BLTE block raised struct.error, which ended the whole bank instead of one file
+        blocks = {b"A" * 16: b"BLTE\0\0", b"B" * 16: b"BLTE" + b"\0\0\0\x20" + b"\x0f\0\0\x02" + b"\0" * 8,
+                  b"C" * 16: b"BLTE\0\0\0\0Nfine"}
+
+        class Fake(casc.Storage):
+            def __init__(self):
+                pass
+
+            def ekeys_for(self, ckeys):
+                return {ck: ck for ck in ckeys}
+
+            def read_ekey(self, ekey):
+                return casc.blte(blocks[ekey])
+        self.assertEqual(Fake().read_ckeys(list(blocks)), {b"C" * 16: b"fine"})
+
     def test_root_keeps_only_wanted(self):
         ru, en = casc.LOCALES["ruRU"], casc.LOCALES["enUS"]
         raw = root_v2([(en, [(10, b"E" * 16), (12, b"F" * 16)]), (ru, [(10, b"R" * 16)])])

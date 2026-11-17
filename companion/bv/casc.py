@@ -127,7 +127,7 @@ class Storage:
         for ckey, ekey in ekeys.items():
             try:
                 out[ckey] = self.read_ekey(ekey)
-            except (KeyError, ValueError, OSError, zlib.error):
+            except (KeyError, ValueError, OSError, zlib.error, struct.error):   # struct.error: a block cut short
                 continue
         return out
 
