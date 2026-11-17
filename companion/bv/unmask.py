@@ -68,5 +68,18 @@ def _stars(token: str) -> str:
     return token.replace("@", "а")
 
 
+# not masks: asterisks around a whole word are emphasis or an action ("*да*", "*вздыхает*"), "@" before a
+# name is a mention ("@Вася") - dropped, the word inside read as it is
+EMPHASIS = re.compile(r"\*+([^*]+)\*+")
+MENTION = re.compile(r"@([^\W\d_][\w*@#$%&]*)")
+
+
+def _token(token: str) -> str:
+    wrapped = EMPHASIS.fullmatch(token) or MENTION.fullmatch(token)
+    if wrapped:
+        token = wrapped.group(1)
+    return _stars(_letters(token))
+
+
 def unmask(text: str) -> str:
-    return TOKEN.sub(lambda m: _stars(_letters(m.group())), text)
+    return TOKEN.sub(lambda m: _token(m.group()), text)

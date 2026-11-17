@@ -754,6 +754,13 @@ class Unmasking(unittest.TestCase):
         self.assertEqual(unmask("50% скидка"), "50% скидка")
         self.assertEqual(unmask("с*ыр"), "с*ыр")                              # nothing fits: as it was
         self.assertEqual(unmask("5*10"), "5*10")
+        # asterisks around a word are emphasis, "@" before a name a mention: no masks
+        self.assertEqual(unmask("*да* я тут"), "да я тут")
+        self.assertEqual(unmask("*ля* какой"), "ля какой")
+        self.assertEqual(unmask("**вздыхает**"), "вздыхает")
+        self.assertEqual(unmask("*бл@дь*"), "блядь")
+        self.assertEqual(unmask("@Вася привет"), "Вася привет")
+        self.assertEqual(unmask("@с*ка"), "сука")
 
     def test_plain(self):
         from bv.text import plain
