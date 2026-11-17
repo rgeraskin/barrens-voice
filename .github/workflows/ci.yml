@@ -34,11 +34,14 @@ jobs:
         run: |
           mkdir pub && cp dist/dictionary.json dist/dictionary.json.sig pub/
           if git fetch --depth 1 origin dictionary 2>/dev/null && git show FETCH_HEAD:dictionary.json > old.json 2>/dev/null \
-              && cmp -s old.json pub/dictionary.json; then
+              && git show FETCH_HEAD:dictionary.json.sig > old.sig 2>/dev/null \
+              && cmp -s old.json pub/dictionary.json && cmp -s old.sig pub/dictionary.json.sig; then
             echo "the dictionary did not change"; exit 0
           fi
           cd pub
           git init -q -b dictionary
+          git config core.autocrlf false        # the bytes as signed: Windows' git would turn line ends
+          echo "* -text" > .gitattributes
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add . && git commit -qm "Dictionary from ${GITHUB_SHA::7}"

@@ -46,6 +46,14 @@ class Build(unittest.TestCase):
         self.assertEqual((data["format"], data["revision"], data["date"]), (od.FORMAT, 1794864817, "2026-11-16"))
         self.assertIsNone(od.regexes_ok(data["text"]), "the shipped dictionary passes the companions' check")
 
+    def test_bytes_as_signed(self):
+        # "\n" only, whatever the system: GitHub serves the bytes git keeps, and the signature is over them
+        import dictionary_json
+        with tempfile.TemporaryDirectory() as d:
+            raw = dictionary_json.write(entry(text="а=б\nв=г"), Path(d) / "dictionary.json").read_bytes()
+        self.assertNotIn(b"\r", raw)
+        self.assertEqual(json.loads(raw)["text"], "а=б\nв=г")
+
     def test_renamed(self):
         import dictionary_json
         lua = 'D.DEFAULT = [[\nа=б\n]]\nD.RENAMED = {\n    ["~old\\\\d"] = "~new\\\\d",\n}\n'

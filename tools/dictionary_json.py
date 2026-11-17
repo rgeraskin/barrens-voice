@@ -47,14 +47,20 @@ def build(text: str | None = None, rev: int | None = None) -> dict:
             "text": default.group(1), "renamed": renamed}
 
 
+def write(data: dict, out: Path) -> Path:
+    """The file as bytes with "\n" line ends on every system: what is signed is what GitHub serves (written as
+    text on Windows it had "\r\n", which git turned into "\n" in the branch, and no signature held)."""
+    out.write_bytes((json.dumps(data, ensure_ascii=False, indent=1) + "\n").encode("utf-8"))
+    return out
+
+
 def main() -> int:
     data = build()
     why = regexes_ok(data["text"])
     if why:
         sys.exit(f"the dictionary would be refused by the companions: {why}")
     DIST.mkdir(exist_ok=True)
-    out = DIST / "dictionary.json"
-    out.write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    out = write(data, DIST / "dictionary.json")
     print(f"{out.relative_to(ROOT)}: revision {data['revision']} ({data['date']}), {len(data['text'].splitlines())} lines")
     return 0
 
