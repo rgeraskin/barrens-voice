@@ -58,11 +58,20 @@ TICK_MS = 400
 UPDATE_EVERY = 3600          # an hour; and at every start
 
 
-def launcher_log(message: str) -> None:
+def rotate_log(path: Path, limit: int = 1_000_000) -> None:
+    """The log moved to .log.1 once it is over `limit`. Best effort: a windowless launcher holds launcher.log open
+    as its stderr, and Windows will not move an open file - main() rotates it before that."""
     try:
-        LAUNCHER_LOG.parent.mkdir(exist_ok=True)
-        if LAUNCHER_LOG.exists() and LAUNCHER_LOG.stat().st_size > 1_000_000:
-            LAUNCHER_LOG.replace(LAUNCHER_LOG.with_suffix(".log.1"))
+        if path.exists() and path.stat().st_size > limit:
+            path.replace(path.with_suffix(".log.1"))
+    except OSError:
+        pass
+
+
+def launcher_log(message: str) -> None:
+    rotate_log(LAUNCHER_LOG)                 # failing, it no longer keeps the line from being written
+    try:
+        LAUNCHER_LOG.parent.mkdir(parents=True, exist_ok=True)
         with open(LAUNCHER_LOG, "a", encoding="utf-8") as f:
             f.write(f"{datetime.now():%Y-%m-%d %H:%M:%S} {message}\n")
     except OSError:
@@ -921,7 +930,8 @@ def run_in_console(args: dict) -> None:
 
 def main() -> int:
     if sys.stderr is None or "pythonw" in Path(sys.executable).name.lower():
-        LAUNCHER_LOG.parent.mkdir(exist_ok=True)
+        LAUNCHER_LOG.parent.mkdir(parents=True, exist_ok=True)
+        rotate_log(LAUNCHER_LOG)                      # now: from here on the file is open as stderr
         sys.stderr = open(LAUNCHER_LOG, "a", encoding="utf-8", buffering=1)   # tracebacks of a windowless run
         sys.stdout = sys.stderr
     args = model.parse_args(sys.argv[1:])

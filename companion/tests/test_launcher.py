@@ -1360,6 +1360,23 @@ class UpdateInWindow(unittest.TestCase):
         self.assertEqual(opened(None, False, False), [])
 
 
+    def test_log_written_when_it_cannot_rotate(self):
+        # launcher.log is the windowless launcher's stderr too: Windows refuses to move it, and the line was lost
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as d:
+            log = Path(d) / "logs" / "launcher.log"
+            log.parent.mkdir()
+            log.write_text("x" * 1_000_001, encoding="utf-8")
+            with mock.patch.object(self.app, "LAUNCHER_LOG", log), \
+                    mock.patch.object(Path, "replace", side_effect=PermissionError("in use")):
+                self.app.launcher_log("строка")
+            self.assertTrue(log.read_text(encoding="utf-8").endswith(" строка\n"))
+            with mock.patch.object(self.app, "LAUNCHER_LOG", log):
+                self.app.launcher_log("ещё")
+            self.assertTrue(log.with_suffix(".log.1").read_text(encoding="utf-8").endswith(" строка\n"))   # rotated now
+            self.assertTrue(log.read_text(encoding="utf-8").endswith(" ещё\n"))
+
+
 class Changelog(unittest.TestCase):
     """CHANGELOG.md in its format (Keep a Changelog, CLAUDE.md), and the release notes cut from it."""
 
