@@ -176,6 +176,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   A client without Russian voice-over on disk made the race voices «ready» and silent. Now they say why and the chat is read with Windows voices; a failed load is tried again after 10 minutes or after switching voices off and on.
 
+- A very short question is read, with its intonation as it is
+
+  A question of a fraction of a second was too short for the pitch analysis, and its line failed.
+
 - A line that fails to play no longer silences the companion
 
 - A damaged voice bank is made again
