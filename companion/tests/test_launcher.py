@@ -430,11 +430,14 @@ class CommandLine(unittest.TestCase):
         self.assertTrue(parse_args(["/?"])["help"])
         self.assertTrue(parse_args(["--tray"])["tray"])
         self.assertTrue(parse_args(["--updated"])["updated"] and not parse_args([])["updated"])
+        self.assertEqual(parse_args(["--pos", "100,-20"])["pos"], (100, -20))
+        for bad in ("100", "a,b", "1,2,3"):                                # said, not a crash at the window's start
+            self.assertEqual(parse_args(["--pos", bad]), {**parse_args([]), "unknown": [f"--pos {bad}"]})
 
     def test_usage_names_every_switch(self):
         from bv.launcher.model import COMPANION_FLAGS, USAGE
-        for flag in COMPANION_FLAGS + ("--forever", "--retail", "--console", "--tray", "--open", "--scale", "--updated",
-                                       "--help"):
+        for flag in COMPANION_FLAGS + ("--forever", "--retail", "--console", "--tray", "--open", "--pos", "--scale",
+                                       "--updated", "--help"):
             self.assertIn(flag, USAGE)
 
 

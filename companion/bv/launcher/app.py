@@ -957,7 +957,7 @@ def main() -> int:
     root = tk.Tk()
     scale = args["scale"] or max(1.0, root.winfo_fpixels("1i") / 96)
     if args["pos"]:
-        root.geometry("+{}+{}".format(*args["pos"].split(",")))
+        root.geometry("+{}+{}".format(*args["pos"]))
     App(root, args, scale)
     root.mainloop()
     return 0

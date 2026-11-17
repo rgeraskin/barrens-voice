@@ -322,6 +322,7 @@ USAGE = """BarrensVoice.pyw [ключи] (или BarrensVoice.cmd [ключи])
 --selftest, --selftest-f5   проверка голосов в файлы (с --console)
 --open settings|help|log  сразу открыть «Настройки», «Помощь» или «Журнал»
 --scale 1.25          свой масштаб окна (обычно — как у экрана)
+--pos 100,200         где открыть окно: его левый верхний угол на экране
 --updated             так лаунчер перезапускает себя после обновления: игру он тогда не запускает
 --help                эта справка"""
 
@@ -347,7 +348,13 @@ def parse_args(argv: list[str]) -> dict:
             out["companion"].append(a)
         elif a in ("--open", "--pos", "--scale") and value is not None:
             try:
-                out[a[2:]] = float(value) if a == "--scale" else value
+                if a == "--scale":
+                    out["scale"] = float(value)
+                elif a == "--pos":
+                    x, y = value.split(",")                  # "100,200": the window's corner (ValueError if not)
+                    out["pos"] = (int(x), int(y))
+                else:
+                    out["open"] = value
             except ValueError:
                 out["unknown"].append(f"{a} {value}")
             i += 1
