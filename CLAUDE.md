@@ -34,6 +34,7 @@ Tools come from mise: `.mise.toml` pins Python, uv and LuaJIT, points uv at mise
 - Amending: a commit not pushed yet may be amended when that is the sensible thing (a fix-up of the same change, a forgotten file); a pushed commit is not rewritten — fix it with a new commit.
 - Name: the display name is "Barrens Voice" (addon title, UI, docs); the addon folder and identifiers stay `BarrensVoice` (`BarrensVoiceDB` is tied to the folder name: renaming it would reset players' settings).
 - Markdown: no hard line wraps. A paragraph or list item is one line; the renderer wraps long lines.
+- Russian user-facing prose (README, docs for players): written as a person writes, no semicolons and no telegraphic fragments. A list item is short; its details go in a note under it (`  > …`, indented into the item), so a reader can skip them.
 - The strip's protocol: bumping `protocol.VERSION` (and the addon's `P.VERSION`) keeps the previous version in `protocol.SUPPORTED` with its decoding, so a companion updated mid-game still reads the old addon until /reload (docs/update-strategy.md).
 - Before a push: read the unpushed commits (`git log origin/master..`). A commit that changes or fixes what an earlier unpushed one added is squashed into it (rebase with fixups, or rebuild the commits), so each pushed commit is one finished feature or fix, and the tests pass at every commit.
 - CHANGELOG.md follows Keep a Changelog 1.1.0 with SemVer, as in its header:
