@@ -116,9 +116,10 @@ def provider(config: dict, available: list[str] | None = None) -> str:
 def on_card(session, engine: str) -> None:
     """A session asked for the video card runs there: ONNX Runtime falls back to the processor quietly when
     the card cannot (DirectML without DirectX 12), and the race voices would then take tens of seconds a
-    line - and the voice bank, built first, many minutes for nothing. Raises then."""
+    line - and the voice bank, built first, many minutes for nothing. Raises then: for any provider asked for
+    other than the processor itself (f5_onnx_provider "TensorrtExecutionProvider" too)."""
     used = session.get_providers()[0] if session.get_providers() else "?"
-    if engine in PREFERRED and used != engine:
+    if engine != "CPUExecutionProvider" and used != engine:
         raise RuntimeError(f"{engine} не запустился на этой видеокарте (ONNX Runtime перешёл на {used}): "
                            "нужна NVIDIA (CUDA) или видеокарта с DirectX 12")
 
@@ -126,8 +127,8 @@ def on_card(session, engine: str) -> None:
 def card_session(engine: str):
     """(SessionOptions, providers) for a graph on the video card, F5's and Whisper's alike: DirectML's
     own requirements (no memory pattern, one node at a time) and its fastest card; the processor last,
-    as ONNX Runtime's fallback (`on_card` refuses a session that fell back). Any other engine: the
-    processor alone."""
+    as ONNX Runtime's fallback (`on_card` refuses a session that fell back); the processor alone for the
+    processor."""
     import onnxruntime as ort
     options = ort.SessionOptions()
     options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
@@ -136,9 +137,9 @@ def card_session(engine: str):
         options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
         return options, [(engine, {"device_id": 0, "performance_preference": "high_performance"}),
                          "CPUExecutionProvider"]
-    if engine in PREFERRED:
-        return options, [engine, "CPUExecutionProvider"]
-    return options, ["CPUExecutionProvider"]
+    if engine == "CPUExecutionProvider":
+        return options, [engine]
+    return options, [engine, "CPUExecutionProvider"]
 
 
 def preload(engine: str) -> None:

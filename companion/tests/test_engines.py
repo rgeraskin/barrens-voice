@@ -364,6 +364,10 @@ class OnCard(unittest.TestCase):
         with self.assertRaises(RuntimeError) as told:
             on_card(Session("CPUExecutionProvider"), "DmlExecutionProvider")
         self.assertIn("DirectX 12", str(told.exception))
+        # a provider of f5_onnx_provider outside PREFERRED was let run on the processor: F5 "ready" there
+        on_card(Session("TensorrtExecutionProvider", "CPUExecutionProvider"), "TensorrtExecutionProvider")
+        with self.assertRaises(RuntimeError):
+            on_card(Session("CPUExecutionProvider"), "TensorrtExecutionProvider")
 
     def test_card_session(self):
         # F5 and Whisper (the voice bank) set their sessions up in one place: the same card, DirectML's needs
@@ -376,6 +380,8 @@ class OnCard(unittest.TestCase):
         self.assertTrue(options.enable_mem_pattern)
         self.assertEqual(providers, ["CUDAExecutionProvider", "CPUExecutionProvider"])
         self.assertEqual(card_session("CPUExecutionProvider")[1], ["CPUExecutionProvider"])
+        # any other provider asked for gets it, the processor as the fallback (it got the processor alone)
+        self.assertEqual(card_session("TensorrtExecutionProvider")[1], ["TensorrtExecutionProvider", "CPUExecutionProvider"])
 
 
 if __name__ == "__main__":
