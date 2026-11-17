@@ -830,6 +830,50 @@ class HighVoices(unittest.TestCase):
             self.assertAlmostEqual(self.f0(y, rate, 0.2, 0.6), f0, delta=f0 * 0.06)   # the body as it was
             self.assertGreater(self.f0(y, rate, 1.4, 1.55), f0 * 2 ** (5 / 12))        # the end well up
 
+    def test_a_piece_too_short_stays_as_it_is(self):
+        # Praat cannot analyse pitch in ~50 ms: the docstring's promise, unchanged, not a PraatError
+        from bv.intonation import shape
+        x, rate = self.voice(150, seconds=0.05)
+        self.assertIs(shape(x, rate, "Идёшь с н+ами?"), x)
+
+    def test_wh_question_peaks_on_its_word(self):
+        # «Кто идёт?»: the question word, first here, is raised; the end is not
+        from bv.intonation import shape
+        x, rate = self.voice(150)
+        y = shape(x, rate, "Кто ид+ёт?")
+        self.assertEqual(len(y), len(x))
+        self.assertGreater(self.f0(y, rate, 0.1, 0.4), 150 * 2 ** (3 / 12))
+        self.assertAlmostEqual(self.f0(y, rate, 1.3, 1.5), 150, delta=150 * 0.06)
+
+
+class SpeechSpanAndLastSyllable(unittest.TestCase):
+    def test_speech_span(self):
+        import numpy as np
+        from bv.intonation import speech_span
+        rate = 24000
+        x = np.zeros(rate, dtype="float32")
+        x[int(0.2 * rate):int(0.7 * rate)] = 0.5
+        a, b = speech_span(x, rate)
+        self.assertAlmostEqual(a, 0.2, delta=0.02)
+        self.assertAlmostEqual(b, 0.7, delta=0.02)
+        self.assertEqual(speech_span(x[:100], rate), (0.0, 100 / rate))                 # under one frame
+
+    def test_a_quiet_last_syllable_is_raised(self):
+        import numpy as np
+        from bv.intonation import boost_last_syllable
+        rate = 24000
+        t = np.arange(rate) / rate
+        tone = np.sin(2 * np.pi * 200 * t).astype("float32")
+        x = np.zeros(rate, dtype="float32")
+        x[:int(0.6 * rate)] = 0.5 * tone[:int(0.6 * rate)]                              # the body
+        x[int(0.7 * rate):int(0.9 * rate)] = 0.05 * tone[:int(0.2 * rate)]              # a quiet last syllable
+        y = boost_last_syllable(x, rate, below_db=4.0)
+        level = lambda s: 20 * np.log10(np.sqrt(np.mean(s ** 2)))
+        body, last = level(y[:int(0.6 * rate)]), level(y[int(0.72 * rate):int(0.88 * rate)])
+        self.assertAlmostEqual(body - last, 4.0, delta=1.0)                             # up to 4 dB under the body
+        again = boost_last_syllable(y, rate, below_db=4.0)                              # loud enough now: left alone
+        self.assertLess(abs(level(again[int(0.72 * rate):int(0.88 * rate)]) - last), 0.6)
+
 
 class Tempo(unittest.TestCase):
     CONFIG = {"f5_margin": 1.0, "f5_tail": 0.0, "voice_pace_blend": 0.85, "voice_pace_limit": 1.8,

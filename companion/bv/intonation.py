@@ -117,11 +117,19 @@ def shape(samples, rate: int, text: str, settings: dict | None = None):
     if what is None or not settings["yes_no_rise_st" if what == "yes_no" else "wh_peak_st"]:
         return samples
     try:
-        import numpy as np
         import parselmouth
-        from parselmouth.praat import call
     except ImportError:
         return samples
+    try:
+        return _shaped(samples, rate, text, settings, what)
+    except parselmouth.PraatError:          # a piece too short for Praat's pitch analysis: as it is
+        return samples
+
+
+def _shaped(samples, rate: int, text: str, settings: dict, what: str):
+    import numpy as np
+    import parselmouth
+    from parselmouth.praat import call
     snd = parselmouth.Sound(np.asarray(samples, dtype="float64"), sampling_frequency=rate)
     floor, ceiling = pitch_range(snd)
     manip = call(snd, "To Manipulation", 0.01, floor, ceiling)
