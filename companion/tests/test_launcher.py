@@ -240,6 +240,36 @@ class LogLines(unittest.TestCase):
         self.assertIn("stderr=subprocess.PIPE", source)
         self.assertNotIn("stderr=subprocess.STDOUT", source)
 
+    def test_glue_in_a_real_process(self):
+        # the case seen: a library writes a bar to fd 2 with no line end, then the companion logs a line;
+        # a stand-in companion (a "bv" package of its own in the folder the launcher starts it in)
+        import tempfile
+        import time
+
+        from bv.launcher.process import Companion
+        from bv.logs import parse
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "bv").mkdir()
+            (Path(d) / "bv" / "__init__.py").write_text("")
+            (Path(d) / "bv" / "__main__.py").write_text(
+                "import os, sys\n"
+                "os.write(2, b'\\x1b[A 40%|####   |\\r 80%|########|\\r')\n"   # below Python, no line end
+                "print('04:45:46 INFO  собираю голоса рас из игры', flush=True)\n"
+                "os.write(2, b'W: onnxruntime\\n')\n"
+                "print('04:45:47 INFO  связь с аддоном есть', flush=True)\n", encoding="utf-8")
+            got = []
+            companion = Companion(Path(d), got.append)
+            companion.start()
+            companion.proc.wait(timeout=30)
+            deadline = time.monotonic() + 5
+            while len(got) < 3 and time.monotonic() < deadline:
+                time.sleep(0.05)
+        lines = [parse(x) for x in got]
+        info = [m for _, lv, m in lines if lv == "INFO"]
+        self.assertEqual(info, ["собираю голоса рас из игры", "связь с аддоном есть"], got)
+        # the bar and the warning after it are one line of stderr: as in a console, the warning overwrote the bar
+        self.assertEqual([m for _, lv, m in lines if lv == "DEBUG"], ["[stderr] W: onnxruntime"], got)
+
     def test_progress_kept_in_one_line(self):
         from bv.launcher.model import main_lines
         items = [("04:45:32", "INFO", "компаньон запущен"), ("04:45:32", "DEBUG", "детали"),
