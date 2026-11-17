@@ -373,7 +373,8 @@ class Dictionary:
 
     def apply(self, text: str, mark: bool = False) -> str:
         """`text` through the regexes; with `mark`, each replacement wrapped in \\x02...\\x03 so it
-        can be declined after a preposition, like the addon's replacements."""
+        can be declined after a preposition, like the word replacements of `apply_words` - and so the
+        regexes after it leave it alone ("уровень 40" made of "лок40" is no "40 к" for the "к" rule)."""
         for pattern, replacement in self.rules:
             try:
                 if mark:

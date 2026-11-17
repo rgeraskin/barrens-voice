@@ -1,9 +1,10 @@
-"""Declension of the addon's dictionary replacements after a preposition ("в ОП" -> "в Огненную
+"""Declension of the dictionary's replacements after a preposition ("в ОП" -> "в Огненную
 пропасть", "для дд" -> "для дамагера"), with pymorphy3.
 
-The addon marks each replacement as \\x02...\\x03. The case comes from the word before it; only the
-start of the replacement is declined - adjectives and the first noun - so a name's genitive tail
-stays ("Глубины Чёрной горы" -> "в Глубины Чёрной горы").
+The dictionary (`Dictionary.apply_words`, and `Dictionary.apply` for its regexes) marks each
+replacement as \\x02...\\x03. The case comes from the word before it; only the start of the
+replacement is declined - adjectives and the first noun - so a name's genitive tail stays
+("Глубины Чёрной горы" -> "в Глубины Чёрной горы").
 """
 from __future__ import annotations
 
