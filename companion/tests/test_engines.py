@@ -155,6 +155,24 @@ class EnginesTest(unittest.TestCase):
             self.assertNotIn("Голоса рас готовы.", self.sapi.said)
 
 
+    def test_a_windows_voice_sample_keeps_the_race_voices(self):
+        # the voices window's play button: voice=sapi;sapi=<name> for that test line only
+        FakeF5.fail = None
+        e = self.make()
+        e.follow(Line("control", "", "", "", "", "", "", 100, "f5"))
+        loaded = e.f5
+        self.assertIsNotNone(loaded)
+        sample = Line("test", "Проверка", "", "", "", "", "Привет!", 100, "sapi", sapi_voice="Irina")
+        e.follow(sample)
+        self.assertIs(e.f5, loaded)
+        self.assertFalse(loaded.stopped)
+        self.assertIs(e.for_line(sample), self.sapi)       # the sample itself in that Windows voice
+        e.follow(Line("control", "", "", "", "", "", "", 100, "sapi"))   # the addon switched: unloaded
+        self.assertTrue(loaded.stopped)
+        loaded.ready.set()
+        wait()
+
+
 class Accent:
     def accent(self, text):
         return text

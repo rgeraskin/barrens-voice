@@ -42,6 +42,13 @@ class Engines:
                 self.failed_at = None       # switched away: switching back tries again at once
             self._unload()
 
+    def follow(self, line: Line) -> None:
+        """The addon's choice of voices as a frame carries it. A test line of one Windows voice
+        (`sapi=`, the play buttons of the voices window) says voice=sapi for itself only: the race
+        voices stay loaded."""
+        if line.voice and not line.sapi_voice:
+            self.want(line.voice)
+
     def _load(self) -> None:
         with self.lock:
             if self.f5 is not None:

@@ -577,8 +577,8 @@ def main() -> int:
                     line = protocol.parse(frame.payload)
                     if line and line.off is not None:
                         sapi.set_disabled({n for n in line.off.split("|") if n})
-                    if line and line.voice:
-                        engines.want(line.voice)
+                    if line:
+                        engines.follow(line)
                     if line and line.kind == "control":
                         # settings: applied above; and where the strip is (or is about to move)
                         place = locate.parse_place(line.options.get("strip", ""))
