@@ -66,14 +66,14 @@ def notes(version: str) -> str:
 
 
 def dictionary_revision() -> int:
-    """The time of the last commit that changed Dictionary.lua (tools/dictionary_json.py gives the online one
-    the same), 0 outside git."""
+    """The time of the last commit that changed Dictionary.lua - tools/dictionary_json.py's revision, so the
+    online dictionary and the release's agree - or 0 outside git."""
     import subprocess
+
+    from dictionary_json import revision
     try:
-        out = subprocess.run(["git", "log", "-1", "--format=%ct", "--", "addon/BarrensVoice/Dictionary.lua"], cwd=ROOT,
-                             capture_output=True, text=True, check=True).stdout.strip()
-        return int(out or 0)
-    except (OSError, subprocess.CalledProcessError, ValueError):
+        return revision()
+    except (OSError, subprocess.CalledProcessError, ValueError, SystemExit):
         return 0
 
 

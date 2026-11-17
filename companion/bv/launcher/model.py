@@ -13,10 +13,11 @@ from pathlib import Path
 
 from ..dictionary import GAMES, wow_roots
 
+from ..install import version_key  # noqa: F401 - versions in order, a test build before its release
 from ..paths import CODE_DIR, DATA_DIR, starter
+from ..update import AGENT, REPO, newer
 APP_DIR = CODE_DIR                                       # the companion's folder: bv/, the addon beside it
 CONFIG_PATH = DATA_DIR / "config.json"
-REPO = "rgeraskin/barrens-voice"
 GAME_NAMES = {"forever": "WoW Forever", "retail": "WoW Retail"}
 ADDON = "BarrensVoice"
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
@@ -61,16 +62,6 @@ def app_version(code_dir: Path = APP_DIR) -> str:
 def addon_version() -> str:
     """The version of the addon that comes with this launcher (what «установить/обновить» puts in the game)."""
     return toc_version(addon_source()) or "?"
-
-
-def version_key(version: str) -> tuple:
-    """Versions in order, a test build before its release (bv/install.py version_key)."""
-    from ..install import version_key as key
-    return key(version)
-
-
-def newer(candidate: str, current: str) -> bool:
-    return version_key(candidate) > version_key(current)
 
 
 SKIP = ("*.md", "._*")      # notes for the repository, macOS copy litter: not for the game
@@ -301,7 +292,7 @@ def latest_release(timeout: float = 10.0) -> dict | None:
     import urllib.request
     request = urllib.request.Request(f"https://api.github.com/repos/{REPO}/releases/latest",
                                      headers={"Accept": "application/vnd.github+json",
-                                              "User-Agent": "BarrensVoice-launcher"})
+                                              "User-Agent": AGENT})
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             data = json.loads(response.read().decode("utf-8"))
