@@ -975,3 +975,34 @@ class UpdateInWindow(unittest.TestCase):
         self.win.updater.ready = None
         self.app.App.install_update_now(self.win)
         self.assertEqual(done, [])                                                     # nothing prepared: nothing
+
+
+class Changelog(unittest.TestCase):
+    """CHANGELOG.md in its format (Keep a Changelog, CLAUDE.md), and the release notes cut from it."""
+
+    def test_format(self):
+        import re
+        text = (Path(__file__).resolve().parents[2] / "CHANGELOG.md").read_text(encoding="utf-8")
+        versions = re.findall(r"^## \[(\d+\.\d+\.\d+)\] - (\d{4}-\d\d-\d\d|Unreleased)$", text, re.M)
+        self.assertEqual(len(versions), len(re.findall(r"^## ", text, re.M)), "a version heading out of form")
+        self.assertTrue(all(d != "Unreleased" for _, d in versions[1:]), "only the newest may be unreleased")
+        order = ["Added", "Changed", "Removed", "Fixed"]
+        for version, body in re.findall(r"^## \[([^\]]+)\][^\n]*\n(.*?)(?=^## |^\[[^\]\n]+\]: |\Z)", text, re.M | re.S):
+            sections = re.findall(r"^### (.+)$", body, re.M)
+            self.assertTrue(sections, version)
+            self.assertEqual(sections, [s for s in order if s in sections], f"{version}: sections {sections}")
+            for entry in re.split(r"^- ", body, flags=re.M)[1:]:
+                title, _, rest = entry.partition("\n")
+                self.assertFalse(title.endswith("."), f"{version}: a title ends with a full stop: {title}")
+                if rest.strip():
+                    self.assertTrue(rest.startswith("\n  "), f"{version}: «{title}» - a blank line, then an indented paragraph")
+            self.assertRegex(text, rf"(?m)^\[{re.escape(version)}\]: https://github\.com/", f"{version}: no link line")
+
+    def test_release_notes(self):
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
+        import release
+        newest = release.notes(release.versions()["version"])
+        self.assertTrue(newest.startswith("### "), newest[:80])
+        self.assertNotIn("\n## ", newest)
+        self.assertNotIn("]: https://github.com/", newest)

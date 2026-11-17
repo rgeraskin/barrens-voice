@@ -57,9 +57,10 @@ def versions() -> dict:
 
 
 def notes(version: str) -> str:
-    """The release's notes: its CHANGELOG.md section (## <version>, «(в работе)» and all)."""
+    """The release's notes: its CHANGELOG.md section (`## [<version>] - <date or Unreleased>`, Keep a Changelog),
+    up to the next version or the link lines at the bottom."""
     text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    m = re.search(rf"^## {re.escape(version)}\b[^\n]*\n(.*?)(?=^## |\Z)", text, re.M | re.S)
+    m = re.search(rf"^## \[{re.escape(version)}\][^\n]*\n(.*?)(?=^## |^\[[^\]\n]+\]: |\Z)", text, re.M | re.S)
     return (m.group(1).strip() if m else "") + "\n\nУстановка: скачайте `BarrensVoice-Setup-*.exe` и запустите его.\n"
 
 
