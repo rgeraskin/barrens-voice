@@ -419,6 +419,8 @@ class App:
         try:
             found = update.latest(self.config.get("update_channel", "stable"))
         except Exception as e:  # noqa: BLE001 - offline, GitHub down: next hour
+            if getattr(e, "code", None) == 404:      # no release in this channel yet (only pre-releases so far)
+                return
             launcher_log(f"проверка обновлений: {e}")
             return
         if found is None:
@@ -499,7 +501,7 @@ class App:
         if snap == self.drawn:
             return
         self.drawn = snap
-        lines, log, _, _, _, show_update, _, launch_wow, exit_with_wow, autostart = snap
+        lines, log, _, _, _, show_update, _, _, launch_wow, exit_with_wow, autostart = snap
         c, p = self.canvas, self.p
         c.delete("all")
         n = max(1, len(self.games))

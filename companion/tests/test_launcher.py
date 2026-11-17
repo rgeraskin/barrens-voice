@@ -343,3 +343,18 @@ class Update(unittest.TestCase):
             update.apply(root, "0.4.1")
             self.assertIsNone(update.record_start(root, 300, failed=True))               # ran a while: not a start failure
             self.assertFalse(update.state_path(root).exists())
+
+
+class WindowCode(unittest.TestCase):
+    """What the tests cannot draw: the window's snapshot and its unpacking in redraw must agree (an item
+    added to one and not the other broke the launcher at its first draw, 0.4.0-beta.3)."""
+
+    def test_snapshot_matches_redraw(self):
+        import ast
+        tree = ast.parse((Path(__file__).resolve().parents[1] / "bv" / "launcher" / "app.py").read_text(encoding="utf-8"))
+        funcs = {n.name: n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)}
+        made = [n.value for n in ast.walk(funcs["snapshot"]) if isinstance(n, ast.Return)][-1]
+        taken = next(n.targets[0] for n in ast.walk(funcs["redraw"])
+                     if isinstance(n, ast.Assign) and isinstance(n.value, ast.Name) and n.value.id == "snap"
+                     and isinstance(n.targets[0], ast.Tuple))
+        self.assertEqual(len(made.elts), len(taken.elts))

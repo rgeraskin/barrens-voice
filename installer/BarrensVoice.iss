@@ -25,7 +25,7 @@ RedirectionGuard=no
 OutputDir=..\dist
 OutputBaseFilename=BarrensVoice-Setup-{#AppVersion}
 SetupIconFile=..\companion\bv\launcher\icon.ico
-UninstallDisplayIcon={app}\app\current\companion\bv\launcher\icon.ico
+UninstallDisplayIcon={app}\BarrensVoice.ico
 UninstallDisplayName=Barrens Voice
 Compression=lzma2
 SolidCompression=yes
@@ -46,6 +46,8 @@ Name: "desktopicon"; Description: "Значок на рабочем столе"
 [Files]
 Source: "..\dist\uv.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\companion\bv\install.py"; DestDir: "{app}\setup"; Flags: ignoreversion
+; the shortcuts' icon at a path that exists when they are made ([Icons] come before [Run], app\current after)
+Source: "..\companion\bv\launcher\icon.ico"; DestDir: "{app}"; DestName: "BarrensVoice.ico"; Flags: ignoreversion
 Source: "..\dist\barrens-voice-{#AppVersion}.zip"; DestDir: "{app}\setup"; Flags: ignoreversion
 
 [Run]
@@ -56,8 +58,8 @@ Filename: "{app}\app\current\.venv\Scripts\python.exe"; Parameters: "-m bv --fet
 Filename: "{app}\app\current\.venv\Scripts\pythonw.exe"; Parameters: """{app}\app\current\companion\BarrensVoice.pyw"""; WorkingDir: "{app}\app\current\companion"; Description: "Запустить Barrens Voice"; Flags: postinstall nowait skipifsilent
 
 [Icons]
-Name: "{userprograms}\Barrens Voice"; Filename: "{app}\app\current\.venv\Scripts\pythonw.exe"; Parameters: """{app}\app\current\companion\BarrensVoice.pyw"""; WorkingDir: "{app}\app\current\companion"; IconFilename: "{app}\app\current\companion\bv\launcher\icon.ico"
-Name: "{userdesktop}\Barrens Voice"; Filename: "{app}\app\current\.venv\Scripts\pythonw.exe"; Parameters: """{app}\app\current\companion\BarrensVoice.pyw"""; WorkingDir: "{app}\app\current\companion"; IconFilename: "{app}\app\current\companion\bv\launcher\icon.ico"; Tasks: desktopicon
+Name: "{userprograms}\Barrens Voice"; Filename: "{app}\app\current\.venv\Scripts\pythonw.exe"; Parameters: """{app}\app\current\companion\BarrensVoice.pyw"""; WorkingDir: "{app}\app\current\companion"; IconFilename: "{app}\BarrensVoice.ico"
+Name: "{userdesktop}\Barrens Voice"; Filename: "{app}\app\current\.venv\Scripts\pythonw.exe"; Parameters: """{app}\app\current\companion\BarrensVoice.pyw"""; WorkingDir: "{app}\app\current\companion"; IconFilename: "{app}\BarrensVoice.ico"; Tasks: desktopicon
 
 [Registry]
 ; the launcher's «Запускать при входе в Windows» writes this value: gone with the program
