@@ -541,6 +541,8 @@ def main() -> int:
             if online.current["revision"] > dictionary.revision:
                 online_dictionary.write_addon(dictionary.addon, online.current, log)
         online.start()
+    else:
+        online_dictionary.clear_addon(dictionary.addon, log)
     from .text import Accentor
     from . import yo
     restore_yo = yo.restore if config.get("restore_yo", True) else (lambda t: t)

@@ -72,19 +72,30 @@ def regexes_ok(text: str, timeout: float = CHECK_TIMEOUT) -> str | None:
     return None
 
 
-def load(raw: bytes, signature: str, public: str = update.PUBLIC_KEY, check=regexes_ok) -> tuple[dict | None, str]:
-    """(the dictionary, "") when `raw` is one this companion may use, else (None, why not)."""
+def signed(raw: bytes, signature: str, public: str = update.PUBLIC_KEY) -> tuple[dict | None, str]:
+    """(the dictionary, "") when `raw` is signed and of this companion's format - its regexes not checked
+    yet; else (None, why not)."""
     if not update.verify(raw, signature, public):
         return None, "подпись не сходится"
     try:
         data = json.loads(raw)
     except ValueError:
         return None, "не JSON"
+    if not isinstance(data, dict):
+        return None, "не описание словаря"
     if data.get("format") != FORMAT:
         return None, f"формат {data.get('format')}, а программа читает {FORMAT}"
     if not isinstance(data.get("text"), str) or not isinstance(data.get("renamed", {}), dict) \
-            or not isinstance(data.get("revision"), int):
+            or not isinstance(data.get("revision"), int) or isinstance(data.get("revision"), bool):
         return None, "описание без текста или ревизии"
+    return data, ""
+
+
+def load(raw: bytes, signature: str, public: str = update.PUBLIC_KEY, check=regexes_ok) -> tuple[dict | None, str]:
+    """(the dictionary, "") when `raw` is one this companion may use, else (None, why not)."""
+    data, why = signed(raw, signature, public)
+    if data is None:
+        return None, why
     why = check(data["text"])
     if why:
         return None, why
@@ -125,7 +136,7 @@ class Online:
         """The last good dictionary kept in the data folder (checked again: the folder is the player's)."""
         try:
             raw = (self.folder / FILE).read_bytes()
-            sig = (self.folder / (FILE + ".sig")).read_text(encoding="ascii")
+            sig = (self.folder / (FILE + ".sig")).read_text(encoding="ascii", errors="replace")
         except OSError:
             return None
         data, _ = load(raw, sig, self.public, self.check)
@@ -140,15 +151,19 @@ class Online:
         except Exception as e:  # noqa: BLE001 - offline, GitHub down: the next time
             self.log(f"словарь онлайн: не скачался ({e})")
             return None
-        data, why = load(raw, sig, self.public, self.check)
-        if data is None:
+        data, why = signed(raw, sig, self.public)
+        if data is not None and self.current and data["revision"] <= self.current["revision"]:
+            return None                                # not news: its regexes were checked when it came
+        why = why or self.check(data["text"])
+        if why:
             self.log(f"словарь онлайн не принят: {why}")
             return None
-        if self.current and data["revision"] <= self.current["revision"]:
-            return None
-        self.folder.mkdir(parents=True, exist_ok=True)
-        (self.folder / FILE).write_bytes(raw)
-        (self.folder / (FILE + ".sig")).write_text(sig, encoding="ascii")
+        try:
+            self.folder.mkdir(parents=True, exist_ok=True)
+            (self.folder / FILE).write_bytes(raw)
+            (self.folder / (FILE + ".sig")).write_text(sig, encoding="ascii", errors="replace")
+        except OSError as e:
+            self.log(f"словарь онлайн: не сохранён для запуска без сети ({e})")   # used all the same
         with self.lock:
             self.current = self.pending = data
         return data
@@ -162,11 +177,37 @@ class Online:
         def loop():
             import time
             while True:
-                self.fetch_once()
+                try:
+                    self.fetch_once()
+                except Exception as e:  # noqa: BLE001 - the thread lives on: the next hour may do
+                    self.log(f"словарь онлайн: {e}")
                 time.sleep(every)
         thread = threading.Thread(target=loop, daemon=True, name="dictionary-online")
         thread.start()
         return thread
+
+
+# DictionaryOnline.lua as the addon ships it: no dictionary from GitHub
+EMPTY_LUA = ("-- Written by the Barrens Voice program: the default dictionary from GitHub when it is newer than the\n"
+             "-- addon's own (Dictionary.lua uses the newer). Empty until the program fetches one.\n"
+             "BarrensVoiceDictionaryOnline = nil\n")
+
+
+def clear_addon(addon: Path | None, log) -> bool:
+    """DictionaryOnline.lua back as shipped (the dictionary online is off: a download kept from before would
+    still be the addon's default, over the Dictionary.lua being edited); whether it was written."""
+    if addon is None or not addon.is_dir():
+        return False
+    path = addon / "DictionaryOnline.lua"
+    try:
+        if not path.exists() or path.read_text(encoding="utf-8", errors="replace") == EMPTY_LUA:
+            return False
+        path.write_text(EMPTY_LUA, encoding="utf-8")
+    except OSError as e:
+        log(f"словарь онлайн: не убран из аддона ({e})")
+        return False
+    log("словарь онлайн выключен: скачанный раньше убран из аддона (в игре — после /reload)")
+    return True
 
 
 def write_addon(addon: Path | None, data: dict, log) -> bool:

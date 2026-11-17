@@ -134,6 +134,49 @@ class Online(unittest.TestCase):
             (Path(d) / od.FILE).write_text("{}")                                     # spoiled in the data folder
             self.assertIsNone(again.cached())
 
+    def test_spoiled_files_and_a_folder_that_cannot_be_written(self):
+        key, public = keys()
+        served = {}
+        raw, sig = published(entry(revision=100), key)
+        served[od.URL + od.FILE], served[od.URL + od.FILE + ".sig"] = raw, sig.encode()
+        logged, checked = [], []
+
+        def check(text):
+            checked.append(text)
+            return None
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / od.FILE).write_bytes(raw)
+            (Path(d) / (od.FILE + ".sig")).write_bytes(b"\xff\xfe not ascii")   # a non-ASCII byte: refused, no exception
+            self.assertIsNone(od.Online(Path(d), logged.append, public=public).cached())
+            blocked = Path(d) / "file"
+            blocked.write_text("")                                                   # the data folder cannot be made
+            online = od.Online(blocked / "data", logged.append, fetch=served.__getitem__, public=public, check=check)
+            self.assertEqual(online.fetch_once()["revision"], 100)                   # used all the same
+            self.assertTrue(any("не сохранён" in m for m in logged))
+            self.assertEqual(len(checked), 1)
+            self.assertIsNone(online.fetch_once())                                   # the same revision again:
+            self.assertEqual(len(checked), 1)                                        # not checked again
+
+    def test_the_thread_lives_on(self):
+        # an exception in a fetch (here: thrown by the fetch itself) is logged; the hourly loop goes on
+        import threading
+        logged, done = [], threading.Event()
+
+        def log(message):
+            logged.append(message)
+            done.set()
+        online = od.Online(Path(tempfile.gettempdir()), log)
+        online.fetch_once = lambda: (_ for _ in ()).throw(RuntimeError("boom"))
+        thread = online.start(every=3600)
+        self.assertTrue(done.wait(5))
+        self.assertTrue(thread.is_alive())
+        self.assertIn("boom", logged[0])
+
+    def test_not_an_object(self):
+        key, public = keys()
+        raw = json.dumps([1, 2]).encode()
+        self.assertIsNone(od.load(raw, base64.b64encode(key.sign(raw)).decode(), public)[0])
+
     def test_offline(self):
         logged = []
 
@@ -176,6 +219,16 @@ class Newer(unittest.TestCase):
         self.assertEqual(merged(new_default, ""), ["кд=кулд+аун"])
         self.assertEqual(merged(new_default, "имба=имба"), ["кд=кулд+аун", "имба=имба"])
         self.assertEqual(merged(new_default, "!имба=имб+а"), ["кд=кулд+аун"])
+
+    def test_cleared_from_the_addon_when_off(self):
+        shipped = (ROOT / "addon" / "BarrensVoice" / "DictionaryOnline.lua").read_text(encoding="utf-8")
+        self.assertEqual(od.EMPTY_LUA, shipped)
+        with tempfile.TemporaryDirectory() as t:
+            self.assertFalse(od.clear_addon(Path(t), print))                          # none there: nothing to do
+            od.write_addon(Path(t), entry(), print)
+            self.assertTrue(od.clear_addon(Path(t), print))
+            self.assertEqual((Path(t) / "DictionaryOnline.lua").read_text(encoding="utf-8"), shipped)
+            self.assertFalse(od.clear_addon(Path(t), print))                          # as shipped: not written
 
     def test_written_into_the_addon(self):
         with tempfile.TemporaryDirectory() as t:
