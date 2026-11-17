@@ -12,6 +12,7 @@ Strip.lua
 DictionaryOnline.lua
 Dictionary.lua
 VoiceList.lua
+Text.lua
 Core.lua
 ChatFade.lua
 CompanionStatus.lua

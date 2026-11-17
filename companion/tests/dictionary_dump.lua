@@ -7,7 +7,7 @@ local case = arg[1] or "none"
 local ns = { db = {} }
 local function stub() return setmetatable({}, { __index = function() return function() end end }) end
 CreateFrame, StaticPopupDialogs, SlashCmdList = stub, {}, {}
-for _, f in ipairs({ "Protocol.lua", "Strip.lua", "Dictionary.lua", "Core.lua" }) do
+for _, f in ipairs({ "Protocol.lua", "Strip.lua", "Dictionary.lua", "Text.lua", "Core.lua" }) do
     assert(loadfile(f))("BarrensVoice", ns)
 end
 local frames = {}

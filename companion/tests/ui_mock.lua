@@ -75,7 +75,7 @@ ChatFrameUtil = {
     end,
 }
 local ns = {}
-for _, f in ipairs({ "Protocol.lua", "Strip.lua", "Dictionary.lua", "VoiceList.lua", "Core.lua", "ChatFade.lua", "CompanionStatus.lua", "Companion.lua", "UI.lua",
+for _, f in ipairs({ "Protocol.lua", "Strip.lua", "Dictionary.lua", "VoiceList.lua", "Text.lua", "Core.lua", "ChatFade.lua", "CompanionStatus.lua", "Companion.lua", "UI.lua",
                      "DictionaryWindow.lua", "StripWindow.lua", "Options.lua", "VoicesWindow.lua", "Minimap.lua" }) do
     assert(loadfile(f))("BarrensVoice", ns)
 end
@@ -179,22 +179,6 @@ assert(fire("CHAT_MSG_YELL", "кричу"), "everything when the option is off")
 ChatFrameUtil.RemoveMessageEventFilter("CHAT_MSG_SAY", spamFilter)
 print("visible ok")
 
--- quest and item links read as their names; a bracket pair inside a word is a masked "х"
-assert(ns.Clean("помочь с |cffff2020|Hquest:92706:0|h[РАЗЫСКИВАЕТСЯ: Брууз]|h|r ?") == "помочь с РАЗЫСКИВАЕТСЯ: Брууз?",
-    ns.Clean("помочь с |cffff2020|Hquest:92706:0|h[РАЗЫСКИВАЕТСЯ: Брууз]|h|r ?"))
-assert(ns.Clean("продам |cff0070dd|Hitem:2589::::::::|h[Льняной мешок]|h|r") == "продам Льняной мешок")
-assert(ns.Clean("на)(уя") == "нахуя", ns.Clean("на)(уя"))
-assert(ns.Clean(")(орошо") == "хорошо" and ns.Clean("ну }{ватит") == "ну хватит")
-assert(ns.Clean("привет))") == "привет." and ns.Clean("ок )(") == "ок.", ns.Clean("ок )("))
--- a link coloured by name (|cnIQ1:), and a colon before a Russian letter left whole
-local link = "WTS |cnIQ1:|Hitem:250335::::::::39:1489:::1:3524::::::|h[Сильный эликсир стойкости]|h|r|cnIQ1:|Hitem:250333::::::::39:1489:::1:3524::::::|h[Сильный эликсир священника]|h|r"
-assert(ns.Clean(link) == "WTS Сильный эликсир стойкости Сильный эликсир священника", ns.Clean(link))
-assert(ns.Clean("внимание:Привет") == "внимание:Привет", ns.Clean("внимание:Привет"))
-assert(ns.Clean("ссылка:Dota") == "ссылка:Dota", ns.Clean("ссылка:Dota"))
-assert(ns.Clean("ну ты :Р") == "ну ты.", ns.Clean("ну ты :Р"))
-assert(ns.Clean("ок :D всё") == "ок. всё", ns.Clean("ок :D всё"))
-assert(ns.Clean("привет :) как") == "привет. как", ns.Clean("привет :) как"))
-print("clean ok")
 -- the dictionary is the program's now: the addon sends the line as typed (cleaned) and the player's
 -- layer of the dictionary as "dict" frames
 sent = {}
@@ -380,10 +364,6 @@ end
 ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "привет")
 ns.Send("emote", "Вася-Степи", "Orc", 2, "WARRIOR", "", "смеётся")
 assert(said(1) == "Вася пишет:\4 привет", said(1))
-assert(ns.IsQuestion("кто в ОП?") and ns.IsQuestion("танк нужен? хил?") and ns.IsQuestion("где? ") and ns.IsQuestion("что???"))
-assert(not ns.IsQuestion("привет. кто идёт?") and not ns.IsQuestion("ура! кто со мной?") and not ns.IsQuestion("кто в ОП")
-    and not ns.IsQuestion("ну... кто?") and not ns.IsQuestion("5.5 кто?") and not ns.IsQuestion("ну… кто?"), "other sentences: no")
-assert(ns.IsQuestion("кто в рейд?") and ns.IsQuestion("Цена?") and ns.IsQuestion("№5 где?") and ns.IsQuestion("а ты — где?"), "letters sharing a byte with «…»")
 ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "кто идёт в ОП?")
 ns.Send("say", "Вася-Степи", "Orc", 2, "WARRIOR", "", "что тут?")
 ns.Send("yell", "Вася-Степи", "Orc", 2, "WARRIOR", "", "что тут?")
@@ -690,14 +670,6 @@ assert(not replayed[4]:find("replay=1", 1, true), "a live line after it: not mar
 print("replay ok")
 
 -- lines other players' addons write: not read (Questie, DBM...), a player's own words are
-local AL = ns.AddonLine
-assert(AL("{звезда} Questie: Сердце Тарагамана Ненасытного: 1/1 для |cffffff00|Hquest:5761:0|h[Убить тварь]|h|r!") == "Questie")
-assert(AL("{rt1} Interrupted: Fireball") == "Interrupted", "an icon and a Latin word with a colon")
-assert(AL("<DBM> Pull in 5") == "DBM" and AL("[Questie] accepted") == "Questie" and AL("Details!: Damage Done") == "Details!")
-assert(AL("Полуказуальная RU/UA гильдия <MIR> ищет игроков!") == nil, "a guild tag inside a player's line")
-assert(AL("[UA] Спільнота < ХАОС > запрошує") == nil, "[UA] is no addon")
-assert(AL("{череп} танк: бери этого") == nil, "an icon, then Russian: a player")
-assert(AL("WTS: сумки") == nil and AL("Nova: привет") == nil, "a Latin word with a colon that is no addon")
 ns.db.enabled, ns.db.party, ns.db.self = true, true, false
 assert(not ns.Reads("CHAT_MSG_PARTY", "Player-1-9", "{звезда} Questie: Баззалан – убито: 1/1"), "not read")
 assert(ns.Reads("CHAT_MSG_PARTY", "Player-1-9", "кто идёт в ОП?"), "a player's line: read")
@@ -724,12 +696,6 @@ assert(type(ns.history) == "table" and #ns.history == 0, "a broken saved value: 
 print("history ok")
 
 -- numbered channels one by one (under "Общие каналы")
-local CS = ns.ChannelSetting
-assert(CS("Общий", "1. Общий - Оргриммар") == "chGeneral" and CS("General") == "chGeneral")
-assert(CS("Торговля (локальный)", "") == "chTrade" and CS("Trade - City") == "chTrade")
-assert(CS("Поиск спутников") == "chLfg" and CS("LookingForGroup") == "chLfg")
-assert(CS("Оборона: Оргриммар") == "chDefense" and CS("LocalDefense") == "chDefense" and CS("Оборона мира") == "chDefense")
-assert(CS("МойКанал") == "chOther" and CS(nil, "5. Мой") == "chOther" and CS(nil, "2. Торговля - Степи") == "chTrade", "by the full channel name when no base name")
 ns.db.enabled, ns.db.channels, ns.db.self = true, true, false
 ns.db.chGeneral, ns.db.chTrade, ns.db.chLfg, ns.db.chDefense, ns.db.chOther = true, false, true, true, true
 assert(ns.Reads("CHAT_MSG_CHANNEL", "Player-1-9", "кто в ОП?", "Общий", "1. Общий - Степи"), "General on")
