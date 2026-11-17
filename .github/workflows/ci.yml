@@ -8,6 +8,6 @@ jobs:
   test:
     runs-on: windows-latest          # the companion is Windows-only; standard runners are free for public repos
     steps:
-      - uses: actions/checkout@v4
-      - uses: jdx/mise-action@v2
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v5
       - run: mise run test
