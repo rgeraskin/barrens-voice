@@ -54,7 +54,7 @@ DEFAULT_CONFIG = {
     "wow_dir": "",
     "game_dirs": {},              # {"forever": "...\\_forever_"}: the folders the launcher found
     "hf_home": "",
-    "launch_wow": True,
+    "launch_wow": False,          # opening Barrens Voice does not start the game unless asked («Играть»)
     "game": "forever",            # or "retail"; --retail / --forever on the command line override it
     "launch_product": "WoWF",
     "launch_product_retail": "WoW",
