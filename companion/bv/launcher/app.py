@@ -82,6 +82,7 @@ class App:
         self.p = Painter(self.canvas, self.title_font)
 
         self.config = model.read_config()
+        self.config_told = False         # config.json does not parse: said once
         self.version = model.app_version()
         self.addon_version = model.addon_version()
         self.addons_tried: set[tuple[str, str]] = set()
@@ -125,6 +126,11 @@ class App:
 
         root.protocol("WM_DELETE_WINDOW", self.close)
         self.say(f"Barrens Voice {display_version(self.version)}" + (", ждёт игру в трее" if resident else ""))
+        problem = model.config_problem()
+        if problem:
+            self.config_told = True
+            self.say(f"{problem} — исправьте его («Открыть config.json» в «Настройках»), до тех пор лаунчер "
+                     "в него не пишет", "WARN")
         if INSTALL_DIR is not None:                # an update by an older version did not bring the starter yet,
             from ..install import place_starter    # nor set the version Windows «Apps» shows
             from ..paths import CODE_DIR
@@ -162,6 +168,18 @@ class App:
         else:
             self.say("ждёт игру: «Играть» или запуск из Battle.net")
 
+    def set_config(self, **changes) -> dict:
+        """Settings changed in config.json; when the file does not parse it is not written over (the player's
+        settings are in it) - the change holds in this window only, and that is said once."""
+        try:
+            self.config = model.update_config(**changes)
+        except model.BrokenConfig as e:
+            self.config = {**self.config, **changes}
+            if not self.config_told:
+                self.config_told = True
+                self.say(f"{e} — изменения не сохраняются, пока файл не исправлен", "WARN")
+        return self.config
+
     def say(self, message: str, level: str = "INFO") -> None:
         """A line of the launcher's own in the logs (and its log file)."""
         self.incoming.put(f"{datetime.now():%H:%M:%S} {level:<5} [лаунчер] {message}")
@@ -184,7 +202,7 @@ class App:
             self.say(f"в {GAME_NAMES[self.selected]} нет аддона — «установить аддон» справа", "WARN")
             return False
         if self.config.get("game") != self.selected:
-            self.config = model.update_config(game=self.selected)
+            self.set_config(game=self.selected)
         self.companion_game = self.selected
         self.companion_started = time.monotonic()
         self.exit_seen = False
@@ -283,7 +301,7 @@ class App:
         if key == self.selected:
             return
         self.selected = key
-        self.config = model.update_config(game=key)
+        self.set_config(game=key)
         if self.addon_missing():
             self.say(f"в {GAME_NAMES[key]} нет аддона — «установить аддон» справа", "WARN")
         if self.companion.running and self.companion_game != key:
@@ -328,7 +346,7 @@ class App:
             except OSError as e:
                 self.say(f"не удалось изменить автозапуск: {e}", "WARN")
         else:
-            self.config = model.update_config(**{key: not self.config.get(key)})
+            self.set_config(**{key: not self.config.get(key)})
             if self.companion.running and key != "exit_with_wow":     # that one the companion reads at once
                 self.say("изменение подействует при следующем запуске компаньона")
         self.redraw()
@@ -348,7 +366,7 @@ class App:
 
     def dismiss_update(self) -> None:
         if self.update:
-            self.config = model.update_config(launcher_dismissed=self.update["version"])
+            self.set_config(launcher_dismissed=self.update["version"])
         self.redraw()
 
     def close(self) -> None:
@@ -371,7 +389,7 @@ class App:
             self.tray.notify(told or "Barrens Voice работает в трее: щёлкните значок, чтобы открыть окно. "
                                      "Выйти — правой кнопкой по значку.")
             if not self.config.get("launcher_tray_told"):
-                self.config = model.update_config(launcher_tray_told=True)
+                self.set_config(launcher_tray_told=True)
 
     def show(self) -> None:
         self.root.deiconify()
@@ -433,7 +451,7 @@ class App:
             self.running_game, folder = launch.running_game() if sys.platform == "win32" else (None, None)
             changes = model.remember(self.config, self.running_game, folder) if folder else None
             if changes:                                # where the game is, for next time and the companion
-                self.config = model.update_config(**changes)
+                self.set_config(**changes)
                 self.games = model.find_games(self.config)
             if self.running_game and self.running_game != self.selected and not self.companion.running:
                 self.selected = self.running_game      # the game the player started: that one
@@ -759,7 +777,12 @@ class App:
                 messagebox.showerror("Barrens Voice", f"Не нашёл Wow.exe в папке {', '.join(missing)}.", parent=win)
                 return
             changed = differs(changes)
-            self.config = model.update_config(**changes)
+            try:
+                self.config = model.update_config(**changes)
+            except model.BrokenConfig as e:
+                messagebox.showerror("Barrens Voice", f"{e}\n\nИсправьте его («Открыть config.json») и сохраните "
+                                     "настройки снова.", parent=win)
+                return
             self.games = model.find_games(self.config)
             win.destroy()
             if changed:

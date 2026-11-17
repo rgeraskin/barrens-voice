@@ -144,6 +144,7 @@ class Layout(unittest.TestCase):
                    mock.patch.object(app, "window_icon", lambda *_: None),
                    mock.patch.object(model, "read_config", lambda: dict(config or {})),
                    mock.patch.object(model, "update_config", lambda **kw: dict(config or {}, **kw)),
+                   mock.patch.object(model, "config_problem", lambda: None),
                    mock.patch.object(model, "find_games", lambda *a, **k: []),
                    mock.patch.object(model, "autostart", lambda: False),
                    mock.patch.object(model, "app_version", lambda: "0.4.0b7"),

@@ -195,20 +195,45 @@ def remember(config: dict, game: str, folder: Path) -> dict | None:
 
 # --- config.json --------------------------------------------------------------------------------
 
-def read_config(path: Path = CONFIG_PATH) -> dict:
-    """The companion's settings as it reads them: its defaults with config.json over them."""
+class BrokenConfig(ValueError):
+    """config.json is there but is not a JSON object of settings (a hand edit gone wrong: a single backslash
+    in a path, a missing comma)."""
+
+
+def read_config(path: Path = CONFIG_PATH, strict: bool = False) -> dict:
+    """The companion's settings as it reads them: its defaults with config.json over them. A file that does
+    not parse gives the defaults, or BrokenConfig when `strict`."""
     from ..__main__ import DEFAULT_CONFIG
     config = dict(DEFAULT_CONFIG)
     try:
-        config.update(json.loads(Path(path).read_text(encoding="utf-8")))
-    except (OSError, ValueError):
-        pass
+        saved = json.loads(Path(path).read_text(encoding="utf-8-sig"))     # -sig: Notepad's BOM is no error
+    except OSError:
+        return config
+    except ValueError as e:
+        if strict:
+            raise BrokenConfig(f"config.json не читается: {e}") from e
+        return config
+    if not isinstance(saved, dict):
+        if strict:
+            raise BrokenConfig("config.json не читается: в нём не настройки в фигурных скобках")
+        return config
+    config.update(saved)
     return config
 
 
+def config_problem(path: Path = CONFIG_PATH) -> str | None:
+    """Why config.json cannot be read (None when it can, or when there is none yet)."""
+    try:
+        read_config(path, strict=True)
+        return None
+    except BrokenConfig as e:
+        return str(e)
+
+
 def update_config(path: Path = CONFIG_PATH, **changes) -> dict:
-    """Change some settings in config.json, keeping the rest as the file has them."""
-    config = read_config(path)
+    """Change some settings in config.json, keeping the rest as the file has them. A file that does not parse
+    is never written over (BrokenConfig): the player's names and voices are in it, to be fixed by hand."""
+    config = read_config(path, strict=True)
     config.update(changes)
     tmp = Path(path).with_suffix(".tmp")
     tmp.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")

@@ -149,6 +149,37 @@ class Config(unittest.TestCase):
             self.assertEqual((saved["players"], saved["rate"], saved["game"]), ({"Вася": "orc-male"}, 3, "retail"))
             self.assertTrue(read_config(path)["exit_with_wow"])        # defaults under the file
 
+    def test_unparsable_file_never_written_over(self):
+        # a hand edit gone wrong (a single backslash in a path): the launcher used to write the defaults over it
+        from bv.launcher.model import BrokenConfig, config_problem, read_config, update_config
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "config.json"
+            broken = '{"wow_dir": "D:\\Games\\WoW", "players": {"Вася": "orc-male"}}'   # JSON has no \\G
+            path.write_text(broken, encoding="utf-8")
+            self.assertTrue(read_config(path)["exit_with_wow"])                     # defaults to show the window
+            self.assertIn("config.json", config_problem(path))
+            with self.assertRaises(BrokenConfig):
+                update_config(path, game="retail")
+            self.assertEqual(path.read_text(encoding="utf-8"), broken)                 # the player's file as it was
+            path.write_text("[]", encoding="utf-8")
+            self.assertRaises(BrokenConfig, update_config, path, game="retail")
+            path.write_text('\ufeff{"rate": 3}', encoding="utf-8")                   # Notepad's BOM: fine
+            self.assertIsNone(config_problem(path))
+            self.assertEqual(update_config(path, game="retail")["rate"], 3)
+            self.assertIsNone(config_problem(Path(d) / "none.json"))                 # none yet: written fresh
+
+    def test_window_keeps_the_change_and_says_once(self):
+        from types import SimpleNamespace
+        from unittest import mock
+        from bv.launcher import app, model
+        said = []
+        win = SimpleNamespace(config={"game": "forever"}, config_told=False, say=lambda m, level="INFO": said.append(level))
+        with mock.patch.object(model, "update_config", side_effect=model.BrokenConfig("config.json не читается")):
+            app.App.set_config(win, game="retail")
+            app.App.set_config(win, launch_wow=True)
+        self.assertEqual(win.config, {"game": "retail", "launch_wow": True})
+        self.assertEqual(said, ["WARN"])
+
 
 class StateLines(unittest.TestCase):
     def test_running_and_ready(self):
