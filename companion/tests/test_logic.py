@@ -1145,6 +1145,12 @@ class GameChoice(unittest.TestCase):
             self.assertIn("--exec=launch WoW", popen.call_args[0][0])
             launch.launch({}, lambda *a: None)
             self.assertIn("--exec=launch WoWF", popen.call_args[0][0])
+            # the player started the game meanwhile (while the voice bank was built): no second game
+            popen.reset_mock()
+            said = []
+            self.assertFalse(launch.launch({}, said.append, game_running=lambda: True))
+            popen.assert_not_called()
+            self.assertIn("уже запущена", said[0])
 
 
 class ColdBattlenet(unittest.TestCase):

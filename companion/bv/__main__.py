@@ -358,9 +358,12 @@ def main() -> int:
     want_launch = "--launch" in sys.argv or (config["launch_wow"] and "--no-launch" not in sys.argv)
     if want_launch and not launch.wow_running():
         # the race voices come from the client's files: (re)made before the game, after an update
+        from . import gamevoices
         from .f5engine import prepare_voices
+        if gamevoices.stale(config, gamevoices.bank_dir(config, DATA_DIR)):
+            log("игра запустится, когда соберутся голоса рас")
         prepare_voices(config, DATA_DIR, log)
-        launch.launch(config, log)   # the game starts while the voices load
+        launch.launch(config, log)   # the game starts while the voices load (not if the player started it meanwhile)
     from .dictionary import Dictionary
     dictionary = Dictionary(config, log, find_addon(config))
     dictionary.refresh()

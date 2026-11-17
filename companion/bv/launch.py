@@ -4,6 +4,7 @@ from __future__ import annotations
 import ctypes
 import os
 import subprocess
+import sys
 import threading
 import time
 from ctypes import wintypes
@@ -109,9 +110,14 @@ def find_battlenet(config: dict) -> Path | None:
     return None
 
 
-def launch(config: dict, log) -> bool:
+def launch(config: dict, log, game_running=None) -> bool:
     """Ask Battle.net to start the game of `game` (`launch_product` for Forever, WoWF;
-    `launch_product_retail` for retail, WoW)."""
+    `launch_product_retail` for retail, WoW) - unless a game runs already: the player may have started it
+    while the voice bank was being built before this launch, and a second command starts a second game."""
+    running = game_running or (wow_running if sys.platform == "win32" else (lambda: False))
+    if running():
+        log("игра уже запущена — второй раз не запускаю")
+        return False
     exe = find_battlenet(config)
     if exe is None:
         log("Battle.net не найден: укажите его в «Настройках»")
