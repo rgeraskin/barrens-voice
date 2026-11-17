@@ -323,19 +323,19 @@ class AddonVersion(unittest.TestCase):
         root = Path(__file__).resolve().parents[2]
         toc = "addon/BarrensVoice/BarrensVoice.toc"
         now = re.search(r"## Version:\s*(\S+)", (root / toc).read_text(encoding="utf-8")).group(1)
-        tags = [t for t in subprocess.run(["git", "tag", "-l", "v*"], cwd=root, capture_output=True, text=True).stdout.split()
+        tags = [t for t in subprocess.run(["git", "tag", "-l", "v*"], cwd=root, capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.split()
                 if re.fullmatch(r"v\d+\.\d+\.\d+(-beta\.\d+)?", t)]
         if not tags:
             self.skipTest("no release tags here (a shallow clone)")
         for tag in tags:
             # the release's own .toc, wherever the addon was then (0.3.0's in addon/WowChatVoice, before the rename)
             listed = subprocess.run(["git", "ls-tree", "-r", "--name-only", tag, "addon"], cwd=root,
-                                    capture_output=True, text=True).stdout.split()
+                                    capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.split()
             old_toc = next((f for f in listed if re.fullmatch(r"addon/([^/]+)/\1\.toc", f)), None)
             if old_toc is None:
                 continue
             then = re.search(r"## Version:\s*(\S+)", subprocess.run(["git", "show", f"{tag}:{old_toc}"], cwd=root,
-                                                                       capture_output=True, text=True).stdout)
+                                                                       capture_output=True, text=True, encoding="utf-8", errors="replace").stdout)
             if not then or then.group(1) != now:
                 continue
             same = (old_toc == toc and subprocess.run(["git", "diff", "--quiet", tag, "--", "addon/BarrensVoice"],
