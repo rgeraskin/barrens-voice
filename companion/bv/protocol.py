@@ -1,4 +1,4 @@
-"""Decoder for the addon's pixel strip (addon/BarrensVoice/Protocol.lua, README "Protocol").
+"""Decoder for the addon's pixel strip (addon/BarrensVoice/Protocol.lua, DEVELOPMENT.md «Протокол полоски»).
 
 Standard library only, so the round-trip test runs anywhere.
 """

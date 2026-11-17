@@ -1,4 +1,4 @@
--- Wire format of the pixel strip (see README.md, "Protocol"). Pure functions only: this file is
+-- Wire format of the pixel strip (see DEVELOPMENT.md, «Протокол полоски»). Pure functions only: this file is
 -- also loaded by the round-trip test outside the game (LuaJIT, which has the same `bit` library).
 local _, ns = ...
 ns = ns or {}
