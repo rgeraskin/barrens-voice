@@ -1,7 +1,8 @@
 """Leaving the computer to the game: the companion works in the game's gaps, not in its way.
 
-Since 0.4.0 the race voices run through ONNX Runtime: the denoising steps on the video card through
-DirectML - the same Direct3D 12 the game draws with - and Vocos (mel to sound) on the processor.
+Since 0.4.0 the race voices run through ONNX Runtime: the denoising steps on the video card (CUDA on
+NVIDIA, else DirectML - the same Direct3D 12 the game draws with) and Vocos (mel to sound) on the
+processor.
 ONNX Runtime takes every core for a CPU graph by default, and its threads spin after each run, waiting
 for more: a burst on all eight cores at each line, just when the game wants one - the game stuttered
 now and then while chat was read (it did not with torch, where Vocos ran on the card).

@@ -34,7 +34,8 @@ class Frame:
 
 class Image:
     """A BGRA screen grab: `raw` bytes, `width` x `height` pixels; `mirrored` reads it right to
-    left (the addon draws its cells from the right edge by default)."""
+    left (the addon draws its cells from the left edge by default, from the right when the player
+    chooses it: stripFrom)."""
 
     def __init__(self, raw: bytes, width: int, height: int, mirrored: bool = False):
         self.raw, self.width, self.height, self.mirrored = raw, width, height, mirrored

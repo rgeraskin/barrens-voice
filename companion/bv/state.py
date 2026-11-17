@@ -3,7 +3,8 @@
 The launcher shows it in its «Состояние» block - the race voices loading or ready, the link with
 the addon, why the companion stopped. The companion's log lines go to the launcher as they are (its
 stdout); this file holds the state those lines tell about, so the launcher never parses them.
-Nothing is written until `init` is called: the companion run by hand or the tests write no file.
+Nothing is written until `init` is called (the companion's main does, in the console too): the tests and
+the selftests write no file.
 """
 from __future__ import annotations
 

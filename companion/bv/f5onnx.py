@@ -1,10 +1,12 @@
-"""F5-TTS through ONNX Runtime (0.4.0): the race voices without torch, on any DirectX 12 card (DirectML).
+"""F5-TTS through ONNX Runtime (0.4.0): the race voices without torch, on the video card - CUDA on an
+NVIDIA card (onnxruntime-gpu), else DirectML on any DirectX 12 card (f5engine.PREFERRED).
 
 The models are the Russian F5 (Misha24-10/F5-TTS_RUSSIAN) exported by DakeQQ/F5-TTS-ONNX: four graphs
-in one folder - Metadata (sample rates, hop, the steps), Preprocess (reference audio and text to the
-starting noise and the conditions), Transformer (one denoising step; 16 of them, fixed at export with
-CFG 2 and sway -1, as the torch F5 the companion used), Decode (Vocos: mel to audio). Preprocess and
-the Transformer run on the card; Decode on the CPU - on DirectML it gives silence (the exporter says so).
+in one folder - Metadata (sample rates, hop, the number of steps), Preprocess (reference audio and text
+to the starting noise and the conditions), Transformer (one denoising step; our export runs 10 of them,
+`nfe_step` in Metadata, fixed at export with CFG 2 and sway -1, as the torch F5 the companion used),
+Decode (Vocos: mel to audio). Preprocess and the Transformer run on the card; Decode on the CPU - on
+DirectML it gives silence (the exporter says so).
 
 The length of the speech is the caller's, as with the torch engine's `fix_duration`: the total seconds
 (reference and line) become the frames of `max_duration`.

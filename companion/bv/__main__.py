@@ -23,8 +23,9 @@ DEFAULT_CONFIG = {
     "_help": "rate -10..10, volume 0..100. exclude: voices left out (part of the name). "
              "gender_overrides: voices whose gender SAPI does not know. players: {\"Name\": \"part of a voice name\"}. "
              "stress: how each engine gets the dictionary's stress marks (plus, acute or strip). "
-             "engine: f5 (race voices from the game client, on a DirectX 12 GPU) or sapi (Windows voices). "
-             "voice_shifts: semitones of the extra copies of each race voice. players: also takes F5 voice ids (orc-male#60).",
+             "engine: f5 (race voices from the game client, on an NVIDIA or DirectX 12 card) or sapi (Windows voices). "
+             "voice_shifts: semitones of the extra copies of each race voice. "
+             "players: also takes race voice ids (orc-male, orc-male/standard, orc-male/standard^+1.5).",
     "engine": "f5",
     "rate": 0,
     "volume": 100,
@@ -437,7 +438,7 @@ def main() -> int:
         from . import state
         state.init(STATE_FILE, phase="error", error=str(e))
         return 1
-    for game in ("retail", "forever"):                # BarrensVoice-Retail.cmd: the same companion, the other game
+    for game in ("retail", "forever"):                # --retail / --forever (the launcher's): the game to read
         if f"--{game}" in sys.argv:
             config["game"] = game
     # one Hugging Face cache for every model (F5, Vocos, RUAccent, Whisper): hf_home in config.json,
