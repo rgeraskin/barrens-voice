@@ -601,6 +601,23 @@ class Update(unittest.TestCase):
             self.assertIsNone(update.record_start(root, 300, failed=True))               # ran a while: not a start failure
             self.assertFalse(update.state_path(root).exists())
 
+    def test_version_runs(self):
+        # the new version's own Python must import the launcher and the companion (a broken launcher could never
+        # update itself again); here the test's Python and this repository stand in for the version's
+        import sys
+        from bv import update
+        repo = Path(__file__).resolve().parents[2]
+        self.assertIsNone(update.version_runs(repo, python=Path(sys.executable)))
+        with tempfile.TemporaryDirectory() as d:
+            bv = Path(d) / "companion" / "bv"
+            (bv / "launcher").mkdir(parents=True)
+            (bv / "__init__.py").write_text("", encoding="utf-8")
+            (bv / "launcher" / "__init__.py").write_text("", encoding="utf-8")
+            (bv / "launcher" / "app.py").write_text("import no_such_module\n", encoding="utf-8")
+            why = update.version_runs(Path(d), python=Path(sys.executable))
+            self.assertIn("no_such_module", why)
+            self.assertIsNotNone(update.version_runs(Path(d)))                          # no environment: an error
+
 
 class WindowCode(unittest.TestCase):
     """What the tests cannot draw: the window's snapshot and its unpacking in redraw must agree (an item
@@ -661,7 +678,7 @@ class Starter(unittest.TestCase):
             d = Path(d)
             root = d / "BarrensVoice"
             starter = root / "Barrens Voice.exe"
-            with mock.patch("bv.install.build"):
+            with mock.patch("bv.install.build"), mock.patch("bv.update.version_runs", return_value=None):
                 install.install(root, release(d, "0.4.0", b"v1"), "cuda", d / "uv.exe", log=lambda *a: None)
                 self.assertEqual(starter.read_bytes(), b"v1")                       # put there by the install
                 v = update.prepare(root, release(d, "0.4.1", b"v2"))
@@ -731,7 +748,8 @@ class UvInPrepare(unittest.TestCase):
             (root / "uv.exe").write_bytes(b"old uv")
             with mock.patch("bv.update.uv_version", return_value="0.13.7"), \
                  mock.patch("bv.update.get", return_value=self.data), \
-                 mock.patch("bv.install.build", side_effect=build):
+                 mock.patch("bv.install.build", side_effect=build), \
+                 mock.patch("bv.update.version_runs", return_value=None):
                 try:
                     update.prepare(root, self.release(Path(d)), log=lambda *a: None, manifest=self.manifest)
                 except RuntimeError:
@@ -783,6 +801,7 @@ class UpdaterFlow(unittest.TestCase):
         self.said: list[tuple[str, str]] = []
         self.settings = {"update_channel": "stable", "auto_update": True}
         self.build = mock.patch("bv.install.build").start()
+        self.runs = mock.patch("bv.update.version_runs", return_value=None).start()   # no environment built here
         self.addCleanup(mock.patch.stopall)
         self.addCleanup(self.tmp.cleanup)
 
@@ -916,6 +935,19 @@ class UpdaterFlow(unittest.TestCase):
         self.assertEqual(relaunch_command('"C:\\BV\\Barrens Voice.exe"', resident=True),
                          'cmd /c ping -n 3 127.0.0.1 >nul & start "" "C:\\BV\\Barrens Voice.exe" --tray')
         self.assertTrue(relaunch_command('"x.exe"', resident=False).endswith('start "" "x.exe"'))
+
+    def test_version_that_does_not_start_refused(self):
+        from bv import update
+        self.runs.return_value = "ModuleNotFoundError: No module named 'tkinter'"
+        self.publish(update.STABLE, "0.4.1")
+        u = self.updater()
+        u.check()
+        self.assertEqual((u.status, u.ready), ("error", None))
+        self.assertEqual(update.refused(self.root), "0.4.1")
+        self.assertTrue(any("tkinter" in m for _, m in self.said))
+        self.build.reset_mock()
+        self.assertEqual(self.updater().check()["version"], "0.4.1")
+        self.build.assert_not_called()                                                 # not rebuilt every hour
 
     def test_rolled_back_version_not_prepared_again(self):
         # two failed starts sent the launcher back: the same release is only told about, «Обновить» tries it

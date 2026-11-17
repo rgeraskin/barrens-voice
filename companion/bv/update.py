@@ -4,9 +4,10 @@ A release carries barrens-voice-<version>.zip, manifest.json (the app's, addon's
 versions, the archive's name, size and SHA-256) and manifest.json.sig (ed25519, tools/sign.py). The
 updater trusts a manifest only when it verifies with PUBLIC_KEY, and an archive only when it matches
 the manifest; then bv.install puts the version beside the current one (uv builds its environment
-from its uv.lock) and app\\current is pointed at it when the game is not running. If the new version's
-companion fails right at its start twice, the launcher points app\\current back and remembers that version:
-it is not prepared by itself again, only by «Обновить», until a newer one comes out (`record_start`, `refused`).
+from its uv.lock), its Python must import the launcher and the companion (`version_runs`), and app\\current
+is pointed at it when the game is not running. If the new version's companion fails right at its start twice,
+the launcher points app\\current back and remembers that version: it is not prepared by itself again, only
+by «Обновить», until a newer one comes out (`record_start`, `refused`).
 """
 from __future__ import annotations
 
@@ -127,9 +128,38 @@ def release_uv(root: Path, manifest: dict, log=print, fetch=None) -> Path:
     return fresh
 
 
+class WontStart(RuntimeError):
+    """The version was built, but its Python cannot import the launcher or the companion."""
+
+    def __init__(self, version: str, why: str):
+        super().__init__(f"версия {install.display_version(version)} не запускается: {why}")
+        self.version = version
+
+
+def version_runs(version_dir: Path, python: Path | None = None) -> str | None:
+    """Whether a built version can start at all: its Python imports the launcher, the companion and this
+    updater, and Tk works. A release whose launcher fails at its start would never be rolled back (the rollback
+    counts the companion's failures, and the launcher is what updates). None when it runs, else the error."""
+    import subprocess
+    if python is None:
+        python = version_dir / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    code = ("import tkinter, bv.launcher.app, bv.__main__, bv.update; tkinter.Tcl(); "
+            "from cryptography.hazmat.primitives.asymmetric import ed25519")
+    try:
+        done = subprocess.run([str(python), "-c", code], cwd=version_dir / "companion", capture_output=True, text=True,
+                              encoding="utf-8", errors="replace", timeout=180,
+                              creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    except (OSError, subprocess.SubprocessError) as e:
+        return str(e)
+    if done.returncode:
+        lines = [line.strip() for line in (done.stderr or "").splitlines() if line.strip()]
+        return lines[-1] if lines else f"код {done.returncode}"
+    return None
+
+
 def prepare(root: Path, archive: Path, log=print, manifest: dict | None = None) -> str:
     """The version unpacked beside the current one and its environment built (with the uv the release names,
-    which then replaces the installed one); not made current yet."""
+    which then replaces the installed one), then checked to start (WontStart if not); not made current yet."""
     version, folder = install.unpack(archive, root)
     uv = release_uv(root, manifest or {}, log)
     try:
@@ -140,6 +170,9 @@ def prepare(root: Path, archive: Path, log=print, manifest: dict | None = None) 
         raise
     if uv.name == "uv.new.exe":
         os.replace(uv, root / "uv.exe")
+    why = version_runs(folder)
+    if why:
+        raise WontStart(version, why)
     return version
 
 
@@ -177,7 +210,7 @@ def refused_path(root: Path) -> Path:
 
 
 def refused(root: Path) -> str | None:
-    """The version that failed here (went back from): not prepared by itself again."""
+    """The version that failed here (went back from, or would not start): not prepared by itself again."""
     try:
         return json.loads(refused_path(root).read_text(encoding="utf-8")).get("version") or None
     except (OSError, ValueError, AttributeError):
@@ -305,6 +338,8 @@ class Updater:
             self.say(f"версия {name} готова — установится, когда закроете игру")
             return self.ready
         except Exception as e:  # noqa: BLE001 - the current version goes on
+            if isinstance(e, WontStart):
+                refuse(self.root, e.version)        # tried again by «Обновить» or with a newer version only
             self.status = "error"
             self.say(f"обновление не удалось: {e}", "WARN")
             return None
