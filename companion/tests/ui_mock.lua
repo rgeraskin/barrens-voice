@@ -429,6 +429,30 @@ ns.Strip.Preview(nil)
 ns.db.stripPlace = "top"
 print("strip place ok")
 
+-- the radio buttons (UI.Radio): the voices' engine in «Голоса», the strip's place in the bridge section
+local function radios(label)
+    local found = {}
+    for _, f in ipairs(frames) do
+        local text = rawget(f, "label")
+        if text and text._text == label and f._scripts.OnClick then found[#found + 1] = f end
+    end
+    return found
+end
+assert(#radios("Windows") == 1 and #radios("Расы") == 1 and #radios("Вверху") == 1, "each radio button made once")
+local sapiRadio, f5Radio, topRadio = radios("Windows")[1], radios("Расы")[1], radios("Вверху")[1]
+assert(sapiRadio._scripts.OnEnter and not topRadio._scripts.OnEnter, "a tooltip only where one is given")
+local quietRadio = print
+print = function() end
+ns.db.voices = "f5"
+sapiRadio._scripts.OnClick(sapiRadio)
+assert(ns.db.voices == "sapi" and sapiRadio._checked and not f5Radio._checked, "Windows voices picked")
+f5Radio._scripts.OnClick(f5Radio)
+assert(ns.db.voices == "f5" and f5Radio._checked and not sapiRadio._checked, "race voices picked")
+print = quietRadio
+topRadio._scripts.OnClick(topRadio)
+assert(ns.StripWindow.Pending().place == "top" and topRadio._checked and not radios("Внизу (обычно)")[1]._checked, "the top picked")
+print("radio buttons ok")
+
 -- the chat windows out of sight: transparent without the mouse; a line not read aloud shows its window
 local filters = {}
 ChatTypeGroup = { SYSTEM = { "CHAT_MSG_SYSTEM" }, PARTY = { "CHAT_MSG_PARTY", "CHAT_MSG_PARTY_LEADER" } }

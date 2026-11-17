@@ -77,6 +77,23 @@ function UI.Check(parent, x, y, label, tip, get, set)
     return c
 end
 
+--- A radio button with a label at (x, y); `onClick` when it is clicked (the caller checks it and
+--- unchecks the others). UIRadioButtonTemplate, or a check box where a client lacks the template.
+function UI.Radio(parent, x, y, label, onClick, tip)
+    local ok, r = pcall(CreateFrame, "CheckButton", nil, parent, "UIRadioButtonTemplate")
+    if not ok then r = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate") end
+    r:SetSize(18, 18)
+    r:SetPoint("TOPLEFT", x, y)
+    local text = r:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    text:SetPoint("LEFT", r, "RIGHT", 4, 0)
+    text:SetText(label)
+    r.label = text
+    r:SetHitRectInsets(0, -(text:GetStringWidth() + 6), 0, 0)
+    r:SetScript("OnClick", onClick)
+    if tip then UI.Tooltip(r, tip) end
+    return r
+end
+
 --- A tooltip over a text (a font string has none of its own): an invisible frame on top of it.
 function UI.TextTooltip(parent, fontString, text)
     local f = CreateFrame("Frame", nil, parent)

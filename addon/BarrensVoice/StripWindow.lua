@@ -67,16 +67,7 @@ function W.Create(pane, close)
     local xs = { 22, 190, 270 }
     for i, item in ipairs(PLACES) do
         local value = item[1]
-        local ok, r = pcall(CreateFrame, "CheckButton", nil, window, "UIRadioButtonTemplate")
-        if not ok then r = CreateFrame("CheckButton", nil, window, "UICheckButtonTemplate") end
-        r:SetSize(18, 18)
-        r:SetPoint("TOPLEFT", xs[i], y)
-        local text = r:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-        text:SetPoint("LEFT", r, "RIGHT", 4, 0)
-        text:SetText(item[2])
-        r:SetHitRectInsets(0, -(text:GetStringWidth() + 6), 0, 0)
-        r:SetScript("OnClick", function() W.Pick(value) end)
-        radios[value] = r
+        radios[value] = UI.Radio(window, xs[i], y, item[2], function() W.Pick(value) end)
     end
     y = y - 28
 

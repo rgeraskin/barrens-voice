@@ -327,20 +327,10 @@ local function BuildVoices(tab, description)
     voicesLabel:SetPoint("TOPLEFT", LEFT + 4, y - 4)
     voicesLabel:SetText("Голоса:")
     local function Radio(value, label, tip, x)
-        local ok, r = pcall(CreateFrame, "CheckButton", nil, tab, "UIRadioButtonTemplate")
-        if not ok then r = CreateFrame("CheckButton", nil, tab, "UICheckButtonTemplate") end
-        r:SetSize(18, 18)
-        r:SetPoint("TOPLEFT", x, y - 2)
-        local text = r:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-        text:SetPoint("LEFT", r, "RIGHT", 4, 0)
-        text:SetText(label)
-        r:SetHitRectInsets(0, -(text:GetStringWidth() + 6), 0, 0)
-        r:SetScript("OnClick", function()
+        radios[value] = UI.Radio(tab, x, y - 2, label, function()
             for v, other in pairs(radios) do other:SetChecked(v == value) end
             if ns.db.voices ~= value then ns.SetVoices(value) end
-        end)
-        UI.Tooltip(r, tip)
-        radios[value] = r
+        end, tip)
     end
     Radio("f5", "Расы", "Голоса рас из русской озвучки самой игры через нейросеть F5-TTS: у каждого персонажа свой голос его "
         .. "расы и пола. Нужна видеокарта с DirectX 12 (проверено пока только на NVIDIA); без неё компаньон читает голосами Windows.", 100)
