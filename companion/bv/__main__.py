@@ -294,6 +294,9 @@ def main() -> int:
     # one Hugging Face cache for every model (F5, Vocos, RUAccent, Whisper): hf_home in config.json,
     # else the hf folder next to the program - before anything of Hugging Face is imported
     os.environ["HF_HOME"] = config.get("hf_home") or str(CACHE_DIR / "hf")
+    # Windows without developer mode has no symlinks for a normal user: the cache keeps plain copies, which
+    # costs nothing here (each model once, one revision) - the library's long warning about it is noise
+    os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
     # transformers (Whisper's features and tokenizer, RUAccent) says at import that it found no
     # PyTorch - on purpose since 0.4.0: only its errors are worth the log
     os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
