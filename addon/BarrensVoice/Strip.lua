@@ -24,6 +24,9 @@ local queue = {}
 local lastShown = 0
 local seq = math.random(0, 65535)
 local moving = false   -- between telling the program of a new place and moving there
+local fromRight = false -- the cells' direction as laid out (Layout), not as just saved: a frame
+                        -- painted before the move keeps the old one for all its cells
+local shown            -- the cells painted last (S.Peek, for the tests)
 
 S.MIN_WIDTH = 200      -- physical pixels: a narrower strip holds too little of a line per row
 -- The longest frame the strip must hold, in payload bytes: a part of the dictionary layer (480) with
@@ -46,7 +49,7 @@ local function Place(i)
     local row = math.floor((i - 1) / perRow)
     t:ClearAllPoints()
     t:SetSize(cellPx * unit, cellPx * unit)
-    if ns.db.stripFrom == "right" then
+    if fromRight then
         t:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -col * cellPx * unit, -row * cellPx * unit)
     else
         t:SetPoint("TOPLEFT", frame, "TOPLEFT", col * cellPx * unit, -row * cellPx * unit)
@@ -91,6 +94,7 @@ function S.Layout()
     local x, y, w, h = S.Geometry()
     unit = 768 / physH
     cellPx = ns.db.cell
+    fromRight = ns.db.stripFrom == "right"
     perRow = math.floor(w / cellPx)
     total = perRow * math.floor(h / cellPx)
     frame:ClearAllPoints()
@@ -156,6 +160,7 @@ local function Paint(cells)
     end
     for i = #cells + 1, painted do textures[i]:Hide() end
     painted = #cells
+    shown = cells
 end
 
 local idle = true
@@ -205,6 +210,11 @@ end
 
 function S.SetShown(shown)
     if frame then frame:SetShown(shown) end
+end
+
+--- For the tests: how many frames wait, and the cells on the strip now.
+function S.Peek()
+    return #queue, shown
 end
 
 function S.Initialize()

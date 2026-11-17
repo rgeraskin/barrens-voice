@@ -763,3 +763,71 @@ ns.ChatFade.Apply()
 print = quiet2
 issecretvalue = nil
 print("secret chat ok")
+
+-- The strip's queue, driven by its OnUpdate: a fresh strip with the real Push / PushFirst / PushNow.
+-- Each frame stays up HOLD (0.25 s), then, with nothing queued, the empty frame after IDLE_AFTER (0.5 s).
+assert(loadfile("Strip.lua"))("BarrensVoice", ns)
+local SQ = ns.Strip
+ns.db.enabled, ns.db.stripPlace, ns.db.stripFrom, ns.db.cell, ns.db.rows, ns.db.voiceOff = true, "bottom", "left", 2, 1, nil
+local encode = ns.Protocol.Encode
+ns.Protocol.Encode = function(seq, payload, cells)             -- each frame's cells tagged with their payload
+    local out, sent = encode(seq, payload, cells)
+    out.payload = payload
+    return out, sent
+end
+local n0 = #frames
+SQ.Initialize()
+local strip = frames[n0 + 1]
+local tick = strip._scripts.OnUpdate
+local t = 5000
+GetTime = function() return t end
+local function onStrip() local _, cells = SQ.Peek(); return cells and cells.payload end
+local function waiting() return (SQ.Peek()) end
+local function step(dt) t = t + dt; tick(); return onStrip() end
+assert(onStrip() == "", "an empty frame from the start: the program sees the addon is there")
+SQ.Push("a"); SQ.Push("b"); SQ.Push("c")
+assert(step(0) == "a" and waiting() == 2)
+assert(step(0.125) == "a", "held")
+assert(step(0.125) == "b", "the next after 0.25 s")
+assert(step(0.25) == "c" and waiting() == 0)
+assert(step(0.25) == "c" and step(0.125) == "c", "nothing queued: up until 0.5 s")
+assert(step(0.125) == "", "then the empty frame")
+-- at most 60 waiting, the oldest dropped; a frame put first keeps the rest, dropping the oldest of them
+for i = 1, 70 do SQ.Push("q" .. i) end
+assert(waiting() == 60, "MAX_QUEUE: " .. waiting())
+SQ.PushFirst("first")
+assert(waiting() == 60)
+assert(step(0) == "first" and step(0.25) == "q12", "ahead of the queue; q1..q11 dropped")
+-- a stop: everything waiting dropped, shown at once (not after HOLD)
+SQ.PushNow("stop")
+assert(step(0.0625) == "stop" and waiting() == 0, "the stop at once")
+assert(step(0.5) == "", "idle")
+-- moving: the program is told on the strip where it is now, nothing else shown until the move
+local later = {}
+local after0 = C_Timer.After
+C_Timer.After = function(_, f) later[#later + 1] = f end
+local made = {}
+rawset(strip, "CreateTexture", function()
+    local tex = widget()
+    tex.SetPoint = function(self, point) self._point = point end
+    made[#made + 1] = tex
+    return tex
+end)
+SQ.Push("before the move")
+ns.db.stripPlace, ns.db.stripFrom = "top", "right"                    -- «Сохранить»: a new place, cells from the right
+SQ.MoveTo()
+assert(step(0) and onStrip():find("^control\31"), "the settings frame first: " .. tostring(onStrip()))
+assert(#made > 0, "a frame longer than any before: new cells")
+for _, tex in ipairs(made) do
+    assert(tex._point == "TOPLEFT", "a frame painted before the move: all its cells from the old edge")
+end
+assert(step(0.5) and onStrip():find("^control\31"), "held until the move")
+assert(#later == 1)
+later[1]()
+for _, tex in ipairs(made) do assert(tex._point == "TOPRIGHT", "moved: from the new edge") end
+assert(step(0) == "before the move" and step(0.25):find("^control\31"), "then the queue, then the place told again")
+C_Timer.After = after0
+ns.db.stripPlace, ns.db.stripFrom = "bottom", "left"
+SQ.Layout()
+print("strip queue ok")
+
