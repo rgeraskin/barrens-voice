@@ -48,7 +48,7 @@ ns.DEFAULTS = {
     sayVerb = true,    -- "Name says: text" (says / yells / whispers / writes, by chat kind)
     sayLastNames = true,  -- the whole name ("Ивар Седой"); off: up to the first space ("Ивар")
     declension = true, -- the program declines dictionary replacements after prepositions (pymorphy3)
-    voices = "f5",     -- "f5": race voices (CatQuest, F5-TTS); "sapi": Windows voices
+    voices = "f5",     -- "f5": race voices (F5-TTS, from the client's own voice-over); "sapi": Windows voices
     -- voiceOff: [Windows voice name] = true for voices switched off; nil until changed here (the
     -- program then uses its own defaults)
 }
@@ -320,10 +320,9 @@ function ns.LineOptions(voice)
         ns.Effective(ns.db.volume, ns.VOLUME_BASE), voice or ns.db.voices or "f5")
 end
 
---- A line the companion does not speak: the current settings (which voices to keep loaded, which
---- Windows voices are off).
---- The settings frame: options, the Windows voices switched off, and where the strip is
---- (strip=x,y,width,height,screen width,screen height, physical pixels).
+--- The settings frame (not spoken): options (which voices to keep loaded), the Windows voices
+--- switched off, and where the strip is (strip=x,y,width,height,screen width,screen height, physical
+--- pixels).
 function ns.ControlPayload()
     local options = ns.LineOptions() .. ";strip=" .. ns.Strip.Describe()
     if ns.db.voiceOff then
@@ -802,7 +801,7 @@ local function OnEvent(self, event, name, ...)
         ns.LoginWord()
         ns.SendControl()   -- the companion loads the voices chosen here
         ns.SendDictionary(true)
-        -- the layer the saved variables hold now (they are written at login and /reload)
+        -- the layer the saved variables hold now (the game wrote them at the last logout or /reload)
         local _, saved = LayerSet()
         if C_Timer and C_Timer.NewTicker then
             C_Timer.NewTicker(0.25, ns.WatchCatQuest)

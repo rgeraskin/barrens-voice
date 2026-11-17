@@ -1,7 +1,8 @@
 -- The settings window (/bv, the minimap button, Options > AddOns), in the game's own tabs under the
 -- frame (PanelTabButtonTemplate): "Общее" (the main switch, speed and volume, the chat windows, and the
 -- foldable "Мост", StripWindow.lua), "Каналы и чтение", "Голоса" (the engine and the Windows voices,
--- VoicesWindow.lua) and "Словарь" (DictionaryWindow.lua). Each tab opens with a line on what is on it, and
+-- VoicesWindow.lua), "Словарь" (DictionaryWindow.lua) and "Помощь" (where to write: the community,
+-- Discord, Telegram, GitHub). Each tab opens with a line on what is on it, and
 -- the window is as high as the tab needs. One grid: the left column at LEFT, the right one at RIGHT_COL,
 -- sub-options indented by SUB.
 local _, ns = ...
@@ -438,7 +439,8 @@ function O.Current()
     return current
 end
 
---- Open the window on the tab `name` ("general", "channels", "reading", "voices", "dictionary").
+--- Open the window on the tab `name` ("general", "reading", "voices", "dictionary", "help"; another
+--- name: the first).
 function O.Open(name)
     if not window then Build() end
     Select(name)

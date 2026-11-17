@@ -1,11 +1,11 @@
--- The slang dictionary, applied before a line goes to the strip ("WTS" is said as "продам"). One
--- entry per line, "key=replacement"; case and ё/е do not matter; "#" starts a comment. A key is a
--- word, a phrase ("мертвые копи"), or a stem ending in "*" ("дамагер*" also takes "дамагера"; a
--- "*" in the replacement gets the ending). A replacement may mark stress with "+" before the vowel
--- ("дам+агер"); the companion turns that into what each voice understands. An empty replacement
--- drops the word. A line starting with "~" is a regular expression for the companion (Python,
--- case-insensitive, split at the last "="), which reads it from the saved variables after /reload;
--- the addon leaves such lines alone.
+-- The slang dictionary ("WTS" is said as "продам"): the addon keeps it - the default here and the
+-- player's edits as a layer over it - and the companion applies it (it reads the default from this
+-- file and gets the layer over the strip, Core.lua ns.SendDictionary). One entry per line,
+-- "key=replacement"; case and ё/е do not matter; "#" starts a comment. A key is a word, a phrase
+-- ("мертвые копи"), or a stem ending in "*" ("дамагер*" also takes "дамагера"; a "*" in the
+-- replacement gets the ending). A replacement may mark stress with "+" before the vowel ("дам+агер");
+-- the companion turns that into what each voice understands. An empty replacement drops the word. A
+-- line starting with "~" is a regular expression (Python, case-insensitive, split at the last "=").
 local _, ns = ...
 
 local D = {}
@@ -14,7 +14,7 @@ ns.Dictionary = D
 D.DEFAULT = [[
 # слово=как читать; ударение: + перед гласной (дам+агер)
 # фразы: мертвые копи=мёртвые к+опи; склонения: дамагер*=дам+агер* (окончание переносится)
-# регулярки (Python, применяет компаньон, после правки — /reload): ~(\d+)\s*к\b=\g<1>000
+# регулярки (Python, применяет компаньон): ~(\d+)\s*к\b=\g<1>000
 ~\b(\d+)\s*(?:лвл|lvl|ур|уровень)\b=<\1> уровень
 ~\b(\d+)\s*(?:з|g)\b=\1 [золотой|золотых|золотых]
 ~\b(\d+)\s*(?:голд|г\+олд)\w*\b=\1 [золотой|золотых|золотых]
@@ -331,7 +331,7 @@ end
 --- Byte lengths are kept, so a normalised word and the original line up byte for byte.
 function D.Norm(s)
     -- ASCII by hand rather than s:lower(): byte for byte, whatever the client's lower() does with
-    -- UTF-8 (/bv diag on the ruRU Forever client: lower() handles Cyrillic correctly too).
+    -- UTF-8 (on the ruRU Forever client lower() handles Cyrillic correctly too).
     s = s:gsub("[A-Z]", function(c) return string.char(c:byte() + 32) end)
     s = s:gsub("\208([\144-\159])", function(c) return "\208" .. string.char(c:byte() + 32) end)
     s = s:gsub("\208([\160-\175])", function(c) return "\209" .. string.char(c:byte() - 32) end)
@@ -363,8 +363,8 @@ end
 --     header = "...",               -- the comment block at the top, when changed
 -- }
 -- An entry left as it is is not stored, so a changed default reaches it by itself; an edited one
--- wins over the default; a deleted one stays deleted; a new default entry simply appears. (A
--- default fetched from GitHub can later be a layer between the two.)
+-- wins over the default; a deleted one stays deleted; a new default entry simply appears. A newer
+-- default from GitHub (DictionaryOnline.lua, below) takes the place of this one.
 
 --- The identity of a dictionary line: its normalised words ("*" for a stem), or for a regex its
 --- pattern - all before the last "=" - so a changed reading is still the same entry. nil for a
