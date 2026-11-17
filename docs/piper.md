@@ -58,6 +58,9 @@
 | RTX 5090, Vast (медиана / минимум) | 0,81 / 0,44 | ~29 ч | ~$23 / $13 |
 | RTX 5090, RunPod Community | 0,69 | ~29 ч | ~$20 |
 | A100 SXM, Vast (медиана) | 1,15 | ~37 ч | ~$43 |
+| RTX 3090, Salad (высокий / низкий / самый низкий приоритет) | 0,20 / 0,13 / 0,09 | ~67 ч | ~$13 / $9 / $6 + прерывания |
+| RTX 4090, Salad (то же) | 0,44 / 0,25 / 0,16 | ~40 ч | ~$18 / $10 / $6 + прерывания |
+| RTX 5090, Salad (то же) | 0,60 / 0,37 / 0,25 | ~29 ч | ~$17 / $11 / $7 + прерывания |
 | H100 SXM, Vast | 2,20 | ~12 ч | ~$27 |
 | H100 SXM, RunPod Community | 2,69 | ~12 ч | ~$32 |
 | **H100, Modal** | 3,95 + ~0,6 (процессор, память) | ~12 ч | ~$55, **~$25 после $30 бесплатных в месяц** |
@@ -69,6 +72,7 @@
 - **Modal** — не машина, а Python-функции: не дольше 24 ч на вызов, точки на Volume, до 10 автоматических перезапусков ([пример длинного обучения](https://modal.com/docs/examples/long-training)). Нужна обёртка (образ с piper1-gpl, загрузка записей). Бесплатные $30 — каждый месяц на тарифе Starter; пробный голос на H100 (~7 ч ≈ $33) почти целиком за их счёт. Нужна ли карта для кредитов — не проверено.
 - **L4** (есть и на Modal, $0,80/ч) — карта для вывода: 72 Вт и 300 ГБ/с памяти (у 3090 — 936), обучение VITS упирается в память — примерно вдвое медленнее тестовой машины (~110–170 ч), итог дороже всех вариантов выше.
 - Vast и RunPod Community — чужие компьютеры частных хозяев: записи из озвучки игры окажутся у них. RunPod Secure — дата-центры, в 2,5 раза дороже.
+- **Salad** (цены на 17.11.2026) — игровые компьютеры частных хозяев, только контейнеры: образ в реестре Docker, SSH и веб-терминал есть. Своего диска нет — записи и точки обучения в облачном хранилище (S3, они советуют Cloudflare R2), синхронизирует их и перезапускает задачу на другой машине их Kelpie. Машина может отключиться в любой момент (большинство работают дольше 10 ч, у задач дольше суток сбой вероятнее), низкие приоритеты вдобавок вытесняются более высокими (не раньше ~30 мин); после каждого переезда — заново ~3 ГБ записей по домашнему интернету. Высокий приоритет дороже RunPod Community, низкие дешевле на $3–8 за всё обучение, но это обёртка под прерывания и риск. Без пробного периода. Подходит для коротких повторяемых задач (раздать генерацию по картам), не для одного долгого обучения.
 - Российские провайдеры (immers.cloud, Selectel, Cloud.ru): рублёвые цены не нашлись — страницы цен динамические, смотреть в калькуляторах.
 - **Выбор:** пробный голос — на тестовой машине (бесплатно, заодно настоящая скорость 5070 Ti, чтобы уточнить таблицу) или на Modal H100 за кредиты; всё обучение — Modal H100 (~12 ч, ~$25) или RunPod 4090 (~40 ч, ~$14).
 
@@ -111,5 +115,6 @@
 - [rhasspy/piper TRAINING.md](https://GitHub.com/rhasspy/piper/blob/master/TRAINING.md)
 - [TextyMcSpeechy](https://github.com/domesticatedviking/TextyMcSpeechy) (MIT, обучение в Docker)
 - [RunPod Pricing](https://www.runpod.io/pricing), [Vast.ai Pricing](https://vast.ai/pricing), [GPUPerHour](https://gpuperhour.com/), [GPU rental prices (Oct 2026)](https://dev.to/lanternworks/gpu-rental-prices-compared-h100-a100-rtx-4090-and-more-oct-2026-eha)
+- [SaladCloud Pricing](https://salad.com/pricing), [Salad — Long-Running Tasks](https://docs.salad.com/container-engine/explanation/job-processing/long-running-tasks.md), [Kelpie](https://docs.salad.com/container-engine/how-to-guides/job-processing/kelpie)
 - [Modal Pricing](https://modal.com/pricing), [Modal — Timeouts](https://modal.com/docs/guide/timeouts)
 - [Yandex Cloud — GPU](https://yandex.cloud/ru/docs/compute/concepts/gpus), [Yandex Compute pricing](https://cloud.yandex.com/docs/compute/pricing)
