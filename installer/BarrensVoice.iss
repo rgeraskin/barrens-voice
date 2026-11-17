@@ -34,6 +34,9 @@ WizardStyle=modern
 ShowLanguageDialog=no
 ; what the libraries and the models take after installing (README: about 6 GB with NVIDIA)
 ExtraDiskSpaceRequired=6442450944
+; Setup and Uninstall wait while the launcher or the companion runs (their named mutexes, bv/launcher/app.py
+; and bv/__main__.py, "Local\": this session's): installing over a running version fails in uv sync or the switch
+AppMutex=BarrensVoiceLauncher,BarrensVoiceCompanion
 
 [Languages]
 Name: "ru"; MessagesFile: "compiler:Languages\Russian.isl"
@@ -52,8 +55,9 @@ Source: "..\dist\Barrens Voice.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\dist\barrens-voice-{#AppVersion}.zip"; DestDir: "{app}\setup"; Flags: ignoreversion
 
 [Run]
-; Python and the libraries: uv's own Python runs install.py, which builds app\{#AppVersion} from its uv.lock
-Filename: "{cmd}"; Parameters: "/c ""set UV_PYTHON_INSTALL_DIR={app}\python&& set UV_CACHE_DIR={app}\cache\uv&& set UV_PYTHON_PREFERENCE=only-managed&& ""{app}\uv.exe"" run --no-project --python 3.13 ""{app}\setup\install.py"" --root ""{app}"" --archive ""{app}\setup\barrens-voice-{#AppVersion}.zip"" || pause"""; StatusMsg: "Скачиваю Python и библиотеки (0,6–2,5 ГБ, несколько минут)…"; Flags: waituntilterminated
+; Python and the libraries: uv's own Python runs install.py, which builds app\{#AppVersion} from its uv.lock.
+; set "VAR=value": the folder quoted, so a "&" in it does not end the command
+Filename: "{cmd}"; Parameters: "/c ""set ""UV_PYTHON_INSTALL_DIR={app}\python""&& set ""UV_CACHE_DIR={app}\cache\uv""&& set ""UV_PYTHON_PREFERENCE=only-managed""&& ""{app}\uv.exe"" run --no-project --python 3.13 ""{app}\setup\install.py"" --root ""{app}"" --archive ""{app}\setup\barrens-voice-{#AppVersion}.zip"" || pause"""; StatusMsg: "Скачиваю Python и библиотеки (0,6–2,5 ГБ, несколько минут)…"; Flags: waituntilterminated
 ; the models now, not at the first start (~3 GB once)
 Filename: "{app}\app\current\.venv\Scripts\python.exe"; Parameters: "-m bv --fetch-models"; WorkingDir: "{app}\app\current\companion"; StatusMsg: "Скачиваю модели голосов (около 3 ГБ)…"; Flags: waituntilterminated
 Filename: "{app}\Barrens Voice.exe"; WorkingDir: "{app}"; Description: "Запустить Barrens Voice"; Flags: postinstall nowait skipifsilent
@@ -67,8 +71,9 @@ Name: "{userdesktop}\Barrens Voice"; Filename: "{app}\Barrens Voice.exe"; Workin
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: "Barrens Voice"; Flags: uninsdeletevalue dontcreatekey
 
 [UninstallRun]
-; the launcher and the companion of this install, not other Python programs
-Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -Command ""Get-CimInstance Win32_Process | Where-Object {{ $_.ExecutablePath -like '{app}\*' }} | ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force }}"""; Flags: runhidden; RunOnceId: "StopBarrensVoice"
+; the launcher and the companion of this install, not other Python programs. StartsWith, not -like: "[" in a
+; folder name is a wildcard there; the folder's "'" doubled for PowerShell's quotes (AppForPowerShell)
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -Command ""$app = '{code:AppForPowerShell}\'; Get-CimInstance Win32_Process | Where-Object {{ $_.ExecutablePath -and $_.ExecutablePath.StartsWith($app, [StringComparison]::OrdinalIgnoreCase) }} | ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force }}"""; Flags: runhidden; RunOnceId: "StopBarrensVoice"
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\app"
@@ -77,6 +82,13 @@ Type: filesandordirs; Name: "{app}\setup"
 Type: files; Name: "{app}\barrens-voice.install"
 
 [Code]
+{ the install folder inside PowerShell's single quotes: a ' in it doubled }
+function AppForPowerShell(Param: String): String;
+begin
+  Result := ExpandConstant('{app}');
+  StringChangeEx(Result, '''', '''''', True);
+end;
+
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if CurUninstallStep = usPostUninstall then
