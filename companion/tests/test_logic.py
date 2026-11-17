@@ -148,10 +148,6 @@ class Payload(unittest.TestCase):
         self.assertEqual((line.rate, line.text), (100, "150 золота"))
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class VoiceListFile(unittest.TestCase):
     def test_render(self):
         from bv.voicelist import label, render
@@ -273,7 +269,6 @@ class DictionaryInCompanion(unittest.TestCase):
         self.assertEqual(plain("доведете до конца"), "довед+ёте до конца")
         self.assertEqual(plain("ага, пойдём"), "аг+а, пойдём")
         self.assertEqual(plain("сережа, у сережи, сережу"), "серёжа, у серёжи, серёжу")
-        self.assertEqual(plain("сережа, у сережи, сережу"), "серёжа, у серёжи, серёжу")
         self.assertEqual(plain("пиши в лс"), "пиш+и в личку")
         self.assertEqual(plain("губа не дура"), "губ+а не дура")
         self.assertEqual(plain("хелло всем"), "хелл+оу всем")
@@ -343,6 +338,49 @@ class DictionaryInCompanion(unittest.TestCase):
         name, rest, _ = split_name("Лок\x05 смеётся")
         self.assertEqual(with_name(name, plain(rest)), "Лок смеётся")            # not «Локсмеётся»
         self.assertEqual(with_name("", "привет"), "привет")                      # the name dropped
+
+
+class Pipeline(unittest.TestCase):
+    """A chat line's text through the real pipeline, in the program's order (`__main__.speech_text`,
+    then the numbers as an engine says them), with the real default dictionary - the rules interact:
+    a regex sees the words the dictionary replaced, the declension sees both."""
+    ADDON = Path(__file__).resolve().parents[2] / "addon" / "BarrensVoice"
+
+    @classmethod
+    def setUpClass(cls):
+        try:
+            import num2words  # noqa: F401
+            import pymorphy3  # noqa: F401
+        except ImportError:
+            raise unittest.SkipTest("num2words / pymorphy3")
+        from bv.dictionary import Dictionary
+        from bv.morph import Inflector
+        cls.book = Dictionary({}, lambda *a: None, cls.ADDON)
+        cls.book.user_path = Path("/nonexistent")          # no saved variables in the tests
+        cls.book.from_addon = "test"
+        cls.book.refresh()
+        cls.inflector = Inflector(lambda *a: None)
+
+    def say(self, text, declension=True):
+        from bv import yo
+        from bv.__main__ import speech_text
+        from bv.text import numbers_to_words
+        return numbers_to_words(speech_text(text, self.book, self.inflector, declension, yo.restore))
+
+    def check(self, cases, declension=True):
+        for text, spoken in cases.items():
+            self.assertEqual(self.say(text, declension), spoken, text)
+
+    def test_lines(self):
+        self.check({
+            "нужен 1 танк и 2дд в ОП, 60 лвл": "нужен один т+анк и два дам+агера в Огненную пр+опасть, шестидесятый уровень",
+            "до 60 лвл": "до шестидесятого уровня",
+            "с БГ": "с полем боя",
+            "продам меч за 5к": "продам меч за пять тысяч",
+            "за 5з 20с": "за пять золотых двадцать серебра",
+            "через 30 сек пул": "через тридцать секунд п+ул",
+            "скидка 50%": "скидка пятьдесят процентов",
+        })
 
 
 class PlayerStop(unittest.TestCase):
@@ -1278,7 +1316,6 @@ class ChatNumbers(unittest.TestCase):
         self.assertEqual(inflector.apply("для \x02дам+агер\x03"), "для дам+агера")
 
 
-
 class LiveSettings(unittest.TestCase):
     def test_exit_with_wow_changed_while_running(self):
         # «Закрываться вместе с игрой» unchecked during the game: the running companion takes it at once
@@ -1297,3 +1334,7 @@ class LiveSettings(unittest.TestCase):
             os.utime(path, (1, 1))                                     # a new stamp, whatever the clock's grain
             live.refresh()
             self.assertEqual((config["exit_with_wow"], config["rate"]), (False, 1))   # only the live keys
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -86,6 +86,22 @@ LABELS = {"party": "группа", "raid": "рейд", "warning": "объявл�
           "notice": "программа"}
 
 
+def speech_text(text: str, dictionary, inflector, declension: bool, restore_yo=lambda t: t) -> str:
+    """A chat line's text (without the name) as it goes to an engine, which then says its numbers
+    as words and stresses it: markup gone, disguised words unmasked ("xyйня", "п0шел", "бл*ть"),
+    the dictionary's words, then its regexes (whose own patterns want plain text), each replacement
+    declined after its preposition when `declension` is on; then `text.plain` and «ё» (`restore_yo`)."""
+    from .morph import strip_marks
+    from .text import plain
+    from .unmask import unmask
+    text = unmask(MARKUP.sub("", text))
+    text = dictionary.apply_words(text)
+    text = inflector.apply(text) if declension else strip_marks(text)
+    text = dictionary.apply(text, mark=declension)
+    text = inflector.apply(text) if declension else strip_marks(text)
+    return restore_yo(plain(text))
+
+
 LOG_DIR = DATA_DIR / "logs"
 _log_file = None
 _log_day = None
@@ -525,8 +541,7 @@ def main() -> int:
             if online.current["revision"] > dictionary.revision:
                 online_dictionary.write_addon(dictionary.addon, online.current, log)
         online.start()
-    from .text import Accentor, plain
-    from .unmask import unmask
+    from .text import Accentor
     from . import yo
     restore_yo = yo.restore if config.get("restore_yo", True) else (lambda t: t)
     if config.get("restore_yo", True):
@@ -540,7 +555,7 @@ def main() -> int:
             log(f"RUAccent: {e}")
             restart_online(log)
         raise
-    from .morph import Inflector, strip_marks
+    from .morph import Inflector
     inflector = Inflector(log, config.get("declension", True))
     inflector.load()
     from .audio import Player
@@ -719,15 +734,8 @@ def main() -> int:
                         name, text, droppable = protocol.split_name(line.text)
                         if continuing and droppable:
                             name, text = "", text.lstrip()
-                        text = unmask(MARKUP.sub("", text))   # "xyйня", "п0шел", "бл*ть"
-                        # the dictionary's words, then its regexes (whose own patterns want plain
-                        # text): each replacement declined after its preposition when that is on;
                         # the name is left as it is
-                        text = dictionary.apply_words(text)
-                        text = inflector.apply(text) if line.declension else strip_marks(text)
-                        text = dictionary.apply(text, mark=line.declension)
-                        text = inflector.apply(text) if line.declension else strip_marks(text)
-                        text = protocol.with_name(name, restore_yo(plain(text)))   # «ждем» -> «ждём»; not the name
+                        text = protocol.with_name(name, speech_text(text, dictionary, inflector, line.declension, restore_yo))
                         line = dataclasses.replace(line, text=text)
                         speaker = engines.for_line(line)
                         label = LABELS.get(line.kind, line.kind) + (f" {line.channel}" if line.channel else "")

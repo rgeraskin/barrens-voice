@@ -156,10 +156,6 @@ class RoundTrip(unittest.TestCase):
         self.assertEqual(protocol.last_failure, "damaged")
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 def scene(width: int, height: int, seed: int = 3) -> bytearray:
     """A dark game picture: noise, with stray dark purple and green pixels that look like sync cells."""
     rnd = random.Random(seed)
@@ -252,3 +248,7 @@ class StripPlace(unittest.TestCase):
         line = parse("\x1f".join(["control", "", "", "", "", "", "rate=100;vol=100;voice=f5;strip=0,1078,1920,2,1920,1080", "-"]).encode())
         from bv.locate import parse_place
         self.assertEqual(parse_place(line.options["strip"]), (0, 1078, 1920, 2, 1920, 1080))
+
+
+if __name__ == "__main__":
+    unittest.main()
