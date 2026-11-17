@@ -212,6 +212,35 @@ class Roots(unittest.TestCase):
         self.assertEqual(set(kept["game_dirs"]), {"retail", "forever"})
 
 
+class LogLines(unittest.TestCase):
+    def test_glued_line_still_read(self):
+        # a library's bar without its line end, then the companion's own line: one line on the pipe
+        from bv.logs import parse
+        self.assertEqual(parse("\x1b[A 40%|####   |\r04:45:46 INFO  собираю голоса рас из игры"),
+                         ("04:45:46", "INFO", "собираю голоса рас из игры"))
+        self.assertEqual(parse("04:45:46 INFO  связь с аддоном есть"), ("04:45:46", "INFO", "связь с аддоном есть"))
+        self.assertEqual(parse("some library text"), ("", "DEBUG", "some library text"))
+
+    def test_raw_stderr(self):
+        from datetime import datetime
+
+        from bv.logs import parse, raw_line
+        now = datetime(2026, 11, 17, 4, 45, 40)
+        self.assertEqual(raw_line(" 10%|#\r 50%|##\r100%|####\r\n", now), "04:45:40 DEBUG [stderr] 100%|####")
+        self.assertEqual(raw_line("\x1b[0;93mW: onnxruntime warning\x1b[m\n", now), "04:45:40 DEBUG [stderr] W: onnxruntime warning")
+        self.assertIsNone(raw_line("\r\x1b[A  \r\n", now))
+        self.assertEqual(parse(raw_line("x\n", now))[1], "DEBUG")
+
+    def test_stderr_apart_from_the_log(self):
+        # stdout carries the companion's log lines only: what libraries write below Python has its own pipe
+        import inspect
+
+        from bv.launcher import process
+        source = inspect.getsource(process)
+        self.assertIn("stderr=subprocess.PIPE", source)
+        self.assertNotIn("stderr=subprocess.STDOUT", source)
+
+
 class CommandLine(unittest.TestCase):
     def test_parse(self):
         from bv.launcher.model import parse_args

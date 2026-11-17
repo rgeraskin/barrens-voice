@@ -36,10 +36,11 @@ class Companion:
             env = dict(os.environ, PYTHONUTF8="1", PYTHONUNBUFFERED="1", **{LAUNCHED: "1"})
             self.exit_code = None
             self.proc = subprocess.Popen([str(python), "-m", "bv", *(args or [])], cwd=self.app_dir, env=env,
-                                         stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                         stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                          creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
             self._tie(self.proc)
             threading.Thread(target=self._read, args=(self.proc,), daemon=True, name="companion-out").start()
+            threading.Thread(target=self._read_err, args=(self.proc,), daemon=True, name="companion-err").start()
 
     def stop(self, timeout: float = 8.0) -> None:
         """Ask the companion to stop (it saves who has which voice), and end it if it does not."""
@@ -83,6 +84,18 @@ class Companion:
     def _read(self, proc: subprocess.Popen) -> None:
         for raw in proc.stdout:
             line = raw.decode("utf-8", "replace").rstrip()
+            if line:
+                self.on_line(line)
+
+    def _read_err(self, proc: subprocess.Popen) -> None:
+        """The companion's stderr apart from its log lines: Python's own stderr it turns into log lines
+        itself, so what comes here is what libraries write below Python (onnxruntime, Rust downloaders)
+        - often a bar without a line end, which on one pipe glued itself to the next log line and hid it."""
+        from datetime import datetime
+
+        from ..logs import raw_line
+        for raw in proc.stderr:
+            line = raw_line(raw.decode("utf-8", "replace"), datetime.now())
             if line:
                 self.on_line(line)
 

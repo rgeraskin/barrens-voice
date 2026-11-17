@@ -52,9 +52,30 @@ def level_of(message: str) -> str:
     return "INFO"
 
 
+ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+INSIDE = re.compile(r"(\d\d:\d\d:\d\d) (DEBUG|CHAT|INFO|WARN|ERROR) +(.*)$")
+
+
+def clean(text: str) -> str:
+    """A raw line as it would look in a console: a bar redrawn with "\\r" - its last state, no colour codes."""
+    states = [part for part in ANSI.sub("", text).split("\r") if part.strip()]
+    return states[-1].rstrip() if states else ""
+
+
 def parse(line: str) -> tuple[str, str, str]:
-    """(time, level, message) of a log line; a line in no such form (a library's own output) is DEBUG."""
+    """(time, level, message) of a log line; a line in no such form (a library's own output) is DEBUG.
+    A log line glued to a library's unfinished output (a bar without its line end) is still found."""
     m = LINE.match(line)
     if m:
         return m.group(1), m.group(2), m.group(3)
-    return "", "DEBUG", line
+    m = INSIDE.search(line)
+    if m:
+        return m.group(1), m.group(2), m.group(3)
+    return "", "DEBUG", clean(line)
+
+
+def raw_line(text: str, now) -> str | None:
+    """A line a library wrote straight to the companion's stderr (below Python: onnxruntime, Rust
+    downloaders), in the log's form; None when nothing is left of it."""
+    text = clean(text)
+    return f"{now:%H:%M:%S} DEBUG [stderr] {text}" if text.strip() else None
