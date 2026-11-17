@@ -190,7 +190,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - An unreadable config.json is said in words
 
-  The companion stopped with a traceback; it now says where the error is and leaves the file alone. Impossible numbers (`"max_queue": 0`) are corrected with a warning.
+  The companion stopped with a traceback; it now says where the error is and leaves the file alone. Impossible numbers (`"max_queue": 0`) are corrected with a warning. A file saved by Notepad as «UTF-8 with BOM» is read, as the launcher already read it.
 
 - A locked VoiceList.lua no longer stops the companion
 

@@ -227,7 +227,7 @@ def load_config(path: Path | None = None, log=log) -> dict:
         _write_config(path, config)
         return config
     try:
-        saved = json.loads(path.read_text(encoding="utf-8"))
+        saved = json.loads(path.read_text(encoding="utf-8-sig"))   # -sig: Notepad's BOM is no error
     except json.JSONDecodeError as e:
         raise ConfigError(f"config.json не читается: ошибка в строке {e.lineno}, столбец {e.colno} ({e.msg})") from e
     except ValueError as e:                             # not UTF-8
@@ -262,7 +262,7 @@ class LiveConfig:
             return
         self.stamp = stamp
         try:
-            saved = json.loads(self.path.read_text(encoding="utf-8"))
+            saved = json.loads(self.path.read_text(encoding="utf-8-sig"))
         except (OSError, ValueError):
             return
         for key in self.KEYS:

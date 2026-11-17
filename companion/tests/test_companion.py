@@ -32,6 +32,13 @@ class LoadConfig(unittest.TestCase):
         self.assertEqual(saved["players"], {"Тралл": "orc-male"})
         self.assertEqual(saved["max_queue"], companion.DEFAULT_CONFIG["max_queue"])   # new settings written in
 
+    def test_bom_is_read(self):
+        # Notepad's «UTF-8 with BOM»: the launcher read it, the companion stopped with CONFIG_ERROR
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "config.json"
+            path.write_text('{"players": {"Тралл": "orc-male"}}', encoding="utf-8-sig")
+            self.assertEqual(companion.load_config(path, lambda *a: None)["players"], {"Тралл": "orc-male"})
+
     def test_not_json_is_said_in_words(self):
         # it died with a traceback before the launcher could be told anything
         with tempfile.TemporaryDirectory() as d:
