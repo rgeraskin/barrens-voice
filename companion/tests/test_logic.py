@@ -1225,3 +1225,24 @@ class ChatNumbers(unittest.TestCase):
         self.assertEqual(inflector.apply("для \x02к+ача\x03"), "для к+ача")        # slang, not the town Кача
         self.assertEqual(inflector.apply("в \x02Огненная пр+опасть\x03"), "в Огненную пр+опасть")
         self.assertEqual(inflector.apply("для \x02дам+агер\x03"), "для дам+агера")
+
+
+
+class LiveSettings(unittest.TestCase):
+    def test_exit_with_wow_changed_while_running(self):
+        # «Закрываться вместе с игрой» unchecked during the game: the running companion takes it at once
+        import json
+        import os
+        import tempfile
+        from bv.__main__ import LiveConfig
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "config.json"
+            path.write_text(json.dumps({"exit_with_wow": True, "rate": 1}), encoding="utf-8")
+            config = {"exit_with_wow": True, "rate": 1}
+            live = LiveConfig(config, path)
+            live.refresh()
+            self.assertTrue(config["exit_with_wow"])
+            path.write_text(json.dumps({"exit_with_wow": False, "rate": 5}), encoding="utf-8")
+            os.utime(path, (1, 1))                                     # a new stamp, whatever the clock's grain
+            live.refresh()
+            self.assertEqual((config["exit_with_wow"], config["rate"]), (False, 1))   # only the live keys

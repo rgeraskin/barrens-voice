@@ -180,6 +180,35 @@ def load_config() -> dict:
     return config
 
 
+class LiveConfig:
+    """Settings the launcher changes while the companion runs, taken from config.json again when it changes:
+    «Закрываться вместе с игрой» unchecked during the game must keep the companion when the game closes."""
+    KEYS = ("exit_with_wow",)
+
+    def __init__(self, config: dict, path: Path = CONFIG_PATH):
+        self.config, self.path = config, path
+        self.stamp = self._stamp()
+
+    def _stamp(self):
+        try:
+            return self.path.stat().st_mtime
+        except OSError:
+            return None
+
+    def refresh(self) -> None:
+        stamp = self._stamp()
+        if stamp == self.stamp:
+            return
+        self.stamp = stamp
+        try:
+            saved = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return
+        for key in self.KEYS:
+            if key in saved:
+                self.config[key] = saved[key]
+
+
 MODELS_READY = DATA_DIR / ".models_ready"
 # the launcher (bv.launcher): what the companion does, and its word to stop
 STATE_FILE = DATA_DIR / "tmp" / "state.json"
@@ -368,6 +397,7 @@ def main() -> int:
     dictionary = Dictionary(config, log, find_addon(config))
     dictionary.refresh()
     dictionary_checked = time.monotonic()
+    live = LiveConfig(config)
     # the dictionary online (bv/online_dictionary.py): on in an install, off run from the source (where the
     # addon's own Dictionary.lua is being edited); config.json "dictionary_online" says otherwise
     from . import online_dictionary
@@ -441,6 +471,7 @@ def main() -> int:
             now = time.monotonic()
             if now - dictionary_checked > 2:
                 dictionary.refresh()               # a changed Dictionary.lua works within seconds
+                live.refresh()                     # the launcher's checks, changed while running
                 dictionary_checked = now
                 fresh = online.take() if online else None
                 if fresh and fresh["revision"] > dictionary.revision:      # applied here, between chat lines

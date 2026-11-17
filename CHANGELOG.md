@@ -98,6 +98,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- «Закрываться вместе с игрой» works when changed during the game
+
+  The companion read it once, at its start: unchecked while the game ran, the companion still stopped when the game closed («игра закрыта — выхожу») while the launcher stayed. It takes the check from config.json again when that changes.
+
 - Starting the game when Battle.net is not running
 
   Battle.net drops the launch command while it starts and logs in, so the game did not start. The command is sent once more when its window is up (or after a minute) — only once: a second one may start a second game.

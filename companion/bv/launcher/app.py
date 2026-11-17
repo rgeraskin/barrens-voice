@@ -310,7 +310,7 @@ class App:
                 self.say(f"не удалось изменить автозапуск: {e}", "WARN")
         else:
             self.config = model.update_config(**{key: not self.config.get(key)})
-            if self.companion.running:
+            if self.companion.running and key != "exit_with_wow":     # that one the companion reads at once
                 self.say("изменение подействует при следующем запуске компаньона")
         self.redraw()
 
