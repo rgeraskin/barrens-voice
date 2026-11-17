@@ -296,6 +296,19 @@ class Mismatch(unittest.TestCase):
         self.assertIn("/reload", describe({"mismatch": "older"}, True, None, "WoW Forever", False)[3][1])
 
 
+class MainLog(unittest.TestCase):
+    def test_a_busy_chat_keeps_the_main_window_filled(self):
+        # each chat line brings a CHAT and two DEBUG lines: they must not push the INFO lines out
+        import ast
+        tree = ast.parse((Path(__file__).resolve().parents[1] / "bv" / "launcher" / "app.py").read_text(encoding="utf-8"))
+        snapshot = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "snapshot")
+        self.assertIn("self.main", ast.unparse(snapshot))
+        self.assertNotIn("self.lines", ast.unparse(snapshot))
+        from bv.launcher.model import main_lines
+        kept = [("20:13:37", "INFO", "голоса рас готовы")]
+        self.assertEqual([m for _, _, m in main_lines(kept)], ["голоса рас готовы"])
+
+
 class AddonsFollowTheApp(unittest.TestCase):
     def test_older_addons_of_closed_games(self):
         from bv.launcher.model import Game, addons_to_update

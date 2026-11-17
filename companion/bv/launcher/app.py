@@ -101,6 +101,9 @@ class App:
         # (time, level, message): every line of the companion and the launcher (bv/logs.py); the main window
         # shows model.MAIN_LEVELS of them, the log window all
         self.lines: collections.deque[tuple[str, str, str]] = collections.deque(maxlen=20000)
+        # the main window's own: a busy chat (a line, «исходно», «к синтезу» each) pushed the last INFO lines
+        # out of any window of recent lines, and the main window went blank
+        self.main: collections.deque[tuple[str, str, str]] = collections.deque(maxlen=200)
         self.incoming: queue.Queue[str] = queue.Queue()
         self.log_window = None
         self.events: queue.Queue[str] = queue.Queue()
@@ -385,6 +388,7 @@ class App:
         while not self.incoming.empty():
             new.append(parse(self.incoming.get_nowait()))
         self.lines.extend(new)
+        self.main.extend(item for item in new if item[1] in model.MAIN_LEVELS)
         if new and self.log_window is not None:
             self.log_window.append(new)
         while not self.events.empty():
@@ -496,7 +500,7 @@ class App:
             lines[0] = (model.YELLOW, "Компаньон перезапускается…" if self.busy == "restarting" else "Компаньон останавливается…")
         show_update = bool(self.update) and self.config.get("launcher_dismissed") != self.update["version"]
         games = tuple((g.key, g.addon, str(g.root)) for g in self.games)
-        progress = model.main_lines(list(self.lines)[-400:])
+        progress = model.main_lines(list(self.main))
         return (tuple(lines), progress, games, self.selected, self.running_game, show_update,
                 self.updater.status if self.updater else "",
                 self.companion.running,

@@ -168,6 +168,7 @@ class Layout(unittest.TestCase):
         for scale in (1.0, 1.25, 1.5):
             a = self.make(scale)
             a.lines.extend(LOG)
+            a.main.extend(item for item in LOG if item[1] in ('INFO', 'WARN', 'ERROR'))
             for (gname, games), (st, running, code), running_game in itertools.product(
                     GAMES.items(), STATES, (None, "forever")):
                 a.games, a.selected = games, games[0].key if games else None
