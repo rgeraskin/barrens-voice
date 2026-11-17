@@ -618,19 +618,26 @@ class App:
         if self.settings_win is not None and self.settings_win.winfo_exists():
             self.settings_win.lift()
             return
-        width, height = 600, 670
+        width, height = 600, 736
         win, c, p = self._child("Настройки", width, height)
         self.settings_win = win
         cfg = model.read_config()
         boxes = {}
-        rows = (("wow_dir", "Папка игры (…\\_forever_ или …\\_retail_), если её не нашли сами", "dir"),
+        # a folder per game (game_dirs, where the launcher also remembers a game it saw running): two games
+        # may well be on two disks; shown as found when not set
+        found = {g.key: str(g.root) for g in self.games}
+        dirs = cfg.get("game_dirs") or {}
+        rows = (("dir_forever", "Папка WoW Forever (…\\_forever_), если её не нашли сами", "dir"),
+                ("dir_retail", "Папка WoW Retail (…\\_retail_), если её не нашли сами", "dir"),
                 ("battlenet_exe", "Battle.net.exe, если его не нашли сами", "exe"),
-                ("hf_home", "Папка кэша моделей (пусто — папка hf рядом с программой)", "dir"),
+                ("hf_home", "Папка кэша моделей (пусто — по умолчанию)", "dir"),
                 ("log_keep_days", "Сколько дней хранить журналы (0 — всегда)", ""))
+        initial = {"dir_forever": dirs.get("forever") or found.get("forever", ""),
+                   "dir_retail": dirs.get("retail") or found.get("retail", "")}
         y = 80
         for key, label, pick in rows:
             c.create_text(30, y, text=label, anchor="w", fill=PARCHMENT, font=p.body)
-            boxes[key] = p.entry(30, y + 26, width - 60 - (100 if pick else 0), str(cfg.get(key, "")))
+            boxes[key] = p.entry(30, y + 26, width - 60 - (100 if pick else 0), str(initial.get(key, cfg.get(key, ""))))
             if pick:
                 def choose(k=key, kind=pick):
                     got = (filedialog.askdirectory(parent=win) if kind == "dir"
@@ -674,7 +681,17 @@ class App:
                 days = int(boxes["log_keep_days"].var.get() or 0)
             except ValueError:
                 return None
-            changes = {k: boxes[k].var.get().strip() for k in ("wow_dir", "battlenet_exe", "hf_home")}
+            changes = {k: boxes[k].var.get().strip() for k in ("battlenet_exe", "hf_home")}
+            game_dirs = dict(cfg.get("game_dirs") or {})
+            for box, game in (("dir_forever", "forever"), ("dir_retail", "retail")):
+                folder = model.game_folder(boxes[box].var.get().strip(), game)
+                if folder and game not in dirs and folder == os.path.normpath(found.get(game, "") or "."):
+                    continue                     # the folder found, shown and left as it was: not a setting
+                if folder:
+                    game_dirs[game] = folder
+                else:
+                    game_dirs.pop(game, None)
+            changes["game_dirs"] = game_dirs
             changes.update(log_keep_days=days, log_details=flags["details"],
                            f5_end_check="whisper" if flags["whisper"] else "silence",
                            auto_update=flags["auto"], update_channel="beta" if flags["beta"] else "stable")
@@ -690,6 +707,11 @@ class App:
             changes = edited()
             if changes is None:
                 messagebox.showerror("Barrens Voice", "Дни хранения журналов — целое число.", parent=win)
+                return
+            missing = [GAME_NAMES[g] for g, d in changes["game_dirs"].items()
+                       if d and not (Path(d) / "Wow.exe").is_file()]
+            if missing:
+                messagebox.showerror("Barrens Voice", f"Не нашёл Wow.exe в папке {', '.join(missing)}.", parent=win)
                 return
             changed = differs(changes)
             self.config = model.update_config(**changes)

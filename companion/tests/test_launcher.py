@@ -121,6 +121,18 @@ class Paths(unittest.TestCase):
             self.assertEqual((data, cache, start), (Path(d) / "data", Path(d) / "cache", '"py" "start.pyw"'))
 
 
+class GameFolder(unittest.TestCase):
+    def test_world_of_warcraft_folder_taken_for_the_game(self):
+        from bv.launcher.model import game_folder
+        with tempfile.TemporaryDirectory() as d:
+            wow = Path(d) / "World of Warcraft"
+            make_game(wow / "_forever_")
+            self.assertEqual(game_folder(str(wow), "forever"), os.path.normpath(str(wow / "_forever_")))
+            self.assertEqual(game_folder(str(wow / "_forever_"), "forever"), os.path.normpath(str(wow / "_forever_")))
+            self.assertEqual(game_folder(str(wow), "retail"), os.path.normpath(str(wow)))   # no retail there: as typed
+            self.assertEqual(game_folder("", "forever"), "")
+
+
 class Config(unittest.TestCase):
     def test_update_keeps_the_rest(self):
         from bv.launcher.model import read_config, update_config

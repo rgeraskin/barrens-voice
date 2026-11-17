@@ -172,6 +172,18 @@ def find_games(config: dict, extra: list[Path] | None = None) -> list[Game]:
     return games
 
 
+def game_folder(text: str, game: str) -> str:
+    """A folder typed or picked for a game, as the game's own: «…\\World of Warcraft» -> «…\\World of Warcraft\\_forever_»
+    when that is where the game is; "" for an empty field."""
+    if not text:
+        return ""
+    folder = Path(text)
+    flavor = GAMES[game]
+    if folder.name.lower() != flavor and (folder / flavor / "Wow.exe").is_file():
+        folder = folder / flavor
+    return os.path.normpath(str(folder))
+
+
 def remember(config: dict, game: str, folder: Path) -> dict | None:
     """The changes to save when a game ran from `folder`: its folder under `game_dirs` (None if known)."""
     dirs = dict(config.get("game_dirs") or {})
