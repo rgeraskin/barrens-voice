@@ -115,6 +115,16 @@ def provider(config: dict, available: list[str] | None = None) -> str:
     return next((p for p in PREFERRED if p in available), "CPUExecutionProvider")
 
 
+def on_card(session, engine: str) -> None:
+    """A session asked for the video card runs there: ONNX Runtime falls back to the processor quietly when
+    the card cannot (DirectML without DirectX 12), and the race voices would then take tens of seconds a
+    line - and the voice bank, built first, many minutes for nothing. Raises then."""
+    used = session.get_providers()[0] if session.get_providers() else "?"
+    if engine in PREFERRED and used != engine:
+        raise RuntimeError(f"{engine} не запустился на этой видеокарте (ONNX Runtime перешёл на {used}): "
+                           "нужна NVIDIA (CUDA) или видеокарта с DirectX 12")
+
+
 def preload(engine: str) -> None:
     """CUDA and cuDNN from their pip packages (onnxruntime-gpu[cuda,cudnn]) before a CUDA session."""
     if engine == "CUDAExecutionProvider":

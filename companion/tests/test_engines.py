@@ -86,3 +86,24 @@ class EnginesTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class OnCard(unittest.TestCase):
+    """A session ONNX Runtime quietly put on the processor (DirectML without DirectX 12) is refused: the voice bank
+    would take many minutes on Whisper there and the race voices would not run anyway."""
+
+    def test_on_card(self):
+        from bv.f5engine import on_card
+
+        class Session:
+            def __init__(self, *providers):
+                self.providers = list(providers)
+
+            def get_providers(self):
+                return self.providers
+        on_card(Session("DmlExecutionProvider", "CPUExecutionProvider"), "DmlExecutionProvider")
+        on_card(Session("CUDAExecutionProvider", "CPUExecutionProvider"), "CUDAExecutionProvider")
+        on_card(Session("CPUExecutionProvider"), "CPUExecutionProvider")          # asked for the processor: fine
+        with self.assertRaises(RuntimeError) as told:
+            on_card(Session("CPUExecutionProvider"), "DmlExecutionProvider")
+        self.assertIn("DirectX 12", str(told.exception))

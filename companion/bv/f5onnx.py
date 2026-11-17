@@ -88,6 +88,8 @@ class F5Onnx:
         cpu = ["CPUExecutionProvider"]
         self.pre = ort.InferenceSession(str(self.model_dir / meta["model_file_name_preprocess"]), options, providers=card)
         self.net = ort.InferenceSession(str(self.model_dir / meta["model_file_name_transformer"]), options, providers=card)
+        from .f5engine import on_card
+        on_card(self.net, self.provider)
         self.dec = ort.InferenceSession(str(self.model_dir / meta["model_file_name_decode"]), providers=cpu)
         types = {"tensor(float)": np.float32, "tensor(float16)": np.float16, "tensor(int16)": np.int16}
         self.audio_type = types[self.pre.get_inputs()[0].type]
