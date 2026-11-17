@@ -736,16 +736,26 @@ class Unmasking(unittest.TestCase):
         self.assertEqual(plain("[24] Миссия: выполнима"), "Миссия: выполнима")
         self.assertEqual(plain("идём в ОП"), "идём в оп")                    # the dictionary expands it first; else a word
         self.assertEqual(plain("ППС типо?"), "пэ-пэ-+эс типо?")              # capital consonants: letter by letter
-        self.assertEqual(plain("в МВД и РЛ"), "в эм-вэ-+дэ и эр-+эл")
+        self.assertEqual(plain("в МВД и РЛ"), "в эм-вэ-д+э и эр-+эл")
         self.assertEqual(plain("хм, тсс"), "хм, тсс")                        # lower case: interjections stay
         try:
             import pymorphy3  # noqa: F401
         except ImportError:
             return
         self.assertEqual(plain("ЦРУ, МГУ и США"), "цэ-эр-+у, эм-гэ-+у и эс-ша-+а")   # vowels, but not syllables
-        self.assertEqual(plain("в ГИБДД"), "в ги-бэ-дэ-+дэ")                 # a syllable, then letters
+        self.assertEqual(plain("в ГИБДД"), "в ги-бэ-дэ-д+э")                 # a syllable, then letters
         self.assertEqual(plain("ОМОН и ВУЗ"), "омон и ВУЗ")                  # said as words
         self.assertEqual(plain("ВСЁ, СТОЙ!"), "всё, стой!")                   # shouted words, not abbreviations
+
+    def test_spelt_stress_is_before_a_vowel(self):
+        from bv.text import apply_stress, spell
+        self.assertEqual(spell("ДК"), "дэ-к+а")
+        self.assertEqual(spell("ЦРУ"), "цэ-эр-+у")
+        self.assertEqual(spell("СССР"), "эс-эс-эс-+эр")
+        self.assertEqual(spell("ВЙ"), "вэ-й+от")
+        for word in ("МВД", "ДК", "КПД", "ППС", "ХП", "ВЙ", "ВЪ"):
+            for mode in ("strip", "acute"):
+                self.assertNotIn("+", apply_stress(spell(word), mode), word)
 
 
 class HighVoices(unittest.TestCase):

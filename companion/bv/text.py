@@ -69,7 +69,7 @@ SHOUTED = re.compile(r"\b[А-ЯЁ]{4,}\b")
 # A word in capitals of 2-5 letters the dictionary did not expand: a word shouted ("ВСЁ", "СТОЙ")
 # when pymorphy knows it as one, else an abbreviation - spelt when it cannot be said as syllables
 # ("ППС" - "пэ-пэ-+эс", "МВД", "ЦРУ", "США"; a syllable to begin with is said as one: "ГИБДД" -
-# "ги-бэ-дэ-+дэ"), read as a word when it can ("ОМОН", "ВУЗ").
+# "ги-бэ-дэ-д+э"), read as a word when it can ("ОМОН", "ВУЗ").
 CAPITALS = re.compile(r"\b[А-ЯЁ]{2,5}\b")
 VOWELS = set("АЕЁИОУЫЭЮЯ")
 LETTERS = {"Б": "бэ", "В": "вэ", "Г": "гэ", "Д": "дэ", "Ж": "жэ", "З": "зэ", "Й": "йот", "К": "ка", "Л": "эл",
@@ -78,8 +78,13 @@ LETTERS = {"Б": "бэ", "В": "вэ", "Г": "гэ", "Д": "дэ", "Ж": "жэ",
 
 
 def spell(abbreviation: str) -> str:
+    """Letter by letter, the last letter's name stressed: "МВД" - "эм-вэ-д+э" (the "+" goes before a
+    vowel, the only place `apply_stress` takes it from: "+дэ" reached the voices as a plain "+")."""
     names = [LETTERS.get(ch, ch.lower()) for ch in abbreviation]
-    names[-1] = "+" + names[-1]
+    last = names[-1]
+    vowel = next((i for i, ch in enumerate(last) if ch.upper() in VOWELS), None)
+    if vowel is not None:
+        names[-1] = last[:vowel] + "+" + last[vowel:]
     return "-".join(names)
 
 
@@ -102,7 +107,7 @@ def _capitals(match) -> str:
         return word
     vowel = [ch in VOWELS for ch in word]
     if len(word) > 2 and not vowel[0] and vowel[1]:
-        return word[:2].lower() + "-" + spell(word[2:])   # a syllable to begin with: "ГИБДД" - "ги-бэ-дэ-+дэ"
+        return word[:2].lower() + "-" + spell(word[2:])   # a syllable to begin with: "ГИБДД" - "ги-бэ-дэ-д+э"
     return spell(word)
 
 
