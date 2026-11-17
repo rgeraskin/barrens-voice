@@ -1,4 +1,4 @@
-"""Where the addon's strip is: at the top edge by default, at the bottom, or in a place of the
+"""Where the addon's strip is: at the bottom edge by default, at the top, or in a place of the
 player's choosing (another addon may draw in the same corner).
 
 The addon says where: `strip=x,y,width,height,screen width,screen height` (physical pixels) in its
@@ -6,6 +6,8 @@ settings frame - at login, every 2 minutes and before it moves the strip, on the
 still is - and in its saved variables (`stripGeometry`) for a program started while the game runs.
 When that is wrong or missed and no strip is in view, the program looks for it over the whole
 window, every 5 seconds: the corner where the first sync cell (purple) meets the second (green).
+Knowing nothing yet (the very first game, before the addon has saved anything), the program grabs the
+top rows: the bottom strip's height depends on the addon's settings, so that first time the search finds it.
 """
 from __future__ import annotations
 

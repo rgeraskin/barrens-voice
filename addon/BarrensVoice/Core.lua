@@ -33,9 +33,9 @@ ns.DEFAULTS = {
     rows = 1,          -- strip rows of cells
     -- the strip's cells start at the "left" edge of it or the "right"
     stripFrom = "left",
-    -- where the strip is: "top" (default), "bottom" or "custom" (stripX, stripY, stripWidth: physical
+    -- where the strip is: "bottom" (default), "top" or "custom" (stripX, stripY, stripWidth: physical
     -- pixels of its top left corner and its width) - for another addon drawing in the same place
-    stripPlace = "top",
+    stripPlace = "bottom",
     stripX = 0,
     stripY = 0,
     stripWidth = 800,

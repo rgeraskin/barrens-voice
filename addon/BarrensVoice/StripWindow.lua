@@ -1,5 +1,5 @@
 -- Where the strip goes (StripWindow; to the player it is "Мост" - the bridge to the program, a thin
--- dark line the addon talks to the program through, as they may see it): the top edge (default), the bottom edge,
+-- dark line the addon talks to the program through, as they may see it): the bottom edge (default), the top edge,
 -- or a place of their own - another addon may draw in the same corner (one of its own strips, say).
 -- The fields show the top's or the bottom's numbers too, so a place of one's own starts from them.
 -- It is the foldable section of the settings window's first tab (Options.lua). While it is open an
@@ -16,8 +16,8 @@ local radios, fields = {}, {}
 local pending = {}
 
 local PLACES = {
-    { "top", "Вверху (обычно)" },
-    { "bottom", "Внизу" },
+    { "bottom", "Внизу (обычно)" },
+    { "top", "Вверху" },
     { "custom", "Своё место:" },
 }
 
@@ -128,7 +128,7 @@ function W.Create(pane, close)
     y = y - 32
 
     window:SetScript("OnShow", function()
-        pending = { place = ns.db.stripPlace or "top", x = ns.db.stripX or 0, y = ns.db.stripY or 0,
+        pending = { place = ns.db.stripPlace or "bottom", x = ns.db.stripX or 0, y = ns.db.stripY or 0,
                     width = ns.db.stripWidth or 800, from = ns.db.stripFrom or "left" }
         Refresh()
     end)

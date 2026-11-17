@@ -1,4 +1,4 @@
--- The strip: a black bar along the top edge of the screen (or the bottom, or a place of the player's
+-- The strip: a black bar along the bottom edge of the screen (or the top, or a place of the player's
 -- choosing: another addon may draw in the same corner), `cell` physical pixels high per row,
 -- with near-black coloured cells on it that carry the latest chat line (Protocol.lua): the whole
 -- bar reads as one dark line. A line's cells are held at least HOLD seconds so the reader catches
@@ -54,13 +54,13 @@ local function Place(i)
 end
 
 --- Where the strip goes, in physical pixels of the screen: x, y (of its top left corner), width,
---- height. "top" (the default) and "bottom" span the screen; "custom" is the player's x, y and width,
+--- height. "bottom" (the default) and "top" span the screen; "custom" is the player's x, y and width,
 --- kept on the screen: x and y as given (as far as a strip of the least width still fits), the width
 --- cut to what is left of the screen after x. The arguments override the saved settings (the
 --- settings window's preview).
 function S.Geometry(place, x, y, width)
     local physW, physH = GetPhysicalScreenSize()
-    place = place or ns.db.stripPlace or "top"
+    place = place or ns.db.stripPlace or "bottom"
     if place == "custom" then
         local least = math.min(S.MIN_WIDTH, physW)
         x = math.max(0, math.min(math.floor(tonumber(x or ns.db.stripX) or 0), physW - least))

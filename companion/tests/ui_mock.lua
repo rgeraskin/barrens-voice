@@ -295,7 +295,8 @@ assert(said(3) == "Вася спрашивает:\4 кто идёт в ОП?" an
 assert(said(2) == "Вася\5 смеётся", said(2))                               -- an emote: a name never dropped
 print("continue ok")
 
--- where the strip goes: the top (default), the bottom, or a place of one's own kept on the screen
+-- where the strip goes: the bottom (default), the top, or a place of one's own kept on the screen
+assert(ns.DEFAULTS.stripPlace == "bottom", "the strip is at the bottom by default")
 ns.db.cell, ns.db.rows = 2, 1
 local gx, gy, gw, gh = ns.Strip.Geometry("top")
 assert(gx == 0 and gy == 0 and gw == 2360 and gh == 2, "top")
