@@ -7,7 +7,7 @@ import re
 import threading
 import zlib
 
-from .audio import Player, wav
+from .audio import Player, drain, wav
 from .text import Accentor, apply_stress
 
 SVSF_IS_NOT_XML = 16
@@ -155,11 +155,7 @@ class Speaker(threading.Thread):
         return voice.description if voice else "-"
 
     def clear(self) -> None:
-        while not self.lines.empty():
-            try:
-                self.lines.get_nowait()
-            except queue.Empty:
-                break
+        drain(self.lines)
 
     def say(self, line) -> None:
         from .audio import queue_line

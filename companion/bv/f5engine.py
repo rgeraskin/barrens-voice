@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 
 from .assign import Assigner
-from .audio import Player, wav
+from .audio import Player, drain, wav
 from . import gamevoices
 from .intonation import shape
 from .text import Accentor, numbers_to_words
@@ -448,21 +448,13 @@ class F5Speaker:
         return slot.id if slot else "-"
 
     def clear(self) -> None:
-        while not self.lines.empty():
-            try:
-                self.lines.get_nowait()
-            except queue.Empty:
-                break
+        drain(self.lines)
 
     def shutdown(self) -> None:
         """Stop after the line being made; the model is freed on the synth thread."""
         if self.assigner is not None:
             self.assigner.flush()
-        while not self.lines.empty():
-            try:
-                self.lines.get_nowait()
-            except queue.Empty:
-                break
+        drain(self.lines)
         self.lines.put(None)
 
     def say(self, line) -> None:

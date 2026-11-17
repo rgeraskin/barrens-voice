@@ -42,18 +42,23 @@ def _replayed(line) -> bool:
     return getattr(line, "options", {}).get("replay") == "1"
 
 
+def drain(q: queue.Queue) -> list:
+    """Everything waiting in `q`, taken out of it."""
+    taken = []
+    while True:
+        try:
+            taken.append(q.get_nowait())
+        except queue.Empty:
+            return taken
+
+
 def queue_line(lines: queue.Queue, line, limit: int, log) -> None:
     """A chat line into an engine's queue. With `limit` live lines waiting, the oldest of them is
     dropped - the reading keeps up with the chat - but never a line sent again by /bv last (asked
     for; the addon marks it replay=1): a replay waits whole and does not count toward the limit, so
     the chat that comes meanwhile keeps its own `limit` lines behind it."""
     if lines.qsize() >= limit:
-        waiting = []
-        while True:
-            try:
-                waiting.append(lines.get_nowait())
-            except queue.Empty:
-                break
+        waiting = drain(lines)
         live = [i for i, x in enumerate(waiting) if x is not None and not _replayed(x)]
         dropped = set()
         while len(live) >= limit and not _replayed(line):
@@ -141,11 +146,7 @@ class Player(threading.Thread):
         """Cut the line being played and forget the queue."""
         self.generation += 1
         self.again = None
-        while not self.items.empty():
-            try:
-                self.items.get_nowait()
-            except queue.Empty:
-                break
+        drain(self.items)
         self.stopped.set()
 
     def run(self) -> None:
