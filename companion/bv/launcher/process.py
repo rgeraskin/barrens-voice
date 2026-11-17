@@ -84,10 +84,11 @@ class Companion:
     # --- inside -----------------------------------------------------------------------------
 
     def _read(self, proc: subprocess.Popen) -> None:
-        for raw in proc.stdout:
-            line = raw.decode("utf-8", "replace").rstrip()
-            if line:
-                self.on_line(line)
+        with proc.stdout:                # read to its end, then closed: the pipe is this reader's alone
+            for raw in proc.stdout:
+                line = raw.decode("utf-8", "replace").rstrip()
+                if line:
+                    self.on_line(line)
 
     def _read_err(self, proc: subprocess.Popen) -> None:
         """The companion's stderr apart from its log lines: Python's own stderr it turns into log lines
@@ -96,10 +97,11 @@ class Companion:
         from datetime import datetime
 
         from ..logs import raw_line
-        for raw in proc.stderr:
-            line = raw_line(raw.decode("utf-8", "replace"), datetime.now())
-            if line:
-                self.on_line(line)
+        with proc.stderr:
+            for raw in proc.stderr:
+                line = raw_line(raw.decode("utf-8", "replace"), datetime.now())
+                if line:
+                    self.on_line(line)
 
     def _tie(self, proc: subprocess.Popen) -> None:
         """The companion ends with the launcher. Programs the companion starts (Battle.net) are not

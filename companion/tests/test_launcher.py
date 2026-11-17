@@ -319,8 +319,10 @@ class LogLines(unittest.TestCase):
             companion.start()
             companion.proc.wait(timeout=30)
             deadline = time.monotonic() + 5
-            while len(got) < 3 and time.monotonic() < deadline:
+            pipes = (companion.proc.stdout, companion.proc.stderr)
+            while (len(got) < 3 or not all(p.closed for p in pipes)) and time.monotonic() < deadline:
                 time.sleep(0.05)
+        self.assertTrue(all(p.closed for p in pipes))          # read to the end and closed (no ResourceWarning)
         lines = [parse(x) for x in got]
         info = [m for _, lv, m in lines if lv == "INFO"]
         self.assertEqual(info, ["собираю голоса рас из игры", "связь с аддоном есть"], got)
