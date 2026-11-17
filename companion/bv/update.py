@@ -135,20 +135,34 @@ class WontStart(RuntimeError):
         self.version = version
 
 
+# what version_runs imports in a version without bv/selfcheck.py: a fallback for a build made without it
+# (no released client checks anything before 0.4.0, and every release from it ships bv/selfcheck.py)
+FALLBACK_CHECK = ("import tkinter, bv.launcher.app, bv.__main__, bv.update; tkinter.Tcl(); "
+                  "from cryptography.hazmat.primitives.asymmetric import ed25519")
+
+
 def version_runs(version_dir: Path, python: Path | None = None) -> str | None:
     """Whether a built version can start at all: its Python imports the launcher, the companion and this
     updater, and Tk works. A release whose launcher fails at its start would never be rolled back (the rollback
     counts the companion's failures, and the launcher is what updates). None when it runs, else the error the
     check ended with. When the check itself could not run (no Python there, a timeout: an antivirus scan, a slow
-    disk) RuntimeError - that says nothing of the version, the next check tries again."""
+    disk) RuntimeError - that says nothing of the version, the next check tries again.
+
+    The version says itself what it needs: its bv/selfcheck.py, run as `python -m bv.selfcheck` in its
+    companion folder, when it has one (the contract is in that module's docstring, and it binds every release:
+    this launcher keeps running it); else FALLBACK_CHECK, the imports this launcher knew of."""
     import subprocess
     if python is None:
         python = version_dir / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
-    code = ("import tkinter, bv.launcher.app, bv.__main__, bv.update; tkinter.Tcl(); "
-            "from cryptography.hazmat.primitives.asymmetric import ed25519")
+    companion = version_dir / "companion"
+    if (companion / "bv" / "selfcheck.py").is_file():
+        command = [str(python), "-m", "bv.selfcheck"]
+    else:
+        command = [str(python), "-c", FALLBACK_CHECK]
     try:
-        done = subprocess.run([str(python), "-c", code], cwd=version_dir / "companion", capture_output=True, text=True,
-                              encoding="utf-8", errors="replace", timeout=180,
+        # its stderr in UTF-8, as it is read (a traceback in the locale's code page came out garbled)
+        done = subprocess.run(command, cwd=companion, capture_output=True, text=True, encoding="utf-8",
+                              errors="replace", timeout=180, env={**os.environ, "PYTHONIOENCODING": "utf-8"},
                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     except (OSError, subprocess.SubprocessError) as e:
         raise RuntimeError(f"не получилось проверить, запускается ли версия: {e}") from e

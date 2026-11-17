@@ -1,0 +1,28 @@
+"""Whether this version can start: run by the updater of the version installed before it, with this version's
+own Python, after building it and before making it current (bv/update.py version_runs).
+
+The contract with every launcher already installed (0.4.0 on), kept by every release: the updater runs
+`<version>\\.venv\\Scripts\\python.exe -m bv.selfcheck` in `<version>\\companion` when
+`<version>\\companion\\bv\\selfcheck.py` exists (else its own fixed list of imports, the one below). Exit 0: the
+version starts; anything else refuses it, the last line on stderr saying why. So a release decides here what
+it needs to start - a launcher, companion or updater moved elsewhere is checked where it is now - and only
+this module's name and place stay fixed.
+"""
+from __future__ import annotations
+
+
+def main() -> int:
+    # what the launcher needs to start and to update again: Tk, the window's code, the companion, the updater
+    # with its signature check (a release whose launcher cannot start could never update itself again)
+    import tkinter
+
+    import bv.__main__  # noqa: F401
+    import bv.launcher.app  # noqa: F401
+    import bv.update  # noqa: F401
+    from cryptography.hazmat.primitives.asymmetric import ed25519  # noqa: F401
+    tkinter.Tcl()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

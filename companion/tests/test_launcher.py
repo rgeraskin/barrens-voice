@@ -717,7 +717,12 @@ class Update(unittest.TestCase):
             (bv / "launcher" / "__init__.py").write_text("", encoding="utf-8")
             (bv / "launcher" / "app.py").write_text("import no_such_module\n", encoding="utf-8")
             why = update.version_runs(Path(d), python=Path(sys.executable))
-            self.assertIn("no_such_module", why)
+            self.assertIn("no_such_module", why)                                       # no selfcheck: the fixed list
+            # with bv/selfcheck.py the version decides: here it moved its launcher and checks it where it is now
+            (bv / "selfcheck.py").write_text("import sys\nsys.exit(0)\n", encoding="utf-8")
+            self.assertIsNone(update.version_runs(Path(d), python=Path(sys.executable)))
+            (bv / "selfcheck.py").write_text("raise SystemExit('нет модуля голосов')\n", encoding="utf-8")
+            self.assertEqual(update.version_runs(Path(d), python=Path(sys.executable)), "нет модуля голосов")
             with self.assertRaises(RuntimeError):                                       # no environment: the check
                 update.version_runs(Path(d))                                            # could not run, not a verdict
 
