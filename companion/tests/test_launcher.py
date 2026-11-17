@@ -596,6 +596,7 @@ class Update(unittest.TestCase):
             self.assertIsNone(update.record_start(root, 5, failed=True))                  # one failure: wait
             self.assertEqual(update.record_start(root, 5, failed=True), "0.4.0")         # two: back
             self.assertEqual(install.current_version(root), "0.4.0")
+            self.assertEqual(update.refused(root), "0.4.1")                               # remembered
             update.apply(root, "0.4.1")
             self.assertIsNone(update.record_start(root, 300, failed=True))               # ran a while: not a start failure
             self.assertFalse(update.state_path(root).exists())
@@ -916,6 +917,32 @@ class UpdaterFlow(unittest.TestCase):
                          'cmd /c ping -n 3 127.0.0.1 >nul & start "" "C:\\BV\\Barrens Voice.exe" --tray')
         self.assertTrue(relaunch_command('"x.exe"', resident=False).endswith('start "" "x.exe"'))
 
+    def test_rolled_back_version_not_prepared_again(self):
+        # two failed starts sent the launcher back: the same release is only told about, «Обновить» tries it
+        from bv import install, update
+        self.publish(update.STABLE, "0.4.1")
+        u = self.updater()
+        u.check()
+        u.apply()
+        update.record_start(self.root, 5, failed=True)
+        self.assertEqual(update.record_start(self.root, 5, failed=True), "0.4.0")
+        self.build.reset_mock()
+        self.said.clear()
+        u = self.updater()                                                              # the launcher's next start
+        self.assertEqual(u.check()["version"], "0.4.1")                                # the banner stays
+        self.assertEqual(u.status, "")
+        self.build.assert_not_called()
+        self.assertIn("WARN", [level for level, _ in self.said])
+        u.check()
+        self.assertEqual(len([m for _, m in self.said if "не запустилась" in m]), 1)    # said once
+        self.assertEqual(u.prepare(), "0.4.1")                                         # «Обновить»: by hand
+        self.publish(update.STABLE, "0.4.2")                                           # a newer one: as usual
+        u = self.updater()
+        self.assertEqual(u.check()["version"], "0.4.2")
+        self.assertEqual(u.ready, "0.4.2")
+        self.assertIsNone(update.refused(self.root))
+        self.assertEqual(install.current_version(self.root), "0.4.0")
+
     def test_stable_channel_takes_no_test_build(self):
         from bv import update
         self.publish(update.STABLE, "0.4.1b1")                                         # releases/latest served one
@@ -1185,6 +1212,18 @@ class UpdateInWindow(unittest.TestCase):
         self.win.updater.ready = None
         self.app.App.install_update_now(self.win)
         self.assertEqual(done, [])                                                     # nothing prepared: nothing
+
+
+    def test_start_failure_counts_only_the_versions_fault(self):
+        state = {}
+        win = self.ns(companion=self.ns(state=lambda: state, proc=self.ns(pid=7)))
+        failed = lambda code: self.app.App.start_failed(win, code)                    # noqa: E731
+        self.assertEqual([failed(c) for c in (0, None, 3, 4)], [False] * 4)
+        self.assertTrue(failed(1))                                                     # died: the version's fault
+        state.update(phase="error", error="аддон не установлен", pid=7)
+        self.assertFalse(failed(1))                                                    # this run said why itself
+        state["pid"] = 6
+        self.assertTrue(failed(1))                                                     # an earlier run's state
 
 
 class Changelog(unittest.TestCase):

@@ -5,7 +5,8 @@ versions, the archive's name, size and SHA-256) and manifest.json.sig (ed25519, 
 updater trusts a manifest only when it verifies with PUBLIC_KEY, and an archive only when it matches
 the manifest; then bv.install puts the version beside the current one (uv builds its environment
 from its uv.lock) and app\\current is pointed at it when the game is not running. If the new version's
-companion fails right at its start twice, the launcher points app\\current back (see `record_start`).
+companion fails right at its start twice, the launcher points app\\current back and remembers that version:
+it is not prepared by itself again, only by «Обновить», until a newer one comes out (`record_start`, `refused`).
 """
 from __future__ import annotations
 
@@ -171,6 +172,31 @@ def state_path(root: Path) -> Path:
     return root / "data" / "tmp" / "update.json"
 
 
+def refused_path(root: Path) -> Path:
+    return root / "data" / "update-refused.json"
+
+
+def refused(root: Path) -> str | None:
+    """The version that failed here (went back from): not prepared by itself again."""
+    try:
+        return json.loads(refused_path(root).read_text(encoding="utf-8")).get("version") or None
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
+def refuse(root: Path, version: str | None) -> None:
+    """Remember the version that failed here (None: forget it)."""
+    path = refused_path(root)
+    try:
+        if version is None:
+            path.unlink(missing_ok=True)
+            return
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"version": version}), encoding="utf-8")
+    except OSError:
+        pass
+
+
 def apply(root: Path, version: str) -> None:
     """app\\current -> `version`, remembering the one before, to go back to if this one fails to start."""
     previous = install.current_version(root)
@@ -198,6 +224,7 @@ def record_start(root: Path, ran_for: float, failed: bool) -> str | None:
         return None
     install.point_current(root, root / "app" / state["previous"])
     note_version(root, state["previous"])
+    refuse(root, state.get("version"))
     path.unlink(missing_ok=True)
     return state["previous"]
 
@@ -239,10 +266,19 @@ class Updater:
             return None                                 # releases/latest serving a test build: not for this channel
         if not newer(found["version"], self.current) or self.status in BUSY:
             return None
-        if self.found is None or self.found["version"] != found["version"]:
-            self.say(f"вышла версия {install.display_version(found['version'])}")
+        name = install.display_version(found["version"])
+        bad = refused(self.root)
+        if bad and newer(found["version"], bad):
+            refuse(self.root, None)                     # a newer one than the version that failed: as usual
+            bad = None
+        told = self.found is not None and self.found["version"] == found["version"]
+        if not told:
+            self.say(f"вышла версия {name}")
         self.found = found
-        if settings.get("auto_update", True):
+        if bad:
+            if not told:
+                self.say(f"версия {name} не запустилась у вас — сама не ставлю, «Обновить» попробует снова", "WARN")
+        elif settings.get("auto_update", True):
             self.prepare()
         return found
 

@@ -209,8 +209,7 @@ class App:
         self.last_code = code
         if INSTALL_DIR is not None and self.companion_started:
             from .. import update
-            failed = code not in (0, None, Companion.RESTART, 4)       # 4: another companion runs - not its fault
-            back = update.record_start(INSTALL_DIR, time.monotonic() - self.companion_started, failed)
+            back = update.record_start(INSTALL_DIR, time.monotonic() - self.companion_started, self.start_failed(code))
             if back:
                 self.say(f"версия {self.version} не запускается — вернулся на {back}", "ERROR")
                 self.tray.notify(f"Новая версия Barrens Voice не запустилась, вернулся на {back}. "
@@ -236,6 +235,16 @@ class App:
             return
         if code not in (0, None):
             self.say(f"компаньон остановился (код {code}) — подробности в «Журнале»", "ERROR")
+
+    def start_failed(self, code: int | None) -> bool:
+        """Whether the companion's end counts against a freshly applied version: an error, but not 4 (another
+        companion runs) nor an error this very run explained itself (state.json's phase "error" with its pid:
+        no addon, say) - the version is not at fault and going back would not help."""
+        if code in (0, None, Companion.RESTART, 4):
+            return False
+        state = self.companion.state()
+        proc = getattr(self.companion, "proc", None)
+        return not (state.get("phase") == "error" and proc is not None and state.get("pid") == proc.pid)
 
     # --- actions --------------------------------------------------------------------------------
 
