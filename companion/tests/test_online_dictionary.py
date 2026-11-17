@@ -157,10 +157,12 @@ class Newer(unittest.TestCase):
             self.assertFalse(od.write_addon(Path(t), data, print))                    # unchanged: not written
             self.assertFalse(od.write_addon(Path(t) / "missing", data, print))
             if LUAJIT:
-                path = str(Path(t) / "DictionaryOnline.lua").replace("\\", "/")
-                check = (f'dofile("{path}"); local o = BarrensVoiceDictionaryOnline; '
-                         'io.write(o.revision, "|", o.renamed[\'~o"ld\'], "|", o.text)')
-                out = subprocess.run([LUAJIT, "-e", check], capture_output=True, check=True).stdout.decode()
+                # a script file, not -e: on Windows luajit is a .CMD shim, and cmd mangles quotes in arguments
+                script = Path(t) / "check.lua"
+                script.write_text('dofile(arg[1]); local o = BarrensVoiceDictionaryOnline; '
+                                  'io.write(o.revision, "|", o.renamed[\'~o"ld\'], "|", o.text)', encoding="utf-8")
+                out = subprocess.run([LUAJIT, str(script), str(Path(t) / "DictionaryOnline.lua")],
+                                     capture_output=True, check=True).stdout.decode()
                 self.assertEqual(out, "100|~new|" + data["text"])
 
 
