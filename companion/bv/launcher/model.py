@@ -243,7 +243,8 @@ def update_config(path: Path = CONFIG_PATH, **changes) -> dict:
 
 # --- what the companion is doing, in words ----------------------------------------------------
 
-EXIT_WORDS = {1: "Компаньон остановился с ошибкой — подробности в журнале", 4: "Компаньон уже запущен отдельно"}
+EXIT_WORDS = {1: "Компаньон остановился с ошибкой — подробности в журнале", 4: "Компаньон уже запущен отдельно",
+              5: "Компаньон не прочитал config.json — подробности в журнале"}
 
 
 def describe(state: dict, running: bool, exit_code: int | None, game: str | None, addon_missing: bool) -> list:

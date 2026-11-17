@@ -276,9 +276,10 @@ class App:
 
     def start_failed(self, code: int | None) -> bool:
         """Whether the companion's end counts against a freshly applied version: an error, but not 4 (another
-        companion runs) nor an error this very run explained itself (state.json's phase "error" with its pid:
-        no addon, say) - the version is not at fault and going back would not help."""
-        if code in (0, None, Companion.RESTART, 4):
+        companion runs), not 5 (config.json cannot be read) nor an error this very run explained itself
+        (state.json's phase "error" with its pid: no addon, say) - the version is not at fault and going back
+        would not help."""
+        if code in (0, None, Companion.RESTART, Companion.ALREADY, Companion.CONFIG_ERROR):
             return False
         state = self.companion.state()
         proc = getattr(self.companion, "proc", None)

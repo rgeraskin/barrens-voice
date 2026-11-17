@@ -196,6 +196,7 @@ class StateLines(unittest.TestCase):
         self.assertEqual(describe({}, False, None, None, True)[0][0], RED)                  # no addon
         self.assertIn("ошибкой", describe({}, False, 1, None, False)[0][1])
         self.assertIn("уже запущен", describe({}, False, 4, None, False)[0][1])
+        self.assertIn("config.json", describe({}, False, 5, None, False)[0][1])
         self.assertIn("игра закрыта", describe({"phase": "game_closed"}, False, 0, None, False)[0][1])
         error = describe({"phase": "error", "error": "аддон не установлен"}, False, 1, None, False)[0]
         self.assertEqual(error, (RED, "Компаньон: аддон не установлен"))
@@ -637,6 +638,25 @@ class Update(unittest.TestCase):
             update.apply(root, "0.4.1")
             self.assertIsNone(update.record_start(root, 300, failed=True))               # ran a while: not a start failure
             self.assertFalse(update.state_path(root).exists())
+
+    def test_config_error_does_not_go_back(self):
+        # the companion's exit 5 (config.json cannot be read): the launcher passes failed=False - no rollback
+        from types import SimpleNamespace
+        from unittest import mock
+        from bv import install, update
+        from bv.launcher import app
+        win = SimpleNamespace(companion=SimpleNamespace(state=lambda: {}, proc=SimpleNamespace(pid=7)))
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            for v in ("0.4.0", "0.4.1"):
+                (root / "app" / v).mkdir(parents=True)
+            install.point_current(root, root / "app" / "0.4.0")
+            update.apply(root, "0.4.1")
+            with mock.patch("bv.install.prune"):
+                for _ in range(3):
+                    self.assertIsNone(update.record_start(root, 5, failed=app.App.start_failed(win, 5)))
+            self.assertEqual(install.current_version(root), "0.4.1")
+            self.assertIsNone(update.refused(root))
 
     def test_settled_start_prunes(self):
         from bv import install, update
@@ -1309,7 +1329,7 @@ class UpdateInWindow(unittest.TestCase):
         state = {}
         win = self.ns(companion=self.ns(state=lambda: state, proc=self.ns(pid=7)))
         failed = lambda code: self.app.App.start_failed(win, code)                    # noqa: E731
-        self.assertEqual([failed(c) for c in (0, None, 3, 4)], [False] * 4)
+        self.assertEqual([failed(c) for c in (0, None, 3, 4, 5)], [False] * 5)        # 5: config.json unreadable
         self.assertTrue(failed(1))                                                     # died: the version's fault
         state.update(phase="error", error="аддон не установлен", pid=7)
         self.assertFalse(failed(1))                                                    # this run said why itself

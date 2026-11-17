@@ -16,6 +16,8 @@ from .. import state as companion_state
 
 class Companion:
     RESTART = RESTART
+    ALREADY = 4               # another companion runs (bv/__main__.py ALREADY)
+    CONFIG_ERROR = 5          # config.json cannot be read: the player's file, not the version, is at fault
     def __init__(self, app_dir: Path, on_line):
         self.app_dir, self.on_line = Path(app_dir), on_line
         self.proc: subprocess.Popen | None = None
