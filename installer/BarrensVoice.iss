@@ -33,7 +33,7 @@ ExtraDiskSpaceRequired=6442450944
 Name: "ru"; MessagesFile: "compiler:Languages\Russian.isl"
 
 [Messages]
-ru.SelectDirLabel3=Barrens Voice установится в эту папку вместе со всем, что скачает: библиотеками и моделями (около 6 ГБ с видеокартой NVIDIA, около 4 ГБ с другой). Мало места на диске C: — выберите другой диск.
+ru.SelectDirLabel3=Barrens Voice установится в эту папку вместе со всем, что скачает: библиотеками и моделями (около 6 ГБ с видеокартой NVIDIA, около 4 ГБ с другой).
 
 [Tasks]
 Name: "desktopicon"; Description: "Значок на рабочем столе"
