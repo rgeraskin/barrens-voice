@@ -111,9 +111,10 @@ class Cache(unittest.TestCase):
             out = Path(d) / "voices"
             self.assertTrue(gamevoices.stale(config, out))                             # no bank yet
             stamp = gamevoices._stamp(config, [1.5])
-            slot = {"id": "orc-male", "base": "orc-male", "race": "orc", "sex": "male", "shift": 0.0,
-                    "path": "x.wav", "text": "Текст.", "speech": 2.0}
             out.mkdir()
+            slot = {"id": "orc-male", "base": "orc-male", "race": "orc", "sex": "male", "shift": 0.0,
+                    "path": str(out / "orc-male.wav"), "text": "Текст.", "speech": 2.0}
+            (out / "orc-male.wav").write_bytes(b"RIFF")
             (out / "bank.json").write_text(json.dumps({"stamp": stamp, "slots": [slot]}), encoding="utf-8")
             self.assertFalse(gamevoices.stale(config, out))
             slots = gamevoices.build(config, out, print, checker=None)                 # no Whisper needed
@@ -136,7 +137,8 @@ class Cache(unittest.TestCase):
             out.mkdir()
             stamp = gamevoices._stamp(config, [])
             slot = {"id": "orc-male", "base": "orc-male", "race": "orc", "sex": "male", "shift": 0.0,
-                    "path": "x.wav", "text": "Текст.", "speech": 2.0}
+                    "path": str(out / "orc-male.wav"), "text": "Текст.", "speech": 2.0}
+            (out / "orc-male.wav").write_bytes(b"RIFF")
             archive = install / "Data" / "data" / "data.000"
             archive.write_bytes(b"x" * 1000)
             for gap, stale in ((None, False), ({"missing_files": 3, "data_size": 1000}, False)):
@@ -150,6 +152,78 @@ class Cache(unittest.TestCase):
             self.assertTrue(gamevoices.stale(config, out), "incomplete and grown: made again")
             (out / "bank.json").write_text(json.dumps({"stamp": stamp, "slots": [slot]}), encoding="utf-8")
             self.assertFalse(gamevoices.stale(config, out), "a complete bank stays, whatever the storage does")
+
+
+    def test_damaged_bank_is_made_again(self):
+        # bank.json cut short (the companion killed while writing it), of another shape, or a clip gone:
+        # made again, not an error that leaves the race voices off for good
+        with tempfile.TemporaryDirectory() as d:
+            install = Path(d) / "World of Warcraft"
+            (install / "Data").mkdir(parents=True)
+            (install / "_forever_").mkdir()
+            head = "Branch!STRING:0|Active!DEC:1|Build Key!HEX:16|Version!STRING:0|Product!STRING:0\n"
+            (install / ".build.info").write_text(head + "eu|1|" + "a" * 32 + "|1.15.8|wowf\n", encoding="utf-8")
+            config = {"wow_dir": str(install / "_forever_"), "voice_shifts": []}
+            out = Path(d) / "voices"
+            out.mkdir()
+            stamp = gamevoices._stamp(config, [])
+            clip = out / "orc-male.wav"
+            clip.write_bytes(b"RIFF")
+            slot = {"id": "orc-male", "base": "orc-male", "race": "orc", "sex": "male", "shift": 0.0,
+                    "path": str(clip), "text": "Текст.", "speech": 2.0}
+            whole = json.dumps({"stamp": stamp, "slots": [slot] * 20})
+            (out / "bank.json").write_text(whole, encoding="utf-8")
+            self.assertFalse(gamevoices.stale(config, out))
+            for broken in (whole[:len(whole) // 2], "[]", json.dumps({"stamp": stamp}),
+                           json.dumps({"stamp": stamp, "slots": [{"id": "orc-male"}]}),
+                           json.dumps({"stamp": stamp, "slots": ["x"]})):
+                (out / "bank.json").write_text(broken, encoding="utf-8")
+                self.assertTrue(gamevoices.stale(config, out), broken[:40])
+            (out / "bank.json").write_text(whole, encoding="utf-8")
+            clip.unlink()
+            self.assertTrue(gamevoices.stale(config, out), "a clip gone")
+
+
+class Building(unittest.TestCase):
+    """build()'s main path with the game's storage, the decoder and Whisper faked: lines chosen,
+    joined, heard back, the shifted copies, the manifest."""
+
+    def test_bank_made_and_kept(self):
+        from unittest import mock
+
+        import numpy as np
+        table = {"orc-male": {"race": "orc", "sex": "male", "files": [[i, "error", 1] for i in range(4)]}}
+
+        class Store:
+            def __init__(self, *_):
+                self.missing, self.borrowed = [], 0
+
+            def read_files(self, wanted, *_):
+                return {f: b"ogg" for f in wanted}
+
+        class Checker:
+            def transcribe(self, x, rate):
+                return "Мне это не по силам."
+
+            def score(self, x, rate, text):
+                return 1.0, text
+        tone = (np.sin(np.arange(48000) / 24000 * 2 * np.pi * 150) * 0.3).astype("float32")   # 2 s
+        stamp = {"install": "x", "product": "wowf"}
+        with tempfile.TemporaryDirectory() as d, \
+                mock.patch.object(gamevoices, "_stamp", return_value=stamp), \
+                mock.patch.object(gamevoices, "voices_for", return_value=table), \
+                mock.patch.object(gamevoices, "other_storages", return_value=[]), \
+                mock.patch.object(gamevoices, "_decode", return_value=tone), \
+                mock.patch.object(casc, "Storage", Store):
+            out = Path(d) / "voices"
+            slots = gamevoices.build({"voice_shifts": [-1.5, 1.5]}, out, lambda *a: None, Checker())
+            self.assertEqual([s.id for s in slots], ["orc-male", "orc-male^-1.5", "orc-male^+1.5"])
+            self.assertEqual(slots[0].text, "Мне это не по силам. Мне это не по силам. Мне это не по силам.")
+            self.assertEqual(slots[0].speech, 6.0)                          # three lines of 2 s
+            self.assertGreater(slots[1].speech, slots[0].speech)            # lower: slower
+            self.assertEqual(sorted(p.name for p in out.iterdir()),
+                             ["bank.json", "orc-male.wav", "orc-male_+1.5.wav", "orc-male_-1.5.wav"])
+            self.assertEqual(gamevoices.load(out, stamp), slots)            # kept: not made again
 
 
 class Progress(unittest.TestCase):

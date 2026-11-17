@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import re
 import time
 import zlib
@@ -143,18 +144,24 @@ def data_size(install: Path) -> int:
 
 
 def load(out: Path, stamp: dict | None) -> list[Slot] | None:
+    """The bank as made for `stamp`; None when it has to be made (again): none, another stamp, a
+    damaged bank.json, a reference clip gone from the folder."""
     manifest = out / "bank.json"
     if stamp is None or not manifest.exists():
         return None
-    saved = json.loads(manifest.read_text(encoding="utf-8"))
-    if saved.get("stamp") != stamp:
+    try:
+        saved = json.loads(manifest.read_text(encoding="utf-8"))
+        if saved.get("stamp") != stamp:
+            return None
+        # made while voice files were not on the disk yet (retail before its download finished): made
+        # again once the storage has grown - a complete bank never is, whatever the storage does
+        gap = saved.get("incomplete")
+        if gap and data_size(Path(stamp["install"])) > gap.get("data_size", 0) + GROWN:
+            return None
+        slots = [Slot(**s) for s in saved["slots"]]
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
         return None
-    # made while voice files were not on the disk yet (retail before its download finished): made
-    # again once the storage has grown - a complete bank never is, whatever the storage does
-    gap = saved.get("incomplete")
-    if gap and data_size(Path(stamp["install"])) > gap.get("data_size", 0) + GROWN:
-        return None
-    return [Slot(**s) for s in saved["slots"]]
+    return slots if all(Path(s.path).is_file() for s in slots) else None
 
 
 def stale(config: dict, out: Path) -> bool:
@@ -353,8 +360,10 @@ def build(config: dict, out: Path, log, checker, clock=time.monotonic) -> list[S
         manifest["incomplete"] = {"missing_files": missing, "data_size": data_size(Path(stamp["install"]))}
         log("игра скачала не все голоса — банк доберётся позже")
         log(f"    ещё нет: {missing}")
-    (out / "bank.json").write_text(json.dumps(manifest,
-                                              ensure_ascii=False, indent=1), encoding="utf-8")
+    # through a temporary file: a companion stopped while writing leaves no half a bank.json
+    tmp = out / "bank.json.tmp"
+    tmp.write_text(json.dumps(manifest, ensure_ascii=False, indent=1), encoding="utf-8")
+    os.replace(tmp, out / "bank.json")
     log(f"голоса рас собраны: {len({s.base for s in slots})} из {len(table)} за {took(clock() - started)}")
     log(f"голосов рас: {len({s.base for s in slots})}, вариантов с тембром: {len(slots)}"
         + (f"; без голоса (мало реплик): {', '.join(skipped)}" if skipped else ""))
