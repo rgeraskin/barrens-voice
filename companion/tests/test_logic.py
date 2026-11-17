@@ -843,32 +843,42 @@ class SameSpeaker(unittest.TestCase):
         self.assertEqual(engines.quiet_for(), 0.0)
 
 
+def fake_winsound(fail_first=False):
+    """(the lines played - each by its last byte, a fake winsound module): the real one is Windows only."""
+    import threading
+    import types
+    played, lock, calls = [], threading.Lock(), []
+
+    def play_sound(path, flags):
+        if path:
+            calls.append(path)
+            if fail_first and len(calls) == 1:
+                raise RuntimeError("Failed to play sound")
+            with lock:
+                played.append(Path(path).read_bytes()[-1:])     # a line's last byte names it
+    return played, types.SimpleNamespace(SND_FILENAME=1, SND_ASYNC=2, SND_NODEFAULT=4, PlaySound=play_sound)
+
+
+def marked_line(mark: bytes, secs: float) -> bytes:
+    """A silent line `secs` long whose last byte is `mark`."""
+    from bv.audio import wav
+    return wav(b"\0\0" * int(8000 * secs), 8000)[:-1] + mark
+
+
 class PauseForCatQuest(unittest.TestCase):
     """While CatQuest speaks the player holds the lines; the line it cut is played again from its
     start, then the queue (a fake winsound: the real one is Windows only)."""
 
     def test_cut_line_again_then_queue(self):
-        import sys
         import tempfile
-        import threading
         import time
-        import types
-        played, lock = [], threading.Lock()
-        fake = types.SimpleNamespace(SND_FILENAME=1, SND_ASYNC=2, SND_NODEFAULT=4)
-        def play_sound(path, flags):
-            if path:
-                with lock:
-                    played.append(Path(path).read_bytes()[-1:])     # a line's last byte names it
-        fake.PlaySound = play_sound
-        sys.modules["winsound"] = fake
-        from bv.audio import Player, wav
-        def line(mark, secs):
-            return wav(b"\0\0" * int(8000 * secs), 8000)[:-1] + mark
+        played, fake = fake_winsound()
+        from bv.audio import Player
         with tempfile.TemporaryDirectory() as d:
-            p = Player(8, d)
+            p = Player(8, d, sound=fake)
             p.start()
-            p.play(line(b"A", 0.6))
-            p.play(line(b"B", 0.1))
+            p.play(marked_line(b"A", 0.6))
+            p.play(marked_line(b"B", 0.1))
             time.sleep(0.2)
             self.assertTrue(p.pause())                   # A cut
             self.assertFalse(p.pause())                  # already paused
@@ -878,13 +888,55 @@ class PauseForCatQuest(unittest.TestCase):
             self.assertTrue(p.resume())
             time.sleep(1.5)
             self.assertEqual(played, [b"A", b"A", b"B"])  # A again from its start, then B
-            p.play(line(b"C", 0.6))
+            p.play(marked_line(b"C", 0.6))
             time.sleep(0.2)
             p.pause()
             p.stop()                                     # a stop during a pause: nothing comes back
             p.resume()
             time.sleep(0.8)
             self.assertEqual(played, [b"A", b"A", b"B", b"C"])
+
+    def test_a_pause_without_resume_ends_by_itself(self):
+        import tempfile
+        import time
+        from unittest import mock
+        from bv import audio
+        played, fake = fake_winsound()
+        logged = []
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(audio, "PAUSE_MAX", 0.2):
+            p = audio.Player(8, d, log=logged.append, sound=fake)
+            p.start()
+            p.pause()                                    # CatQuest's "resume" never comes
+            p.play(marked_line(b"A", 0.1))
+            time.sleep(0.2)
+            self.assertEqual(played, [])
+            time.sleep(1.0)                              # PAUSE_MAX later (checked every 0.5 s): on its own
+            self.assertEqual(played, [b"A"])
+            self.assertTrue(any(m.startswith("пауза для CatQuest дольше") for m in logged), logged)
+
+
+class PlayerErrors(unittest.TestCase):
+    """The player is the only one: a line that fails to play is logged and the next ones still play
+    (it was the thread's end, and the companion went silent for good)."""
+
+    def test_goes_on_after_a_failed_line(self):
+        import tempfile
+        import time
+        played, fake = fake_winsound(fail_first=True)
+        logged = []
+        from bv.audio import Player
+        from bv.logs import level_of
+        with tempfile.TemporaryDirectory() as d:
+            p = Player(2, d, log=logged.append, sound=fake)
+            p.start()
+            for mark in (b"A", b"B", b"C"):
+                p.play(marked_line(mark, 0.05))
+            time.sleep(1.0)
+            self.assertTrue(p.is_alive())
+            self.assertEqual(played, [b"B", b"C"])
+            self.assertEqual(logged, ["не удалось проиграть строку: Failed to play sound"])
+            self.assertEqual(level_of(logged[0]), "WARN")
+            self.assertGreater(p.quiet_for(), 0)
 
 
 class CompanionStatus(unittest.TestCase):
