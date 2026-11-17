@@ -133,7 +133,7 @@ GENDERS = {"masc", "femn", "neut"}
 NUMBERED = {"уровень", "этаж", "число", "ранг", "фаза", "сезон", "глава", "акт", "волна", "слот", "босс"}
 # a numbered noun whose singular the stress model takes for the plural ("числ+а" - "two numbers"):
 # after an ordinal it is the singular, stressed here
-SINGULAR_STRESS = {"числа": "ч+исла", "места": "м+еста"}
+SINGULAR_STRESS = {"числа": "ч+исла"}
 # a number that goes on from the one before it - a time, a decimal, a version: neither an ordinal nor agreeing
 GLUED = re.compile(r"\d[:.,]$")
 PREV_WORD = re.compile(r"(?<![\w'+-])([а-яёА-ЯЁ]+(?:-[а-яёА-ЯЁ]+)?)\s+$")   # a whole word, as morph.PREVIOUS

@@ -4,7 +4,6 @@ Run: python -m bv  (config.json next to the bv folder is created on first run)
 """
 from __future__ import annotations
 
-import contextlib
 import dataclasses
 import json
 import os
@@ -600,155 +599,154 @@ def main() -> int:
         log("полоска (по сохранённым настройкам аддона): " + describe_place(place))
     absent_since, searched = None, 0.0
     state.report(phase="running")
-    with contextlib.nullcontext():
-        while True:
-            if _restart.is_set():                  # restart_online from another thread
-                run_again()
-            now = time.monotonic()
-            if now - dictionary_checked > 2:
-                dictionary.refresh()               # a changed Dictionary.lua works within seconds
-                live.refresh()                     # the launcher's checks, changed while running
-                dictionary_checked = now
-                fresh = online.take() if online else None
-                if fresh and fresh["revision"] > dictionary.revision:      # applied here, between chat lines
-                    dictionary.use_online(fresh)
-                    online_dictionary.write_addon(dictionary.addon, fresh, log)
-                    log("свежий словарь с GitHub — в окне словаря после /reload")
-                if STOP_FILE.exists():             # the launcher's "stop" (its window closed, «Выход»)
-                    STOP_FILE.unlink(missing_ok=True)
-                    log("остановлен лаунчером")
-                    state.report(phase="stopped")
+    while True:
+        if _restart.is_set():                  # restart_online from another thread
+            run_again()
+        now = time.monotonic()
+        if now - dictionary_checked > 2:
+            dictionary.refresh()               # a changed Dictionary.lua works within seconds
+            live.refresh()                     # the launcher's checks, changed while running
+            dictionary_checked = now
+            fresh = online.take() if online else None
+            if fresh and fresh["revision"] > dictionary.revision:      # applied here, between chat lines
+                dictionary.use_online(fresh)
+                online_dictionary.write_addon(dictionary.addon, fresh, log)
+                log("свежий словарь с GitHub — в окне словаря после /reload")
+            if STOP_FILE.exists():             # the launcher's "stop" (its window closed, «Выход»)
+                STOP_FILE.unlink(missing_ok=True)
+                log("остановлен лаунчером")
+                state.report(phase="stopped")
+                return 0
+        if config["exit_with_wow"] and now - wow_checked > 2:
+            wow_checked = now
+            if launch.wow_running():
+                wow_seen, wow_gone_since = True, None
+            elif wow_seen:
+                wow_gone_since = wow_gone_since or now
+                if now - wow_gone_since > 10:
+                    log("игра закрыта — выхожу")
+                    state.report(phase="game_closed")
                     return 0
-            if config["exit_with_wow"] and now - wow_checked > 2:
-                wow_checked = now
-                if launch.wow_running():
-                    wow_seen, wow_gone_since = True, None
-                elif wow_seen:
-                    wow_gone_since = wow_gone_since or now
-                    if now - wow_gone_since > 10:
-                        log("игра закрыта — выхожу")
-                        state.report(phase="game_closed")
-                        return 0
-            if window is None or now - window_checked > 2:
-                found = capturer.find()
-                if found != window or first_check:
-                    log(f"окно WoW: {found[1]}" if found else "окно игры не найдено или свёрнуто — жду")
-                    state.report(window=bool(found))
-                window, window_checked, first_check = found, now, False
-            if window is None:
-                time.sleep(1)
-                continue
-            try:
-                grabbed = capturer.grab()
-            except Exception as e:  # noqa: BLE001 - window moved or closed between checks
-                if not grab_failed:                # once, not every second while it keeps failing
-                    log(f"снимок не удался: {e}")
-                grab_failed = True
-                window_checked = 0.0               # the window looked for again, after a pause
-                time.sleep(1)
-                continue
-            grab_failed = False
-            if grabbed is None:
-                time.sleep(config["poll_interval"])
-                continue
-            frame = protocol.decode(protocol.Image(*grabbed))
-            if frame is None and protocol.last_failure == "absent":
-                # no strip where it was said to be: look over the whole window, every 5 s (~0.3 s of work)
-                absent_since = absent_since or time.monotonic()
-                if time.monotonic() - absent_since > 2 and time.monotonic() - searched > 5:
-                    searched = time.monotonic()
-                    whole = capturer.grab_full()
-                    # rows enough for a narrow strip: the addon makes it thicker so a long line fits
-                    hit = locate.find(*whole, width_hint=capturer.rect[2],
-                                      capture_height=max(config["capture_height"], 64)) if whole else None
-                    if hit and hit[:4] != capturer.rect:
-                        capturer.use(hit[:4])
-                        log(f"полоска найдена в другом месте: x {hit[0]}, y {hit[1]}, ширина {hit[2]}")
-            elif frame is not None:
-                absent_since = None
-            if frame is None and protocol.last_failure == "version":
-                now = time.monotonic()
-                foreign_since = foreign_since or now
-                if not foreign_told and now - foreign_since > 3.0:      # held a while: not a damaged frame's chance
-                    which, words = protocol.mismatch(protocol.other_version)
-                    log(words)
-                    log(f"    протокол полоски: у аддона {protocol.other_version}, у программы {protocol.VERSION}")
-                    foreign_told = True
-                    state.report(mismatch=which)
-            elif foreign_since is not None:
-                foreign_since = None
-                if foreign_told:
-                    foreign_told = False
-                    state.report(mismatch="")
-            if frame is None:
-                misses += 1
-                if protocol.last_failure == "damaged":
-                    now = time.monotonic()
-                    damaged_since = damaged_since or now
-                    if not damaged_told and now - damaged_since > 1.0:
-                        log("полоска видна, но не читается: её что-то перекрывает?")
-                        log("    миникарта, окно другого аддона или настройки изображения, искажающие цвета")
-                        damaged_told = True
-                        state.report(damaged=True)
-                else:
-                    damaged_since = None
-                    if damaged_told:             # gone, not covered: its own state now (minimized, hidden UI)
-                        damaged_told = False
-                        state.report(damaged=False)
-                if linked and misses == int(5 / config["poll_interval"]):
-                    log("полоска аддона пропала: игра свёрнута или скрыт интерфейс?")
-                    linked = False
-                    state.report(linked=False)
-            else:
-                misses = 0
-                damaged_since = None
-                if damaged_told:                 # readable again: a later cover is told again
-                    damaged_told = False
-                    log("полоска снова читается")
-                    state.report(damaged=False)
-                if not linked:
-                    log("связь с аддоном есть")
-                    log(f"    ячейка полоски: {frame.cell} px")
-                    linked = True
-                    state.report(linked=True)
-                if frame.seq != seen:
-                    first = seen is None       # what was up before we started: not news
-                    seen = frame.seq
-                    line = protocol.parse(frame.payload)
-                    if line and line.off is not None:
-                        sapi.set_disabled({n for n in line.off.split("|") if n})
-                    if line:
-                        engines.follow(line)
-                    if line and line.kind in SERVICE_KINDS:
-                        service(line, first, engines, player, dictionary, capturer)
-                    elif line and line.kind not in LABELS:
-                        # a service line of a newer addon: never read aloud what is not chat
-                        if line.kind not in unknown_kinds:
-                            unknown_kinds.add(line.kind)
-                            log(f"строки типа «{line.kind}» не озвучиваю (аддон новее программы?)")
-                    elif line and line.text and not first and seen_lines.seen(line.options.get("id", "")):
-                        # a line the addon sent again: this one was read already
-                        log(f"строка {line.options.get('id')} уже прочитана — пропускаю повтор")
-                    elif line and line.text and not first:
-                        speaker_key = (line.kind, line.sender, line.channel)
-                        continuing = (speaker_key == last_speaker
-                                      and engines.quiet_for() <= config["same_speaker_gap"])
-                        last_speaker = speaker_key
-                        name, text, droppable = protocol.split_name(line.text)
-                        if continuing and droppable:
-                            name, text = "", text.lstrip()
-                        # the name is left as it is
-                        text = protocol.with_name(name, speech_text(text, dictionary, inflector, line.declension, restore_yo))
-                        line = dataclasses.replace(line, text=text)
-                        speaker = engines.for_line(line)
-                        label = LABELS.get(line.kind, line.kind) + (f" {line.channel}" if line.channel else "")
-                        log(f"[{label}] {line.sender} ({line.race or '?'}"
-                            f"{', м' if line.sex == '2' else ', ж' if line.sex == '3' else ''})"
-                            f" → {speaker.describe(line)}: {text}")
-                        if config["log_details"] and line.raw and line.raw != text:
-                            log(f"    исходно:   {line.raw}")
-                        speaker.say(line)
+        if window is None or now - window_checked > 2:
+            found = capturer.find()
+            if found != window or first_check:
+                log(f"окно WoW: {found[1]}" if found else "окно игры не найдено или свёрнуто — жду")
+                state.report(window=bool(found))
+            window, window_checked, first_check = found, now, False
+        if window is None:
+            time.sleep(1)
+            continue
+        try:
+            grabbed = capturer.grab()
+        except Exception as e:  # noqa: BLE001 - window moved or closed between checks
+            if not grab_failed:                # once, not every second while it keeps failing
+                log(f"снимок не удался: {e}")
+            grab_failed = True
+            window_checked = 0.0               # the window looked for again, after a pause
+            time.sleep(1)
+            continue
+        grab_failed = False
+        if grabbed is None:
             time.sleep(config["poll_interval"])
+            continue
+        frame = protocol.decode(protocol.Image(*grabbed))
+        if frame is None and protocol.last_failure == "absent":
+            # no strip where it was said to be: look over the whole window, every 5 s (~0.3 s of work)
+            absent_since = absent_since or time.monotonic()
+            if time.monotonic() - absent_since > 2 and time.monotonic() - searched > 5:
+                searched = time.monotonic()
+                whole = capturer.grab_full()
+                # rows enough for a narrow strip: the addon makes it thicker so a long line fits
+                hit = locate.find(*whole, width_hint=capturer.rect[2],
+                                  capture_height=max(config["capture_height"], 64)) if whole else None
+                if hit and hit[:4] != capturer.rect:
+                    capturer.use(hit[:4])
+                    log(f"полоска найдена в другом месте: x {hit[0]}, y {hit[1]}, ширина {hit[2]}")
+        elif frame is not None:
+            absent_since = None
+        if frame is None and protocol.last_failure == "version":
+            now = time.monotonic()
+            foreign_since = foreign_since or now
+            if not foreign_told and now - foreign_since > 3.0:      # held a while: not a damaged frame's chance
+                which, words = protocol.mismatch(protocol.other_version)
+                log(words)
+                log(f"    протокол полоски: у аддона {protocol.other_version}, у программы {protocol.VERSION}")
+                foreign_told = True
+                state.report(mismatch=which)
+        elif foreign_since is not None:
+            foreign_since = None
+            if foreign_told:
+                foreign_told = False
+                state.report(mismatch="")
+        if frame is None:
+            misses += 1
+            if protocol.last_failure == "damaged":
+                now = time.monotonic()
+                damaged_since = damaged_since or now
+                if not damaged_told and now - damaged_since > 1.0:
+                    log("полоска видна, но не читается: её что-то перекрывает?")
+                    log("    миникарта, окно другого аддона или настройки изображения, искажающие цвета")
+                    damaged_told = True
+                    state.report(damaged=True)
+            else:
+                damaged_since = None
+                if damaged_told:             # gone, not covered: its own state now (minimized, hidden UI)
+                    damaged_told = False
+                    state.report(damaged=False)
+            if linked and misses == int(5 / config["poll_interval"]):
+                log("полоска аддона пропала: игра свёрнута или скрыт интерфейс?")
+                linked = False
+                state.report(linked=False)
+        else:
+            misses = 0
+            damaged_since = None
+            if damaged_told:                 # readable again: a later cover is told again
+                damaged_told = False
+                log("полоска снова читается")
+                state.report(damaged=False)
+            if not linked:
+                log("связь с аддоном есть")
+                log(f"    ячейка полоски: {frame.cell} px")
+                linked = True
+                state.report(linked=True)
+            if frame.seq != seen:
+                first = seen is None       # what was up before we started: not news
+                seen = frame.seq
+                line = protocol.parse(frame.payload)
+                if line and line.off is not None:
+                    sapi.set_disabled({n for n in line.off.split("|") if n})
+                if line:
+                    engines.follow(line)
+                if line and line.kind in SERVICE_KINDS:
+                    service(line, first, engines, player, dictionary, capturer)
+                elif line and line.kind not in LABELS:
+                    # a service line of a newer addon: never read aloud what is not chat
+                    if line.kind not in unknown_kinds:
+                        unknown_kinds.add(line.kind)
+                        log(f"строки типа «{line.kind}» не озвучиваю (аддон новее программы?)")
+                elif line and line.text and not first and seen_lines.seen(line.options.get("id", "")):
+                    # a line the addon sent again: this one was read already
+                    log(f"строка {line.options.get('id')} уже прочитана — пропускаю повтор")
+                elif line and line.text and not first:
+                    speaker_key = (line.kind, line.sender, line.channel)
+                    continuing = (speaker_key == last_speaker
+                                  and engines.quiet_for() <= config["same_speaker_gap"])
+                    last_speaker = speaker_key
+                    name, text, droppable = protocol.split_name(line.text)
+                    if continuing and droppable:
+                        name, text = "", text.lstrip()
+                    # the name is left as it is
+                    text = protocol.with_name(name, speech_text(text, dictionary, inflector, line.declension, restore_yo))
+                    line = dataclasses.replace(line, text=text)
+                    speaker = engines.for_line(line)
+                    label = LABELS.get(line.kind, line.kind) + (f" {line.channel}" if line.channel else "")
+                    log(f"[{label}] {line.sender} ({line.race or '?'}"
+                        f"{', м' if line.sex == '2' else ', ж' if line.sex == '3' else ''})"
+                        f" → {speaker.describe(line)}: {text}")
+                    if config["log_details"] and line.raw and line.raw != text:
+                        log(f"    исходно:   {line.raw}")
+                    speaker.say(line)
+        time.sleep(config["poll_interval"])
 
 
 if __name__ == "__main__":
