@@ -10,10 +10,10 @@ jobs:
   release:
     runs-on: windows-latest          # Inno Setup 6 is preinstalled there
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0               # Dictionary.lua's D.REVISION: the last commit that changed it
-      - uses: jdx/mise-action@v5
+      - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d  # v5.2.9
       - run: mise run test
       - run: mise run installer      # dist/: archive, manifest.json, notes.md, uv.exe, BarrensVoice-Setup.exe
         env:

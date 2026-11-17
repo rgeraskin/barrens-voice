@@ -1,17 +1,20 @@
-# Every step is a mise task, run the same way locally (docs/update-strategy.md).
+# Every step is a mise task, run the same way locally (docs/update-strategy.md). Actions are pinned by commit
+# (the version in the comment): the dictionary job holds the release signing key.
 name: CI
 on:
   push:
     branches: [master]
   pull_request:
+permissions:
+  contents: read
 jobs:
   test:
     runs-on: windows-latest          # the companion is Windows-only; standard runners are free for public repos
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0               # the release tags: the addon's version is checked against the last one
-      - uses: jdx/mise-action@v5
+      - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d  # v5.2.9
       - run: mise run test
   # The dictionary online (bv/online_dictionary.py): after the tests pass on master, the addon's default
   # dictionary, signed, into the branch `dictionary` - only when it changed. Companions fetch it from there.
@@ -21,11 +24,14 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: write
+    concurrency:                       # one publish at a time; the newer revision check below orders them
+      group: dictionary
+      cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0               # revision: the time of the last commit that changed Dictionary.lua
-      - uses: jdx/mise-action@v5
+      - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d  # v5.2.9
       - run: mise run dictionary
         env:
           BV_SIGNING_KEY: ${{ secrets.BV_SIGNING_KEY }}
@@ -39,6 +45,10 @@ jobs:
               && git show FETCH_HEAD:dictionary.json.sig > old.sig 2>/dev/null \
               && cmp -s old.json pub/dictionary.json && cmp -s old.sig pub/dictionary.json.sig; then
             echo "the dictionary did not change"; exit 0
+          fi
+          # two close pushes: the run of the older commit may come last - it never replaces a newer revision
+          if [ -s old.json ] && mise exec -- python -c "import json, sys; r = lambda p: json.load(open(p, encoding='utf-8'))['revision']; sys.exit(r('old.json') <= r('pub/dictionary.json'))"; then
+            echo "a newer dictionary is published already"; exit 0
           fi
           cd pub
           git init -q -b dictionary
