@@ -14,19 +14,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - An installer
 
-  `BarrensVoice-Setup.exe` from the latest GitHub release installs for the current Windows user, without administrator rights, into one folder (by default `%LOCALAPPDATA%\BarrensVoice`): the program, `data` (settings, the voice bank, logs) and `cache` (models). While installing it downloads Python and the libraries through uv — the CUDA build with an NVIDIA card, DirectML otherwise — and the models (~3 GB): about 6 GB on disk with NVIDIA, 4 GB otherwise. The folder has «Barrens Voice.exe» with the app's icon, which starts the current version; the shortcuts and the start at Windows sign-in go through it. Uninstalling stops it and asks whether to delete the settings, the voice bank and the models too. `BarrensVoice.cmd` stays for running from the source, and downloads the models too (`python -m bv --fetch-models`).
+  `BarrensVoice-Setup.exe` from the latest GitHub release installs for the current Windows user, without administrator rights, into one folder (by default `%LOCALAPPDATA%\BarrensVoice`): the program, `data` (settings, the voice bank, logs) and `cache` (models). While installing it downloads Python and the libraries through uv — the CUDA build with an NVIDIA card, DirectML otherwise — and the models (~3 GB): about 6 GB on disk with NVIDIA, 4 GB otherwise. The folder has «Barrens Voice.exe» with the app's icon, which starts the current version; the shortcuts and the start at Windows sign-in go through it. Uninstalling stops it and asks whether to delete the settings, the voice bank and the models too. The installer does not run over a running Barrens Voice. `BarrensVoice.cmd` stays for running from the source, and downloads the models too (`python -m bv --fetch-models`).
 
 - Updates by themselves
 
-  An installed Barrens Voice checks GitHub Releases at start and hourly and trusts a release only with its signed manifest (ed25519) and an archive that matches it. With «Обновлять автоматически» (on by default) the launcher downloads the new version and builds it beside the current one in the background, with the uv the release names, and switches to it when the game and the voice-over are not running — or at once on «Установить сейчас»: the voice-over stops for about half a minute while the launcher restarts into the new version and starts it again for the running game. With the check off, the notice offers «Обновить». A failed download or build is tried again at the next check; a version whose companion fails right at start twice is rolled back. Windows «Apps» shows the version in use. The notice says «Вышла версия 0.4.1 и аддон 0.3.2» (the addon only when it changed), under it what the update does («обновление скачивается… / готовится… / ждёт закрытия игры»), and «Что нового» opens the release's page. The addon follows the app: with automatic updates an older addon is replaced in each game that is not running (a newer one, from CurseForge, stays); otherwise a game's card offers «обновить аддон». «Получать тестовые версии» takes pre-releases: a test build carries its own version (tag `v0.4.0-beta.5` → `0.4.0b5`, shown as «0.4.0 beta 5»), a newer beta is an update, and the release is newer than its betas. The app's version is `pyproject.toml`'s now, the addon's its own.
+  An installed Barrens Voice checks GitHub Releases at start and hourly and trusts a release only with its signed manifest (ed25519) and an archive that matches it. With «Обновлять автоматически» (on by default) the launcher downloads the new version and builds it beside the current one in the background, with the uv the release names, and switches to it when the game and the voice-over are not running — or at once on «Установить сейчас»: the voice-over stops for about half a minute while the launcher restarts into the new version and starts it again for the running game. With the check off, the notice offers «Обновить». A failed download or build is tried again at the next check. A prepared version must load in its own Python before it is used, and `app\current` is switched through a new link, so a failure leaves the old version in place. A version whose companion fails right at start twice (not counting another companion running or an unreadable config.json) is rolled back and remembered: the notice stays, but it is installed again only by «Обновить», until a newer one comes. The current and one previous version are kept, older ones and downloaded archives are removed. After an update the launcher starts itself again without starting the game; when it was closing with the game, it just closes. The stable channel never takes a test build. Windows «Apps» shows the version in use. The notice says «Вышла версия 0.4.1 и аддон 0.3.2» (the addon only when it changed), under it what the update does («обновление скачивается… / готовится… / ждёт закрытия игры»), and «Что нового» opens the release's page. The addon follows the app: with automatic updates an older addon is replaced in each game that is not running (a newer one, from CurseForge, stays); otherwise a game's card offers «обновить аддон». «Получать тестовые версии» takes pre-releases: a test build carries its own version (tag `v0.4.0-beta.5` → `0.4.0b5`, shown as «0.4.0 beta 5»), a newer beta is an update, and the release is newer than its betas. The app's version is `pyproject.toml`'s now, the addon's its own.
 
 - A launcher window instead of the companion's console
 
-  `BarrensVoice.pyw` opens a window: the state (companion, game, race voices with the video card, the link with the addon), the companion's log, the start options with hints (launch the game with Barrens Voice — off by default; close with the game; start at Windows sign-in, then waiting in the tray), the installed games with the addon's version in each and «установить аддон» / «обновить аддон», «Играть», settings, help and the update notice. Opened by hand it starts the companion only with the game — when the game runs or appears, on «Играть», or with «Запускать игру» on — so the race voices take video memory only for a game. The cross closes it with the companion (asking if the game runs); it hides in the tray by itself when it starts the game and at Windows sign-in; when the launcher ends, the companion ends too. The games are found where they last ran, from the registry and Battle.net's settings, and in the usual folders on every local disk; the settings have a folder field for each game, «Папка WoW Forever» and «Папка WoW Retail» (`game_dirs` in config.json; the single `wow_dir` is still read), ask whether to save changes when closed, and link to the description of config.json. The log says at once when the chosen game has no addon. Installing the addon mirrors it into the game: files the new version no longer has are removed, the three the companion writes there (`VoiceList.lua`, `CompanionStatus.lua`, `DictionaryOnline.lua`) are kept; with the game running a `/reload` is enough (checked on Forever's client, new files and pictures included). The window follows the Windows screen scale; its icon is the addon's. `BarrensVoice.pyw` and `BarrensVoice.cmd` take the same switches (`--retail`, `--console`, `--f5`…, `--help`).
+  `BarrensVoice.pyw` opens a window: the state (companion, game, race voices with the video card, the link with the addon), the companion's log, the start options with hints (launch the game with Barrens Voice — off by default; close with the game; start at Windows sign-in, then waiting in the tray), the installed games with the addon's version in each and «установить аддон» / «обновить аддон», «Играть», settings, help and the update notice. Opened by hand it starts the companion only with the game — when the game runs or appears, on «Играть», or with «Запускать игру» on — so the race voices take video memory only for a game. The cross closes it with the companion (asking if the game runs); it hides in the tray by itself when it starts the game and at Windows sign-in; when the launcher ends, the companion ends too. The games are found where they last ran, from the registry and Battle.net's settings, and in the usual folders on every local disk; the settings have a folder field for each game, «Папка WoW Forever» and «Папка WoW Retail» (`game_dirs` in config.json; the single `wow_dir` is still read), ask whether to save changes when closed, and link to the description of config.json. A config.json that does not parse is never written over: the launcher and the companion say where the error is. The log says at once when the chosen game has no addon. Installing the addon mirrors it into the game: files the new version no longer has are removed, the three the companion writes there (`VoiceList.lua`, `CompanionStatus.lua`, `DictionaryOnline.lua`) are kept; with the game running a `/reload` is enough (checked on Forever's client, new files and pictures included). The window follows the Windows screen scale; its icon is the addon's. `BarrensVoice.pyw` and `BarrensVoice.cmd` take the same switches (`--retail`, `--console`, `--f5`…, `--help`).
 
 - The dictionary online
 
-  The default dictionary comes from GitHub without an addon update: CI publishes it, signed, after the tests pass on master (the branch `dictionary`), and the companion fetches it at start and hourly. It takes it only with a valid signature, a format it reads (raised when the dictionary's syntax changes: an older companion keeps its last one), and regexes that compile and run fast (checked in a process of their own), keeps the last good one for starts without the network, and uses it while it is newer than the addon's own (`revision`, the time of the last commit that changed Dictionary.lua). The companion applies it at once and writes it into the addon as DictionaryOnline.lua, so the dictionary window shows it after `/reload`. `dictionary_online` in config.json turns it off; run from the source it is off.
+  The default dictionary comes from GitHub without an addon update: CI publishes it, signed, after the tests pass on master (the branch `dictionary`), and the companion fetches it at start and hourly. It takes it only with a valid signature, a format it reads (raised when the dictionary's syntax changes: an older companion keeps its last one), and regexes that compile, run fast and have valid replacements (checked in a process of their own, and in CI before publishing), keeps the last good one for starts without the network, and uses it while it is newer than the addon's own (`revision`, the time of the last commit that changed Dictionary.lua). The companion applies it at once and writes it into the addon as DictionaryOnline.lua, so the dictionary window shows it after `/reload`. `dictionary_online` in config.json turns it off (and empties DictionaryOnline.lua); run from the source it is off.
 
 - Log levels
 
@@ -129,6 +129,70 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - «полоска видна, но не читается» is cleared
 
   When the strip reads again («полоска снова читается») or goes away: a second cover in the same session was not logged.
+
+- Lines another addon's chat filter hides are not read on Forever
+
+  The check called a function Forever does not have, so a spam blocker's hidden lines were still read aloud. Filters are now asked through the client's own `ChatFrameUtil`, and one that fails counts as not hiding.
+
+- «спрашивает» for questions with «р», «Ц», «—» or «№»
+
+  The «…» in the question check was taken as three loose bytes, and «кто в рейд?» or «Цена?» counted as not a question.
+
+- Nothing stale after `/bv on`
+
+  With the reading off, the strip still queued its frames, and `/bv on` played old test lines and opened links clicked long before. Nothing is queued while it is off, and turning it on sends the settings and the dictionary afresh.
+
+- «Озвучить» right after a dictionary edit uses the edit
+
+- A dictionary line over 480 bytes is said, not sent cut
+
+- The strip draws a frame from one edge while it moves
+
+- Units after a number are not taken for a preposition
+
+  «5с кд» was read «пятьс кулд+ауном» and «10к хп» «десять тысяч здоровью»: the «с» or «к» of the number was taken for a preposition and declined the next word. «из-за» and «из-под» now decline too.
+
+- Numbers before «хп», a hyphenated word or after a colon
+
+  «осталось 100 хп» is «сто здоровья», not «сотое здоровье», «нужно 5 рейд-лидеров» keeps its count, and «20:00 сбор» no longer reads «двадцать:нулевой».
+
+- Spelt abbreviations keep their stress on a vowel
+
+  «МВД» was «эм-вэ-+дэ», and Windows voices that do not take stress marks read the «+» aloud. Now «эм-вэ-д+э».
+
+- The dictionary's regexes match the same with declension off
+
+- «Лок'тар огар!» is not «чернокнижник'тар»
+
+  A word joined to the next by an apostrophe is not a dictionary entry.
+
+- «*да*» and «@Вася» are not unmasked into swear words
+
+  Asterisks around a whole word are emphasis and «@» before a name a mention: both are dropped.
+
+- A Windows voice sample no longer unloads the race voices
+
+- Race voices: an empty voice bank is an error, and a failed load is not retried on every line
+
+  A client without Russian voice-over on disk made the race voices «ready» and silent. Now they say why and the chat is read with Windows voices; a failed load is tried again after 10 minutes or after switching voices off and on.
+
+- A line that fails to play no longer silences the companion
+
+- A damaged voice bank is made again
+
+- Programs named like the game are not taken for it
+
+  Any `wow*.exe` counted as the game (WowUp, say): it is now `Wow.exe` in a game's folder.
+
+- An unreadable config.json is said in words
+
+  The companion stopped with a traceback; it now says where the error is and leaves the file alone. Impossible numbers (`"max_queue": 0`) are corrected with a warning.
+
+- A locked VoiceList.lua no longer stops the companion
+
+  The files the companion writes into the addon are written through a temporary file.
+
+- A screen grab that keeps failing no longer spins the companion, and a voice bank file cut short counts as missing
 
 ## [0.3.0] - 2026-11-15
 
