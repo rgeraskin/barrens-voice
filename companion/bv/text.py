@@ -121,7 +121,8 @@ def plain(text: str) -> str:
     return re.sub(r"\s+([,.!?:;…])", r"\1", re.sub(r"\s{2,}", " ", text)).strip()
 
 
-NEXT_WORD = re.compile(r"\s+([а-яёА-ЯЁ+]+)")
+# the word after a number, hyphenated ones whole: "5 рейд-лидеров" agrees with "лидеров", its last part
+NEXT_WORD = re.compile(r"\s+([а-яёА-ЯЁ+]+(?:-[а-яёА-ЯЁ+]+)*)")
 GENDERS = {"masc", "femn", "neut"}
 # words that number rather than count: "15 уровня" is the fifteenth (a count is "15 уровней")
 NUMBERED = {"уровень", "этаж", "число", "ранг", "фаза", "сезон", "глава", "акт", "волна", "слот", "босс"}
@@ -306,8 +307,9 @@ def numbers_to_words(text: str) -> str:
                 spoken = " ".join(words)
             return spoken, m.end()
         if morph is not None and following:
+            head = following.group(1).rsplit("-", 1)[-1]
             try:
-                as_ordinal = ordinal(n, before, following.group(1), morph)
+                as_ordinal = ordinal(n, before, head, morph)
                 if as_ordinal:
                     word = following.group(1)
                     stressed = SINGULAR_STRESS.get(word.lower())
@@ -315,7 +317,7 @@ def numbers_to_words(text: str) -> str:
                         stressed = word[0] + stressed[1:]
                         return as_ordinal + m.string[m.end():following.start(1)] + stressed, following.end(1)
                     return as_ordinal, m.end()
-                spoken = agree(n, spoken, following.group(1), morph)
+                spoken = agree(n, spoken, head, morph)
             except Exception:  # noqa: BLE001 - a number read in the nominative is still a number
                 pass
         return spoken, m.end()

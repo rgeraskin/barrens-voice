@@ -399,6 +399,10 @@ class Pipeline(unittest.TestCase):
             "хп мало": "здоровье мало",
         })
 
+    def test_hyphenated_words_after_a_number(self):
+        # the default's «рл» entries make «рейд-лидер»: a count, not «второй рейд-лидера»
+        self.check({"2 рла": "два рейд-лидера", "5 рлов": "пять рейд-лидеров", "2 топ-гильдии": "две топ-гильдии"})
+
 
 class PlayerStop(unittest.TestCase):
     def test_stop_drops_queued_and_late_lines(self):
@@ -528,6 +532,9 @@ class NumberAgreement(unittest.TestCase):
             "хил 15 уровня": "хил пятнадцатого уровня", "на 2 боссе": "на втором боссе", "в 3 слоте": "в третьем слоте",
             "с 3 фазы": "с третьей фазы", "3 фазы": "три фазы", "убил 5 боссов": "убил пять боссов",
             "до 11 числа": "до одиннадцатого ч+исла", "2 числа": "два числа", "с 1 места": "с одного места", "на 2 месте": "на втором месте",
+            # a hyphenated word agrees by its last part
+            "нужно 5 рейд-лидеров": "нужно пять рейд-лидеров", "2 рейд-группы": "две рейд-группы",
+            "в 3 рейд-группах": "в трёх рейд-группах", "собрал 3 сет-бонуса": "собрал три сет-бонуса",
         }
         for text, spoken in cases.items():
             self.assertEqual(f(text), spoken, text)
