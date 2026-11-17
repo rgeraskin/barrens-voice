@@ -30,3 +30,17 @@ jobs:
           case "$GITHUB_REF_NAME" in *-*) flags="--prerelease" ;; esac
           gh release create "$GITHUB_REF_NAME" $flags --title "Barrens Voice ${GITHUB_REF_NAME#v}" --notes-file dist/notes.md \
             dist/BarrensVoice-Setup.exe dist/barrens-voice-*.zip dist/manifest.json dist/manifest.json.sig
+      # Clients up to 0.4.0 beta 10 on the test channel take the FIRST release in GitHub's list that has a manifest
+      # (not the highest version): another release still carrying one may be taken instead of this one. Only a
+      # warning; the latest stable release keeps its manifest (the stable channel reads releases/latest).
+      - name: Releases that still offer a manifest
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          latest=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name 2>/dev/null || true)
+          gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq ".[] | select(.draft | not) | select(.tag_name != \"$GITHUB_REF_NAME\" and .tag_name != \"$latest\") | select([.assets[].name] | index(\"manifest.json\")) | .tag_name" |
+            while read -r tag; do
+              echo "::warning::$tag still has manifest.json: test-channel clients up to beta 10 may take it instead of $GITHUB_REF_NAME"
+            done
