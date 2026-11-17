@@ -310,6 +310,51 @@ class AddonsFollowTheApp(unittest.TestCase):
         self.assertEqual(addons_to_update([game("forever", None)], "0.3.1", None), [])              # not installed: asked
 
 
+class AddonVersion(unittest.TestCase):
+    """A released addon version is never changed: the launcher replaces a game's addon only when its version is
+    older, so an addon changed under the same version would never reach the game (and a version would stand for
+    two different addons)."""
+
+    def test_one_version_one_addon(self):
+        # every release (a test build included) whose addon has the version the .toc has now had this very addon:
+        # a change to the addon after a release raises ## Version before the next one
+        import re
+        import subprocess
+        root = Path(__file__).resolve().parents[2]
+        toc = "addon/BarrensVoice/BarrensVoice.toc"
+        now = re.search(r"## Version:\s*(\S+)", (root / toc).read_text(encoding="utf-8")).group(1)
+        tags = [t for t in subprocess.run(["git", "tag", "-l", "v*"], cwd=root, capture_output=True, text=True).stdout.split()
+                if re.fullmatch(r"v\d+\.\d+\.\d+(-beta\.\d+)?", t)]
+        if not tags:
+            self.skipTest("no release tags here (a shallow clone)")
+        for tag in tags:
+            # the release's own .toc, wherever the addon was then (0.3.0's in addon/WowChatVoice, before the rename)
+            listed = subprocess.run(["git", "ls-tree", "-r", "--name-only", tag, "addon"], cwd=root,
+                                    capture_output=True, text=True).stdout.split()
+            old_toc = next((f for f in listed if re.fullmatch(r"addon/([^/]+)/\1\.toc", f)), None)
+            if old_toc is None:
+                continue
+            then = re.search(r"## Version:\s*(\S+)", subprocess.run(["git", "show", f"{tag}:{old_toc}"], cwd=root,
+                                                                       capture_output=True, text=True).stdout)
+            if not then or then.group(1) != now:
+                continue
+            same = (old_toc == toc and subprocess.run(["git", "diff", "--quiet", tag, "--", "addon/BarrensVoice"],
+                                                      cwd=root).returncode == 0)
+            self.assertTrue(same, f"{tag} released addon {now} with other files: raise ## Version in {toc}")
+
+    def test_a_release_carries_a_released_addon(self):
+        # test builds carry the addon's test builds (0.4.0b1, 0.4.0b2...), a release its release version
+        import os
+        import sys
+        from unittest import mock
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
+        import release
+        with mock.patch.object(release, "versions", return_value={"version": "0.4.0", "addon": "0.4.0b1", "protocol": 1}), \
+                mock.patch.dict(os.environ, {"RELEASE_TAG": "v0.4.0"}), self.assertRaises(SystemExit) as stop:
+            release.build()
+        self.assertIn("test build of the addon", str(stop.exception))
+
+
 class CommandLine(unittest.TestCase):
     def test_parse(self):
         from bv.launcher.model import parse_args

@@ -557,6 +557,11 @@ ns.db.seenVersion = "0.2.1"
 welcome = {}
 ns.LoginWord()
 assert(welcome[1]:find("что нового — в описании аддона"), "a version with no news of its own")
+GetAddOnMetadata = function() return "0.4.0b1" end                   -- a test build: shown so, its release's news
+ns.db.seenVersion = "0.3.0"
+welcome = {}
+ns.LoginWord()
+assert(welcome[1]:find("обновление 0.4.0 beta 1: Barrens Voice ставится установщиком", 1, true), tostring(welcome[1]))
 GetAddOnMetadata = nil
 print = plainPrint
 print("welcome ok")

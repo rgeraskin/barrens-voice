@@ -689,10 +689,18 @@ local function Version()
     return meta and meta(ADDON, "Version") or "?"
 end
 
+--- For people: a test build "0.4.0b1" -> "0.4.0 beta 1" (the launcher's install.display_version).
+local function Shown(version) return (version:gsub("b(%d+)$", " beta %1")) end
+
+--- The release a version leads to: "0.4.0b1" -> "0.4.0" (a test build has its release's news).
+local function Release(version) return (version:gsub("b%d+$", "")) end
+
 -- What a version brought, in a few words, for the line after an update (CHANGELOG.md has it all).
 ns.NEWS = {
-    ["0.3.0"] = "ритейл WoW (BarrensVoice-Retail.cmd) с голосами всех его рас; окно чата можно прятать, пока на нём нет "
-        .. "мыши; настройки во вкладках; чат ждёт и Wayfarer; «ё» в словах из чата ставится сама",
+    ["0.4.0"] = "Barrens Voice ставится установщиком и обновляется сам, вместе с аддоном, мост к компаньону теперь "
+        .. "внизу экрана, стандартный словарь обновляется без обновления аддона, в настройках появилась вкладка «Помощь»",
+    ["0.3.0"] = "ритейл WoW с голосами всех его рас, окно чата можно прятать, пока на нём нет мыши, настройки во "
+        .. "вкладках, чат ждёт и Wayfarer, «ё» в словах из чата ставится сама",
     ["0.2.1"] = "мост к компаньону можно перенести",
 }
 
@@ -707,7 +715,7 @@ function ns.LoginWord()
     if ns.firstRun then
         ns.Welcome()
     elseif ns.db.seenVersion ~= version then
-        print(PREFIX .. ("обновление %s: %s. Настройки — /bv."):format(version, ns.NEWS[version]
+        print(PREFIX .. ("обновление %s: %s. Настройки — /bv."):format(Shown(version), ns.NEWS[Release(version)]
             or "что нового — в описании аддона"))
         print(PREFIX .. HELP_HINT)
     end

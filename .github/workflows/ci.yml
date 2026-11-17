@@ -9,6 +9,8 @@ jobs:
     runs-on: windows-latest          # the companion is Windows-only; standard runners are free for public repos
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0               # the release tags: the addon's version is checked against the last one
       - uses: jdx/mise-action@v5
       - run: mise run test
   # The dictionary online (bv/online_dictionary.py): after the tests pass on master, the addon's default

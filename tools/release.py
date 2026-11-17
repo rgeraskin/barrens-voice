@@ -91,6 +91,9 @@ def build() -> Path:
     tag = os.environ.get("RELEASE_TAG", "")
     if tag:
         info["version"] = version_of(tag, base)
+        if "b" not in info["version"] and "b" in info["addon"]:
+            sys.exit(f"the release {tag} would carry a test build of the addon ({info['addon']}): give the addon its "
+                     "release version in BarrensVoice.toc")
     DIST.mkdir(exist_ok=True)
     archive = DIST / f"barrens-voice-{info['version']}.zip"
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as z:
