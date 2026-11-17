@@ -360,6 +360,35 @@ CatQuestCore = nil
 sent = {}
 ns.ReleaseHeld()
 assert(#sent == 0, "nothing held over /bv off: " .. tostring(sent[1]))
+-- with the addon off the strip takes nothing: what asks the companion says it is off, not its usual
+-- word; the reset of the race voices waits for /bv on
+do
+    local said, push0, first0, now0 = {}, ns.Strip.Push, ns.Strip.PushFirst, ns.Strip.PushNow
+    local pushed = {}
+    ns.Strip.Push = function(p) pushed[#pushed + 1] = p end
+    ns.Strip.PushFirst, ns.Strip.PushNow = ns.Strip.Push, ns.Strip.Push
+    print = function(t) said[#said + 1] = t end
+    ns.SetEnabled(false)
+    pushed, said = {}, {}
+    ns.ResetVoices(); ns.OpenLink("discord"); ns.CopyLink("discord"); ns.Replay(3); ns.TestVoice("Anna"); ns.Test()
+    SlashCmdList.BARRENSVOICE("stop")
+    tryBox._scripts.OnEnterPressed(tryBox)                 -- the dictionary window's «Озвучить»
+    print = print0
+    assert(#pushed == 0, "nothing for the strip while off: " .. tostring(pushed[1]))
+    assert(#said == 8, "a word for each: " .. #said)
+    assert(said[1]:find("когда вы её включите", 1, true) and ns.db.resetVoices, said[1])
+    assert(said[2]:find("озвучка выключена", 1, true) and said[2]:find("discord.gg", 1, true), said[2])
+    for i = 3, 6 do assert(said[i]:find("озвучка выключена", 1, true), said[i]) end
+    assert(said[7]:find("и так выключена", 1, true), said[7])
+    assert(said[8]:find("озвучка выключена", 1, true), said[8])
+    print = function() end
+    ns.SetEnabled(true)
+    print = print0
+    local reset = 0
+    for _, p in ipairs(pushed) do if p:find("^reset\31") then reset = reset + 1 end end
+    assert(reset == 1 and ns.db.resetVoices == nil, "the reset goes at /bv on, once: " .. reset)
+    ns.Strip.Push, ns.Strip.PushFirst, ns.Strip.PushNow = push0, first0, now0
+end
 GetTime = function() return 0 end
 print("catquest ok")
 

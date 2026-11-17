@@ -52,6 +52,7 @@ ns.DEFAULTS = {
     voices = "f5",     -- "f5": race voices (F5-TTS, from the client's own voice-over); "sapi": Windows voices
     -- voiceOff: [Windows voice name] = true for voices switched off; nil until changed here (the
     -- program then uses its own defaults)
+    -- resetVoices: true while a /bv reset-voices asked for with the addon off waits for /bv on
 }
 
 -- Event -> setting that switches it on.
@@ -164,6 +165,14 @@ function ns.SendControl()
     ns.Strip.Push(ns.ControlPayload())
 end
 
+--- While the addon is off the strip takes nothing (Strip.lua): an action that asks the companion
+--- for something says so instead of its usual word. True when off.
+function ns.Off()
+    if ns.db.enabled then return false end
+    print(PREFIX .. "озвучка выключена, включите её: /bv on.")
+    return true
+end
+
 -- The player's dictionary layer (their edits of the default: Dictionary.D.UserLayer) goes to the
 -- program over the strip, in parts of at most DICT_PART bytes (cut at line ends), tagged with a
 -- checksum of the whole layer: "id=..;part=i;of=n". Sent when it changes (2 s after the last edit),
@@ -244,6 +253,10 @@ end
 function ns.OpenLink(key)
     local link = ns.LINKS[key]
     if not link then return end
+    if not ns.db.enabled then
+        print(PREFIX .. ("%s: озвучка выключена, и компаньон страницу не откроет. Адрес: %s"):format(link[1], link[2]))
+        return
+    end
     AskCompanion("open", key)
     print(PREFIX .. ("%s: компаньон откроет страницу в браузере. Если не открылась (компаньон не запущен) — адрес: %s")
         :format(link[1], link[2]))
@@ -253,6 +266,11 @@ end
 function ns.CopyLink(key)
     local link = ns.LINKS[key]
     if not link then return end
+    if not ns.db.enabled then
+        print(PREFIX .. ("%s: озвучка выключена, и компаньон адрес не скопирует. Щёлкните по адресу в настройках и "
+            .. "нажмите Ctrl+C."):format(link[1]))
+        return
+    end
     AskCompanion("copy", key)
     print(PREFIX .. ("%s: компаньон положит адрес в буфер обмена — вставьте его в браузер (Ctrl+V). Если компаньон не "
         .. "запущен, щёлкните по адресу в настройках и нажмите Ctrl+C."):format(link[1]))
@@ -267,15 +285,23 @@ StaticPopupDialogs["BARRENSVOICE_RESET"] = {
 }
 
 --- Ask the program to forget which race voice each character had and hand them out afresh
---- (/bv reset-voices, asking first).
+--- (/bv reset-voices, asking first). While the addon is off the strip takes nothing: the reset waits
+--- for the next /bv on (ns.SetEnabled), kept in the saved variables over a /reload. Unlike a test line
+--- or a link, it is not heard and does not go stale - the player confirmed it and still wants it then.
 function ns.ResetVoices()
-    local options = ns.LineOptions()
-    ns.Strip.Push(ns.ServiceFrame("reset", options, "-"))
+    if not ns.db.enabled then
+        ns.db.resetVoices = true
+        print(PREFIX .. "озвучка выключена: голоса рас будут розданы заново, когда вы её включите (/bv on).")
+        return
+    end
+    ns.db.resetVoices = nil
+    ns.Strip.Push(ns.ServiceFrame("reset", ns.LineOptions(), "-"))
     print(PREFIX .. "голоса рас будут розданы заново: каждый персонаж получит голос, когда заговорит.")
 end
 
 --- A test line in one Windows voice (the voices window's play buttons).
 function ns.TestVoice(name)
+    if ns.Off() then return end
     local options = ns.LineOptions("sapi") .. ";sapi=" .. name
     ns.Strip.Push(ns.ServiceFrame("test", options,
         "Привет! Нужен дам+агер в Мёртвые копи, продам сумки за пять тысяч.", "Проверка"))
@@ -285,7 +311,10 @@ end
 function ns.SetVoices(value)
     ns.db.voices = value
     ns.SendControl()
-    if value == "f5" then
+    if not ns.db.enabled then        -- the settings go to the companion at /bv on
+        print(PREFIX .. (value == "f5" and "голоса рас" or "голоса Windows")
+            .. ". Компаньон переключится на них, когда вы включите озвучку (/bv on).")
+    elseif value == "f5" then
         print(PREFIX .. "голоса рас. Компаньон загружает модель — около 15 секунд, пока читают голоса Windows.")
     else
         print(PREFIX .. "голоса Windows. Компаньон выгружает модель голосов рас.")
@@ -312,6 +341,7 @@ end
 
 --- Read the last `n` chat lines again, through the current dictionary and settings.
 function ns.Replay(n)
+    if ns.Off() then return end
     n = math.max(1, math.min(n or 5, #ns.history))
     if #ns.history == 0 then
         print(PREFIX .. "пока нечего повторять: ни одной прочитанной строки чата.")
@@ -468,10 +498,7 @@ local TESTS = {
 }
 
 function ns.Test()
-    if not ns.db.enabled then
-        print(PREFIX .. "озвучка выключена, включите её: /bv on.")
-        return
-    end
+    if ns.Off() then return end
     for _, t in ipairs(TESTS) do ns.Send("test", t[1], t[2], t[3], t[4], "", t[5]) end
     print("|cff66ccffBarrens Voice|r: отправлено " .. #TESTS .. " тестовых строки.")
 end
@@ -537,6 +564,7 @@ function ns.SetEnabled(enabled)
         ns.Strip.SetShown(true)
         ns.SendControl()
         ns.SendDictionary(true)
+        if ns.db.resetVoices then ns.ResetVoices() end   -- asked for while the addon was off
     else
         -- the stop has to be on the strip long enough to be read before the strip goes
         ns.Stop()
@@ -630,8 +658,12 @@ SlashCmdList.BARRENSVOICE = function(msg)
     elseif msg == "test" then
         ns.Test()
     elseif msg == "stop" then
-        ns.Stop()
-        print(PREFIX .. "замолкаю (очередь очищена).")
+        if not ns.db.enabled then
+            print(PREFIX .. "озвучка и так выключена: компаньон молчит.")   -- /bv off stopped it
+        else
+            ns.Stop()
+            print(PREFIX .. "замолкаю (очередь очищена).")
+        end
     elseif msg:match("^last") then
         ns.Replay(tonumber(msg:match("%d+")) or 5)
     elseif msg == "debug" then

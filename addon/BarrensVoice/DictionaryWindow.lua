@@ -133,6 +133,7 @@ function W.Create(pane)
     try:SetAutoFocus(false)
     try:SetText("WTS сумки, нужен дд в ОП")
     local function Say()
+        if ns.Off() then return end
         local _, class = UnitClass("player")
         local _, race = UnitRace("player")
         -- an edit of the last 2 s is still waiting to be sent (Core.lua ns.DictionaryChanged): it goes
