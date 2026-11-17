@@ -42,10 +42,7 @@ class Storage:
     def __init__(self, install: Path, product: str):
         self.install = Path(install)
         self.data = self.install / "Data"
-        info = build_info(self.install, product)
-        self.product = product
-        self.build_key = info["Build Key"]
-        self.version = info.get("Version", "")
+        self.build_key = build_info(self.install, product)["Build Key"]
         self.config = self._config(self.build_key)
         self.index: dict[bytes, tuple[int, int, int]] = {}
         self._load_indices()

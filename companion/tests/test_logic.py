@@ -332,11 +332,10 @@ class DictionaryInCompanion(unittest.TestCase):
             self.assertEqual(d.apply_words("ыыы"), "\x02смех\x03")
 
     def test_names_kept_out(self):
-        from bv.protocol import split_name, without_repeated_name
+        from bv.protocol import split_name
         self.assertEqual(split_name("Лок пишет:\x04 привет"), ("Лок пишет:", " привет", True))
-        self.assertEqual(split_name("Лок\x05 смеётся"), ("Лок", " смеётся", False))
+        self.assertEqual(split_name("Лок\x05 смеётся"), ("Лок", " смеётся", False))   # an emote keeps it
         self.assertEqual(split_name("привет"), ("", "привет", False))
-        self.assertEqual(without_repeated_name("Лок\x05 смеётся", True), "Лок смеётся")   # an emote keeps it
         from bv.protocol import with_name
         from bv.text import plain
         name, rest, _ = split_name("Лок пишет:\x04 привет")
@@ -811,10 +810,10 @@ class MergeMarks(unittest.TestCase):
 
 class SameSpeaker(unittest.TestCase):
     def test_name_dropped_when_going_on(self):
-        from bv.protocol import without_repeated_name
-        self.assertEqual(without_repeated_name("Вася пишет:\x04 кто в ОП", True), "кто в ОП")
-        self.assertEqual(without_repeated_name("Вася пишет:\x04 кто в ОП", False), "Вася пишет: кто в ОП")
-        self.assertEqual(without_repeated_name("кто в ОП", True), "кто в ОП")              # names off: nothing to drop
+        # the companion drops a name split_name says is droppable when the same character goes on
+        from bv.protocol import split_name
+        self.assertEqual(split_name("Вася пишет:\x04 кто в ОП"), ("Вася пишет:", " кто в ОП", True))
+        self.assertEqual(split_name("кто в ОП"), ("", "кто в ОП", False))              # names off: nothing to drop
 
     def test_quiet_for(self):
         import time

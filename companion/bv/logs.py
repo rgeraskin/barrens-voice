@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import re
 
-LEVELS = ("DEBUG", "CHAT", "INFO", "WARN", "ERROR")
 LINE = re.compile(r"^(\d\d:\d\d:\d\d) (DEBUG|CHAT|INFO|WARN|ERROR) +(.*)$")
 
 DEBUG_STARTS = (

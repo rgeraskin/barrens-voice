@@ -12,7 +12,6 @@ for a strip that is not where it was said to be.
 from __future__ import annotations
 
 import threading
-import time
 
 from .window import find_wow_window, frame_offset
 
@@ -21,16 +20,15 @@ class WindowCapture:
     """Windows Graphics Capture of one window; the newest strip rectangle kept for latest(), the
     whole client area for full() when asked."""
 
-    def __init__(self, hwnd: int, client: tuple[int, int, int, int], rect: tuple[int, int, int, int], log):
+    def __init__(self, hwnd: int, client: tuple[int, int, int, int], rect: tuple[int, int, int, int]):
         from windows_capture import WindowsCapture
 
-        self.hwnd, self.client, self.log = hwnd, client, log
+        self.hwnd, self.client = hwnd, client
         self.rect = rect               # x, y, width, height of the strip in the client area
         self.lock = threading.Lock()
         self.strip: tuple[bytes, int, int] | None = None
         self.whole: tuple[bytes, int, int] | None = None
         self.want_whole = False
-        self.stamp = 0.0
         self.closed = False
         self.offset = frame_offset(hwnd)
         self.session = WindowsCapture(cursor_capture=False, draw_border=False, minimum_update_interval=40,
@@ -55,7 +53,6 @@ class WindowCapture:
                 whole = (buf[oy:oy + ch, ox:ox + cw].tobytes(), cw, ch)
             with self.lock:
                 self.strip = (rows.tobytes(), w, h)
-                self.stamp = time.monotonic()
                 if whole is not None:
                     self.whole, self.want_whole = whole, False
 
@@ -102,7 +99,7 @@ class Capturer:
             self._fit()
             if found and not self.wgc_failed:
                 try:
-                    self.wgc = WindowCapture(found[0], found[1], self.rect, self.log)
+                    self.wgc = WindowCapture(found[0], found[1], self.rect)
                     self.log("захват окна WoW: Windows Graphics Capture (работает и под другими окнами)")
                 except Exception as e:  # noqa: BLE001 - fall back to grabbing the screen
                     self.wgc_failed = True

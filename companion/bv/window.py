@@ -79,8 +79,3 @@ def find_wow_window() -> tuple[int, tuple[int, int, int, int]] | None:
         return None
     _, hwnd, rect = max(best)
     return hwnd, rect
-
-
-def find_wow() -> tuple[int, int, int, int] | None:
-    found = find_wow_window()
-    return found[1] if found else None

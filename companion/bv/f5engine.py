@@ -13,7 +13,6 @@ import re
 import queue
 import threading
 import time
-import wave
 from pathlib import Path
 
 from .assign import Assigner
@@ -47,7 +46,6 @@ VOCAB_FILE = "F5TTS_v1_Base/vocab.txt"
 # the video card, best first: CUDA (NVIDIA; onnxruntime-gpu) leaves the game alone - DirectML (any DirectX 12
 # card; onnxruntime-directml) holds the card for a whole denoising step, and the game's frames wait (DEVELOPMENT.md)
 PREFERRED = ("CUDAExecutionProvider", "DmlExecutionProvider")
-PROVIDER = PREFERRED[0]
 # our ONNX export of that model (10 steps; Hugging Face, CC BY-NC 4.0 as the model), downloaded into
 # the model cache at the first start unless the graphs are in models/f5-onnx or `f5_onnx_dir`
 ONNX_REPO = "rgeraskin/barrens-voice-f5-onnx"
@@ -337,10 +335,6 @@ class F5Speaker:
         self.provider = engine
         self.device = f"{self.card} (ONNX Runtime, {self.onnx.steps} шагов)"
 
-    def reference(self, slot, text: str):
-        """(clip, its text, its seconds)."""
-        return slot.path, self.ref_text[slot.id], self.ref_seconds[slot.id]
-
     def pace(self, slot) -> float:
         """The voice's seconds of speech per byte of its reference's text as F5 gets it - stressed, as
         the lines are counted (`duration`): the bank's target pace and each voice's own in one unit."""
@@ -359,7 +353,7 @@ class F5Speaker:
         under CUT_TAIL: one line in eight, most of them whole) is made once more with a quarter
         more length: always (`f5_end_check` "silence", the default), or only when Whisper does not
         hear the last word ("whisper": a second saved on such lines for 1.5 GB of video memory)."""
-        ref_file, ref_text, ref = self.reference(slot, text)
+        ref_file, ref_text, ref = slot.path, self.ref_text[slot.id], self.ref_seconds[slot.id]
         total = self.duration(slot, text, rate, character)
         if ref_file not in self.ref_audio:
             import soundfile as sf

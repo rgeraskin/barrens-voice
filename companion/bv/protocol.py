@@ -11,8 +11,6 @@ VERSION = 1
 # during the game (the old addon until /reload) and an addon updated before the program both still work
 SUPPORTED = (1,)
 HEADER_CELLS = 6
-HEADER_BITS = 48
-BITS_PER_CELL = 6
 MAX_CELL = 8          # largest cell size (physical pixels) looked for
 MIN_LEVEL_GAP = 4     # calibration levels closer than this (0..255) are not trusted (the addon's are 12 apart)
 
@@ -213,13 +211,6 @@ def with_name(name: str, text: str) -> str:
     «Вася смеётся»): the line's own leading space goes on the way (text.plain strips it)."""
     name, text = name.rstrip(), text.lstrip()
     return f"{name} {text}" if name and text else name or text
-
-
-def without_repeated_name(text: str, continuing: bool) -> str:
-    """The line to say: the name the addon put before it dropped when the same character goes on
-    (their previous line still being said, or just said), else kept; the mark removed either way."""
-    name, rest, droppable = split_name(text)
-    return rest.lstrip() if continuing and droppable else name + rest
 
 
 def parse(payload: bytes) -> Line | None:
