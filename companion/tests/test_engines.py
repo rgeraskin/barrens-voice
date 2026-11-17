@@ -21,7 +21,7 @@ class FakeF5:
 
     def start(self):
         self.error = FakeF5.fail
-        if FakeF5.fail:
+        if FakeF5.fail is not None:          # failed at once; else ready when the test says
             self.ready.set()
 
     def shutdown(self):
@@ -41,7 +41,8 @@ from bv.engines import Engines  # noqa: E402
 FAKE_F5 = types.SimpleNamespace(F5Speaker=FakeF5)
 
 
-def wait(engines):
+def wait():
+    """Until the engine manager has heard how a load ended (its f5-wait threads are done)."""
     for t in threading.enumerate():
         if t.name == "f5-wait":
             t.join(2)
@@ -64,7 +65,7 @@ class EnginesTest(unittest.TestCase):
         line = Line("say", "Орк", "Orc", "2", "", "", "текст", 100, "f5")
         self.assertIs(e.for_line(line), self.sapi)          # still loading: Windows voices meanwhile
         e.f5.ready.set()
-        wait(e)
+        wait()
         self.assertIn("Голоса рас готовы.", self.sapi.said)
         self.assertIsInstance(e.for_line(line), FakeF5)
         f5 = e.f5
@@ -79,13 +80,57 @@ class EnginesTest(unittest.TestCase):
         FakeF5.fail = "нет CUDA"
         e = self.make()
         e.want("f5")
-        wait(e)
+        wait()
         self.assertIsNone(e.f5)
         self.assertIn("Голоса рас недоступны, читаю голосами Windows.", self.sapi.said)
 
+    def test_an_empty_error_is_still_a_failure(self):
+        # str() of some exceptions is "" (StopIteration): never taken for "ready"
+        FakeF5.fail = ""
+        e = self.make()
+        e.want("f5")
+        wait()
+        self.assertFalse(e.ready)
+        self.assertIsNone(e.f5)
+        self.assertNotIn("Голоса рас готовы.", self.sapi.said)
+        line = Line("say", "Орк", "Orc", "2", "", "", "текст", 100, "f5")
+        self.assertIs(e.for_line(line), self.sapi)
 
-if __name__ == "__main__":
-    unittest.main()
+
+class Accent:
+    def accent(self, text):
+        return text
+
+    def load(self):
+        pass
+
+
+class F5SpeakerLoad(unittest.TestCase):
+    """F5Speaker's own thread with ONNX Runtime and the game client faked (they are Windows only)."""
+
+    def speaker(self, home, slots):
+        from bv import f5engine
+        from bv.assign import Assigner
+        logged = []
+        speaker = f5engine.F5Speaker({"max_queue": 8, "players": {}}, logged.append, home, Accent(),
+                                     player=types.SimpleNamespace(generation=0))
+
+        def load_onnx():
+            speaker.assigner = Assigner(slots, home / "assignments.json", {})
+        speaker._load_onnx = load_onnx
+        return speaker, logged
+
+    def test_an_empty_voice_bank_is_an_error(self):
+        # a client without the Russian voice-over: the bank is made with no voices in it
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            speaker, _ = self.speaker(Path(d), [])
+            loop = threading.Thread(target=speaker._synth_loop)
+            loop.start()
+            loop.join(5)
+            self.assertFalse(loop.is_alive())
+            self.assertTrue(speaker.ready.is_set())
+            self.assertIn("русской озвучки", speaker.error)
 
 
 class OnCard(unittest.TestCase):
@@ -107,3 +152,7 @@ class OnCard(unittest.TestCase):
         with self.assertRaises(RuntimeError) as told:
             on_card(Session("CPUExecutionProvider"), "DmlExecutionProvider")
         self.assertIn("DirectX 12", str(told.exception))
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -52,12 +52,12 @@ class Engines:
         with self.lock:
             if self.f5 is not speaker:
                 return                      # unloaded meanwhile
-            if speaker.error:
+            if speaker.error is not None:
                 self.f5 = None
                 error = speaker.error
             else:
                 self.ready, error = True, None
-        if error:
+        if error is not None:
             state.report(voices="error", voices_error=error)
             self.notice("Голоса рас недоступны, читаю голосами Windows.")
             self.log(f"  причина: {error}")

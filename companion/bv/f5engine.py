@@ -296,12 +296,14 @@ class F5Speaker:
         self._load_onnx()
         import soundfile as sf
         slots = self.assigner.slots
+        first = next((s for s in slots if s.race), None)
+        if first is None:      # a client without the Russian voice-over (or before it is downloaded)
+            raise RuntimeError("в клиенте игры нет русской озвучки: голоса рас не из чего собрать")
         self.ref_text = {s.id: self.accentor.accent(s.text) for s in slots}
         self.ref_seconds = {s.id: sf.info(s.path).duration for s in slots}
         paces = sorted(s.speech / max(1, len(s.text.encode("utf-8"))) for s in slots if s.shift == 0 and s.speech)
         quantile = self.config.get("voice_pace_quantile", 0.25)
         self.target_pace = paces[min(len(paces) - 1, int(len(paces) * quantile))] if paces else 0.0
-        first = next(s for s in slots if s.race)
         self._synth(first, "Проверка.", 100)   # warm-up: the first call is slow
         self.log(f"F5-TTS готов на {self.device}")
 
@@ -393,7 +395,7 @@ class F5Speaker:
         try:
             self._load()
         except Exception as e:  # noqa: BLE001 - reported, the caller falls back to SAPI
-            self.error = str(e)
+            self.error = str(e) or type(e).__name__     # never "": that would read as success
             self.ready.set()
             return
         self.ready.set()
