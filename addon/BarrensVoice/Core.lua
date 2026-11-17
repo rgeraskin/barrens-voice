@@ -436,7 +436,16 @@ function ns.CopyLink(key)
         .. "запущен, щёлкните по адресу в настройках и нажмите Ctrl+C."):format(link[1]))
 end
 
---- Ask the program to forget which race voice each character had and hand them out afresh.
+StaticPopupDialogs["BARRENSVOICE_RESET"] = {
+    text = "Раздать голоса рас заново?\n\nКомпаньон забудет, у кого какой голос был, и выдаст их снова — "
+        .. "так же, без повторов, начиная с тех, кто заговорит первым.",
+    button1 = YES, button2 = NO,
+    OnAccept = function() ns.ResetVoices() end,
+    timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+}
+
+--- Ask the program to forget which race voice each character had and hand them out afresh
+--- (/bv reset-voices, asking first).
 function ns.ResetVoices()
     local options = ns.LineOptions()
     ns.Strip.Push(table.concat({ "reset", "", "", "", "", "", options, "-" }, SEP))
@@ -810,6 +819,7 @@ SlashCmdList.BARRENSVOICE = function(msg)
         print("  " .. G .. "/bv test|r — четыре тестовые строки разными голосами")
         print("  " .. G .. "/bv last 5|r — ещё раз прочитать последние 5 строк чата (через текущий словарь)")
         print("  " .. G .. "/bv debug|r — отладка: почему строка чата не прочитана — в журнал компаньона")
+        print("  " .. G .. "/bv reset-voices|r — раздать голоса рас заново (спросит)")
         print("  " .. G .. "/bv help|r — этот список")
     elseif msg == "test" then
         ns.Test()
@@ -825,6 +835,8 @@ SlashCmdList.BARRENSVOICE = function(msg)
             or "отладка выключена."))
     elseif msg == "on" or msg == "off" then
         ns.SetEnabled(msg == "on")
+    elseif msg == "reset-voices" then
+        StaticPopup_Show("BARRENSVOICE_RESET")
     else
         ns.Options.Toggle()
     end

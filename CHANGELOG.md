@@ -70,6 +70,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   Only while the companion was running at login or the last `/reload`: hidden lines nobody reads would be lost. A companion started later makes it transparent at the next `/reload`.
 
+- «Перераздать голоса» is a command now
+
+  `/bv reset-voices` (it asks first, as the button did): handing the race voices out afresh is rarely needed, and «Общее» has the main switch and «Проверка» across its width.
+
 - The links to more Windows voices are rows
 
   RHVoice and Silero on «Голоса» are rows of the same kind as on «Помощь»: the address to see and copy, «Копировать» and «Открыть».

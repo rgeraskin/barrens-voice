@@ -147,16 +147,10 @@ end
 -- windows, and the foldable "Мост".
 local function BuildGeneral(tab, description)
     local y = Describe(tab, description)
-    -- Three buttons of one size in a row: the main switch (green or red), trying the voices, handing
-    -- the race voices out afresh.
-    StaticPopupDialogs["BARRENSVOICE_RESET"] = {
-        text = "Раздать голоса рас заново?\n\nКомпаньон забудет, у кого какой голос был, и выдаст их снова — "
-            .. "так же, без повторов, начиная с тех, кто заговорит первым.",
-        button1 = YES, button2 = NO,
-        OnAccept = function() ns.ResetVoices() end,
-        timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
-    }
-    local W, GAP = 176, 8
+    -- Two buttons of one size across the tab's width: the main switch (green or red) and trying the voices.
+    -- (Handing the race voices out afresh is /bv reset-voices: a thing done once in a blue moon.)
+    local GAP = 8
+    local W = (TEXT_W + 8 - GAP) / 2
     toggle = UI.Button(tab, "", W, function() ns.SetEnabled(not ns.db.enabled) end)
     toggle:SetPoint("TOPLEFT", LEFT, y)
     UI.Tooltip(toggle, "Включить или выключить всю озвучку: мост к компаньону (линию у края экрана) и передачу чата "
@@ -164,9 +158,6 @@ local function BuildGeneral(tab, description)
     local test = UI.Button(tab, "Проверка", W, ns.Test)
     test:SetPoint("TOPLEFT", LEFT + W + GAP, y)
     UI.Tooltip(test, "Четыре тестовые строки разными голосами (/bv test). Все команды — /bv help.")
-    local reset = UI.Button(tab, "Перераздать голоса", W, function() StaticPopup_Show("BARRENSVOICE_RESET") end)
-    reset:SetPoint("TOPLEFT", LEFT + 2 * (W + GAP), y)
-    UI.Tooltip(reset, "Раздать голоса рас заново: у каждого персонажа может оказаться другой голос.")
     y = y - 30
     local get, set = Setting("minimapIcon", function() ns.Minimap.Update() end)
     checks[#checks + 1] = UI.Check(tab, LEFT, y, "Значок у миникарты",
