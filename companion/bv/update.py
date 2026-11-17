@@ -44,24 +44,25 @@ def verify(manifest: bytes, signature: str, public: str = PUBLIC_KEY) -> bool:
         return False
 
 
-def signed_manifest(base: str, fetch=get) -> dict | None:
+def signed_manifest(base: str, fetch=get, public: str = PUBLIC_KEY) -> dict | None:
     """The manifest at `base` if its signature holds, with "base": where its archive is."""
     raw = fetch(base + "manifest.json")
-    if not verify(raw, fetch(base + "manifest.json.sig").decode("ascii", "replace")):
+    if not verify(raw, fetch(base + "manifest.json.sig").decode("ascii", "replace"), public):
         return None
     return {**json.loads(raw), "base": base}
 
 
-def latest(channel: str = "stable", fetch=get) -> dict | None:
-    """The newest signed release of the channel: "stable" (the latest release) or "beta" (pre-releases too)."""
+def latest(channel: str = "stable", fetch=get, public: str = PUBLIC_KEY) -> dict | None:
+    """The newest signed release of the channel: "stable" (the latest release) or "beta" (pre-releases too:
+    the newest release in GitHub's list that carries a manifest; drafts skipped)."""
     if channel != "beta":
-        return signed_manifest(STABLE, fetch)
+        return signed_manifest(STABLE, fetch, public)
     for release in json.loads(fetch(RELEASES)):
         if release.get("draft"):
             continue
         names = {a.get("name") for a in release.get("assets", [])}
         if {"manifest.json", "manifest.json.sig"} <= names:
-            return signed_manifest(f"https://github.com/{REPO}/releases/download/{release['tag_name']}/", fetch)
+            return signed_manifest(f"https://github.com/{REPO}/releases/download/{release['tag_name']}/", fetch, public)
     return None
 
 
@@ -168,14 +169,86 @@ def record_start(root: Path, ran_for: float, failed: bool) -> str | None:
     return state["previous"]
 
 
-def checked_recently(root: Path, every: float, now: float | None = None) -> bool:
-    stamp = root / "data" / "tmp" / "update-checked"
-    now = time.time() if now is None else now
-    try:
-        if now - stamp.stat().st_mtime < every:
-            return True
-    except OSError:
-        pass
-    stamp.parent.mkdir(parents=True, exist_ok=True)
-    stamp.touch()
-    return False
+BUSY = ("downloading", "preparing", "ready")
+
+
+class Updater:
+    """The launcher's update flow without its window (bv/launcher/app.py draws its state and calls it):
+    `check` finds a newer release of the channel and, with automatic updates on, `prepare`s it; `due`
+    says when the prepared version may become current (no game, no voice-over, nothing else on the way);
+    `apply` makes it so. `status`: "" | "downloading" | "preparing" | "ready" | "error" (an error is tried
+    again at the next check)."""
+
+    def __init__(self, root: Path, current: str, settings, say, detail=None, fetch=get, fetch_stream=None,
+                 public: str = PUBLIC_KEY):
+        self.root, self.current, self.settings, self.say = Path(root), current, settings, say
+        self.detail = detail or (lambda m: None)
+        self.fetch, self.fetch_stream, self.public = fetch, fetch_stream, public
+        self.found: dict | None = None
+        self.status = ""
+        self.ready: str | None = None
+
+    def check(self) -> dict | None:
+        """The newer release found now (None when there is none, or it is being made ready already)."""
+        settings = self.settings()
+        try:
+            found = latest(settings.get("update_channel", "stable"), self.fetch, self.public)
+        except Exception as e:  # noqa: BLE001 - offline, GitHub down: the next check
+            if getattr(e, "code", None) != 404:          # 404: no release in this channel yet
+                self.detail(f"проверка обновлений: {e}")
+            return None
+        if found is None:
+            self.say("описание выпуска без верной подписи — не обновляюсь", "WARN")
+            return None
+        if not newer(found["version"], self.current) or self.status in BUSY:
+            return None
+        if self.found is None or self.found["version"] != found["version"]:
+            self.say(f"вышла версия {install.display_version(found['version'])}")
+        self.found = found
+        if settings.get("auto_update", True):
+            self.prepare()
+        return found
+
+    def url(self) -> str | None:
+        """The page of the release found."""
+        if not self.found:
+            return None
+        return f"https://github.com/{REPO}/releases/tag/{install.release_tag(self.found['version'])}"
+
+    def prepare(self) -> str | None:
+        """Download, check and build the release found beside the current version; its version when ready."""
+        found = self.found
+        if not found or self.status in BUSY:
+            return None
+        name = install.display_version(found["version"])
+        try:
+            self.status = "downloading"
+            self.say(f"скачиваю версию {name} ...")
+            archive = download(found, self.root / "cache" / "downloads", fetch_stream=self.fetch_stream)
+            self.status = "preparing"
+            self.say(f"готовлю версию {name} ...")
+            self.ready = prepare(self.root, archive, log=self.detail, manifest=found)
+            self.status = "ready"
+            self.say(f"версия {name} готова — включится после игры")
+            return self.ready
+        except Exception as e:  # noqa: BLE001 - the current version goes on
+            self.status = "error"
+            self.say(f"обновление не удалось: {e}", "WARN")
+            return None
+
+    def due(self, game_running: bool, companion_running: bool, busy: bool) -> bool:
+        """Whether the prepared version may become current now: never under a running game or voice-over."""
+        return bool(self.ready) and not game_running and not companion_running and not busy
+
+    def apply(self) -> str:
+        """app\\current -> the prepared version (the launcher restarts into it: relaunch_command)."""
+        version, self.ready = self.ready, None
+        apply(self.root, version)
+        self.status = ""
+        self.say(f"перехожу на версию {install.display_version(version)}")
+        return version
+
+
+def relaunch_command(starter: str, resident: bool) -> str:
+    """How the launcher starts anew a moment after it ends (cmd waits ~2 s: the old one frees its mutex)."""
+    return f'cmd /c ping -n 3 127.0.0.1 >nul & start "" {starter}' + (" --tray" if resident else "")

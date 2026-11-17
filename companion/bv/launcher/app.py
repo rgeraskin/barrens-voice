@@ -82,8 +82,11 @@ class App:
         self.config = model.read_config()
         self.version = model.app_version()
         self.addon_version = model.addon_version()
-        self.updating = ""               # an update of an install: "downloading", "preparing", "ready", "error"
-        self.update_ready: str | None = None
+        self.updater = None              # an install's updates (bv/update.py Updater); None run from the source
+        if INSTALL_DIR is not None:
+            from ..update import Updater
+            self.updater = Updater(INSTALL_DIR, self.version, lambda: self.config, self.say,
+                                   detail=lambda m: self.incoming.put(f"{datetime.now():%H:%M:%S} DEBUG [обновление] {m}"))
         self.companion_started = 0.0
         self.games = model.find_games(self.config)
         keys = [g.key for g in self.games]
@@ -418,73 +421,35 @@ class App:
         self.redraw()
 
     def _check_update(self) -> None:
-        if INSTALL_DIR is None:                       # run from the source: only tell
+        """On its own thread: an install checks (and prepares) through its Updater; from the source - only tell."""
+        if self.updater is None:
             found = model.latest_release()
             if found and model.newer(found["version"], self.version):
                 self.update = found
                 launcher_log(f"вышла версия {found['version']}")
             return
-        from .. import update
-        try:
-            found = update.latest(self.config.get("update_channel", "stable"))
-        except Exception as e:  # noqa: BLE001 - offline, GitHub down: next hour
-            if getattr(e, "code", None) == 404:      # no release in this channel yet (only pre-releases so far)
-                return
-            launcher_log(f"проверка обновлений: {e}")
-            return
-        if found is None:
-            launcher_log("проверка обновлений: описание выпуска без верной подписи — пропускаю")
-            return
-        if not update.newer(found["version"], self.version) or self.updating:
-            return
-        self.update = {"version": found["version"], "manifest": found,
-                       "url": f"https://github.com/{update.REPO}/releases/tag/v{found['version']}"}
-        self.say(f"вышла версия {display_version(found['version'])}")
-        if self.config.get("auto_update", True):
-            self._prepare_update()
+        if self.updater.check():
+            self.update = {"version": self.updater.found["version"], "url": self.updater.url()}
 
     def start_update(self) -> None:
         """«Обновить»: prepare the new version now (installs); from the source - its release page."""
-        if INSTALL_DIR is None or not self.update or "manifest" not in self.update:
+        if self.updater is None or not self.updater.found:
             webbrowser.open(self.update["url"] if self.update else f"https://github.com/{model.REPO}/releases")
             return
-        if not self.updating:
-            threading.Thread(target=self._prepare_update, daemon=True, name="update").start()
-
-    def _prepare_update(self) -> None:
-        """Download, check and build the new version beside the current one (on its own thread)."""
-        from .. import update
-        found = self.update["manifest"]
-        try:
-            self.updating = "downloading"
-            self.say(f"скачиваю версию {display_version(found['version'])} ...")
-            archive = update.download(found, INSTALL_DIR / "cache" / "downloads")
-            self.updating = "preparing"
-            self.say(f"готовлю версию {display_version(found['version'])} ...")
-            version = update.prepare(INSTALL_DIR, archive, log=lambda m: self.incoming.put(
-                f"{datetime.now():%H:%M:%S} DEBUG [обновление] {m}"), manifest=found)
-            self.update_ready, self.updating = version, "ready"
-            self.say(f"версия {display_version(version)} готова — включится после игры")
-        except Exception as e:  # noqa: BLE001 - the current version goes on
-            self.updating = "error"
-            self.say(f"обновление не удалось: {e}", "WARN")
+        threading.Thread(target=self.updater.prepare, daemon=True, name="update").start()
 
     def apply_update_when_idle(self) -> None:
         """A prepared version becomes current while no game and no companion run; the launcher restarts into it."""
-        if (self.update_ready and not self.running_game and not self.companion.running and not self.busy
-                and INSTALL_DIR is not None):
-            from .. import update
-            version, self.update_ready = self.update_ready, None
-            update.apply(INSTALL_DIR, version)
-            self.say(f"перехожу на версию {display_version(version)}")
+        if self.updater is not None and self.updater.due(bool(self.running_game), self.companion.running, bool(self.busy)):
+            self.updater.apply()
             self.relaunch()
 
     def relaunch(self) -> None:
-        """Start the launcher anew through app\\current (a moment after this one has gone) and end this one."""
+        """Start the launcher anew through the install's starter (a moment after this one has gone); end this one."""
         import subprocess
-        command = starter() + (" --tray" if self.resident else "")
-        subprocess.Popen(f'cmd /c ping -n 3 127.0.0.1 >nul & start "" {command}',
-                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+
+        from ..update import relaunch_command
+        subprocess.Popen(relaunch_command(starter(), self.resident), creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         self.quit()
 
     # --- drawing --------------------------------------------------------------------------------
@@ -499,7 +464,8 @@ class App:
         show_update = bool(self.update) and self.config.get("launcher_dismissed") != self.update["version"]
         games = tuple((g.key, g.addon, str(g.root)) for g in self.games)
         progress = tuple(item for item in list(self.lines)[-400:] if item[1] in MAIN_LEVELS)[-14:]
-        return (tuple(lines), progress, games, self.selected, self.running_game, show_update, self.updating,
+        return (tuple(lines), progress, games, self.selected, self.running_game, show_update,
+                self.updater.status if self.updater else "",
                 self.companion.running,
                 self.config.get("launch_wow"), self.config.get("exit_with_wow"), self.autostart)
 
@@ -596,10 +562,11 @@ class App:
             c.create_text(36, y + 24, text=f"Вышла версия {u['version']}", anchor="w", fill=GOLD, font=(self.title_font, -18))
             c.create_text(200, y + 24, text="— аддон и компаньон", anchor="w", fill=PARCHMENT, font=p.body)
             p.button(W - 236, y + 9, W - 136, y + 39, "Что нового", "news", lambda: webbrowser.open(u["url"]))
-            if self.updating in ("downloading", "preparing", "ready"):
+            status = self.updater.status if self.updater else ""
+            if status in ("downloading", "preparing", "ready"):
                 c.create_text(W - 58, y + 24, anchor="e", fill=PARCHMENT, font=p.small,
                               text={"downloading": "скачивается…", "preparing": "готовится…",
-                                    "ready": "включится после игры"}[self.updating])
+                                    "ready": "включится после игры"}[status])
             else:
                 p.button(W - 128, y + 9, W - 58, y + 39, "Обновить", "update", self.start_update)
             p.button(W - 50, y + 9, W - 30, y + 39, "×", "dismiss", self.dismiss_update)

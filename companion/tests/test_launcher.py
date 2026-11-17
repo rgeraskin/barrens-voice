@@ -517,3 +517,273 @@ class UvInPrepare(unittest.TestCase):
             self.assertEqual(update.uv_version(Path("uv.exe")), "0.13.7")
         with mock.patch("subprocess.run", side_effect=OSError("missing")):
             self.assertIsNone(update.uv_version(Path("uv.exe")))
+
+
+class UpdaterFlow(unittest.TestCase):
+    """The launcher's whole update flow (bv.update.Updater) against a fake GitHub: releases signed with a
+    test key, the environment build stubbed. What breaks here breaks every player's updates."""
+
+    def setUp(self):
+        import base64
+        import io
+        from unittest import mock
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+        self.key = Ed25519PrivateKey.generate()
+        raw = serialization.Encoding.Raw
+        self.public = base64.b64encode(self.key.public_key().public_bytes(raw, serialization.PublicFormat.Raw)).decode()
+        self.tmp = tempfile.TemporaryDirectory()
+        self.d = Path(self.tmp.name)
+        self.root = self.d / "BarrensVoice"
+        (self.root / "app" / "0.4.0").mkdir(parents=True)
+        (self.root / "uv.exe").write_bytes(b"uv")
+        from bv import install
+        install.point_current(self.root, self.root / "app" / "0.4.0")
+        self.files: dict[str, bytes] = {}
+        self.said: list[tuple[str, str]] = []
+        self.settings = {"update_channel": "stable", "auto_update": True}
+        self.build = mock.patch("bv.install.build").start()
+        self.addCleanup(mock.patch.stopall)
+        self.addCleanup(self.tmp.cleanup)
+
+        class Stream(io.BytesIO):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+        self.Stream = Stream
+
+    def publish(self, base: str, version: str, signed_with=None, archive_bytes=None) -> None:
+        """A release at `base`: its archive, manifest and signature, as GitHub serves them."""
+        import base64
+        import hashlib
+        import io
+        import json
+        import zipfile
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            z.writestr("pyproject.toml", f'[project]\nname = "barrens-voice"\nversion = "{version}"\n')
+            z.writestr("uv.lock", "version = 1\n")
+        data = archive_bytes or buf.getvalue()
+        name = f"barrens-voice-{version}.zip"
+        manifest = json.dumps({"version": version, "addon": "0.3.0", "protocol": 1, "archive": name,
+                               "size": len(buf.getvalue()), "sha256": hashlib.sha256(buf.getvalue()).hexdigest()}).encode()
+        self.files[base + name] = data
+        self.files[base + "manifest.json"] = manifest
+        self.files[base + "manifest.json.sig"] = base64.b64encode((signed_with or self.key).sign(manifest))
+
+    def fetch(self, url):
+        if url not in self.files:
+            import urllib.error
+            raise urllib.error.HTTPError(url, 404, "Not Found", {}, None)
+        return self.files[url]
+
+    def updater(self, current="0.4.0"):
+        from bv import update
+        return update.Updater(self.root, current, lambda: self.settings, lambda m, level="INFO": self.said.append((level, m)),
+                              fetch=self.fetch, fetch_stream=lambda req, timeout=0: self.Stream(self.fetch(req.full_url)),
+                              public=self.public)
+
+    def test_found_prepared_applied_when_idle(self):
+        from bv import install, update
+        self.publish(update.STABLE, "0.4.1")
+        u = self.updater()
+        self.assertEqual(u.check()["version"], "0.4.1")
+        self.assertEqual((u.status, u.ready), ("ready", "0.4.1"))
+        self.assertTrue((self.root / "app" / "0.4.1" / "uv.lock").is_file())       # unpacked beside
+        self.assertEqual(install.current_version(self.root), "0.4.0")              # not current yet
+        self.assertFalse(u.due(game_running=True, companion_running=False, busy=False))
+        self.assertFalse(u.due(game_running=False, companion_running=True, busy=False))
+        self.assertFalse(u.due(game_running=False, companion_running=False, busy=True))
+        self.assertTrue(u.due(game_running=False, companion_running=False, busy=False))
+        self.assertEqual(u.apply(), "0.4.1")
+        self.assertEqual(install.current_version(self.root), "0.4.1")
+        self.assertTrue(update.state_path(self.root).is_file())                    # watched for a failed start
+        self.assertIsNone(u.ready)
+
+    def test_nothing_newer(self):
+        from bv import update
+        for version in ("0.4.0", "0.3.9", "0.4.0b9"):                               # same, older, its own beta
+            self.files.clear()
+            self.publish(update.STABLE, version)
+            self.assertIsNone(self.updater().check(), version)
+        self.build.assert_not_called()
+
+    def test_bad_signature_refused(self):
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+        from bv import update
+        self.publish(update.STABLE, "0.4.1", signed_with=Ed25519PrivateKey.generate())
+        u = self.updater()
+        self.assertIsNone(u.check())
+        self.assertIn("WARN", [level for level, _ in self.said])
+        self.assertFalse((self.root / "app" / "0.4.1").exists())
+
+    def test_tampered_archive_refused_and_tried_again(self):
+        from bv import update
+        self.publish(update.STABLE, "0.4.1", archive_bytes=b"not what the manifest says")
+        u = self.updater()
+        u.check()
+        self.assertEqual(u.status, "error")
+        self.assertFalse((self.root / "app" / "0.4.1").exists())
+        self.publish(update.STABLE, "0.4.1")                                         # fixed upstream
+        u.check()                                                                    # an error does not block the next try
+        self.assertEqual(u.status, "ready")
+
+    def test_no_release_yet_is_quiet(self):
+        self.assertIsNone(self.updater().check())                                    # 404: only pre-releases so far
+        self.assertEqual(self.said, [])
+
+    def test_manual_when_automatic_is_off(self):
+        from bv import update
+        self.settings["auto_update"] = False
+        self.publish(update.STABLE, "0.4.1")
+        u = self.updater()
+        self.assertEqual(u.check()["version"], "0.4.1")
+        self.assertEqual(u.status, "")                                               # only told
+        self.assertEqual(u.prepare(), "0.4.1")                                       # «Обновить»
+
+    def test_beta_channel_picks_the_newest_published(self):
+        import json
+        from bv import update
+        self.settings["update_channel"] = "beta"
+        base = f"https://github.com/{update.REPO}/releases/download/"
+        self.publish(base + "v0.4.1-beta.2/", "0.4.1b2")
+        self.publish(base + "v0.4.0/", "0.4.0")
+        listing = [{"tag_name": "v0.4.1-beta.3", "draft": True, "assets": [{"name": "manifest.json"}, {"name": "manifest.json.sig"}]},
+                   {"tag_name": "v0.4.1-beta.9", "draft": False, "assets": []},     # no manifest (a broken upload)
+                   {"tag_name": "v0.4.1-beta.2", "draft": False, "assets": [{"name": "manifest.json"}, {"name": "manifest.json.sig"}]},
+                   {"tag_name": "v0.4.0", "draft": False, "assets": [{"name": "manifest.json"}, {"name": "manifest.json.sig"}]}]
+        self.files[update.RELEASES] = json.dumps(listing).encode()
+        u = self.updater()
+        self.assertEqual(u.check()["version"], "0.4.1b2")
+        self.assertEqual(u.url(), f"https://github.com/{update.REPO}/releases/tag/v0.4.1-beta.2")
+
+    def test_relaunch_command(self):
+        from bv.update import relaunch_command
+        self.assertEqual(relaunch_command('"C:\\BV\\Barrens Voice.exe"', resident=True),
+                         'cmd /c ping -n 3 127.0.0.1 >nul & start "" "C:\\BV\\Barrens Voice.exe" --tray')
+        self.assertTrue(relaunch_command('"x.exe"', resident=False).endswith('start "" "x.exe"'))
+
+
+class ReleaseBuild(unittest.TestCase):
+    """tools/release.py: what CI publishes is what bv.install puts in place."""
+
+    def build(self, tag, exe=None):
+        import importlib
+        import sys
+        from unittest import mock
+        root = Path(__file__).resolve().parents[2]
+        sys.path.insert(0, str(root / "tools"))
+        release = importlib.import_module("release")
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        dist = Path(tmp.name)
+        if exe is not None:
+            (dist / "Barrens Voice.exe").write_bytes(exe)
+        uv = {"version": "0.13.7", "url": "https://x/uv.zip", "sha256": "0" * 64}
+        with mock.patch.object(release, "DIST", dist), mock.patch.object(release, "uv_entry", return_value=uv), \
+             mock.patch.dict("os.environ", {"RELEASE_TAG": tag} if tag else {}, clear=False):
+            if not tag:
+                os.environ.pop("RELEASE_TAG", None)
+            archive = release.build()
+        import json
+        return archive, json.loads((dist / "manifest.json").read_text(encoding="utf-8"))
+
+    def test_beta_build_installs(self):
+        import hashlib
+        import zipfile
+        from unittest import mock
+        from bv import install, paths
+        archive, manifest = self.build("v0.4.0-beta.7", exe=b"starter")
+        self.assertEqual((archive.name, manifest["version"]), ("barrens-voice-0.4.0b7.zip", "0.4.0b7"))
+        data = archive.read_bytes()
+        self.assertEqual((manifest["size"], manifest["sha256"]), (len(data), hashlib.sha256(data).hexdigest()))
+        self.assertIn("uv", manifest)
+        with zipfile.ZipFile(archive) as z:
+            names = set(z.namelist())
+            self.assertIn('version = "0.4.0b7"', z.read("pyproject.toml").decode())
+        for need in ("pyproject.toml", "uv.lock", "LICENSE", "Barrens Voice.exe", "companion/BarrensVoice.pyw",
+                     "companion/bv/__main__.py", "companion/bv/update.py", "companion/bv/launcher/app.py",
+                     "addon/BarrensVoice/BarrensVoice.toc"):
+            self.assertIn(need, names)
+        self.assertFalse(any(n.startswith("companion/tests/") or "__pycache__" in n for n in names))
+        with tempfile.TemporaryDirectory() as d, mock.patch("bv.install.build"):
+            root = Path(d) / "BarrensVoice"
+            self.assertEqual(install.install(root, archive, "cuda", Path(d) / "uv.exe", log=lambda *a: None), "0.4.0b7")
+            self.assertEqual((root / "Barrens Voice.exe").read_bytes(), b"starter")
+            code = Path(os.path.realpath(root / "app" / "current" / "companion"))
+            self.assertEqual(paths.layout(code, {})["root"], root.resolve())
+
+    def test_tag_must_name_the_version(self):
+        with self.assertRaises(SystemExit):
+            self.build("v9.9.9")
+        _, manifest = self.build("")
+        self.assertNotIn("b", manifest["version"])                                  # no tag: pyproject's own
+
+
+class UvSyncFails(unittest.TestCase):
+    def test_build_raises_on_uv_error(self):
+        from unittest import mock
+        from bv import install
+
+        class Proc:
+            stdout = iter(["error: no network\n"])
+            returncode = 2
+
+            def wait(self):
+                return 2
+        said = []
+        with tempfile.TemporaryDirectory() as d, mock.patch("subprocess.Popen", return_value=Proc()):
+            with self.assertRaises(RuntimeError):
+                install.build(Path(d), Path(d) / "app" / "0.4.1", "cuda", Path(d) / "uv.exe", log=said.append)
+        self.assertTrue(any("no network" in s for s in said))                       # uv's own words in the log
+
+
+class OldClients(unittest.TestCase):
+    """A release must install through the update code players already have (tests/compat: frozen copies of
+    released clients). A change to the archive or the manifest that an old client cannot take strands it."""
+
+    def test_beta5_client_installs_a_new_release(self):
+        import base64
+        import io
+        import json
+        from unittest import mock
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+        from compat.v0_4_0b5 import install as old_install, update as old_update
+        from bv import install
+        archive, manifest = ReleaseBuild.build(self, "v0.4.0-beta.7", exe=b"starter")
+        base = "https://example/download/"
+        raw = json.dumps(manifest).encode()
+        key = Ed25519PrivateKey.generate()
+        public = base64.b64encode(key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)).decode()
+        files = {base + "manifest.json": raw, base + "manifest.json.sig": base64.b64encode(key.sign(raw)),
+                 base + archive.name: archive.read_bytes()}
+
+        class Stream(io.BytesIO):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d) / "BarrensVoice"
+            (root / "app" / "0.4.0b5").mkdir(parents=True)
+            (root / "uv.exe").write_bytes(b"uv")
+            old_install.point_current(root, root / "app" / "0.4.0b5")
+            real_verify = old_update.verify      # its default key is bound at definition: give it the test key
+            with mock.patch.object(old_update, "verify", lambda m, s, *a: real_verify(m, s, public)):
+                found = old_update.signed_manifest(base, fetch=files.__getitem__)       # the old client reads it
+                self.assertIsNotNone(found)
+                self.assertTrue(old_update.newer(found["version"], "0.4.0b5"))
+                got = old_update.download(found, root / "cache" / "downloads",
+                                          fetch_stream=lambda req, timeout=0: Stream(files[req.full_url]))
+                with mock.patch.object(old_install, "build") as build:
+                    version = old_update.prepare(root, got)
+                    build.assert_called_once()
+                old_update.apply(root, version)
+            self.assertEqual(install.current_version(root), "0.4.0b7")                 # the old client switched
+            from bv.paths import CODE_DIR  # noqa: F401 - the new launcher's start puts its starter in place
+            install.place_starter(root, root / "app" / "0.4.0b7")
+            self.assertEqual((root / "Barrens Voice.exe").read_bytes(), b"starter")
