@@ -173,38 +173,51 @@ function ns.Off()
     return true
 end
 
--- The player's dictionary layer (their edits of the default: Dictionary.D.UserLayer) goes to the
+-- The player's dictionary layer (their edits of the default: Dictionary.D.SentLayer) goes to the
 -- program over the strip, in parts of at most DICT_PART bytes (cut at line ends), tagged with a
 -- checksum of the whole layer: "id=..;part=i;of=n". Sent when it changes (2 s after the last edit),
 -- at login, and every 2 minutes when it changed in this session (else a program started after the
 -- game reads the same layer from the saved variables, which the game writes on /reload and logout).
--- The default itself the program reads from Dictionary.lua. A line longer than a part is not sent:
--- cut, a regex would be another rule (or a broken one); the player is told once.
-local DICT_PART = 480
+-- The default itself the program reads from Dictionary.lua. A line longer than a part is left out of the
+-- layer (D.SentLayer: of the frames, their id and the saved variables' copy alike); the player is told.
+local DICT_PART = ns.Dictionary.MAX_LINE
 local lastLayer
-local toldLong = {}
+local longBefore = {}   -- the layer's long lines at the last send
 
---- The layer as sent and its id (CRC-16, hex).
+--- The layer as sent, its id (CRC-16, hex) and the lines left out of it.
 local function LayerSet()
-    local text = ns.Dictionary.UserLayer()
+    local text, long = ns.Dictionary.SentLayer()
     local bytes = {}
     for i = 1, #text do bytes[i] = text:byte(i) end
-    return text, ("%04x"):format(ns.Protocol.CRC16(bytes))
+    return text, ("%04x"):format(ns.Protocol.CRC16(bytes)), long
+end
+
+--- Tell the player of a line left out of the layer - once, not at every pause while they type it: only
+--- when the layer has more long lines than at the last send.
+local function TellLong(long)
+    local seen = {}
+    for _, line in ipairs(longBefore) do seen[line] = true end
+    if #long > #longBefore then
+        for _, line in ipairs(long) do
+            if not seen[line] then
+                -- "|" starts the chat's markup: "||" shows one (a regex is full of them)
+                print(PREFIX .. ("строка словаря длиннее %d байт, компаньону она не передаётся. Разбейте её на "
+                    .. "несколько: %s…"):format(DICT_PART, (ns.Protocol.TrimUTF8(line, 60):gsub("|", "||"))))
+                break
+            end
+        end
+    end
+    longBefore = long
 end
 
 function ns.SendDictionary(force)
-    local text, id = LayerSet()
+    local text, id, long = LayerSet()
+    TellLong(long)
     if not force and id == lastLayer then return end
     lastLayer = id
     local parts, current = {}, ""
     for line in (text .. "\n"):gmatch("(.-)\n") do
-        if #line > DICT_PART then
-            if not toldLong[line] then
-                toldLong[line] = true
-                print(PREFIX .. ("строка словаря длиннее %d байт, компаньону она не передаётся. Разбейте её на "
-                    .. "несколько: %s…"):format(DICT_PART, ns.Protocol.TrimUTF8(line, 60)))
-            end
-        elseif current ~= "" and #current + 1 + #line > DICT_PART then
+        if current ~= "" and #current + 1 + #line > DICT_PART then
             parts[#parts + 1] = current
             current = line
         else

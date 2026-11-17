@@ -240,9 +240,27 @@ for line in ns.Dictionary.UserLayer():gmatch("[^\n]+") do if line ~= long then k
 local withoutLong = table.concat(kept, "\n")
 assert(#kept == 40 and ns.Dictionary.UserLayer():find(long, 1, true), "the long line is in the layer")
 assert(parts() == withoutLong, "the rest goes whole")
+-- left out alike of the frames, their id and the saved variables (read when the frames have not come)
+assert(ns.db.dictionaryUser == withoutLong, "the saved variables keep the layer as sent")
+local crcBytes = {}
+for i = 1, #withoutLong do crcBytes[i] = withoutLong:byte(i) end
+assert(sent[1]:find(("\31id=%04x;"):format(ns.Protocol.CRC16(crcBytes))), "the id is the sent layer's: " .. sent[1]:sub(1, 80))
 ns.SendDictionary(true)
+-- typed on, with pauses (each sends the layer 2 s after the last key): told once, not at every pause
+for i = 1, 4 do
+    ns.Dictionary.SetText(many .. long .. (" ещё"):rep(i) .. "\n")
+    ns.SendDictionary(false)
+end
 print = print0
 assert(#toldLong == 1 and toldLong[1]:find("длиннее 480 байт", 1, true), toldLong[1] or "not told")
+-- the line as the chat shows it: its "|" doubled, or the chat takes them for markup
+assert(toldLong[1]:find("(?:сказала?||говорит||пишет)", 1, true), toldLong[1])
+-- a second long line is news
+print = function(t) toldLong[#toldLong + 1] = t end
+ns.Dictionary.SetText(many .. long .. "\n" .. long:gsub("слишком", "очень") .. "\n")
+ns.SendDictionary(false)
+print = print0
+assert(#toldLong == 2 and toldLong[2]:find("длиннее 480 байт", 1, true), "a new long line: " .. #toldLong)
 ns.Dictionary.Reset()
 print("dictionary parts ok")
 

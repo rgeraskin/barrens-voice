@@ -358,7 +358,7 @@ end
 --- from this file, so a new default works without a /reload.
 function D.Rebuild()
     if ns.DictionaryChanged then ns.DictionaryChanged() end
-    ns.db.dictionaryUser = D.UserLayer()
+    ns.db.dictionaryUser = (D.SentLayer())
 end
 
 -- Layers. The default (D.DEFAULT) lives in the addon; the player's dictionary is the default with
@@ -504,6 +504,24 @@ function D.UserLayer()
     end
     table.sort(out)
     return #out > 0 and table.concat(out, "\n") or "-"
+end
+
+-- The longest line of the layer the program gets: the strip carries the layer in parts of this many
+-- bytes (Core.lua ns.SendDictionary), and a longer line cut would be another rule, or a broken one.
+D.MAX_LINE = 480
+
+--- The player's layer as the program gets it, over the strip and from the saved variables alike (so a
+--- rule never works in one session and not in the next): D.UserLayer without its lines longer than
+--- D.MAX_LINE; "-" for none. Those lines are the second result.
+function D.SentLayer()
+    local kept, long = {}, {}
+    local layer = D.UserLayer()
+    if layer ~= "-" then
+        for line in (layer .. "\n"):gmatch("(.-)\n") do
+            if #line > D.MAX_LINE then long[#long + 1] = line else kept[#kept + 1] = line end
+        end
+    end
+    return #kept > 0 and table.concat(kept, "\n") or "-", long
 end
 
 --- Back to the default: no edits.
