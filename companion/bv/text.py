@@ -134,6 +134,8 @@ NUMBERED = {"уровень", "этаж", "число", "ранг", "фаза", 
 # a numbered noun whose singular the stress model takes for the plural ("числ+а" - "two numbers"):
 # after an ordinal it is the singular, stressed here
 SINGULAR_STRESS = {"числа": "ч+исла", "места": "м+еста"}
+# a number that goes on from the one before it - a time, a decimal, a version: neither an ordinal nor agreeing
+GLUED = re.compile(r"\d[:.,]$")
 PREV_WORD = re.compile(r"(?<![\w'+-])([а-яёА-ЯЁ]+(?:-[а-яёА-ЯЁ]+)?)\s+$")   # a whole word, as morph.PREVIOUS
 # the cases a preposition asks of the word after it (only those a count never takes in the singular)
 GOVERNS = {**dict.fromkeys(("с", "со"), {"gent", "ablt"}),
@@ -301,6 +303,8 @@ def numbers_to_words(text: str) -> str:
         if LETTERS_AFTER.match(m.string, m.end()):
             return spoken + " ", m.end()                # "200ХП" - "двести ХП"
         following = NEXT_WORD.match(m.string, m.end())
+        if GLUED.search(m.string, 0, m.start()):
+            following = None                           # "20:00 сбор", "1.12 патч": no "нулевой сбор"
         if morph is not None and following and following.group(1).lower() in SIGNS:
             # "от 50+" - "от пятидесяти плюс"; "на 3+ человек" stays "на три плюс" (the accusative)
             case = "gent" if "gent" in GOVERNS.get(before.lower(), set()) else None
