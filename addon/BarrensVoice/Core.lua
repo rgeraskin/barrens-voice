@@ -315,18 +315,6 @@ function ns.Effective(value, base)
     return math.floor((value or 100) * base + 0.5)
 end
 
---- A saved setting from before the sliders' 100 stood for a base (the program's own scale): the same
---- sound as before, on the new scale, to the step of 5.
-function ns.MigrateScale(db)
-    if db.scale == 1 then return end
-    local function convert(v, base, hi)
-        return math.max(0, math.min(hi, math.floor((v / base) / 5 + 0.5) * 5))
-    end
-    if type(db.rate) == "number" then db.rate = math.max(40, convert(db.rate, ns.RATE_BASE, 160)) end
-    if type(db.volume) == "number" then db.volume = convert(db.volume, ns.VOLUME_BASE, 200) end
-    db.scale = 1
-end
-
 function ns.LineOptions(voice)
     return ("rate=%d;vol=%d;voice=%s"):format(ns.Effective(ns.db.rate, ns.RATE_BASE),
         ns.Effective(ns.db.volume, ns.VOLUME_BASE), voice or ns.db.voices or "f5")
@@ -728,9 +716,6 @@ local function Release(version) return (version:gsub("b%d+$", "")) end
 ns.NEWS = {
     ["0.4.0"] = "Barrens Voice ставится установщиком и обновляется сам, вместе с аддоном, мост к компаньону теперь "
         .. "внизу экрана, стандартный словарь обновляется без обновления аддона, в настройках появилась вкладка «Помощь»",
-    ["0.3.0"] = "ритейл WoW с голосами всех его рас, окно чата можно прятать, пока на нём нет мыши, настройки во "
-        .. "вкладках, чат ждёт и Wayfarer, «ё» в словах из чата ставится сама",
-    ["0.2.1"] = "мост к компаньону можно перенести",
 }
 
 --- The word at login: the welcome on the first run, a line on what is new after an update (the
@@ -749,7 +734,7 @@ function ns.LoginWord()
         print(PREFIX .. HELP_HINT)
     end
     ns.db.seenVersion = version
-    if ns.Companion then ns.Companion.SayAtLogin() end      -- a file new in 0.2.1: after a game restart
+    ns.Companion.SayAtLogin()
 end
 
 --- The first run's word (as CatQuest does it): what this is, that it needs the companion app, where
@@ -782,7 +767,7 @@ function ns.SetEnabled(enabled)
     end
     if ns.Minimap then ns.Minimap.Refresh() end
     if ns.Options.Refresh then ns.Options.Refresh() end
-    if ns.ChatFade then ns.ChatFade.Apply() end     -- the chat is not read aloud: show it
+    ns.ChatFade.Apply()     -- the chat is not read aloud: show it
     print(PREFIX .. "озвучка чата " .. (ns.db.enabled and "включена" or "выключена"))
 end
 
@@ -801,13 +786,12 @@ local function OnEvent(self, event, name, ...)
         ns.firstRun = BarrensVoiceDB == nil   -- no saved settings yet: a welcome at login
         BarrensVoiceDB = Merge(BarrensVoiceDB or {}, ns.DEFAULTS)
         ns.db = BarrensVoiceDB
-        if ns.firstRun then ns.db.scale = 1 else ns.MigrateScale(ns.db) end   -- settings of the program's own scale
         ns.RestoreHistory()
         ns.Dictionary.Migrate(ns.db)
         ns.Dictionary.Rebuild()
         ns.Strip.Initialize()
         ns.Options.Initialize()
-        if ns.ChatFade then ns.ChatFade.Initialize() end   -- a file new in 0.2.1: loaded after a game restart
+        ns.ChatFade.Initialize()
         ns.Minimap.Update()
         self:UnregisterEvent("ADDON_LOADED")
         for e in pairs(EVENTS) do self:RegisterEvent(e) end

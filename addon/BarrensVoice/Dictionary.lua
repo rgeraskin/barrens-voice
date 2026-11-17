@@ -354,7 +354,6 @@ end
 function D.Rebuild()
     if ns.DictionaryChanged then ns.DictionaryChanged() end
     ns.db.dictionaryUser = D.UserLayer()
-    ns.db.regexes = nil
 end
 
 -- Layers. The default (D.DEFAULT) lives in the addon; the player's dictionary is the default with

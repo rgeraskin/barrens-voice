@@ -645,35 +645,25 @@ print("companion ok")
 -- the word at login: the welcome on the first run, a line after an update, then the companion's line
 local welcome, plainPrint = {}, print
 print = function(text) welcome[#welcome + 1] = text end
-GetAddOnMetadata = function() return "0.3.0" end
+GetAddOnMetadata = function() return "0.4.0b1" end
 ns.firstRun, ns.db.seenVersion = true, nil
 ns.LoginWord()
 assert(#welcome == 5 and welcome[1]:find("добро пожаловать") and welcome[2]:find("приложение%-компаньон")
     and welcome[4]:find("«Помощь»", 1, true) and welcome[5]:find("озвучка чата"), "welcome, then whether the reading works")
-assert(ns.db.seenVersion == "0.3.0", "the version is kept")
+assert(ns.db.seenVersion == "0.4.0b1", "the version is kept")
 ns.firstRun = false
 welcome = {}
 ns.LoginWord()
 assert(#welcome == 1 and welcome[1]:find("озвучка чата"), "the same version again: only whether the reading works")
-welcome = {}
-ns.db.seenVersion = "0.2.1"                  -- an update
-ns.LoginWord()
-assert(#welcome == 3 and welcome[1]:find("обновление 0.3.0: ритейл WoW") and welcome[2]:find("«Помощь»", 1, true),
-    tostring(welcome[1]))
-ns.db.seenVersion = nil                      -- from a version before the line was there: the line too
+GetAddOnMetadata = function() return "0.4.0b2" end                   -- a test build: shown so, its release's news
 welcome = {}
 ns.LoginWord()
-assert(#welcome == 3 and welcome[1]:find("обновление 0.3.0"), "an update from before 0.2.1")
+assert(#welcome == 3 and welcome[1]:find("обновление 0.4.0 beta 2: Barrens Voice ставится установщиком", 1, true)
+    and welcome[2]:find("«Помощь»", 1, true), tostring(welcome[1]))
 GetAddOnMetadata = function() return "9.9.9" end
-ns.db.seenVersion = "0.2.1"
 welcome = {}
 ns.LoginWord()
 assert(welcome[1]:find("что нового — в описании аддона"), "a version with no news of its own")
-GetAddOnMetadata = function() return "0.4.0b1" end                   -- a test build: shown so, its release's news
-ns.db.seenVersion = "0.3.0"
-welcome = {}
-ns.LoginWord()
-assert(welcome[1]:find("обновление 0.4.0 beta 1: Barrens Voice ставится установщиком", 1, true), tostring(welcome[1]))
 GetAddOnMetadata = nil
 print = plainPrint
 print("welcome ok")
@@ -756,19 +746,8 @@ ns.db.rate, ns.db.volume = 160, 200
 assert(ns.LineOptions():find("rate=200;vol=240;", 1, true), "the top of the sliders is within the program's limits: " .. ns.LineOptions())
 ns.db.rate, ns.db.volume = 40, 0
 assert(ns.LineOptions():find("rate=50;vol=0;", 1, true), ns.LineOptions())
-local old = { rate = 125, volume = 120 }              -- saved before: the same sound is 100 and 100 now
-ns.MigrateScale(old)
-assert(old.rate == 100 and old.volume == 100 and old.scale == 1, old.rate .. " " .. old.volume)
-old = { rate = 200, volume = 200 }                    -- the program's top: the sliders' top
-ns.MigrateScale(old)
-assert(old.rate == 160 and old.volume == 165, old.rate .. " " .. old.volume)
-old = { rate = 100, volume = 100 }
-ns.MigrateScale(old)
-assert(old.rate == 80 and old.volume == 85, "100 of the program's own scale: " .. old.rate .. " " .. old.volume)
-ns.MigrateScale(old)
-assert(old.rate == 80, "migrated once")
 ns.db.rate, ns.db.volume = 100, 100
-print("scale ok")
+print("sliders ok")
 
 -- channel labels carry the client's own slash commands, the fallback where the client has none
 SLASH_PARTY1, SLASH_PARTY2, SLASH_PARTY3 = "/гр", "/группа", "/p"

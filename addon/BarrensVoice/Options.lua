@@ -88,7 +88,7 @@ local function Refresh()
     if not window then return end
     toggle:SetText(ns.db.enabled and "|cff40ff40Озвучка чата включена|r" or "|cffff5050Озвучка чата выключена|r")
     if programState then
-        programState:SetText(ns.Companion and ns.Companion.Describe() or "|cffaaaaaaКомпаньон: не проверить|r")
+        programState:SetText(ns.Companion.Describe())
     end
     for _, c in ipairs(checks) do c.refresh() end
     for _, c in ipairs(numbered) do UI.SetCheckEnabled(c, ns.db.channels) end
@@ -212,7 +212,7 @@ local function BuildGeneral(tab, description)
         "Громкость озвучки, от 0 до 200 %: действует со следующей строки.")
 
     y = UI.Header(tab, "Окно чата", y)
-    get, set = Setting("fadeChat", function() if ns.ChatFade then ns.ChatFade.Apply() end Refresh() end)
+    get, set = Setting("fadeChat", function() ns.ChatFade.Apply() Refresh() end)
     checks[#checks + 1] = UI.Check(tab, LEFT, y, "Прятать окно чата, пока на нём нет мыши", "Чат и так "
         .. "звучит: окна чата (текст, фон, вкладки, поле ввода) прозрачны, пока на них не наведена мышь и вы ничего "
         .. "не пишете. Строка, которую компаньон не читает вслух — системное сообщение, добыча, выключенный канал, "
@@ -250,15 +250,9 @@ local function BuildGeneral(tab, description)
         Resize()
     end
     fold:SetScript("OnClick", function() Fold(not bridge:IsShown()) end)
-    if ns.StripWindow then
-        bridgeHeight = ns.StripWindow.Create(bridge, function() Fold(false) end)
-        bridge:SetHeight(bridgeHeight)
-        O.Bridge = Fold
-    else   -- a file new to the addon: the game loads it only after a restart, not on /reload
-        fold:SetScript("OnClick", function()
-            print("|cff40c0ffBarrens Voice:|r раздел «Мост» появится после перезапуска игры.")
-        end)
-    end
+    bridgeHeight = ns.StripWindow.Create(bridge, function() Fold(false) end)
+    bridge:SetHeight(bridgeHeight)
+    O.Bridge = Fold
     fold:SetText("Мост к компаньону…")
     y = y - 34
     return -y

@@ -193,7 +193,7 @@ end
 
 --- Was the companion reading the chat at login or the last /reload (Companion.lua)?
 function F.Voiced()
-    return not ns.Companion or ns.Companion.State() == "running"
+    return ns.Companion.State() == "running"
 end
 
 --- Start or stop fading as the setting (and the addon's main switch) says - and the companion.
