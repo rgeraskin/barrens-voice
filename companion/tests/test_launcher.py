@@ -458,3 +458,62 @@ class ReleaseUv(unittest.TestCase):
                     update.release_uv(root, {"uv": {**want["uv"], "sha256": "0" * 64}}, log=lambda *a: None,
                                       fetch=lambda u: data)
             self.assertEqual(update.release_uv(root, {}), root / "uv.exe")                          # an old manifest
+
+
+class UvInPrepare(unittest.TestCase):
+    """prepare() with a release naming another uv: replaced after a good build, kept after a failed one."""
+
+    def setUp(self):
+        import hashlib
+        import io
+        import zipfile
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            z.writestr("uv.exe", b"new uv")
+        self.data = buf.getvalue()
+        self.manifest = {"uv": {"version": "0.14.0", "url": "https://x/uv.zip",
+                                "sha256": hashlib.sha256(self.data).hexdigest()}}
+
+    def release(self, d: Path) -> Path:
+        import zipfile
+        archive = d / "barrens-voice-0.4.1.zip"
+        with zipfile.ZipFile(archive, "w") as z:
+            z.writestr("pyproject.toml", '[project]\nname = "barrens-voice"\nversion = "0.4.1"\n')
+            z.writestr("uv.lock", "version = 1\n")
+        return archive
+
+    def run_prepare(self, build):
+        from unittest import mock
+        from bv import update
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d) / "BarrensVoice"
+            (root / "app").mkdir(parents=True)
+            (root / "uv.exe").write_bytes(b"old uv")
+            with mock.patch("bv.update.uv_version", return_value="0.13.7"), \
+                 mock.patch("bv.update.get", return_value=self.data), \
+                 mock.patch("bv.install.build", side_effect=build):
+                try:
+                    update.prepare(root, self.release(Path(d)), log=lambda *a: None, manifest=self.manifest)
+                except RuntimeError:
+                    pass
+            return (root / "uv.exe").read_bytes(), (root / "uv.new.exe").exists()
+
+    def test_good_build_replaces_uv(self):
+        used = []
+        uv, leftover = self.run_prepare(lambda root, folder, runtime, uv, log: used.append(uv.name))
+        self.assertEqual(used, ["uv.new.exe"])                     # the version was built with the new uv
+        self.assertEqual((uv, leftover), (b"new uv", False))
+
+    def test_failed_build_keeps_the_old_uv(self):
+        def fail(*a):
+            raise RuntimeError("uv sync failed")
+        self.assertEqual(self.run_prepare(fail), (b"old uv", False))
+
+    def test_uv_version_parsed(self):
+        from unittest import mock
+        from bv import update
+        done = mock.Mock(stdout="uv 0.13.7 (316c827e0 2026-11-03 x86_64-pc-windows-msvc)\n")
+        with mock.patch("subprocess.run", return_value=done):
+            self.assertEqual(update.uv_version(Path("uv.exe")), "0.13.7")
+        with mock.patch("subprocess.run", side_effect=OSError("missing")):
+            self.assertIsNone(update.uv_version(Path("uv.exe")))

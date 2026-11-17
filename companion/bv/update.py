@@ -101,7 +101,7 @@ def uv_version(uv: Path) -> str | None:
         return None
 
 
-def release_uv(root: Path, manifest: dict, log=print, fetch=get) -> Path:
+def release_uv(root: Path, manifest: dict, log=print, fetch=None) -> Path:
     """The uv the release names (manifest "uv"): the installed uv.exe when it is that version, else that
     one downloaded, checked against the signed manifest's SHA-256 and unpacked beside as uv.new.exe."""
     import io
@@ -110,7 +110,7 @@ def release_uv(root: Path, manifest: dict, log=print, fetch=get) -> Path:
     if not want or uv_version(current) == want.get("version"):
         return current
     log(f"uv {want['version']} ...")
-    data = fetch(want["url"])
+    data = (fetch or get)(want["url"])
     if hashlib.sha256(data).hexdigest() != want.get("sha256"):
         raise ValueError("uv не совпал с подписанным описанием выпуска — не ставлю")
     fresh = root / "uv.new.exe"
@@ -124,7 +124,12 @@ def prepare(root: Path, archive: Path, log=print, manifest: dict | None = None) 
     which then replaces the installed one); not made current yet."""
     version, folder = install.unpack(archive, root)
     uv = release_uv(root, manifest or {}, log)
-    install.build(root, folder, install.runtime_of(root), uv, log)
+    try:
+        install.build(root, folder, install.runtime_of(root), uv, log)
+    except BaseException:
+        if uv.name == "uv.new.exe":                # the new uv failed: the installed one stays, nothing left over
+            uv.unlink(missing_ok=True)
+        raise
     if uv.name == "uv.new.exe":
         os.replace(uv, root / "uv.exe")
     return version
