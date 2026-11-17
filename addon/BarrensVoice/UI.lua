@@ -114,7 +114,7 @@ function UI.LinkRow(parent, x, y, width, key, icon)
     end
     local name = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     name:SetPoint("TOPLEFT", left, y - 4)
-    name:SetWidth(70)
+    name:SetWidth(84)
     name:SetJustifyH("LEFT")
     name:SetText(link[1])
     local open = UI.Button(parent, "Открыть", 76, function() ns.OpenLink(key) end)

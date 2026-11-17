@@ -6,6 +6,7 @@ from __future__ import annotations
 import webbrowser
 
 LINKS = {
+    "community": "https://launch.battle.net/invite/N9KR2WNHDgW",
     "discord": "https://discord.gg/hxpuTQF2Bb",
     "telegram": "https://t.me/+NwReoOS9x7hhYjgy",
     "github": "https://github.com/rgeraskin/barrens-voice/issues",

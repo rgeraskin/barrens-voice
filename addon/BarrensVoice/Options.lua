@@ -360,15 +360,19 @@ local function BuildVoices(tab, description)
     return -(y - 22 - GAP) + ns.VoicesWindow.Create(pane, TEXT_W) + LIST
 end
 
--- "Помощь": where to write about bugs, ideas and words read wrong.
+-- "Помощь": where to write about bugs, ideas and words read wrong - the community in Battle.net first.
 local MEDIA = "Interface\\AddOns\\BarrensVoice\\Media\\"
+local HELP_LINKS = {
+    { "community", "Interface\\FriendsFrame\\Battlenet-Portrait" },   -- the game's own Battle.net icon
+    { "discord", MEDIA .. "discord" }, { "telegram", MEDIA .. "telegram" }, { "github", MEDIA .. "github" },
+}
 local function BuildHelp(tab, description)
     -- three blocks a GAP apart, and the window ending a GAP under the last: the description, the
     -- links, what to send
     local y = Describe(tab, description)
-    for i, item in ipairs({ "discord", "telegram", "github" }) do
-        local h = UI.LinkRow(tab, LEFT, y, 580 - 2 * LEFT - 4, item, MEDIA .. item)
-        y = y - (i < 3 and h or 22)                 -- the last row: its buttons' height, not the row's air
+    for i, item in ipairs(HELP_LINKS) do
+        local h = UI.LinkRow(tab, LEFT, y, 580 - 2 * LEFT - 4, item[1], item[2])
+        y = y - (i < #HELP_LINKS and h or 22)       -- the last row: its buttons' height, not the row's air
     end
     y = y - GAP
     local _, height = UI.Text(tab, "GameFontHighlight", LEFT + 4, y, TEXT_W,

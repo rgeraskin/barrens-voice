@@ -50,7 +50,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - A «Помощь» tab in the settings
 
-  Where to write about bugs, ideas and words read wrong — Discord, Telegram and the GitHub issues, each with its icon, its address in a box (a click selects it, Ctrl+C copies), «Копировать» and «Открыть». The game gives an addon neither the browser nor the clipboard, so the companion does both (bridge kinds `open` and `copy`, only for the addresses it knows). The welcome on the first run and the line after an update point to it.
+  Where to write about bugs, ideas and words read wrong — Barrens Voice's community in Battle.net (the game's «Сообщества»: news and questions), Discord, Telegram and the GitHub issues, each with its icon, its address in a box (a click selects it, Ctrl+C copies), «Копировать» and «Открыть». The game gives an addon neither the browser nor the clipboard, so the companion does both (bridge kinds `open` and `copy`, only for the addresses it knows). The welcome on the first run and the line after an update point to it.
 
 - «Отладка (/bv debug)» in the addon's settings
 

@@ -407,6 +407,7 @@ end
 -- list of the same addresses (bv/links.py) and touches nothing else. The address also stands in a
 -- box in the settings, to select and copy with Ctrl+C when the companion is not running.
 ns.LINKS = {
+    community = { "Сообщество", "https://launch.battle.net/invite/N9KR2WNHDgW" },     -- Barrens Voice's community in Battle.net (the game's «Сообщества»)
     discord = { "Discord", "https://discord.gg/hxpuTQF2Bb" },
     telegram = { "Telegram", "https://t.me/+NwReoOS9x7hhYjgy" },
     github = { "GitHub", "https://github.com/rgeraskin/barrens-voice/issues" },
