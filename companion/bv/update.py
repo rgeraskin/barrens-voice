@@ -136,6 +136,31 @@ def prepare(root: Path, archive: Path, log=print, manifest: dict | None = None) 
     return version
 
 
+# the installer's entry in Windows «Apps» (Inno Setup: the AppId of installer/BarrensVoice.iss, "_is1")
+UNINSTALL_KEY = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\{6F2E1C55-3B8D-4E57-9C61-0B6E2A7D4F19}_is1"
+
+
+def note_version(root: Path, version: str, reg=None) -> bool:
+    """Windows «Apps» shows the version the installer put; after an update (or a rollback) it is the version
+    in use. Only when the entry is this install's (its InstallLocation) and the version is known; whether it was
+    changed."""
+    if not version:
+        return False
+    if reg is None:
+        if os.name != "nt":
+            return False
+        import winreg as reg
+    try:
+        with reg.OpenKey(reg.HKEY_CURRENT_USER, UNINSTALL_KEY, 0, reg.KEY_READ | reg.KEY_SET_VALUE) as key:
+            location = reg.QueryValueEx(key, "InstallLocation")[0]
+            if Path(location.rstrip("\\/")).resolve() != Path(root).resolve():
+                return False
+            reg.SetValueEx(key, "DisplayVersion", 0, reg.REG_SZ, version)
+            return True
+    except OSError:
+        return False
+
+
 def state_path(root: Path) -> Path:
     return root / "data" / "tmp" / "update.json"
 
@@ -144,6 +169,7 @@ def apply(root: Path, version: str) -> None:
     """app\\current -> `version`, remembering the one before, to go back to if this one fails to start."""
     previous = install.current_version(root)
     install.point_current(root, root / "app" / version)
+    note_version(root, version)
     path = state_path(root)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({"version": version, "previous": previous, "fails": 0}), encoding="utf-8")
@@ -165,6 +191,7 @@ def record_start(root: Path, ran_for: float, failed: bool) -> str | None:
         path.write_text(json.dumps(state), encoding="utf-8")
         return None
     install.point_current(root, root / "app" / state["previous"])
+    note_version(root, state["previous"])
     path.unlink(missing_ok=True)
     return state["previous"]
 

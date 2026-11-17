@@ -122,10 +122,12 @@ class App:
 
         root.protocol("WM_DELETE_WINDOW", self.close)
         self.say(f"Barrens Voice {display_version(self.version)}" + (", ждёт игру в трее" if resident else ""))
-        if INSTALL_DIR is not None:                # an update by an older version did not bring the starter yet
-            from ..install import place_starter
+        if INSTALL_DIR is not None:                # an update by an older version did not bring the starter yet,
+            from ..install import place_starter    # nor set the version Windows «Apps» shows
             from ..paths import CODE_DIR
+            from ..update import note_version
             place_starter(INSTALL_DIR, CODE_DIR.parent)
+            note_version(INSTALL_DIR, self.version)
         if self.addon_missing():                   # said at once, not only when the companion would start
             self.say(f"в {GAME_NAMES[self.selected]} нет аддона — «установить аддон» справа", "WARN")
         self.redraw()

@@ -1016,3 +1016,34 @@ class Changelog(unittest.TestCase):
         self.assertNotIn("]: https://github.com/", newest)
 
 
+
+class AppsEntry(unittest.TestCase):
+    """Windows «Apps» shows the version in use after an update or a rollback (the installer's entry)."""
+
+    class Reg:
+        HKEY_CURRENT_USER, KEY_READ, KEY_SET_VALUE, REG_SZ = 1, 2, 4, 1
+
+        def __init__(self, location):
+            self.values = {"InstallLocation": location, "DisplayVersion": "0.4.0b6"}
+
+        def OpenKey(self, *a):
+            import contextlib
+            return contextlib.nullcontext(self)
+
+        def QueryValueEx(self, key, name):
+            return self.values[name], 1
+
+        def SetValueEx(self, key, name, _, kind, value):
+            self.values[name] = value
+
+    def test_note_version(self):
+        from bv import update
+        with tempfile.TemporaryDirectory() as d:
+            reg = self.Reg(d + "\\")                                         # Inno writes it with a trailing backslash
+            self.assertTrue(update.note_version(Path(d), "0.4.0b8", reg))
+            self.assertEqual(reg.values["DisplayVersion"], "0.4.0b8")
+            other = self.Reg(str(Path(d) / "elsewhere"))                       # another install's entry: untouched
+            self.assertFalse(update.note_version(Path(d), "0.4.0b8", other))
+            self.assertEqual(other.values["DisplayVersion"], "0.4.0b6")
+            self.assertFalse(update.note_version(Path(d), None, reg))           # not known (a junction unread): no blank
+            self.assertEqual(reg.values["DisplayVersion"], "0.4.0b8")
