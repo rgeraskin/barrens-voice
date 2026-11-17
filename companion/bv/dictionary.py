@@ -119,6 +119,7 @@ def saved_flag(config: dict, name: str) -> bool | None:
 
 
 PLURAL = re.compile(r"(\d+)(\s*)\[([^\[\]|]+)\|([^\[\]|]+)\|([^\[\]|]+)\]")
+WORD_BEFORE = re.compile(r"(?<![\w'+-])([а-яё]+(?:-[а-яё]+)?)\s+$", re.IGNORECASE)
 
 
 def plural_form(n: int, one: str, few: str, many: str) -> str:
@@ -143,9 +144,21 @@ def ordinals(text: str) -> str:
 
 
 def plurals(text: str) -> str:
-    """"5 [дамагер|дамагера|дамагеров]" -> "5 дамагеров" (written by the dictionary's regexes)."""
-    return PLURAL.sub(lambda m: m.group(1) + (m.group(2) or " ")
-                      + plural_form(int(m.group(1)), m.group(3), m.group(4), m.group(5)), text)
+    """"5 [дамагер|дамагера|дамагеров]" -> "5 дамагеров" (written by the dictionary's regexes). After a
+    preposition that asks the genitive, 2-4 take the plural too ("для 2 танк" - "для 2 танков", said
+    "двух"): the form for 2-4 is the nominative count's, which the numbers would read as an ordinal
+    ("для второго танка")."""
+    from .text import GOVERNS
+
+    unmarked = text.replace("\x02", " ").replace("\x03", " ")   # the same offsets
+
+    def form(m):
+        n, one, few, many = int(m.group(1)), m.group(3), m.group(4), m.group(5)
+        before = WORD_BEFORE.search(unmarked, 0, m.start())
+        if before is not None and GOVERNS.get(before.group(1).lower()) == {"gent"}:
+            few = many
+        return m.group(1) + (m.group(2) or " ") + plural_form(n, one, few, many)
+    return PLURAL.sub(form, text)
 
 
 def parse(dictionary: str, log) -> list[tuple[re.Pattern, str]]:

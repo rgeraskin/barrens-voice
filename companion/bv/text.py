@@ -136,10 +136,12 @@ NUMBERED = {"уровень", "этаж", "число", "ранг", "фаза", 
 SINGULAR_STRESS = {"числа": "ч+исла"}
 # a number that goes on from the one before it - a time, a decimal, a version: neither an ordinal nor agreeing
 GLUED = re.compile(r"\d[:.,]$")
+GOES_ON = re.compile(r"[:.,]\d")       # ... and a number with one after it: "до 20:00" is a time, not a count
 PREV_WORD = re.compile(r"(?<![\w'+-])([а-яёА-ЯЁ]+(?:-[а-яёА-ЯЁ]+)?)\s+$")   # a whole word, as morph.PREVIOUS
-# the cases a preposition asks of the word after it (only those a count never takes in the singular)
+# the cases a preposition asks of the word after it (only those a count never takes in the singular);
+# "нет" is no preposition but asks the genitive the same way ("нет 5 места", "нет 5 игроков")
 GOVERNS = {**dict.fromkeys(("с", "со"), {"gent", "ablt"}),
-           **dict.fromkeys(("до", "от", "из", "для", "без", "после", "около", "у", "кроме", "из-за", "из-под"), {"gent"}),
+           **dict.fromkeys(("до", "от", "из", "для", "без", "после", "около", "у", "кроме", "из-за", "из-под", "нет"), {"gent"}),
            **dict.fromkeys(("к", "ко", "по"), {"datv"}),
            **dict.fromkeys(("в", "во", "на", "о", "об", "при"), {"loct"}),
            **dict.fromkeys(("за", "под", "над", "перед"), {"ablt"})}
@@ -162,32 +164,46 @@ def analyzer():
     return _morph or None
 
 
-def agree(n: int, spoken: str, following: str, morph) -> str:
+def to_case(words: list[str], case: str, morph) -> list[str]:
+    """Number words in `case`, as a numeral where pymorphy has one ("сто" - "ста", not the
+    abbreviation "СТО", which it lists first)."""
+    out = []
+    for w in words:
+        parses = morph.parse(w)
+        parse = next((p for p in parses if p.tag.POS == "NUMR"), parses[0])
+        form = parse.inflect({case})
+        out.append(form.word if form else w)
+    return out
+
+
+def agree(n: int, spoken: str, following: str, morph, before: str = "") -> str:
     """`spoken` (num2words' nominative for `n`) agreeing with the word after it:
-    "1 руку" -> "одну", "без 1 руки" -> "одной", "2 руки" -> "две", "с 5 магами" -> "пятью".
+    "1 руку" -> "одну", "без 1 руки" -> "одной", "2 руки" -> "две", "с 5 магами" -> "пятью";
+    `before`, the word before the number, gives the genitive, which the word alone cannot ("5 игроков"
+    is also the nominative count): "у 5 игроков" - "пяти", "до 200 опыта" - "двухсот".
     Left as it is when the word is not a noun or adjective, not in pymorphy's dictionary (slang:
     "2 дамагера"), or could be the plain nominative ("1 золотой")."""
     word = following.replace("+", "").lower()
+    asked = GOVERNS.get(before.lower(), set())
+    parts = spoken.split()
+    one = n % 10 == 1 and not 10 < n % 100 < 20
+    if "gent" in asked and word == "до":
+        return " ".join(to_case(parts, "gent", morph))  # a range: "с 5 до 10" - "с пяти до десяти"
+    if asked == {"gent"} and not one:
+        # a count after a preposition that asks only the genitive is in the genitive whatever word
+        # follows ("ordinal" has had its say): "из-за 2 боссов", "до 200 опыта", slang "для 3 хилов"
+        return " ".join(to_case(parts, "gent", morph))
     if not morph.word_is_known(word):
         return spoken                                  # a guess ("дамагера" as feminine) does worse
     parses = [p for p in morph.parse(word) if p.tag.POS in ("NOUN", "ADJF", "PRTF")]
     if not parses:
         return spoken
-    parts = spoken.split()
-
-    def to_case(words, case):
-        out = []
-        for w in words:
-            form = morph.parse(w)[0].inflect({case})
-            out.append(form.word if form else w)
-        return out
-
-    teen = 10 < n % 100 < 20
-    if n % 10 == 1 and not teen:
+    if one:
         sing = [p for p in parses if p.tag.number == "sing"]
         if not sing or any(p.tag.case == "nomn" and p.tag.gender in ("masc", None) for p in sing):
             return spoken
-        tag = sing[0].tag
+        # the case the preposition asks first: "у 101 игрока" - "ста одного" (not the accusative)
+        tag = next((p.tag for p in sing if p.tag.case in asked), sing[0].tag)
         tags = {tag.case} | ({tag.gender} if tag.gender in GENDERS else set())
         if tag.case == "accs" and tag.gender == "masc" and tag.animacy:
             tags.add(tag.animacy)                      # "на 1 мага" - "одного"
@@ -195,12 +211,14 @@ def agree(n: int, spoken: str, following: str, morph) -> str:
         if one:
             parts[-1] = one.word
         if tag.case in OBLIQUE:                        # "с 21 магом" - "двадцатью одним"
-            parts[:-1] = to_case(parts[:-1], tag.case)
+            parts[:-1] = to_case(parts[:-1], tag.case, morph)
         return " ".join(parts)
+    if "gent" in asked and any(p.tag.case == "gent" for p in parses):
+        return " ".join(to_case(parts, "gent", morph))  # "с 5 часов" - "пяти" ("с 5 магами" - "пятью" below)
     tag = parses[0].tag
     if tag.number == "plur" and tag.case in ("datv", "ablt", "loct"):
-        return " ".join(to_case(parts, tag.case))       # "в 3 сумках" - "трёх"
-    if n % 10 == 2 and not teen and parts[-1] == "два" and tag.gender == "femn":
+        return " ".join(to_case(parts, tag.case, morph))  # "в 3 сумках" - "трёх"
+    if n % 10 == 2 and n % 100 != 12 and parts[-1] == "два" and tag.gender == "femn":
         parts[-1] = "две"                              # "2 руки" - "две"
     return " ".join(parts)
 
@@ -294,8 +312,7 @@ def numbers_to_words(text: str) -> str:
         if glued and morph is not None:
             ending = glued.group(1).lower()
             if ending in ("х", "ух", "ех"):              # "из 2х", "3х": a count in the genitive - "двух", "трёх"
-                words = [(morph.parse(w)[0].inflect({"gent"}) or morph.parse(w)[0]).word for w in spoken.split()]
-                return " ".join(words), glued.end()
+                return " ".join(to_case(spoken.split(), "gent", morph)), glued.end()
             # a lone "м" is an ordinal only after a preposition ("на 4м этаже"); "через 5м" is minutes or metres
             if ending != "м" or before.lower() in GOVERNS:
                 as_ordinal = ending_form(n, glued.group(1), before, morph)
@@ -310,11 +327,7 @@ def numbers_to_words(text: str) -> str:
             # "от 50+" - "от пятидесяти плюс"; "на 3+ человек" stays "на три плюс" (the accusative)
             case = "gent" if "gent" in GOVERNS.get(before.lower(), set()) else None
             if case:
-                words = []
-                for w in spoken.split():
-                    form = morph.parse(w)[0].inflect({case})
-                    words.append(form.word if form else w)
-                spoken = " ".join(words)
+                spoken = " ".join(to_case(spoken.split(), case, morph))
             return spoken, m.end()
         if morph is not None and following:
             head = following.group(1).rsplit("-", 1)[-1]
@@ -327,9 +340,12 @@ def numbers_to_words(text: str) -> str:
                         stressed = word[0] + stressed[1:]
                         return as_ordinal + m.string[m.end():following.start(1)] + stressed, following.end(1)
                     return as_ordinal, m.end()
-                spoken = agree(n, spoken, head, morph)
+                spoken = agree(n, spoken, head, morph, before)
             except Exception:  # noqa: BLE001 - a number read in the nominative is still a number
                 pass
+        elif (morph is not None and GOVERNS.get(before.lower()) == {"gent"}
+              and not GOES_ON.match(m.string, m.end())):
+            spoken = " ".join(to_case(spoken.split(), "gent", morph))   # "ждём до 10." - "до десяти"
         return spoken, m.end()
 
     out, pos = [], 0
