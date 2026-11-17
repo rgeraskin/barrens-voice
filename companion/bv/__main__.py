@@ -320,6 +320,47 @@ def describe_place(place) -> str:
     return f"{where}, x {x}, y {y}, ширина {w} (экран {sw}×{sh})"
 
 
+# frames that are not chat: settings, the dictionary, the addon's commands and clicks (`service`)
+SERVICE_KINDS = ("control", "dict", "stop", "pause", "resume", "reset", "open", "copy", "diag")
+
+
+def service(line, first: bool, engines, player, dictionary, capturer) -> None:
+    """A frame of one of SERVICE_KINDS. State (control, dict, pause, resume) counts even in the frame
+    that was up before the companion started; a command or a click (stop, reset, open, copy, diag)
+    only in a new one - `first` is the frame already there."""
+    kind = line.kind
+    if kind == "control":
+        # settings: applied for every frame (sapi, follow); here where the strip is (or is about to move)
+        from . import locate
+        place = locate.parse_place(line.options.get("strip", ""))
+        if place and place != capturer.place:
+            capturer.set_place(place)
+            log("полоска: " + describe_place(place))
+    elif kind == "dict":
+        dictionary.receive(line.options, line.text)
+    elif kind == "pause":
+        if player.pause():
+            log("CatQuest говорит: чат на паузе")
+    elif kind == "resume":
+        if player.resume():
+            log("CatQuest замолчал: чат продолжает (прерванная строка — сначала)")
+    elif first:
+        return
+    elif kind == "stop":
+        engines.stop()
+        log("стоп: замолкаю")
+    elif kind == "reset":
+        engines.reset_assignments()
+    elif kind == "open":                                # a click in the addon's settings
+        from .links import open_link
+        open_link(line.text, log)
+    elif kind == "copy":
+        from .links import copy_link
+        copy_link(line.text, log)
+    elif kind == "diag":
+        log(f"[диагностика аддона] {line.text}")
+
+
 def fetch_models(config: dict) -> int:
     """Everything the race voices need from the network, downloaded now - BarrensVoice.cmd runs this
     right after installing, so the first start neither waits for ~3 GB nor needs the network: F5 in
@@ -636,36 +677,8 @@ def main() -> int:
                         sapi.set_disabled({n for n in line.off.split("|") if n})
                     if line:
                         engines.follow(line)
-                    if line and line.kind == "control":
-                        # settings: applied above; and where the strip is (or is about to move)
-                        place = locate.parse_place(line.options.get("strip", ""))
-                        if place and place != capturer.place:
-                            capturer.set_place(place)
-                            log("полоска: " + describe_place(place))
-                    elif line and line.kind == "dict":
-                        dictionary.receive(line.options, line.text)  # state, not speech: even if first
-                    elif line and line.kind == "stop":
-                        if not first:
-                            engines.stop()
-                            log("стоп: замолкаю")
-                    elif line and line.kind == "pause":            # state: even if first
-                        if player.pause():
-                            log("CatQuest говорит: чат на паузе")
-                    elif line and line.kind == "resume":
-                        if player.resume():
-                            log("CatQuest замолчал: чат продолжает (прерванная строка — сначала)")
-                    elif line and line.kind == "reset" and not first:
-                        engines.reset_assignments()
-                    elif line and line.kind == "open":
-                        if not first:                          # a click in the addon's settings
-                            from .links import open_link
-                            open_link(line.text, log)
-                    elif line and line.kind == "copy":
-                        if not first:
-                            from .links import copy_link
-                            copy_link(line.text, log)
-                    elif line and line.kind == "diag" and not first:
-                        log(f"[диагностика аддона] {line.text}")
+                    if line and line.kind in SERVICE_KINDS:
+                        service(line, first, engines, player, dictionary, capturer)
                     elif line and line.kind not in LABELS:
                         # a service line of a newer addon: never read aloud what is not chat
                         if line.kind not in unknown_kinds:

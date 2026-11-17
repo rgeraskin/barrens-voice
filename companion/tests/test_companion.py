@@ -61,6 +61,54 @@ class LoadConfig(unittest.TestCase):
         self.assertEqual({level_of(m) for m in logged}, {"WARN"})
 
 
+class ServiceFrames(unittest.TestCase):
+    """Frames that are not chat: state counts even in the frame that was up at the start, a command
+    or a click only in a new one - and none of them is «строки типа … не озвучиваю»."""
+
+    def run_frame(self, kind, first, text="-", options=None):
+        from unittest import mock
+
+        from bv.protocol import Line
+        calls, logged = [], []
+
+        class Fake:
+            place = None
+
+            def __getattr__(self, name):
+                def call(*args):
+                    calls.append(name)
+                    return True
+                return call
+        fake = Fake()
+        line = Line(kind, "", "", "", "", "", text, options=options or {})
+        with mock.patch.object(companion, "log", logged.append), \
+                mock.patch("bv.links.open_link", lambda *a: calls.append("open_link")), \
+                mock.patch("bv.links.copy_link", lambda *a: calls.append("copy_link")):
+            self.assertIn(kind, companion.SERVICE_KINDS)
+            companion.service(line, first, fake, fake, fake, fake)
+        return calls, logged
+
+    def test_commands_only_when_new(self):
+        # reset or diag as the very first frame fell through to «строки типа «reset» не озвучиваю»
+        for kind, call in (("stop", "stop"), ("reset", "reset_assignments"), ("open", "open_link"),
+                           ("copy", "copy_link"), ("diag", None)):
+            calls, logged = self.run_frame(kind, first=True)
+            self.assertEqual((calls, logged), ([], []), kind)
+            calls, logged = self.run_frame(kind, first=False, text="проверка")
+            if call:
+                self.assertEqual(calls, [call], kind)
+            else:
+                self.assertEqual(logged, ["[диагностика аддона] проверка"])
+
+    def test_state_even_when_first(self):
+        for kind, call in (("dict", "receive"), ("pause", "pause"), ("resume", "resume")):
+            for first in (True, False):
+                self.assertEqual(self.run_frame(kind, first)[0], [call], kind)
+        calls, logged = self.run_frame("control", True, options={"strip": "0,0,1920,16,1920,1080"})
+        self.assertEqual(calls, ["set_place"])
+        self.assertTrue(logged[0].startswith("полоска: верх"), logged)
+
+
 class AddonFiles(unittest.TestCase):
     """VoiceList.lua, CompanionStatus.lua and DictionaryOnline.lua: written whole or not at all."""
 
