@@ -38,26 +38,31 @@ print("ok")
 """
 
 
-def patterns(text: str) -> list[str]:
-    """The regexes of a dictionary text ("~pattern=replacement" lines)."""
-    return [line.strip()[1:].rsplit("=", 1)[0].strip() for line in text.splitlines()
+def rules(text: str) -> list[tuple[str, str]]:
+    """The regexes of a dictionary text ("~pattern=replacement" lines) as (pattern, replacement)."""
+    return [tuple(part.strip() for part in line.strip()[1:].rsplit("=", 1)) for line in text.splitlines()
             if line.strip().startswith("~") and "=" in line]
 
 
 def regexes_ok(text: str, timeout: float = CHECK_TIMEOUT) -> str | None:
-    """None when every regex compiles, is of a sane length and runs fast over PROBES (in a separate Python,
+    """None when every regex compiles, its replacement too (group references such as "\\2" or
+    "\\g<name>", escapes), is of a sane length and runs fast over PROBES (in a separate Python,
     killed at `timeout`: a runaway pattern cannot hang the companion); else what is wrong."""
     import re
-    found = patterns(text)
-    for p in found:
+    found = rules(text)
+    for p, replacement in found:
         if len(p) > MAX_PATTERN:
             return f"регулярка длиннее {MAX_PATTERN} символов"
         try:
-            re.compile(p, re.IGNORECASE)
+            compiled = re.compile(p, re.IGNORECASE)
         except re.error as e:
             return f"регулярка «{p[:60]}» с ошибкой: {e}"
+        try:
+            compiled.sub(replacement, "")          # the template is parsed before any match
+        except (re.error, IndexError) as e:
+            return f"замена «{replacement[:60]}» регулярки «{p[:60]}» с ошибкой: {e}"
     try:
-        done = subprocess.run([sys.executable, "-I", "-c", PROBE], input=json.dumps([found, PROBES]),
+        done = subprocess.run([sys.executable, "-I", "-c", PROBE], input=json.dumps([[p for p, _ in found], PROBES]),
                               capture_output=True, text=True, encoding="utf-8", timeout=timeout,
                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     except subprocess.TimeoutExpired:

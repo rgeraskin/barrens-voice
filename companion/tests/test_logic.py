@@ -121,6 +121,14 @@ class Regexes(unittest.TestCase):
         rules = parse_rules("~a(?=b)=c", print)
         self.assertEqual(rules[0][0].sub(rules[0][1], "ab"), "cb")
 
+    def test_bad_replacement_skipped_at_load(self):
+        # a group the pattern has not: said once when the dictionary loads, not on every chat line
+        errors = []
+        rules = parse_rules("~(\\d+)x=\\2 y\n~(\\d+)y=\\g<n>\n~(\\d+)z=\\1 з", errors.append)
+        self.assertEqual([r for _, r in rules], ["\\1 з"])
+        self.assertEqual(len(errors), 2)
+        self.assertIn("замена", errors[0])
+
 
 class Payload(unittest.TestCase):
     def test_options(self):

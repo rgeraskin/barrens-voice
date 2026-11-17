@@ -153,9 +153,16 @@ def parse(dictionary: str, log) -> list[tuple[re.Pattern, str]]:
             continue
         pattern, replacement = line[1:].rsplit("=", 1)
         try:
-            rules.append((re.compile(pattern.strip(), re.IGNORECASE), replacement.strip()))
+            compiled = re.compile(pattern.strip(), re.IGNORECASE)
         except re.error as e:
             log(f"словарь: регулярка «{pattern}» с ошибкой: {e}")
+            continue
+        try:
+            compiled.sub(replacement.strip(), "")   # a bad group reference ("\\2"): said once, not on every line
+        except (re.error, IndexError) as e:
+            log(f"словарь: замена «{replacement.strip()}» регулярки «{pattern}» с ошибкой: {e}")
+            continue
+        rules.append((compiled, replacement.strip()))
     return rules
 
 

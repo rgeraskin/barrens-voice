@@ -81,6 +81,10 @@ class Load(unittest.TestCase):
         self.assertIn("ревизии", self.load(entry(revision="100"))[1])
         self.assertIn("ошибкой", self.load(entry(text="~(a=b"))[1])
         self.assertIn("длиннее", self.load(entry(text="~" + "a" * 500 + "=b"))[1])
+        # a replacement's group reference the pattern has not: refused before it is published or taken
+        self.assertIn("замена", self.load(entry(text="~(\\d+)x=\\2 y"))[1])
+        self.assertIn("замена", self.load(entry(text="~(\\d+)x=\\g<n> y"))[1])
+        self.assertIsNone(od.regexes_ok("~(\\d+)x=\\g<1>000 [а|б|в]"))
 
     def test_slow_regex(self):
         # catastrophic backtracking: run in a process of its own and killed, the companion goes on
