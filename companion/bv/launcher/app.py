@@ -34,7 +34,6 @@ from .tray import Tray
 W = 840
 LX0, LX1, RX0, RX1 = 22, 462, 478, W - 22       # left column (state, log), right column (start, game)
 TOP, GAP, ROW1 = 100, 14, 140                   # State and Start: one height
-MAIN_LEVELS = ("INFO", "WARN", "ERROR")          # the main window's log: how things go, not every detail
 MAIN_COLORS = {"WARN": "#e0b33a", "ERROR": "#ff6a5a"}
 # hints on the main window's checks and links (what the window does not show by itself)
 TIPS = {
@@ -96,7 +95,7 @@ class App:
         self.autostart = model.autostart()
 
         # (time, level, message): every line of the companion and the launcher (bv/logs.py); the main window
-        # shows MAIN_LEVELS of them, the log window all
+        # shows model.MAIN_LEVELS of them, the log window all
         self.lines: collections.deque[tuple[str, str, str]] = collections.deque(maxlen=20000)
         self.incoming: queue.Queue[str] = queue.Queue()
         self.log_window = None
@@ -463,7 +462,7 @@ class App:
             lines[0] = (model.YELLOW, "Компаньон перезапускается…" if self.busy == "restarting" else "Компаньон останавливается…")
         show_update = bool(self.update) and self.config.get("launcher_dismissed") != self.update["version"]
         games = tuple((g.key, g.addon, str(g.root)) for g in self.games)
-        progress = tuple(item for item in list(self.lines)[-400:] if item[1] in MAIN_LEVELS)[-14:]
+        progress = model.main_lines(list(self.lines)[-400:])
         return (tuple(lines), progress, games, self.selected, self.running_game, show_update,
                 self.updater.status if self.updater else "",
                 self.companion.running,

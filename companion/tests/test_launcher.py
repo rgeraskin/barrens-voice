@@ -240,6 +240,20 @@ class LogLines(unittest.TestCase):
         self.assertIn("stderr=subprocess.PIPE", source)
         self.assertNotIn("stderr=subprocess.STDOUT", source)
 
+    def test_progress_kept_in_one_line(self):
+        from bv.launcher.model import main_lines
+        items = [("04:45:32", "INFO", "компаньон запущен"), ("04:45:32", "DEBUG", "детали"),
+                 ("04:45:46", "INFO", "собираю голоса рас из игры — несколько минут ..."),
+                 ("04:45:56", "INFO", "собираю голоса рас: 3 из 66"), ("04:45:57", "WARN", "что-то"),
+                 ("04:46:06", "INFO", "собираю голоса рас: 7 из 66")]
+        self.assertEqual([m for _, _, m in main_lines(items)],
+                         ["компаньон запущен", "что-то", "собираю голоса рас: 7 из 66"])
+        items.append(("04:49:06", "INFO", "голоса рас собраны: 66 из 66 за 3 мин"))
+        self.assertEqual([m for _, _, m in main_lines(items)][-1], "голоса рас собраны: 66 из 66 за 3 мин")
+        self.assertEqual(len([m for _, _, m in main_lines(items) if "голоса рас" in m]), 1)
+        many = [("t", "INFO", str(i)) for i in range(30)]
+        self.assertEqual([m for _, _, m in main_lines(many)], [str(i) for i in range(16, 30)])
+
 
 class CommandLine(unittest.TestCase):
     def test_parse(self):

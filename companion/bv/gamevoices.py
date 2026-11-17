@@ -14,6 +14,7 @@ from __future__ import annotations
 import io
 import json
 import re
+import time
 import zlib
 from dataclasses import dataclass
 from pathlib import Path
@@ -27,6 +28,7 @@ GAP = 0.15            # seconds of silence between the lines of a reference clip
 TARGET = (5.5, 9.5)   # seconds of speech wanted in a reference clip
 MAX_LINES = 4
 MIN_SPEECH = 3.0      # seconds: a voice with less usable speech than this gets no reference clip
+PROGRESS_EVERY = 10.0  # seconds between the bank's progress lines (the launcher shows the last one only)
 GOOD = 0.8            # the joined clip heard back by Whisper must match its text at least this well
 # Whisper's hallucinations on short or wordless clips
 JUNK = re.compile(r"продолжение следует|субтитр|спасибо за просмотр|редактор|корректор|подпис", re.I)
@@ -256,9 +258,15 @@ def _shift(samples, semitones: float):
 
 # --- the bank -----------------------------------------------------------------------------------
 
-def build(config: dict, out: Path, log, checker) -> list[Slot]:
+def took(seconds: float) -> str:
+    return f"{round(seconds)} с" if seconds < 90 else f"{round(seconds / 60)} мин"
+
+
+def build(config: dict, out: Path, log, checker, clock=time.monotonic) -> list[Slot]:
     """The bank: kept as it is while the game build and settings are the same, else made again
-    from the client with `checker` (a loaded whisper_onnx.OnnxChecker: Whisper)."""
+    from the client with `checker` (a loaded whisper_onnx.OnnxChecker: Whisper). Made: once, and after
+    each game update or a change of `voice_shifts`; its progress goes to the log every PROGRESS_EVERY s
+    ("собираю голоса рас: N из M"), then "голоса рас собраны" (the launcher keeps one line of them)."""
     shifts = config.get("voice_shifts", [])
     stamp = _stamp(config, shifts)
     if stamp is None:
@@ -272,6 +280,7 @@ def build(config: dict, out: Path, log, checker) -> list[Slot]:
 
     from .casc import Storage
 
+    started = told = clock()
     log("собираю голоса рас из игры — несколько минут ...")
     log(f"    {stamp['install']}, {stamp['product']}: один раз после каждого обновления игры")
     table = voices_for(config)
@@ -286,7 +295,10 @@ def build(config: dict, out: Path, log, checker) -> list[Slot]:
         old.unlink()
     slots: list[Slot] = []
     skipped = []
-    for voice, entry in sorted(table.items()):
+    for done, (voice, entry) in enumerate(sorted(table.items())):
+        if clock() - told >= PROGRESS_EVERY:
+            told = clock()
+            log(f"собираю голоса рас: {done} из {len(table)}")
         heard: list[dict] = []
         audio: dict[int, object] = {}
         candidates = [f for f in entry["files"] if f[0] in files]
@@ -343,6 +355,7 @@ def build(config: dict, out: Path, log, checker) -> list[Slot]:
         log(f"    ещё нет: {missing}")
     (out / "bank.json").write_text(json.dumps(manifest,
                                               ensure_ascii=False, indent=1), encoding="utf-8")
+    log(f"голоса рас собраны: {len({s.base for s in slots})} из {len(table)} за {took(clock() - started)}")
     log(f"голосов рас: {len({s.base for s in slots})}, вариантов с тембром: {len(slots)}"
         + (f"; без голоса (мало реплик): {', '.join(skipped)}" if skipped else ""))
     return slots

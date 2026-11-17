@@ -453,3 +453,25 @@ def report_header(version: str, state: dict, config: dict, games: list, running_
         "Настройки не по умолчанию: " + ("; ".join(changed_settings(config, DEFAULT_CONFIG)) or "нет"),
     ]
     return hide_private("\n".join(lines))
+
+
+MAIN_LEVELS = ("INFO", "WARN", "ERROR")          # the main window's log: how things go, not every detail
+# lines of one long job: the main window keeps only the newest of each group, a line that moves on in place
+PROGRESS = (("собираю голоса рас", "голоса рас собраны"),)
+
+
+def main_lines(items, keep: int = 14) -> tuple:
+    """What the main window's log shows: INFO, WARN and ERROR, of a PROGRESS group only the newest."""
+    shown, groups = [], set()
+    for item in reversed(items):
+        if item[1] not in MAIN_LEVELS:
+            continue
+        group = next((g for g in PROGRESS if item[2].startswith(g)), None)
+        if group is not None:
+            if group in groups:
+                continue
+            groups.add(group)
+        shown.append(item)
+        if len(shown) == keep:
+            break
+    return tuple(reversed(shown))

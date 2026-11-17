@@ -152,6 +152,44 @@ class Cache(unittest.TestCase):
             self.assertFalse(gamevoices.stale(config, out), "a complete bank stays, whatever the storage does")
 
 
+class Progress(unittest.TestCase):
+    def test_progress_lines_and_the_end(self):
+        # every PROGRESS_EVERY seconds "собираю голоса рас: N из M", then how many and how long
+        from unittest import mock
+        table = {f"v{i}": {"race": "orc", "sex": "male", "files": [(i, "line", 1)]} for i in range(5)}
+
+        class Store:
+            def __init__(self, *_):
+                pass
+
+            def read_files(self, wanted, *_):
+                return {f: b"" for f in wanted}
+
+        ticks = iter(range(0, 1000, 6))                    # each look at the clock: 6 s later
+        logged = []
+        with tempfile.TemporaryDirectory() as d, \
+                mock.patch.object(gamevoices, "_stamp", return_value={"install": d, "product": "wowf"}), \
+                mock.patch.object(gamevoices, "load", return_value=None), \
+                mock.patch.object(gamevoices, "voices_for", return_value=table), \
+                mock.patch.object(gamevoices, "other_storages", return_value=[]), \
+                mock.patch.object(gamevoices, "_decode", side_effect=ValueError), \
+                mock.patch.object(casc, "Storage", Store):
+            slots = gamevoices.build({}, Path(d) / "voices", logged.append, checker=object(), clock=lambda: next(ticks))
+        self.assertEqual(slots, [])
+        self.assertEqual(logged[0], "собираю голоса рас из игры — несколько минут ...")
+        progress = [m for m in logged if m.startswith("собираю голоса рас: ")]
+        self.assertTrue(progress and all(m.endswith(" из 5") for m in progress), logged)
+        self.assertLess(len(progress), 5)                  # not a line per voice
+        self.assertTrue(any(m.startswith("голоса рас собраны: 0 из 5 за ") for m in logged), logged)
+        from bv.logs import level_of
+        self.assertEqual({level_of(m) for m in progress}, {"INFO"})
+        self.assertEqual(level_of("голоса рас собраны: 0 из 5 за 1 мин"), "INFO")
+
+    def test_took(self):
+        self.assertEqual(gamevoices.took(40), "40 с")
+        self.assertEqual(gamevoices.took(200), "3 мин")
+
+
 class Table(unittest.TestCase):
     def test_every_race_and_sex_has_voices(self):
         table = json.loads(gamevoices.TABLE.read_text(encoding="utf-8"))["voices"]
