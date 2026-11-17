@@ -1,4 +1,5 @@
-"""The icon by the clock: the launcher hides there instead of closing, and while the game runs.
+"""The icon by the clock: the launcher waits there when started with --tray (at Windows sign-in) and while a
+game it started runs (the window's cross quits otherwise).
 pystray runs its own Windows message loop on a thread; its clicks reach the window through a
 queue the window empties (tkinter must be touched from its own thread only)."""
 from __future__ import annotations

@@ -99,7 +99,7 @@ def build() -> Path:
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as z:
         extra = [(DIST / "Barrens Voice.exe", "Barrens Voice.exe")] if (DIST / "Barrens Voice.exe").is_file() else []
         for source, name in sorted(files() + extra, key=lambda f: f[1]):   # the starter: built first on Windows
-            info_ = zipfile.ZipInfo(name, date_time=(2026, 1, 1, 0, 0, 0))   # the same bytes from the same tree
+            info_ = zipfile.ZipInfo(name, date_time=(2026, 1, 1, 0, 0, 0))   # a fixed time, not the checkout's
             info_.compress_type = zipfile.ZIP_DEFLATED
             data = source.read_bytes()
             if name == "pyproject.toml" and info["version"] != base:     # the build's own version, beta and all

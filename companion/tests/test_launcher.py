@@ -88,7 +88,8 @@ class Games(unittest.TestCase):
 
 
 class Paths(unittest.TestCase):
-    """The installer's starter sets BV_DATA, BV_CACHE and BV_STARTER; without them, the companion's folder."""
+    """An install is told by its mark file (paths.layout): its data and cache folders, its starter. BV_DATA,
+    BV_CACHE and BV_STARTER override them (tests, odd setups); not installed, the companion's own folder."""
 
     def run_paths(self, env):
         import os

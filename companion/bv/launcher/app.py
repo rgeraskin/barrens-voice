@@ -2,9 +2,10 @@
 
 It finds the installed games, keeps the addon in them up to date, starts the companion (a child
 process without a console: bv.launcher.process) and shows what it does - the state from its
-tmp/state.json, its log lines from its output - and starts the game through Battle.net. Closing the
-window hides it by the clock (tray); «Выход» there ends the companion too. Started with --tray (at
-Windows sign-in) it waits there for the game and starts the companion when the game appears.
+tmp/state.json, its log lines from its output - and starts the game through Battle.net. The window's
+cross quits, the companion with it. It waits by the clock (tray) only when started with --tray (at
+Windows sign-in: the companion starts when the game appears) and while a game it started runs; «Выход»
+in the tray's menu quits then.
 
 Run: pythonw BarrensVoice.pyw  (or python -m bv.launcher)
 """
