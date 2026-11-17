@@ -81,7 +81,6 @@ class Player(threading.Thread):
         import tempfile
         from pathlib import Path
         self.folder = Path(folder) if folder else Path(tempfile.gettempdir()) / "barrens-voice"
-        self.folder.mkdir(parents=True, exist_ok=True)
         self.turn = 0
         self.items: queue.Queue = queue.Queue()
         self.max_queue = max_queue
@@ -177,6 +176,7 @@ class Player(threading.Thread):
             return
         self.turn = (self.turn + 1) % 3
         path = self.folder / f"line{self.turn}.wav"
+        self.folder.mkdir(parents=True, exist_ok=True)   # each time: a folder removed meanwhile is made again
         path.write_bytes(data)
         # asynchronous, so a stop can cut it
         length = seconds(data)

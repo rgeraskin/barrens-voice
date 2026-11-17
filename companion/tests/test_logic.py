@@ -1142,6 +1142,25 @@ class PlayerErrors(unittest.TestCase):
             self.assertEqual(level_of(logged[0]), "WARN")
             self.assertGreater(p.quiet_for(), 0)
 
+    def test_its_folder_removed_meanwhile(self):
+        # the folder was made only when the player was: removed (a temp cleaner) it failed every line from then on
+        import shutil
+        import tempfile
+        import time
+        played, fake = fake_winsound()
+        logged = []
+        from bv.audio import Player
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d) / "tmp"
+            p = Player(2, folder, log=logged.append, sound=fake)
+            p.start()
+            p.play(marked_line(b"A", 0.05))
+            time.sleep(0.4)
+            shutil.rmtree(folder)
+            p.play(marked_line(b"B", 0.05))
+            time.sleep(0.4)
+        self.assertEqual((played, logged), ([b"A", b"B"], []))
+
 
 class CompanionStatus(unittest.TestCase):
     """The companion's word to the addon: the time in CompanionStatus.lua, read by the game at login."""
