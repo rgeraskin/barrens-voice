@@ -13,6 +13,7 @@ DictionaryOnline.lua
 Dictionary.lua
 VoiceList.lua
 Text.lua
+QuestVoice.lua
 Core.lua
 ChatFade.lua
 CompanionStatus.lua
