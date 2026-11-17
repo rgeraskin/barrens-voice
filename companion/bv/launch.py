@@ -8,7 +8,7 @@ import sys
 import threading
 import time
 from ctypes import wintypes
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 TH32CS_SNAPPROCESS = 0x2
 
@@ -38,12 +38,20 @@ def process_names() -> set[str]:
 
 
 def is_wow(name: str) -> bool:
+    """A program file named like the game's (Wow.exe, WowClassic.exe) - so are WowUp.exe and other
+    tools: only a first sieve before the path (`is_game`)."""
     name = name.lower()
     return name.startswith("wow") and name.endswith(".exe") and "voice" not in name
 
 
+def is_game(path: str) -> bool:
+    """Whether a running program (its full path) is the game: a Wow*.exe in one of the games' folders
+    (…\\_forever_\\Wow.exe). The companion's exit with the game, its launch and its window all ask this."""
+    return is_wow(PureWindowsPath(path).name) and game_of_path(path) is not None
+
+
 def wow_running() -> bool:
-    return any(is_wow(n) for n in process_names())
+    return any(is_game(p) for p in process_paths(is_wow))
 
 
 def process_paths(match) -> list[str]:
@@ -76,16 +84,15 @@ def process_paths(match) -> list[str]:
 def game_of_path(path: str) -> str | None:
     """Which game a Wow.exe belongs to, by its folder (…\\_forever_\\Wow.exe → "forever")."""
     from .dictionary import GAMES
-    folder = Path(path).parent.name.lower()
+    folder = PureWindowsPath(path).parent.name.lower()
     return next((game for game, name in GAMES.items() if name == folder), None)
 
 
 def running_game() -> tuple[str, Path] | tuple[None, None]:
     """The game whose Wow.exe runs now and its folder (("forever", …\\_forever_)), or (None, None)."""
     for path in process_paths(is_wow):
-        game = game_of_path(path)
-        if game:
-            return game, Path(path).parent
+        if is_game(path):
+            return game_of_path(path), Path(path).parent
     return None, None
 
 

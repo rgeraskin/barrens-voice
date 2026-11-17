@@ -198,6 +198,27 @@ class GameOfPath(unittest.TestCase):
         self.assertEqual(game_of_path(r"E:\World of Warcraft\_forever_\Wow.exe".replace("\\", "/")), "forever")
         self.assertEqual(game_of_path("D:/World of Warcraft/_retail_/Wow.exe"), "retail")
         self.assertIsNone(game_of_path("D:/World of Warcraft/_classic_era_/WowClassic.exe"))
+        self.assertEqual(game_of_path(r"D:\Games\World of Warcraft\_forever_\Wow.exe"), "forever")   # either slash
+
+    def test_only_the_game_is_the_game(self):
+        # any wow*.exe counted: with WowUp running --launch neither made the voices nor started the
+        # game, the exit with the game never came, and the capture could pick the manager's window
+        from unittest import mock
+
+        from bv import launch
+        game = r"D:\Games\World of Warcraft\_forever_\Wow.exe"
+        self.assertTrue(launch.is_game(game))
+        for other in (r"C:\Programs\WowUp\WowUp.exe", r"C:\Programs\WowUp-CF\WowUp-CF.exe",
+                      r"D:\Games\World of Warcraft\_forever_\WoWChatVoice.exe", r"D:\Games\_forever_\Battle.net.exe",
+                      r"D:\Games\World of Warcraft\_classic_era_\WowClassic.exe", ""):
+            self.assertFalse(launch.is_game(other), other)
+        with mock.patch.object(launch, "process_paths", lambda match: [p for p in [r"C:\Programs\WowUp\WowUp.exe"]
+                                                                       if match("WowUp.exe")]):
+            self.assertFalse(launch.wow_running())
+            self.assertEqual(launch.running_game(), (None, None))
+        with mock.patch.object(launch, "process_paths", lambda match: [r"C:\Programs\WowUp\WowUp.exe", game]):
+            self.assertTrue(launch.wow_running())
+            self.assertEqual(launch.running_game()[0], "forever")
 
 
 class Roots(unittest.TestCase):

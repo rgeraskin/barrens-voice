@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import ctypes
-import os
 from ctypes import wintypes
 
 user32 = ctypes.WinDLL("user32", use_last_error=True)
@@ -23,7 +22,8 @@ def make_dpi_aware() -> None:
             pass
 
 
-def _exe_of(hwnd: int) -> str:
+def _path_of(hwnd: int) -> str:
+    """The full path of the program the window belongs to; "" when Windows does not say."""
     pid = wintypes.DWORD()
     user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
     handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid.value)
@@ -33,7 +33,7 @@ def _exe_of(hwnd: int) -> str:
         size = wintypes.DWORD(1024)
         buf = ctypes.create_unicode_buffer(size.value)
         if kernel32.QueryFullProcessImageNameW(handle, 0, buf, ctypes.byref(size)):
-            return os.path.basename(buf.value).lower()
+            return buf.value
         return ""
     finally:
         kernel32.CloseHandle(handle)
@@ -54,14 +54,15 @@ def frame_offset(hwnd: int) -> tuple[int, int]:
 
 def find_wow_window() -> tuple[int, tuple[int, int, int, int]] | None:
     """(hwnd, (left, top, width, height) of its client area) of the largest visible, not minimised
-    Wow*.exe window, in physical screen pixels; None when there is none."""
+    window of the game (`launch.is_game`: not WowUp.exe and the like), in physical screen pixels; None
+    when there is none."""
+    from .launch import is_game
     best: list = []
 
     def visit(hwnd, _):
         if not user32.IsWindowVisible(hwnd) or user32.IsIconic(hwnd):
             return True
-        exe = _exe_of(hwnd)
-        if not (exe.startswith("wow") and exe.endswith(".exe")):
+        if not is_game(_path_of(hwnd)):
             return True
         rect = wintypes.RECT()
         if not user32.GetClientRect(hwnd, ctypes.byref(rect)):
