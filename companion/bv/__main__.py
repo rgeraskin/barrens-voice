@@ -278,6 +278,11 @@ def main() -> int:
         print("Windows only")
         return 1
     offline = offline_models() if "--fetch-models" not in sys.argv else False
+    # two notices of RUAccent's own, harmless and not ours to fix: a regex string it writes without r"" (shown
+    # once, when Python first compiles it) and an argument huggingface_hub no longer uses
+    import warnings
+    warnings.filterwarnings("ignore", message=r"invalid escape sequence", category=SyntaxWarning, module=r".*ruaccent.*")
+    warnings.filterwarnings("ignore", message=r".*local_dir_use_symlinks.*")
     install_crash_logging()
     if not isinstance(sys.stderr, StderrToLog):
         sys.stderr = StderrToLog(sys.stderr)
