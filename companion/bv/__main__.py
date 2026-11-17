@@ -615,10 +615,7 @@ def main() -> int:
     live = LiveConfig(config, CONFIG_PATH, config_stamp)   # from the file as read: a change from now on is seen
     if want_launch and not launch.wow_running():
         # the race voices come from the client's files: (re)made before the game, after an update
-        from . import gamevoices
         from .f5engine import prepare_voices
-        if gamevoices.stale(config, gamevoices.bank_dir(config, DATA_DIR)):
-            log("игра запустится, когда соберутся голоса рас")
         prepare_voices(config, DATA_DIR, log)
         launch.launch(config, log)   # the game starts while the voices load (not if the player started it meanwhile)
     from .dictionary import Dictionary

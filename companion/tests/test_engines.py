@@ -308,6 +308,43 @@ class F5SpeakerLoad(unittest.TestCase):
             self.assertIn("русской озвучки", speaker.error)
 
 
+class PrepareVoices(unittest.TestCase):
+    """The bank made before the game is launched: never an error that ends the companion at «Играть», and
+    «игра запустится, когда соберутся голоса рас» only when it is about to be made."""
+
+    def prepare(self, stale, providers=("CUDAExecutionProvider", "CPUExecutionProvider")):
+        from unittest import mock
+
+        from bv import f5engine
+        logged, made = [], []
+        with mock.patch("bv.gamevoices.stale", stale), \
+                mock.patch("onnxruntime.get_available_providers", lambda: list(providers)), \
+                mock.patch.object(f5engine, "make_bank", lambda *a: made.append(1)):
+            f5engine.prepare_voices({"f5_onnx_provider": "CUDAExecutionProvider"}, Path("."), logged.append)
+        return logged, made
+
+    def test_made_with_its_word(self):
+        logged, made = self.prepare(lambda config, out: True)
+        self.assertEqual((logged, made), (["игра запустится, когда соберутся голоса рас"], [1]))
+
+    def test_nothing_to_make(self):
+        self.assertEqual(self.prepare(lambda config, out: False), ([], []))
+
+    def test_no_word_when_the_card_cannot_make_it(self):
+        # the word was logged before prepare_voices found it would build nothing
+        self.assertEqual(self.prepare(lambda config, out: True, ("CPUExecutionProvider",)), ([], []))
+
+    def test_a_failing_look_at_the_bank_is_no_end(self):
+        # stale() ran in main outside the guard: anything it raised ended the companion at «Играть» (exit 1,
+        # a failed start for the update's rollback)
+        def stale(config, out):
+            raise TypeError("expected str, bytes or os.PathLike object, not int")
+        logged, made = self.prepare(stale)
+        self.assertEqual(made, [])
+        self.assertEqual(len(logged), 1)
+        self.assertTrue(logged[0].startswith("голоса рас из клиента: "), logged)
+
+
 class OnCard(unittest.TestCase):
     """A session ONNX Runtime quietly put on the processor (DirectML without DirectX 12) is refused: the voice bank
     would take many minutes on Whisper there and the race voices would not run anyway."""

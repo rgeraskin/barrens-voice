@@ -192,7 +192,9 @@ class Cache(unittest.TestCase):
             self.assertFalse(gamevoices.stale(config, out))
             for broken in (whole[:len(whole) // 2], "[]", json.dumps({"stamp": stamp}),
                            json.dumps({"stamp": stamp, "slots": [{"id": "orc-male"}]}),
-                           json.dumps({"stamp": stamp, "slots": ["x"]})):
+                           json.dumps({"stamp": stamp, "slots": ["x"]}),
+                           json.dumps({"stamp": stamp, "slots": [{**slot, "path": 5}]}),     # raised past load's try
+                           json.dumps({"stamp": stamp, "slots": [{**slot, "path": None}]})):
                 (out / "bank.json").write_text(broken, encoding="utf-8")
                 self.assertTrue(gamevoices.stale(config, out), broken[:40])
             (out / "bank.json").write_text(whole, encoding="utf-8")

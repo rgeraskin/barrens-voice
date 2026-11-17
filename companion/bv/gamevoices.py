@@ -159,9 +159,10 @@ def load(out: Path, stamp: dict | None) -> list[Slot] | None:
         if gap and data_size(Path(stamp["install"])) > gap.get("data_size", 0) + GROWN:
             return None
         slots = [Slot(**s) for s in saved["slots"]]
+        whole = all(Path(s.path).is_file() for s in slots)     # a path of another type (5, null) raises here
     except (OSError, ValueError, KeyError, TypeError, AttributeError):
         return None
-    return slots if all(Path(s.path).is_file() for s in slots) else None
+    return slots if whole else None
 
 
 def stale(config: dict, out: Path) -> bool:

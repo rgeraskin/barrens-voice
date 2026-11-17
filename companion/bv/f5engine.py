@@ -203,13 +203,15 @@ def make_bank(config: dict, home: Path, log) -> list:
 def prepare_voices(config: dict, home: Path, log) -> None:
     """Before the game starts: (re)make the voice bank if the game was updated since, so its files
     are read while nothing (Battle.net patching, the game) is busy with them. Quiet when the bank
-    is up to date or F5 cannot run here (the F5 engine reports that when it is asked for)."""
+    is up to date or F5 cannot run here (the F5 engine reports that when it is asked for). Never raises:
+    whatever goes wrong here is tried again when the F5 engine loads, and the game starts anyway."""
     try:
         if not gamevoices.stale(config, gamevoices.bank_dir(config, home)):
             return
         import onnxruntime
         if provider(config) not in onnxruntime.get_available_providers() or provider(config) == "CPUExecutionProvider":
             return
+        log("игра запустится, когда соберутся голоса рас")
         make_bank(config, home, log)
     except ImportError:
         return
