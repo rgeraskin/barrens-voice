@@ -46,6 +46,9 @@ TIPS = {
                  "сама, когда вы запустите игру; до этого ничего не загружается и видеопамять свободна.",
     "install": "Скопировать аддон Barrens Voice в папку игры (Interface\\AddOns\\BarrensVoice). "
                "Если игра запущена — потом /reload.",
+    "update_now": "Версия готова и сама установится, когда вы закроете игру. Установить сейчас — Barrens Voice "
+                  "перезапустится с ней, озвучка прервётся примерно на полминуты (пока загружаются голоса). "
+                  "Если менялся аддон — в игре потом нужен /reload.",
     "update": "Заменить аддон в игре версией, которая пришла с Barrens Voice. Ваши настройки аддона сохранятся. "
               "Если игра запущена — потом /reload.",
 }
@@ -442,7 +445,8 @@ class App:
                 launcher_log(f"вышла версия {found['version']}")
             return
         if self.updater.check():
-            self.update = {"version": self.updater.found["version"], "url": self.updater.url()}
+            self.update = {"version": self.updater.found["version"], "url": self.updater.url(),
+                           "addon": self.updater.found.get("addon")}
 
     def start_update(self) -> None:
         """«Обновить»: prepare the new version now (installs); from the source - its release page."""
@@ -450,6 +454,20 @@ class App:
             webbrowser.open(self.update["url"] if self.update else f"https://github.com/{model.REPO}/releases")
             return
         threading.Thread(target=self.updater.prepare, daemon=True, name="update").start()
+
+    def install_update_now(self) -> None:
+        """«Установить сейчас»: the prepared version at once, the game or not - the companion stops, the launcher
+        restarts into the new version and starts it again for a running game."""
+        if self.updater is None or not self.updater.ready or self.busy:
+            return
+        if self.running_game and not messagebox.askyesno(
+                "Barrens Voice", "Установить новую версию сейчас? Озвучка прервётся примерно на полминуты.", parent=self.root):
+            return
+
+        def switch():
+            self.updater.apply()
+            self.relaunch()
+        self.stop_companion(switch, why="stopping")
 
     def apply_update_when_idle(self) -> None:
         """A prepared version becomes current while no game and no companion run; the launcher restarts into it."""
@@ -572,16 +590,23 @@ class App:
             y = y3 + 52 + GAP
             u = self.update
             p.rounded(22, y, W - 22, y + 48, r=6, fill="#3c2d0a", outline="#b8862b")
-            c.create_text(36, y + 24, text=f"Вышла версия {u['version']}", anchor="w", fill=GOLD, font=(self.title_font, -18))
-            c.create_text(200, y + 24, text="— аддон и компаньон", anchor="w", fill=PARCHMENT, font=p.body)
-            p.button(W - 236, y + 9, W - 136, y + 39, "Что нового", "news", lambda: webbrowser.open(u["url"]))
+            title = f"Вышла версия {display_version(u['version'])}"
+            if u.get("addon") and model.newer(u["addon"], self.addon_version):     # the addon changed too
+                title += f" и аддон {u['addon']}"
+            # what the update does or waits for: a second line under the title; the buttons on the right
             status = self.updater.status if self.updater else ""
-            if status in ("downloading", "preparing", "ready"):
-                c.create_text(W - 58, y + 24, anchor="e", fill=PARCHMENT, font=p.small,
-                              text={"downloading": "скачивается…", "preparing": "готовится…",
-                                    "ready": "включится после игры"}[status])
-            else:
-                p.button(W - 128, y + 9, W - 58, y + 39, "Обновить", "update", self.start_update)
+            doing = {"downloading": "обновление скачивается…", "preparing": "обновление готовится…",
+                     "ready": "обновление ждёт закрытия игры" if self.running_game else "обновление ждёт остановки озвучки"
+                     }.get(status)
+            c.create_text(36, y + (16 if doing else 24), text=title, anchor="w", fill=GOLD, font=(self.title_font, -18))
+            if doing:
+                c.create_text(36, y + 35, text=doing, anchor="w", fill=PARCHMENT, font=p.small)
+            if status == "ready":                 # or now, by the player
+                p.button(W - 316, y + 9, W - 166, y + 39, "Установить сейчас", "update_now", self.install_update_now,
+                         tip=TIPS["update_now"])
+            elif not doing:
+                p.button(W - 246, y + 9, W - 166, y + 39, "Обновить", "update", self.start_update)
+            p.button(W - 156, y + 9, W - 58, y + 39, "Что нового", "news", lambda: webbrowser.open(u["url"]))
             p.button(W - 50, y + 9, W - 30, y + 39, "×", "dismiss", self.dismiss_update)
         c.create_text(W - 24, h - 16, text=f"версия {display_version(self.version)}", anchor="e", fill=DIM, font=p.small)
         self.tray.tooltip("Barrens Voice — " + lines[0][1])

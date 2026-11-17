@@ -39,6 +39,7 @@
 - The launcher reads the companion's stderr apart from its log lines: a library writing below Python (a progress bar without its line end) glued itself to the next log line, which the main window then did not show — the first «собираю голоса рас из игры» among them. Such output is a `DEBUG [stderr]` line of its own, its last state, without colour codes.
 - Building the voice bank (once, and after each game update) shows its progress: «собираю голоса рас: N из M» every 10 s, then «голоса рас собраны: N из M за X мин»; the launcher's main window keeps them in one line that moves on.
 - The addon follows the app: with «Обновлять автоматически» an installed Barrens Voice replaces an older addon in each game that is not running (a newer one, from CurseForge, stays); otherwise a game's card offers «обновить аддон».
+- The update notice: «Вышла версия 0.4.1 и аддон 0.3.2» (the addon only when it changed), under it what the update does («обновление скачивается… / готовится… / ждёт закрытия игры»), «Что нового» by the cross. «Установить сейчас» puts a prepared version in at once: the companion stops, the launcher restarts into it and starts the voice-over again for the running game (about half a minute without it).
 - The links to more Windows voices (RHVoice, Silero) on «Голоса» are rows of the same kind: the address to see and copy, «Копировать» and «Открыть».
 
 ## 0.3.0

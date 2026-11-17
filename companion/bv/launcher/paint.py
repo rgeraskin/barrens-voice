@@ -202,8 +202,10 @@ class Painter:
                        lambda: self.lacquer(x0, y0, x1, y1, top, bottom, tag))
             self.click(tag, action)
 
-    def button(self, x0, y0, x1, y1, text, tag, action=None, font=None) -> None:
+    def button(self, x0, y0, x1, y1, text, tag, action=None, font=None, tip=None) -> None:
         """A small dark button with a gold edge on hover."""
+        if tip:
+            self.tips[tag] = tip
         self.rounded(x0, y0, x1, y1, r=5, fill="#23170d", outline=EDGE, tags=(tag, tag + "box"))
         self.c.create_text((x0 + x1) / 2, (y0 + y1) / 2, text=text, fill=PARCHMENT, font=font or self.body,
                            tags=(tag, tag + "text"))

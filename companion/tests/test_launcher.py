@@ -948,3 +948,22 @@ class UpdateInWindow(unittest.TestCase):
         self.win.updater = None                                                        # run from the source: never
         self.app.App.update_addons(self.win)
         self.assertEqual(self.installed, [])
+
+    def test_install_now(self):
+        from unittest import mock
+        done = []
+        self.win.updater.apply = lambda: done.append("apply")
+        self.win.relaunch = lambda: done.append("relaunch")
+        self.win.root = None
+        self.win.stop_companion = lambda then, why: (done.append("stop"), then())
+        self.win.running_game = "forever"
+        with mock.patch.object(self.app.messagebox, "askyesno", return_value=False):
+            self.app.App.install_update_now(self.win)
+        self.assertEqual(done, [])                                                     # the player said no
+        with mock.patch.object(self.app.messagebox, "askyesno", return_value=True):
+            self.app.App.install_update_now(self.win)
+        self.assertEqual(done, ["stop", "apply", "relaunch"])                          # stopped first, then switched
+        done.clear()
+        self.win.updater.ready = None
+        self.app.App.install_update_now(self.win)
+        self.assertEqual(done, [])                                                     # nothing prepared: nothing
