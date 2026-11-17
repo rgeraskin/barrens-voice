@@ -601,6 +601,19 @@ class Update(unittest.TestCase):
             self.assertIsNone(update.record_start(root, 300, failed=True))               # ran a while: not a start failure
             self.assertFalse(update.state_path(root).exists())
 
+    def test_settled_start_prunes(self):
+        from bv import install, update
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            for v in ("0.4.0", "0.4.1", "0.4.2"):
+                (root / "app" / v).mkdir(parents=True)
+            install.point_current(root, root / "app" / "0.4.1")
+            update.apply(root, "0.4.2")
+            self.assertIsNone(update.record_start(root, 5, failed=True))                 # not settled: all kept
+            self.assertEqual(len(list((root / "app").iterdir())), 4)
+            self.assertIsNone(update.record_start(root, 5, failed=False))                # a good start: settled
+            self.assertEqual(sorted(p.name for p in (root / "app").iterdir()), ["0.4.1", "0.4.2", "current"])
+
     def test_version_runs(self):
         # the new version's own Python must import the launcher and the companion (a broken launcher could never
         # update itself again); here the test's Python and this repository stand in for the version's
@@ -935,6 +948,15 @@ class UpdaterFlow(unittest.TestCase):
         self.assertEqual(relaunch_command('"C:\\BV\\Barrens Voice.exe"', resident=True),
                          'cmd /c ping -n 3 127.0.0.1 >nul & start "" "C:\\BV\\Barrens Voice.exe" --tray')
         self.assertTrue(relaunch_command('"x.exe"', resident=False).endswith('start "" "x.exe"'))
+
+    def test_archive_removed_after_prepare(self):
+        from bv import update
+        downloads = self.root / "cache" / "downloads"
+        downloads.mkdir(parents=True)
+        (downloads / "barrens-voice-0.3.9.zip").write_bytes(b"an old one")
+        self.publish(update.STABLE, "0.4.1")
+        self.updater().check()
+        self.assertEqual(list(downloads.iterdir()), [])
 
     def test_version_that_does_not_start_refused(self):
         from bv import update

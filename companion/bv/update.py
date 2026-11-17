@@ -250,6 +250,10 @@ def record_start(root: Path, ran_for: float, failed: bool) -> str | None:
         return None
     if not failed or ran_for > EARLY:
         path.unlink(missing_ok=True)
+        try:                                        # settled: the versions before the one to go back to go
+            install.prune(root)
+        except OSError:
+            pass
         return None
     state["fails"] = state.get("fails", 0) + 1
     if state["fails"] < 2 or not state.get("previous") or not (root / "app" / state["previous"]).is_dir():
@@ -327,10 +331,11 @@ class Updater:
         if not found or self.status in BUSY:
             return None
         name = install.display_version(found["version"])
+        downloads = self.root / "cache" / "downloads"
         try:
             self.status = "downloading"
             self.say(f"скачиваю версию {name} ...")
-            archive = download(found, self.root / "cache" / "downloads", fetch_stream=self.fetch_stream)
+            archive = download(found, downloads, fetch_stream=self.fetch_stream)
             self.status = "preparing"
             self.say(f"готовлю версию {name} ...")
             self.ready = prepare(self.root, archive, log=self.detail, manifest=found)
@@ -343,6 +348,12 @@ class Updater:
             self.status = "error"
             self.say(f"обновление не удалось: {e}", "WARN")
             return None
+        finally:
+            for leftover in downloads.glob("barrens-voice-*"):   # unpacked or refused: the archive is not needed
+                try:
+                    leftover.unlink()
+                except OSError:
+                    pass
 
     def due(self, game_running: bool, companion_running: bool, busy: bool) -> bool:
         """Whether the prepared version may become current now: never under a running game or voice-over, and
