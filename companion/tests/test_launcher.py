@@ -169,6 +169,28 @@ class Config(unittest.TestCase):
             self.assertEqual(update_config(path, game="retail")["rate"], 3)
             self.assertIsNone(config_problem(Path(d) / "none.json"))                 # none yet: written fresh
 
+    def test_unreadable_file_never_written_over(self):
+        # in use (a sharing violation, an antivirus scan) or its permissions: the launcher wrote the defaults over it
+        from unittest import mock
+        from bv.launcher.model import BrokenConfig, config_problem, read_config, update_config
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "config.json"
+            mine = json.dumps({"players": {"Громмаш": "orc-male"}, "rate": 3})
+            path.write_text(mine, encoding="utf-8")
+            real = Path.read_text
+
+            def locked(self, *a, **k):
+                if self == path:
+                    raise PermissionError(13, "The process cannot access the file")
+                return real(self, *a, **k)
+            with mock.patch.object(Path, "read_text", locked):
+                self.assertTrue(read_config(path)["exit_with_wow"])                 # the window still opens
+                self.assertIn("config.json", config_problem(path))
+                with self.assertRaises(BrokenConfig):
+                    update_config(path, game="retail")
+            self.assertEqual(path.read_text(encoding="utf-8"), mine)               # nothing written
+            self.assertEqual(update_config(path, game="retail")["rate"], 3)          # readable again: written
+
     def test_window_keeps_the_change_and_says_once(self):
         from types import SimpleNamespace
         from unittest import mock

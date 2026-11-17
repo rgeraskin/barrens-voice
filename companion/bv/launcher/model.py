@@ -188,17 +188,23 @@ def remember(config: dict, game: str, folder: Path) -> dict | None:
 
 class BrokenConfig(ValueError):
     """config.json is there but is not a JSON object of settings (a hand edit gone wrong: a single backslash
-    in a path, a missing comma)."""
+    in a path, a missing comma), or it cannot be read at all right now (in use, an antivirus scan, its
+    permissions)."""
 
 
 def read_config(path: Path = CONFIG_PATH, strict: bool = False) -> dict:
     """The companion's settings as it reads them: its defaults with config.json over them. A file that does
-    not parse gives the defaults, or BrokenConfig when `strict`."""
+    not parse or cannot be read gives the defaults, or BrokenConfig when `strict` - only a file that is not
+    there gives the defaults then (the defaults written over an unreadable file lost the player's settings)."""
     from ..__main__ import DEFAULT_CONFIG
     config = dict(DEFAULT_CONFIG)
     try:
         saved = json.loads(Path(path).read_text(encoding="utf-8-sig"))     # -sig: Notepad's BOM is no error
-    except OSError:
+    except FileNotFoundError:
+        return config
+    except OSError as e:
+        if strict:
+            raise BrokenConfig(f"config.json не открывается: {e.strerror or e}") from e
         return config
     except ValueError as e:
         if strict:
