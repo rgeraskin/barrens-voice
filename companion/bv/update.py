@@ -378,6 +378,9 @@ class Updater:
         return version
 
 
-def relaunch_command(starter: str, resident: bool) -> str:
-    """How the launcher starts anew a moment after it ends (cmd waits ~2 s: the old one frees its mutex)."""
-    return f'cmd /c ping -n 3 127.0.0.1 >nul & start "" {starter}' + (" --tray" if resident else "")
+def relaunch_command(starter: str, resident: bool, updated: bool = False) -> str:
+    """How the launcher starts anew a moment after it ends (cmd waits ~2 s: the old one frees its mutex).
+    `updated`: into a version just applied, which knows --updated (not a version gone back to: an older
+    launcher stops at a switch it does not know) - that start does not start the game."""
+    return (f'cmd /c ping -n 3 127.0.0.1 >nul & start "" {starter}' + (" --tray" if resident else "")
+            + (" --updated" if updated else ""))

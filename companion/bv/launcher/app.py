@@ -140,12 +140,7 @@ class App:
             from .. import launch
             if sys.platform == "win32":
                 self.running_game = launch.running_game()[0]
-            # the companion (and the race voices in video memory) only with the game: started now when it
-            # runs or the launcher starts it; else when it appears (tick) or on «Играть»
-            if self.running_game or self.config.get("launch_wow"):
-                self.start_companion()
-            else:
-                self.say("ждёт игру: «Играть» или запуск из Battle.net")
+            self.start_on_open()
             if self.config.get("launch_wow") and self.companion.running and not self.running_game:
                 self.hide(told="Barrens Voice запускает игру и ждёт её в трее — щёлкните значок, чтобы открыть окно.")
         if args["open"]:                           # --open settings|help: straight to that window
@@ -153,6 +148,19 @@ class App:
         root.after(TICK_MS, self.tick)
 
     # --- the companion --------------------------------------------------------------------------
+
+    def start_on_open(self) -> None:
+        """The companion (and the race voices in video memory) only with the game: started at the window's
+        start when the game runs or the launcher starts it («Запускать игру вместе с Barrens Voice»); else when
+        it appears (tick) or on «Играть». Not the game after an update's restart (--updated): the player did not
+        ask to play, and may just have closed it."""
+        updated = self.args.get("updated")
+        if self.running_game:
+            self.start_companion(["--no-launch"] if updated else None)
+        elif self.config.get("launch_wow") and not updated:
+            self.start_companion()
+        else:
+            self.say("ждёт игру: «Играть» или запуск из Battle.net")
 
     def say(self, message: str, level: str = "INFO") -> None:
         """A line of the launcher's own in the logs (and its log file)."""
@@ -231,6 +239,8 @@ class App:
         if state.get("phase") == "game_closed":
             if self.config.get("exit_with_wow") and not self.resident:
                 self.say("игра закрыта — закрываюсь")
+                if self.updater is not None and self.updater.due(False, self.companion.running, bool(self.busy)):
+                    self.updater.apply()             # no restart: the next start opens the new version
                 self.quit()
             return
         if code not in (0, None):
@@ -431,6 +441,10 @@ class App:
             self.checked["games"] = now
             self.games = model.find_games(self.config)
             self.update_addons()
+        if not self.exit_seen and not self.busy and not self.companion.running:
+            self.companion_ended(self.companion.poll())   # may close the launcher with the game, or go back a version
+            if self.closed:
+                return
         self.apply_update_when_idle()
         if self.closed:
             return
@@ -441,8 +455,6 @@ class App:
             self.reload_told = True          # started after the player entered the world: say it outside the game too
             self.tray.notify("Озвучка включена. Если окно чата не прячется — сделайте в игре /reload: аддон узнаёт "
                              "о Barrens Voice при входе в игру и /reload.")
-        if not self.exit_seen and not self.busy and not self.companion.running:
-            self.companion_ended(self.companion.poll())
         # the game started from Battle.net while the companion is not running (waiting in the tray, or
         # after the last game was closed): start it for that game - unless it ended with an error
         if (self.running_game and not self.companion.running and not self.busy and self.exit_seen
@@ -481,21 +493,25 @@ class App:
 
         def switch():
             if self.updater.apply():                # failed: the version stays ready, the companion comes back (tick)
-                self.relaunch()
+                self.relaunch(updated=True)
         self.stop_companion(switch, why="stopping")
 
     def apply_update_when_idle(self) -> None:
-        """A prepared version becomes current while no game and no companion run; the launcher restarts into it."""
-        if self.updater is not None and self.updater.due(bool(self.running_game), self.companion.running, bool(self.busy)):
+        """A prepared version becomes current while no game and no companion run; the launcher restarts into it.
+        Only after the companion's end is handled (companion_ended): closing with the game comes first."""
+        if (self.updater is not None and self.exit_seen
+                and self.updater.due(bool(self.running_game), self.companion.running, bool(self.busy))):
             if self.updater.apply():
-                self.relaunch()
+                self.relaunch(updated=True)
 
-    def relaunch(self) -> None:
-        """Start the launcher anew through the install's starter (a moment after this one has gone); end this one."""
+    def relaunch(self, updated: bool = False) -> None:
+        """Start the launcher anew through the install's starter (a moment after this one has gone); end this one.
+        `updated`: into the version just applied, which then does not start the game (--updated)."""
         import subprocess
 
         from ..update import relaunch_command
-        subprocess.Popen(relaunch_command(starter(), self.resident), creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        subprocess.Popen(relaunch_command(starter(), self.resident, updated),
+                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         self.quit()
 
     # --- drawing --------------------------------------------------------------------------------

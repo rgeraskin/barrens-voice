@@ -398,10 +398,12 @@ class CommandLine(unittest.TestCase):
         self.assertEqual(parse_args(["--scale", "x"])["unknown"], ["--scale x"])
         self.assertTrue(parse_args(["/?"])["help"])
         self.assertTrue(parse_args(["--tray"])["tray"])
+        self.assertTrue(parse_args(["--updated"])["updated"] and not parse_args([])["updated"])
 
     def test_usage_names_every_switch(self):
         from bv.launcher.model import COMPANION_FLAGS, USAGE
-        for flag in COMPANION_FLAGS + ("--forever", "--retail", "--console", "--tray", "--open", "--scale", "--help"):
+        for flag in COMPANION_FLAGS + ("--forever", "--retail", "--console", "--tray", "--open", "--scale", "--updated",
+                                       "--help"):
             self.assertIn(flag, USAGE)
 
 
@@ -1247,7 +1249,7 @@ class UpdateInWindow(unittest.TestCase):
         from unittest import mock
         done = []
         self.win.updater.apply = lambda: done.append("apply") or "0.4.1"
-        self.win.relaunch = lambda: done.append("relaunch")
+        self.win.relaunch = lambda updated=False: done.append("relaunch" if updated else "relaunch without --updated")
         self.win.root = None
         self.win.stop_companion = lambda then, why: (done.append("stop"), then())
         self.win.running_game = "forever"
@@ -1278,6 +1280,53 @@ class UpdateInWindow(unittest.TestCase):
         self.assertFalse(failed(1))                                                    # this run said why itself
         state["pid"] = 6
         self.assertTrue(failed(1))                                                     # an earlier run's state
+
+
+    def ended_with_the_game(self, exit_with_wow, resident=False):
+        """The companion ended because the game closed, a version prepared: what the launcher does."""
+        done = []
+        win = self.ns(exit_seen=False, last_code=None, companion_started=0.0, companion_game=None, running_game=None,
+                      game=lambda key: None, tray=self.ns(notify=done.append), say=lambda *a: None, busy="",
+                      companion=self.ns(state=lambda: {"phase": "game_closed"}, running=False),
+                      config={"exit_with_wow": exit_with_wow}, resident=resident,
+                      quit=lambda: done.append("quit"), relaunch=lambda updated=False: done.append(("relaunch", updated)))
+        win.updater = self.ns(due=lambda *a: True, apply=lambda: done.append("apply") or "0.4.1")
+        win.closed = False
+        self.app.App.companion_ended(win, 0)
+        if "quit" not in done:                                                         # the tick goes on
+            self.app.App.apply_update_when_idle(win)
+        return done
+
+    def test_update_after_the_game_closed(self):
+        # closing with the game: the version is switched, no restart (it reopened the window, or started the game
+        # again with «Запускать игру вместе с Barrens Voice»); else the restart that does not start the game
+        self.assertEqual(self.ended_with_the_game(exit_with_wow=True), ["apply", "quit"])
+        self.assertEqual(self.ended_with_the_game(exit_with_wow=False), ["apply", ("relaunch", True)])
+        self.assertEqual(self.ended_with_the_game(exit_with_wow=True, resident=True), ["apply", ("relaunch", True)])
+
+    def test_switch_waits_for_the_companions_end(self):
+        done = []
+        win = self.ns(exit_seen=False, running_game=None, busy="", companion=self.ns(running=False),
+                      updater=self.ns(due=lambda *a: True, apply=lambda: done.append("apply") or "0.4.1"),
+                      relaunch=lambda updated=False: done.append("relaunch"))
+        self.app.App.apply_update_when_idle(win)
+        self.assertEqual(done, [])
+        win.exit_seen = True
+        self.app.App.apply_update_when_idle(win)
+        self.assertEqual(done, ["apply", "relaunch"])
+
+    def test_start_after_an_update_does_not_start_the_game(self):
+        def opened(running_game, launch_wow, updated):
+            started = []
+            win = self.ns(args={"updated": updated}, running_game=running_game, config={"launch_wow": launch_wow},
+                          start_companion=lambda args=None: started.append(args), say=lambda *a: None)
+            self.app.App.start_on_open(win)
+            return started
+        self.assertEqual(opened(None, True, False), [None])                               # the player's start: the game
+        self.assertEqual(opened(None, True, True), [])                                   # after an update: no game
+        self.assertEqual(opened("forever", True, True), [["--no-launch"]])               # the game runs: voices back
+        self.assertEqual(opened("forever", False, False), [None])
+        self.assertEqual(opened(None, False, False), [])
 
 
 class Changelog(unittest.TestCase):

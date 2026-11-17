@@ -297,6 +297,7 @@ USAGE = """BarrensVoice.pyw [ключи] (или BarrensVoice.cmd [ключи])
 --selftest, --selftest-f5   проверка голосов в файлы (с --console)
 --open settings|help|log  сразу открыть «Настройки», «Помощь» или «Журнал»
 --scale 1.25          свой масштаб окна (обычно — как у экрана)
+--updated             так лаунчер перезапускает себя после обновления: игру он тогда не запускает
 --help                эта справка"""
 
 COMPANION_FLAGS = ("--f5", "--launch", "--no-launch", "--selftest", "--selftest-f5")
@@ -305,7 +306,7 @@ COMPANION_FLAGS = ("--f5", "--launch", "--no-launch", "--selftest", "--selftest-
 def parse_args(argv: list[str]) -> dict:
     """The launcher's command line: its own switches, the game, and the companion's switches it
     passes on to the companion."""
-    out = {"tray": False, "console": False, "help": False, "game": None, "open": None, "pos": None,
+    out = {"tray": False, "console": False, "help": False, "updated": False, "game": None, "open": None, "pos": None,
            "scale": None, "companion": [], "unknown": []}
     i = 0
     while i < len(argv):
@@ -313,7 +314,7 @@ def parse_args(argv: list[str]) -> dict:
         value = argv[i + 1] if i + 1 < len(argv) else None
         if a in ("--help", "-h", "/?"):
             out["help"] = True
-        elif a in ("--tray", "--console"):
+        elif a in ("--tray", "--console", "--updated"):
             out[a[2:]] = True
         elif a in ("--forever", "--retail"):
             out["game"] = a[2:]
