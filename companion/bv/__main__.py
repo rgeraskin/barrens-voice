@@ -168,15 +168,60 @@ def prune_logs(keep_days: int) -> None:
             path.unlink(missing_ok=True)
 
 
-def load_config() -> dict:
+class ConfigError(Exception):
+    """config.json cannot be read: the companion stops and says why, in words for the player."""
+
+
+# the least a number setting may be: a queue of 0 lines, a poll every 0 s would break the reading
+LEAST = {"max_queue": 1, "poll_interval": 0.01, "capture_height": 1}
+
+
+def settle_numbers(config: dict, log) -> None:
+    """Number settings as numbers: one typed as text ("8") is read as the number, one that is no number
+    at all gets its default (logged), and none goes under its LEAST."""
+    for key, default in DEFAULT_CONFIG.items():
+        if not isinstance(default, (int, float)) or isinstance(default, bool):
+            continue
+        value = config.get(key)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            try:
+                value = type(default)(float(value))
+            except (TypeError, ValueError):
+                log(f"не удалось прочитать «{key}» в config.json ({value!r}): беру {default}")
+                value = default
+        if key in LEAST and value < LEAST[key]:
+            log(f"не удалось взять «{key}» = {value} из config.json: беру {LEAST[key]}")
+            value = LEAST[key]
+        config[key] = value
+
+
+def _write_config(path: Path, config: dict) -> None:
+    """Through a temporary file, as the launcher writes it: neither ever reads half a file."""
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def load_config(path: Path | None = None, log=log) -> dict:
+    """DEFAULT_CONFIG with config.json over it; settings new to the file written into it. Raises
+    ConfigError when the file is not JSON of settings (the launcher shows why)."""
+    path = path or CONFIG_PATH
     config = dict(DEFAULT_CONFIG)
-    if CONFIG_PATH.exists():
-        saved = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
-        config.update(saved)
-        if any(key not in saved for key in DEFAULT_CONFIG):   # new settings: write them in
-            CONFIG_PATH.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
-    else:
-        CONFIG_PATH.write_text(json.dumps(DEFAULT_CONFIG, ensure_ascii=False, indent=2), encoding="utf-8")
+    if not path.exists():
+        _write_config(path, config)
+        return config
+    try:
+        saved = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        raise ConfigError(f"config.json не читается: ошибка в строке {e.lineno}, столбец {e.colno} ({e.msg})") from e
+    except ValueError as e:                             # not UTF-8
+        raise ConfigError(f"config.json не читается: {e}") from e
+    if not isinstance(saved, dict):
+        raise ConfigError("config.json не читается: в нём должны быть настройки в фигурных скобках { }")
+    config.update(saved)
+    settle_numbers(config, log)
+    if any(key not in saved for key in DEFAULT_CONFIG):   # new settings: write them in
+        _write_config(path, config)
     return config
 
 
@@ -322,7 +367,14 @@ def main() -> int:
 
     make_dpi_aware()
 
-    config = load_config()
+    try:
+        config = load_config()
+    except (ConfigError, OSError) as e:                 # before anything else: nothing works without it
+        log(f"ОШИБКА: {e}")
+        log("    исправьте файл или удалите его — компаньон создаст новый с настройками по умолчанию")
+        from . import state
+        state.init(STATE_FILE, phase="error", error=str(e))
+        return 1
     for game in ("retail", "forever"):                # BarrensVoice-Retail.cmd: the same companion, the other game
         if f"--{game}" in sys.argv:
             config["game"] = game
