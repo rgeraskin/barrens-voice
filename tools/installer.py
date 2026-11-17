@@ -40,12 +40,30 @@ def uv_exe() -> Path:
     return target
 
 
+CSC = [r"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe", r"C:\Windows\Microsoft.NET\Framework\v4.0.30319\csc.exe"]
+
+
+def launcher_exe() -> Path:
+    """Barrens Voice.exe, the install folder's starter with the app's icon (installer/launcher.cs), by the C#
+    compiler of the .NET Framework that every Windows 10/11 has."""
+    csc = next((p for p in CSC if Path(p).is_file()), None)
+    if csc is None:
+        sys.exit("csc.exe (.NET Framework 4) not found")
+    out = DIST / "Barrens Voice.exe"
+    subprocess.run([csc, "/nologo", "/target:winexe", "/optimize+", f"/win32icon:{ROOT / 'companion' / 'bv' / 'launcher' / 'icon.ico'}",
+                    f"/out:{out}", "/r:System.Windows.Forms.dll", "/r:System.Core.dll", str(ROOT / "installer" / "launcher.cs")],
+                   check=True)
+    print(f"{out.name}: {out.stat().st_size / 1e3:.0f} kB")
+    return out
+
+
 def main() -> int:
     sys.path.insert(0, str(ROOT / "tools"))
     import release
     archive = release.build()
     version = archive.stem.removeprefix("barrens-voice-")
     uv_exe()
+    launcher_exe()
     iscc = next((p for p in ISCC if p and Path(p).is_file()), None)
     if iscc is None:
         sys.exit("Inno Setup 6 (ISCC.exe) not found: install it or set INNO_ISCC")

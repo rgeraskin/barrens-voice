@@ -25,7 +25,7 @@ RedirectionGuard=no
 OutputDir=..\dist
 OutputBaseFilename=BarrensVoice-Setup-{#AppVersion}
 SetupIconFile=..\companion\bv\launcher\icon.ico
-UninstallDisplayIcon={app}\BarrensVoice.ico
+UninstallDisplayIcon={app}\Barrens Voice.exe
 UninstallDisplayName=Barrens Voice
 Compression=lzma2
 SolidCompression=yes
@@ -46,8 +46,8 @@ Name: "desktopicon"; Description: "Значок на рабочем столе"
 [Files]
 Source: "..\dist\uv.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\companion\bv\install.py"; DestDir: "{app}\setup"; Flags: ignoreversion
-; the shortcuts' icon at a path that exists when they are made ([Icons] come before [Run], app\current after)
-Source: "..\companion\bv\launcher\icon.ico"; DestDir: "{app}"; DestName: "BarrensVoice.ico"; Flags: ignoreversion
+; the starter a player finds in the folder, with the app's icon; the shortcuts and the sign-in go through it
+Source: "..\dist\Barrens Voice.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\dist\barrens-voice-{#AppVersion}.zip"; DestDir: "{app}\setup"; Flags: ignoreversion
 
 [Run]
@@ -55,11 +55,11 @@ Source: "..\dist\barrens-voice-{#AppVersion}.zip"; DestDir: "{app}\setup"; Flags
 Filename: "{cmd}"; Parameters: "/c ""set UV_PYTHON_INSTALL_DIR={app}\python&& set UV_CACHE_DIR={app}\cache\uv&& set UV_PYTHON_PREFERENCE=only-managed&& ""{app}\uv.exe"" run --no-project --python 3.13 ""{app}\setup\install.py"" --root ""{app}"" --archive ""{app}\setup\barrens-voice-{#AppVersion}.zip"" || pause"""; StatusMsg: "Скачиваю Python и библиотеки (0,6–2,5 ГБ, несколько минут)…"; Flags: waituntilterminated
 ; the models now, not at the first start (~3 GB once)
 Filename: "{app}\app\current\.venv\Scripts\python.exe"; Parameters: "-m bv --fetch-models"; WorkingDir: "{app}\app\current\companion"; StatusMsg: "Скачиваю модели голосов (около 3 ГБ)…"; Flags: waituntilterminated
-Filename: "{app}\app\current\.venv\Scripts\pythonw.exe"; Parameters: """{app}\app\current\companion\BarrensVoice.pyw"""; WorkingDir: "{app}\app\current\companion"; Description: "Запустить Barrens Voice"; Flags: postinstall nowait skipifsilent
+Filename: "{app}\Barrens Voice.exe"; WorkingDir: "{app}"; Description: "Запустить Barrens Voice"; Flags: postinstall nowait skipifsilent
 
 [Icons]
-Name: "{userprograms}\Barrens Voice"; Filename: "{app}\app\current\.venv\Scripts\pythonw.exe"; Parameters: """{app}\app\current\companion\BarrensVoice.pyw"""; WorkingDir: "{app}\app\current\companion"; IconFilename: "{app}\BarrensVoice.ico"
-Name: "{userdesktop}\Barrens Voice"; Filename: "{app}\app\current\.venv\Scripts\pythonw.exe"; Parameters: """{app}\app\current\companion\BarrensVoice.pyw"""; WorkingDir: "{app}\app\current\companion"; IconFilename: "{app}\BarrensVoice.ico"; Tasks: desktopicon
+Name: "{userprograms}\Barrens Voice"; Filename: "{app}\Barrens Voice.exe"; WorkingDir: "{app}"
+Name: "{userdesktop}\Barrens Voice"; Filename: "{app}\Barrens Voice.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Registry]
 ; the launcher's «Запускать при входе в Windows» writes this value: gone with the program

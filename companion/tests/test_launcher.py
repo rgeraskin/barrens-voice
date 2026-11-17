@@ -109,6 +109,8 @@ class Paths(unittest.TestCase):
             got = layout(code, {})
             self.assertEqual((got["root"], got["data"], got["cache"]), (root, root / "data", root / "cache"))
             self.assertIn(str(root / "app" / "current" / ".venv"), got["starter"])   # through the junction
+            (root / "Barrens Voice.exe").write_bytes(b"")
+            self.assertEqual(layout(code, {})["starter"], f'"{root / "Barrens Voice.exe"}"')   # the starter, if there
             self.assertEqual(layout(code, {"BV_DATA": "x"})["data"], Path("x"))
 
     def test_installed_and_not(self):

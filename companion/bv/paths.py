@@ -31,6 +31,8 @@ def layout(code_dir: Path, env=os.environ) -> dict:
     cache = Path(env.get("BV_CACHE") or (root / "cache" if root else data))
     if env.get("BV_STARTER"):
         start = env["BV_STARTER"]
+    elif root and (root / "Barrens Voice.exe").is_file():
+        start = f'"{root / "Barrens Voice.exe"}"'           # the install's starter: the current version, whichever
     elif root:
         current = root / "app" / "current"
         start = f'"{current / ".venv" / "Scripts" / "pythonw.exe"}" "{current / "companion" / "BarrensVoice.pyw"}"'

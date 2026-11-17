@@ -116,6 +116,8 @@ class App:
 
         root.protocol("WM_DELETE_WINDOW", self.close)
         self.say(f"Barrens Voice {display_version(self.version)}" + (", ждёт игру в трее" if resident else ""))
+        if self.addon_missing():                   # said at once, not only when the companion would start
+            self.say(f"в {GAME_NAMES[self.selected]} нет аддона — «установить аддон» справа", "WARN")
         self.redraw()
         if resident and self.has_tray:
             root.withdraw()
@@ -248,6 +250,8 @@ class App:
             return
         self.selected = key
         self.config = model.update_config(game=key)
+        if self.addon_missing():
+            self.say(f"в {GAME_NAMES[key]} нет аддона — «установить аддон» справа", "WARN")
         if self.companion.running and self.companion_game != key:
             self.restart_companion(["--no-launch"])
         self.redraw()
