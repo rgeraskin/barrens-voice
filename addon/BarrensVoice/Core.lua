@@ -527,6 +527,31 @@ local function Takes(frame, event, zoneChannel, baseName)
     return false
 end
 
+--- Whether a chat filter of another addon (a spam blocker and the like) hides this line in `frame`:
+--- the client's own ChatFrameUtil.ProcessMessageEventFilters (Forever, retail: its first result says
+--- "discard"), else the old clients' ChatFrame_GetMessageEventFilters(event) list. Our own filter
+--- (ChatFade.lua) keeps out of it while ns.askingFilters is set; another addon's filter that errors
+--- counts as not hiding.
+local function Filtered(frame, event, ...)
+    local util = rawget(_G, "ChatFrameUtil")
+    ns.askingFilters = true
+    local ok, hidden
+    if type(util) == "table" and type(util.ProcessMessageEventFilters) == "function" then
+        ok, hidden = pcall(util.ProcessMessageEventFilters, frame, event, ...)
+        hidden = ok and hidden and true or false
+    else
+        local get = rawget(_G, "ChatFrame_GetMessageEventFilters")
+        local filters = type(get) == "function" and select(2, pcall(get, event))
+        hidden = false
+        for _, filter in ipairs(type(filters) == "table" and filters or {}) do
+            local fine, hide = pcall(filter, frame, event, ...)
+            if fine and hide then hidden = true break end
+        end
+    end
+    ns.askingFilters = false
+    return hidden
+end
+
 --- Whether the player sees this line: some chat window that is open (shown or docked as a tab)
 --- takes it, and no chat filter - spam blockers and the like - hides it there.
 local function Visible(event, ...)
@@ -542,16 +567,7 @@ local function Visible(event, ...)
         end
     end
     if not seen then return false, "нет открытого окна чата с этим типом или каналом" end
-    local filters = ChatFrame_GetMessageEventFilters and ChatFrame_GetMessageEventFilters(event)
-    ns.askingFilters = true       -- our own chat filter (ChatFade.lua) keeps out of this
-    for i, filter in ipairs(filters or {}) do
-        local ok, hide = pcall(filter, seen, event, ...)
-        if ok and hide then
-            ns.askingFilters = false
-            return false, ("скрыто фильтром чата другого аддона (№%d)"):format(i)
-        end
-    end
-    ns.askingFilters = false
+    if Filtered(seen, event, ...) then return false, "скрыто фильтром чата другого аддона" end
     return true
 end
 

@@ -207,13 +207,26 @@ function F.Apply()
     end
 end
 
+--- The client's way to add a chat filter: ChatFrameUtil.AddMessageEventFilter (Forever, retail); the
+--- old global is only a deprecation alias there (loaded with the CVar loadDeprecationFallbacks), the
+--- only one on older clients. nil when there is neither: no line is marked, so each shows its window.
+local function AddFilter()
+    local util = rawget(_G, "ChatFrameUtil")
+    if type(util) == "table" and type(util.AddMessageEventFilter) == "function" then
+        return util.AddMessageEventFilter
+    end
+    local old = rawget(_G, "ChatFrame_AddMessageEventFilter")
+    return type(old) == "function" and old or nil
+end
+
 function F.Initialize()
     driver = CreateFrame("Frame")
+    local add = AddFilter()
     local seen = {}
     local function Watch(event)
-        if not seen[event] then
+        if add and not seen[event] then
             seen[event] = true
-            ChatFrame_AddMessageEventFilter(event, F.Filter)
+            add(event, F.Filter)
         end
     end
     -- the events the addon reads, and every other the chat windows show; the channels' own messages

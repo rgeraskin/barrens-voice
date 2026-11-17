@@ -47,6 +47,33 @@ BackdropTemplateMixin = {}
 C_Timer = { NewTimer = function(_, f) return { Cancel = function() end } end, NewTicker = function() end,
             After = function(_, f) f() end }
 Settings = { RegisterCanvasLayoutCategory = function() return {} end, RegisterAddOnCategory = function() end }
+-- The chat filters as the Forever client keeps them (Blizzard_ChatFrameBase/Shared/ChatFrameFilters.lua):
+-- per event, in the order added, each called (frame, event, ...) - an error counts as no answer; the first
+-- result true discards the line, a second result replaces the arguments for the filters after it.
+-- ProcessMessageEventFilters returns (discard, arguments...). There is no ChatFrame_GetMessageEventFilters.
+local chatFilters = {}
+ChatFrameUtil = {
+    AddMessageEventFilter = function(event, f)
+        chatFilters[event] = chatFilters[event] or {}
+        for _, g in ipairs(chatFilters[event]) do if g == f then return end end
+        table.insert(chatFilters[event], f)
+    end,
+    RemoveMessageEventFilter = function(event, f)
+        for i, g in ipairs(chatFilters[event] or {}) do if g == f then table.remove(chatFilters[event], i) return end end
+    end,
+    ProcessMessageEventFilters = function(frame, event, ...)
+        local function pack(...) return { n = select("#", ...), ... } end
+        local args = pack(...)
+        for _, f in ipairs(chatFilters[event] or {}) do
+            local r = pack(pcall(f, frame, event, unpack(args, 1, args.n)))
+            if r[1] then
+                if r[2] then return true, unpack(args, 1, args.n) end
+                if r[3] then args = pack(unpack(r, 3, r.n)) end
+            end
+        end
+        return false, unpack(args, 1, args.n)
+    end,
+}
 local ns = {}
 for _, f in ipairs({ "Protocol.lua", "Strip.lua", "Dictionary.lua", "VoiceList.lua", "Core.lua", "ChatFade.lua", "CompanionStatus.lua", "Companion.lua", "UI.lua",
                      "DictionaryWindow.lua", "StripWindow.lua", "Options.lua", "VoicesWindow.lua", "Minimap.lua" }) do
@@ -110,7 +137,9 @@ GetChatWindowInfo = function(i)
     if i == 1 then return "Общий", 14, 1, 1, 1, 1, true, false, 1 end
     return "Гильдия", 14, 1, 1, 1, 1, false, false, nil
 end
-ChatFrame_GetMessageEventFilters = function() return { function(_, _, msg) return msg:find("спам") ~= nil end } end
+local function spamFilter(_, _, msg) return msg:find("спам") ~= nil end
+ChatFrameUtil.AddMessageEventFilter("CHAT_MSG_SAY", function() error("a broken filter of another addon") end)
+ChatFrameUtil.AddMessageEventFilter("CHAT_MSG_SAY", spamFilter)
 for k, v in pairs({ say = true, yell = true, guild = true, channels = true, onlyVisible = true, sayNames = false }) do
     ns.db[k] = v
 end
@@ -136,8 +165,18 @@ local cases = {
 for _, c in ipairs(cases) do
     assert(fire(c[1], c[2], c[3], c[4]) == c[5], c[1] .. " " .. c[2])
 end
+assert(ns.askingFilters == false, "the filters asked, the mark is off again")
+-- a client with the old global list only (no ChatFrameUtil), and one with neither
+local util = ChatFrameUtil
+ChatFrameUtil = nil
+ChatFrame_GetMessageEventFilters = function(event) return event == "CHAT_MSG_SAY" and { spamFilter } or nil end
+assert(not fire("CHAT_MSG_SAY", "это спам") and fire("CHAT_MSG_SAY", "привет"), "the old clients' filter list")
+ChatFrame_GetMessageEventFilters = nil
+assert(fire("CHAT_MSG_SAY", "это спам"), "no filter API at all: shown")
+ChatFrameUtil = util
 ns.db.onlyVisible = false
 assert(fire("CHAT_MSG_YELL", "кричу"), "everything when the option is off")
+ChatFrameUtil.RemoveMessageEventFilter("CHAT_MSG_SAY", spamFilter)
 print("visible ok")
 
 -- quest and item links read as their names; a bracket pair inside a word is a masked "х"
@@ -354,7 +393,10 @@ print("strip place ok")
 -- the chat windows out of sight: transparent without the mouse; a line not read aloud shows its window
 local filters = {}
 ChatTypeGroup = { SYSTEM = { "CHAT_MSG_SYSTEM" }, PARTY = { "CHAT_MSG_PARTY", "CHAT_MSG_PARTY_LEADER" } }
-ChatFrame_AddMessageEventFilter = function(event, f) filters[event] = f end
+-- the filter goes in through ChatFrameUtil (the old global is only a deprecation alias in Forever)
+ChatFrame_AddMessageEventFilter = function() error("the deprecated alias is not needed") end
+local addFilter = ChatFrameUtil.AddMessageEventFilter
+ChatFrameUtil.AddMessageEventFilter = function(event, f) filters[event] = f; addFilter(event, f) end
 hooksecurefunc = function(t, name, f)
     local orig = t[name]
     t[name] = function(...) if orig then orig(...) end f(...) end
@@ -491,6 +533,17 @@ ns.db.fadeChat = false
 ns.ChatFade.Apply()
 assert(ChatFrame1:GetAlpha() == 1, "the setting off: the chat as it was")
 assert(editBox:GetAlpha() == 1, "and its edit box")
+-- the visible-check asks every filter, ours among them: ours never hides a line, nor marks a window then
+rawset(ChatFrame1, "messageTypeList", { "PARTY" })
+rawset(ChatFrame1, "channelList", {})
+ns.db.onlyVisible, ns.db.party = true, true
+assert(fire("CHAT_MSG_PARTY", "через все фильтры"), "our own filter does not hide the line")
+ns.db.onlyVisible = false
+-- a client with no filter API at all: the fading still starts
+local util2 = ChatFrameUtil
+ChatFrameUtil, ChatFrame_AddMessageEventFilter = nil, nil
+ns.ChatFade.Initialize()
+ChatFrameUtil = util2
 print("chat fade ok")
 
 -- is the companion running: the time it writes into CompanionStatus.lua, read when the addon loads
