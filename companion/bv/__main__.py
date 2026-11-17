@@ -613,7 +613,7 @@ def main() -> int:
     # --launch / --no-launch: the launcher's Play and its start for a game already running
     want_launch = "--launch" in sys.argv or (config["launch_wow"] and "--no-launch" not in sys.argv)
     live = LiveConfig(config, CONFIG_PATH, config_stamp)   # from the file as read: a change from now on is seen
-    if want_launch and not launch.wow_running():
+    if want_launch and not launch.wow_may_run():
         # the race voices come from the client's files: (re)made before the game, after an update
         from .f5engine import prepare_voices
         prepare_voices(config, DATA_DIR, log)

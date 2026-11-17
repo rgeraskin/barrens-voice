@@ -51,12 +51,24 @@ def is_game(path: str) -> bool:
 
 
 def wow_running() -> bool:
+    """The game runs: a Wow.exe in a game's folder (`is_game`). The exit with the game asks this - a tool
+    named like the game (WowUp.exe) must not keep the companion running after the game closed, so a
+    program whose path cannot be read is not the game here."""
     return any(is_game(p) for p in process_paths(is_wow))
 
 
-def process_paths(match) -> list[str]:
+def wow_may_run() -> bool:
+    """The game may run: `wow_running`, or a program named like the game (`is_wow`) whose path cannot be
+    read (run as another user or as administrator, say). The launch asks this: a second game started by
+    Battle.net is worse than a launch left to the player, who sees «игра уже запущена» in the log."""
+    unread: list[str] = []
+    return any(is_game(p) for p in process_paths(is_wow, unread)) or bool(unread)
+
+
+def process_paths(match, unread: list[str] | None = None) -> list[str]:
     """Full paths of the running programs whose file name `match` accepts (those this user may ask
-    about: the game, run by the same user, is one of them)."""
+    about: the game, run by the same user, is one of them). The names of those whose path cannot be
+    read go to `unread`."""
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
     kernel32.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
     kernel32.OpenProcess.restype = wintypes.HANDLE
@@ -69,12 +81,17 @@ def process_paths(match) -> list[str]:
         while ok:
             if match(entry.szExeFile):
                 handle = kernel32.OpenProcess(0x1000, False, entry.th32ProcessID)   # QUERY_LIMITED_INFORMATION
+                path = None
                 if handle:
                     buf = ctypes.create_unicode_buffer(1024)
                     size = wintypes.DWORD(len(buf))
                     if kernel32.QueryFullProcessImageNameW(handle, 0, buf, ctypes.byref(size)):
-                        paths.append(buf.value)
+                        path = buf.value
                     kernel32.CloseHandle(handle)
+                if path:
+                    paths.append(path)
+                elif unread is not None:
+                    unread.append(entry.szExeFile)
             ok = kernel32.Process32NextW(snapshot, ctypes.byref(entry))
     finally:
         kernel32.CloseHandle(snapshot)
@@ -120,8 +137,9 @@ def find_battlenet(config: dict) -> Path | None:
 def launch(config: dict, log, game_running=None) -> bool:
     """Ask Battle.net to start the game of `game` (`launch_product` for Forever, WoWF;
     `launch_product_retail` for retail, WoW) - unless a game runs already: the player may have started it
-    while the voice bank was being built before this launch, and a second command starts a second game."""
-    running = game_running or (wow_running if sys.platform == "win32" else (lambda: False))
+    while the voice bank was being built before this launch, and a second command starts a second game
+    (`wow_may_run`: a program named like the game whose path cannot be read counts)."""
+    running = game_running or (wow_may_run if sys.platform == "win32" else (lambda: False))
     if running():
         log("игра уже запущена — второй раз не запускаю")
         return False
@@ -179,8 +197,8 @@ def follow_cold_start(send, log, game_running=None, ready=None, sleep=time.sleep
     the window opens and the game does not start. So: wait for the game; once Battle.net's window is up
     (or after a minute: it may start minimized to the tray) with no game, send the command once more -
     only once: a command sent to a Battle.net that took the first one may start a second game. True
-    when the game came."""
-    game_running = game_running or wow_running
+    when the game came (`wow_may_run`, as for the launch: never a second command to a second game)."""
+    game_running = game_running or wow_may_run
     ready = ready or battlenet_window
     start, resent = clock(), False
     while clock() - start < limit:

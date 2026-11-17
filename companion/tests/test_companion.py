@@ -422,6 +422,45 @@ class AddonFiles(unittest.TestCase):
             self.assertTrue((Path(d) / "VoiceList.lua").is_file())
 
 
+class GameRunning(unittest.TestCase):
+    """A program named like the game whose path cannot be read: the game for the launch (no second game
+    started), not for the exit with the game (a tool such as WowUp.exe must not keep the companion)."""
+
+    def processes(self, readable, unreadable):
+        def process_paths(match, unread=None):
+            if unread is not None:
+                unread.extend(name for name in unreadable if match(name))
+            return [p for p in readable if match(p.replace("\\", "/").rsplit("/", 1)[-1])]
+        return process_paths
+
+    def test_unreadable(self):
+        from unittest import mock
+
+        from bv import launch
+        game = r"D:\Games\World of Warcraft\_forever_\Wow.exe"
+        for readable, unreadable, running, may_run in (
+                ([], [], False, False),
+                ([game], [], True, True),
+                ([r"C:\Programs\WowUp\WowUp.exe"], [], False, False),
+                ([], ["Wow.exe"], False, True),                  # its path hidden from this user: may be the game
+                ([], ["Battle.net.exe"], False, False)):         # only names like the game's count
+            with mock.patch.object(launch, "process_paths", self.processes(readable, unreadable)):
+                self.assertEqual((launch.wow_running(), launch.wow_may_run()), (running, may_run),
+                                 (readable, unreadable))
+
+    def test_no_second_game(self):
+        # launch() asked wow_running: a Wow.exe it could not read was no game, and Battle.net started a second one
+        from unittest import mock
+
+        from bv import launch
+        logged, sent = [], []
+        with mock.patch.object(launch, "process_paths", self.processes([], ["Wow.exe"])), \
+                mock.patch.object(launch.sys, "platform", "win32"), \
+                mock.patch.object(launch, "find_battlenet", lambda config: sent.append(1)):
+            self.assertFalse(launch.launch({}, logged.append))
+        self.assertEqual((logged, sent), (["игра уже запущена — второй раз не запускаю"], []))
+
+
 
 class ExitCodes(unittest.TestCase):
     def test_the_launcher_knows_ours(self):
