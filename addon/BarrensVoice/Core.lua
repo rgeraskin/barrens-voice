@@ -185,7 +185,7 @@ end
 
 --- A note for the program's log (kind "diag": logged, never spoken) - what the addon dropped.
 function ns.Diag(text)
-    ns.Strip.Push(table.concat({ "diag", "", "", "", "", "", ns.LineOptions(), text }, SEP))
+    ns.Strip.Push(ns.ServiceFrame("diag", ns.LineOptions(), text))
 end
 
 -- Debug (/bv debug): each chat line the addon gets but does not send, with the reason, and when
@@ -233,7 +233,7 @@ function ns.WatchCatQuest()
     local speaking = ns.db.enabled and ns.db.waitForCatQuest ~= false and QuestVoiceSpeaking() or false
     if speaking ~= pausedForCatQuest then
         pausedForCatQuest = speaking
-        ns.Strip.PushFirst(table.concat({ speaking and "pause" or "resume", "", "", "", "", "", ns.LineOptions(), "-" }, SEP))
+        ns.Strip.PushFirst(ns.ServiceFrame(speaking and "pause" or "resume", ns.LineOptions(), "-"))
     end
     if not ns.db.debug then voiceSeen = nil; return end
     local now = QuestVoiceState()
@@ -284,7 +284,7 @@ function ns.ControlPayload()
         table.sort(off)
         options = options .. ";off=" .. table.concat(off, "|")
     end
-    return table.concat({ "control", "", "", "", "", "", options, "-" }, SEP)
+    return ns.ServiceFrame("control", options, "-")
 end
 
 function ns.SendControl()
@@ -332,7 +332,7 @@ function ns.SendDictionary(force)
     parts[#parts + 1] = current
     for i, part in ipairs(parts) do
         local options = ("id=%s;part=%d;of=%d"):format(id, i, #parts)
-        ns.Strip.Push(table.concat({ "dict", "", "", "", "", "", options, part }, SEP))
+        ns.Strip.Push(ns.ServiceFrame("dict", options, part))
     end
 end
 
@@ -364,7 +364,7 @@ ns.LINKS = {
 }
 
 local function AskCompanion(kind, key)
-    ns.Strip.Push(table.concat({ kind, "", "", "", "", "", ns.LineOptions(), key }, SEP))
+    ns.Strip.Push(ns.ServiceFrame(kind, ns.LineOptions(), key))
 end
 
 --- Ask the companion to open one of ns.LINKS in the browser; the address goes to the chat too.
@@ -397,15 +397,15 @@ StaticPopupDialogs["BARRENSVOICE_RESET"] = {
 --- (/bv reset-voices, asking first).
 function ns.ResetVoices()
     local options = ns.LineOptions()
-    ns.Strip.Push(table.concat({ "reset", "", "", "", "", "", options, "-" }, SEP))
+    ns.Strip.Push(ns.ServiceFrame("reset", options, "-"))
     print(PREFIX .. "голоса рас будут розданы заново: каждый персонаж получит голос, когда заговорит.")
 end
 
 --- A test line in one Windows voice (the voices window's play buttons).
 function ns.TestVoice(name)
     local options = ns.LineOptions("sapi") .. ";sapi=" .. name
-    ns.Strip.Push(table.concat({ "test", "Проверка", "", "", "", "", options,
-        "Привет! Нужен дам+агер в Мёртвые копи, продам сумки за пять тысяч." }, SEP))
+    ns.Strip.Push(ns.ServiceFrame("test", options,
+        "Привет! Нужен дам+агер в Мёртвые копи, продам сумки за пять тысяч.", "Проверка"))
 end
 
 
@@ -606,7 +606,7 @@ end
 --- Silence now: the program cuts the line being said and drops what is waiting (/bv stop).
 function ns.Stop()
     local options = ns.LineOptions()
-    ns.Strip.PushNow(table.concat({ "stop", "", "", "", "", "", options, "-" }, SEP))
+    ns.Strip.PushNow(ns.ServiceFrame("stop", options, "-"))
 end
 
 local function Version()

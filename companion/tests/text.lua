@@ -15,6 +15,10 @@ local function eq(got, want, what)
 end
 
 eq(ns.SEP, "\31", "the payload separator")
+-- a service frame: kind, five empty fields of the sender, options, text (Core.lua and the companion's protocol.parse)
+eq(ns.ServiceFrame("stop", "rate=125", "-"), "stop\31\31\31\31\31\31rate=125\31-", "a command")
+eq(ns.ServiceFrame("test", "voice=sapi", "Привет", "Проверка"), "test\31Проверка\31\31\31\31\31voice=sapi\31Привет", "with a sender's name")
+print("service frames ok")
 
 -- IsQuestion: a line of questions only
 for _, q in ipairs({ "кто в ОП?", "танк нужен? хил?", "где? ", "что???" }) do assert(ns.IsQuestion(q), q) end

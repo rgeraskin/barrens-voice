@@ -1,12 +1,20 @@
 -- A chat line's text as the addon reads it: markup and emoticons cleaned, a question told apart, an
--- addon's line and a numbered channel recognised. Pure functions on strings and tables only, no WoW
--- API: this file is also loaded by the tests outside the game (companion/tests/text.lua).
+-- addon's line and a numbered channel recognised; and the payload's service frames. Pure functions on
+-- strings and tables only, no WoW API: this file is also loaded by the tests outside the game
+-- (companion/tests/text.lua).
 local _, ns = ...
 ns = ns or {}
 
 -- The payload's field separator (the unit separator): Core.lua joins the fields with it.
 local SEP = "\31"
 ns.SEP = SEP
+
+--- A frame that is not a chat line (settings, a command to the companion, a note for its log): its
+--- kind, options and text, with the sender's fields empty - or only the sender's name (`sender`, the
+--- voices window's test line).
+function ns.ServiceFrame(kind, options, text, sender)
+    return table.concat({ kind, sender or "", "", "", "", "", options, text }, SEP)
+end
 
 --- A line that is nothing but a question or questions ("кто в ОП?", "танк нужен? хил?"): no full stop,
 --- exclamation mark or ellipsis anywhere, and it ends with "?". The voices rise at a question mark
