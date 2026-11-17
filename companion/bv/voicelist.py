@@ -53,7 +53,7 @@ def render(voices, default_off) -> str:
 def write(config: dict, voices, default_off, log) -> None:
     addon = find_addon(config)
     if addon is None:
-        log("аддон BarrensVoice не найден: список голосов для него не записан")
+        log("аддон не найден: список голосов Windows не записан")
         return
     path = addon / "VoiceList.lua"
     text = render(voices, default_off)

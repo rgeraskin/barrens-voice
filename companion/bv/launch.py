@@ -114,7 +114,7 @@ def launch(config: dict, log) -> bool:
     `launch_product_retail` for retail, WoW)."""
     exe = find_battlenet(config)
     if exe is None:
-        log("Battle.net не найден: запустите игру сами (или укажите battlenet_exe в config.json)")
+        log("Battle.net не найден: укажите его в «Настройках»")
         return False
     from .dictionary import game_of
     product = (config.get("launch_product_retail", "WoW") if game_of(config) == "retail"

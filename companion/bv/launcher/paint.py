@@ -248,6 +248,21 @@ class Painter:
                 hi = mid - 1
         return text[:lo] + "…"
 
+    def wrap(self, text: str, font, width: int, indent: str = "") -> list[str]:
+        """`text` broken at spaces into lines of at most `width` pixels (a word longer than a line is cut by
+        `fit`); the lines after the first start with `indent`. A fallback: the main window's lines are written
+        to fit one line, and one that does not is better wrapped than cut."""
+        lines, line = [], ""
+        for word in text.split(" "):
+            candidate = f"{line} {word}" if line else (indent + word if lines else word)
+            if line and self.measure(candidate, font) > width:
+                lines.append(line)
+                line = indent + word
+            else:
+                line = candidate
+        lines.append(line)
+        return [self.fit(x, font, width) for x in lines]
+
     def measure(self, text: str, font) -> float:
         """The width of `text` in design pixels."""
         s = getattr(self.c, "s", 1.0)

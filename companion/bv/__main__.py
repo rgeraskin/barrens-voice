@@ -234,7 +234,7 @@ def restart_online(log) -> None:
     """A model missing from the cache in offline mode: forget the mark and start again online (under
     the launcher: exit with RESTART, it starts the companion again - so it keeps its process)."""
     MODELS_READY.unlink(missing_ok=True)
-    log("в кэше моделей чего-то не хватает — перезапускаюсь с доступом к сети")
+    log("в кэше моделей не всё — перезапускаюсь с сетью")
     if os.environ.get(LAUNCHED):
         os._exit(RESTART)          # from any thread (engines.on_error runs on its own)
     os.execv(sys.executable, [sys.executable, "-m", "bv"] + sys.argv[1:])
@@ -267,7 +267,8 @@ def fetch_models(config: dict) -> int:
         log("модели: ударения (~0,7 ГБ) ...")
         Accentor(log, True).load()
     except Exception as e:  # noqa: BLE001 - the first start tries again
-        log(f"модели не скачались: {e} — компаньон докачает их при первом запуске")
+        log("модели не скачались — докачаются при первом запуске")
+        log(f"    {e}")
         return 1
     log("модели скачаны")
     return 0
@@ -348,7 +349,7 @@ def main() -> int:
     beat = Beat(find_addon(config), log)
     beat.start()
     if needs_reload:
-        log("если окно чата не прячется — сделайте в игре /reload: аддон узнаёт о компаньоне при входе и /reload")
+        log("если окно чата не прячется — /reload в игре")
         state.report(reload_hint=True)
     import atexit
     atexit.register(beat.stop)        # any end - the game closed, a crash, the launcher's stop - but a kill
@@ -479,8 +480,8 @@ def main() -> int:
                     now = time.monotonic()
                     damaged_since = damaged_since or now
                     if not damaged_told and now - damaged_since > 1.0:
-                        log("полоска видна, но кадры не читаются: её что-то перекрывает (миникарта, окно другого "
-                            "аддона?) или настройки изображения искажают цвета")
+                        log("полоска видна, но не читается: её что-то перекрывает?")
+                        log("    миникарта, окно другого аддона или настройки изображения, искажающие цвета")
                         damaged_told = True
                         state.report(damaged=True)
                 else:
@@ -489,7 +490,7 @@ def main() -> int:
                         damaged_told = False
                         state.report(damaged=False)
                 if linked and misses == int(5 / config["poll_interval"]):
-                    log("полоска аддона пропала (выключен, свёрнут или скрыт интерфейс?)")
+                    log("полоска аддона пропала: игра свёрнута или скрыт интерфейс?")
                     linked = False
                     state.report(linked=False)
             else:

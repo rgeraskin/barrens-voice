@@ -24,7 +24,8 @@ def open_link(key: str, log, opener=webbrowser.open) -> str | None:
         opener(url)
         log(f"открываю в браузере: {url}")
     except Exception as e:  # noqa: BLE001 - no browser is not an error of the companion
-        log(f"не удалось открыть браузер ({e}): {url}")
+        log("не удалось открыть браузер")
+        log(f"    {e}: {url}")
     return url
 
 
@@ -48,5 +49,6 @@ def copy_link(key: str, log, setter=_set_clipboard) -> str | None:
         setter(url)
         log(f"адрес в буфере обмена: {url}")
     except Exception as e:  # noqa: BLE001 - the clipboard held by another program: say so, go on
-        log(f"не удалось положить адрес в буфер обмена ({e}): {url}")
+        log("не удалось положить адрес в буфер обмена")
+        log(f"    {e}: {url}")
     return url

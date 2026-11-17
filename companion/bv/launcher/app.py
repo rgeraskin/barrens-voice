@@ -23,6 +23,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox
 
 from . import model
+from ..install import display_version, release_tag
 from ..paths import DATA_DIR, INSTALL_DIR, starter
 from .model import APP_DIR, GAME_NAMES
 from .paint import DIM, GOLD, PARCHMENT, Painter, ScaledCanvas, register_font, window_icon
@@ -114,7 +115,7 @@ class App:
         self.reload_told = False         # the /reload hint of this companion's run shown
 
         root.protocol("WM_DELETE_WINDOW", self.close)
-        self.say(f"Barrens Voice {self.version}" + (", ждёт игру в трее" if resident else ""))
+        self.say(f"Barrens Voice {display_version(self.version)}" + (", ждёт игру в трее" if resident else ""))
         self.redraw()
         if resident and self.has_tray:
             root.withdraw()
@@ -155,7 +156,7 @@ class App:
             self.say("игра не найдена: укажите её папку в «Настройках»", "WARN")
             return False
         if self.addon_missing():
-            self.say(f"в {GAME_NAMES[self.selected]} нет аддона — нажмите «установить аддон» в блоке «Игра»", "WARN")
+            self.say(f"в {GAME_NAMES[self.selected]} нет аддона — «установить аддон» справа", "WARN")
             return False
         if self.config.get("game") != self.selected:
             self.config = model.update_config(game=self.selected)
@@ -254,7 +255,7 @@ class App:
     def install_addon(self, g, ask=False) -> bool:
         source = model.addon_source()
         if source is None:
-            self.say("аддона нет рядом с программой (папка addon\\BarrensVoice) — установите его вручную", "WARN")
+            self.say("аддона нет рядом с Barrens Voice — переустановите его", "WARN")
             return False
         if ask and not messagebox.askyesno("Barrens Voice", f"В {g.name} нет аддона Barrens Voice. Установить его?",
                                            parent=self.root):
@@ -430,7 +431,7 @@ class App:
             return
         self.update = {"version": found["version"], "manifest": found,
                        "url": f"https://github.com/{update.REPO}/releases/tag/v{found['version']}"}
-        self.say(f"вышла версия {found['version']}")
+        self.say(f"вышла версия {display_version(found['version'])}")
         if self.config.get("auto_update", True):
             self._prepare_update()
 
@@ -448,14 +449,14 @@ class App:
         found = self.update["manifest"]
         try:
             self.updating = "downloading"
-            self.say(f"скачиваю версию {found['version']} ...")
+            self.say(f"скачиваю версию {display_version(found['version'])} ...")
             archive = update.download(found, INSTALL_DIR / "cache" / "downloads")
             self.updating = "preparing"
-            self.say(f"готовлю версию {found['version']} (библиотеки — из кэша, новые скачиваются) ...")
+            self.say(f"готовлю версию {display_version(found['version'])} ...")
             version = update.prepare(INSTALL_DIR, archive, log=lambda m: self.incoming.put(
                 f"{datetime.now():%H:%M:%S} DEBUG [обновление] {m}"))
             self.update_ready, self.updating = version, "ready"
-            self.say(f"версия {version} готова — включится, когда игра и озвучка не запущены")
+            self.say(f"версия {display_version(version)} готова — включится после игры")
         except Exception as e:  # noqa: BLE001 - the current version goes on
             self.updating = "error"
             self.say(f"обновление не удалось: {e}", "WARN")
@@ -467,7 +468,7 @@ class App:
             from .. import update
             version, self.update_ready = self.update_ready, None
             update.apply(INSTALL_DIR, version)
-            self.say(f"перехожу на версию {version}")
+            self.say(f"перехожу на версию {display_version(version)}")
             self.relaunch()
 
     def relaunch(self) -> None:
@@ -529,9 +530,16 @@ class App:
         # row 2: the log | Game
         p.panel(LX0, y2, LX1, y2 + row2, "Журнал")
         fits = (row2 - 44 - 6) // 18 + 1
-        for i, (time, level, message) in enumerate(log[-fits:]):      # the level itself is not shown here
-            c.create_text(LX0 + 14, y2 + 44 + i * 18, text=p.fit(f"{time} {message}", p.mono, LX1 - LX0 - 28),
-                          anchor="w", fill=MAIN_COLORS.get(level, "#c9b896"), font=p.mono)
+        # the newest lines that fit; messages are written to fit one line (~58 characters after the time), and
+        # one that does not is wrapped under its time rather than cut
+        rows: list[tuple[str, str]] = []
+        for time, level, message in reversed(log):  # the level itself is not shown here
+            rows[:0] = [(level, part) for part in p.wrap(f"{time} {message}", p.mono, LX1 - LX0 - 28, " " * (len(time) + 1))]
+            if len(rows) >= fits:
+                break
+        for i, (level, text) in enumerate(rows[-fits:]):
+            c.create_text(LX0 + 14, y2 + 44 + i * 18, text=text, anchor="w", fill=MAIN_COLORS.get(level, "#c9b896"),
+                          font=p.mono)
         p.panel(RX0, y2, RX1, y2 + row2, "Игра")
         if not self.games:
             c.create_text(RX0 + 14, y2 + 40, anchor="nw", width=RX1 - RX0 - 28, fill=PARCHMENT, font=p.body,
@@ -587,7 +595,7 @@ class App:
             else:
                 p.button(W - 128, y + 9, W - 58, y + 39, "Обновить", "update", self.start_update)
             p.button(W - 50, y + 9, W - 30, y + 39, "×", "dismiss", self.dismiss_update)
-        c.create_text(W - 24, h - 16, text=f"версия {self.version}", anchor="e", fill=DIM, font=p.small)
+        c.create_text(W - 24, h - 16, text=f"версия {display_version(self.version)}", anchor="e", fill=DIM, font=p.small)
         self.tray.tooltip("Barrens Voice — " + lines[0][1])
 
     # --- settings and help ----------------------------------------------------------------------
@@ -610,7 +618,7 @@ class App:
         if self.settings_win is not None and self.settings_win.winfo_exists():
             self.settings_win.lift()
             return
-        width, height = 600, 650
+        width, height = 600, 670
         win, c, p = self._child("Настройки", width, height)
         self.settings_win = win
         cfg = model.read_config()
@@ -652,8 +660,13 @@ class App:
         p.tips["beta"] = ("Тестовые версии выходят раньше и могут быть с ошибками — для тех, кто готов проверять "
                           "сборки и писать о найденном. Выключите — останетесь на тестовой, пока не выйдет "
                           "стабильная новее.")
-        c.create_text(30, y + 216, anchor="w", fill=DIM, font=p.small,
-                      text="Остальное — в config.json (описание в docs/config.md). Компаньон перезапустится, если он работает.")
+        lead = "Остальное — в config.json:"
+        c.create_text(30, y + 216, anchor="w", fill=DIM, font=p.small, text=lead)
+        doc_tag = release_tag(self.version) if INSTALL_DIR is not None and self.version != "?" else "master"
+        p.link(30 + p.measure(lead, p.small) + 6, y + 216, "описание настроек", "configdoc",
+               lambda: webbrowser.open(f"https://github.com/{model.REPO}/blob/{doc_tag}/docs/config.md"))
+        c.create_text(30, y + 236, anchor="w", fill=DIM, font=p.small,
+                      text="Если озвучка работает, после сохранения она перезапустится.")
 
         def edited():
             """The settings as the window has them now; None if the days are not a number."""

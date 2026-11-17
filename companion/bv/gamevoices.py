@@ -272,8 +272,8 @@ def build(config: dict, out: Path, log, checker) -> list[Slot]:
 
     from .casc import Storage
 
-    log(f"готовлю голоса рас из клиента игры ({stamp['install']}, {stamp['product']}) — один раз после "
-        "каждого обновления игры, несколько минут ...")
+    log("собираю голоса рас из игры — несколько минут ...")
+    log(f"    {stamp['install']}, {stamp['product']}: один раз после каждого обновления игры")
     table = voices_for(config)
     storage = Storage(Path(stamp["install"]), stamp["product"])
     others = other_storages(config, log)
@@ -339,7 +339,8 @@ def build(config: dict, out: Path, log, checker) -> list[Slot]:
     manifest = {"stamp": stamp, "slots": [s.__dict__ for s in slots]}
     if missing:
         manifest["incomplete"] = {"missing_files": missing, "data_size": data_size(Path(stamp["install"]))}
-        log(f"файлов голосов ещё нет на диске: {missing} — банк соберётся заново, когда игра их докачает")
+        log("игра скачала не все голоса — банк доберётся позже")
+        log(f"    ещё нет: {missing}")
     (out / "bank.json").write_text(json.dumps(manifest,
                                               ensure_ascii=False, indent=1), encoding="utf-8")
     log(f"голосов рас: {len({s.base for s in slots})}, вариантов с тембром: {len(slots)}"

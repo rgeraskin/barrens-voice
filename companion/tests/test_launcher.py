@@ -361,3 +361,27 @@ class WindowCode(unittest.TestCase):
                      if isinstance(n, ast.Assign) and isinstance(n.value, ast.Name) and n.value.id == "snap"
                      and isinstance(n.targets[0], ast.Tuple))
         self.assertEqual(len(made.elts), len(taken.elts))
+
+
+class Wrap(unittest.TestCase):
+    """The main window's log: a line that does not fit is wrapped under its time, not cut."""
+
+    def test_wrap(self):
+        import tkinter as tk
+        try:
+            root = tk.Tk()
+        except tk.TclError:
+            self.skipTest("no display")
+        try:
+            from bv.launcher.paint import Painter
+            p = Painter(tk.Canvas(root), "TkDefaultFont")
+            short = "03:12:01 связь с аддоном есть"
+            self.assertEqual(p.wrap(short, p.mono, 412, " " * 9), [short])
+            long = "03:12:01 " + "слово " * 40
+            lines = p.wrap(long.strip(), p.mono, 412, " " * 9)
+            self.assertGreater(len(lines), 1)
+            self.assertTrue(all(x.startswith(" " * 9) for x in lines[1:]))
+            self.assertTrue(all(p.measure(x, p.mono) <= 412 for x in lines))
+            self.assertEqual(" ".join(x.strip() for x in lines), long.strip())     # nothing lost
+        finally:
+            root.destroy()
