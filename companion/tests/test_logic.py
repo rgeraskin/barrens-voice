@@ -407,6 +407,16 @@ class Pipeline(unittest.TestCase):
             "хп мало": "здоровье мало",
         })
 
+    def test_declension_off_changes_only_the_declension(self):
+        # the regexes match the same with declension off: «лок40» made «уровень 40», and the «к» rule
+        # must not then take «40 к» for forty thousand
+        cases = {"лок40 к вам": "чернокнижник, уровень сорок к вам",
+                 "дд60 к нам в пати": "дам+агер, уровень шестьдесят к нам в п+ати",
+                 "у босса 10к хп": "у босса десять тысяч здоровья", "5с кд": "пять секунд кулд+аун"}
+        self.check(cases)
+        self.check(cases, declension=False)
+        self.assertEqual(self.say("идём в ОП", declension=False), "идём в Огненная пр+опасть")
+
     def test_hyphenated_words_after_a_number(self):
         # the default's «рл» entries make «рейд-лидер»: a count, not «второй рейд-лидера»
         self.check({"2 рла": "два рейд-лидера", "5 рлов": "пять рейд-лидеров", "2 топ-гильдии": "две топ-гильдии"})

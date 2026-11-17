@@ -97,7 +97,7 @@ def speech_text(text: str, dictionary, inflector, declension: bool, restore_yo=l
     text = unmask(MARKUP.sub("", text))
     text = dictionary.apply_words(text)
     text = inflector.apply(text) if declension else strip_marks(text)
-    text = dictionary.apply(text, mark=declension)
+    text = dictionary.apply(text, mark=True)     # marked either way: a mark keeps a replacement from the next regexes
     text = inflector.apply(text) if declension else strip_marks(text)
     return restore_yo(plain(text))
 
