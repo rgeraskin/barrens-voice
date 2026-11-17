@@ -950,6 +950,9 @@ class OldClients(unittest.TestCase):
     def test_beta8_client_updates_through_its_updater(self):
         self.updater_client("v0_4_0b8", "0.4.0b8")
 
+    def test_beta11_client_updates_through_its_updater(self):
+        self.updater_client("v0_4_0b11", "0.4.0b11")
+
     def updater_client(self, client: str, current: str):
         import base64
         import io
@@ -961,7 +964,7 @@ class OldClients(unittest.TestCase):
         old_install = importlib.import_module(f"compat.{client}.install")
         old_update = importlib.import_module(f"compat.{client}.update")
         from bv import install
-        archive, manifest = ReleaseBuild.build(self, "v0.4.0-beta.9", exe=b"starter")
+        archive, manifest = ReleaseBuild.build(self, "v0.4.0-beta.99", exe=b"starter")
         base = old_update.STABLE
         raw = json.dumps(manifest).encode()
         key = Ed25519PrivateKey.generate()
@@ -992,7 +995,7 @@ class OldClients(unittest.TestCase):
             self.assertFalse(updater.due(game_running=True, companion_running=False, busy=False))
             self.assertTrue(updater.due(game_running=False, companion_running=False, busy=False))
             updater.apply()
-            self.assertEqual(install.current_version(root), "0.4.0b9")                 # the old client switched
+            self.assertEqual(install.current_version(root), "0.4.0b99")                 # the old client switched
 
 
 class UpdateInWindow(unittest.TestCase):
