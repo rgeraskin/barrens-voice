@@ -185,5 +185,19 @@ class AddonFiles(unittest.TestCase):
             self.assertTrue((Path(d) / "VoiceList.lua").is_file())
 
 
+
+class ExitCodes(unittest.TestCase):
+    def test_the_launcher_knows_ours(self):
+        # the launcher does not count these as a failed start of a new version (no rollback for them)
+        import ast
+        from bv.launcher.process import Companion
+        self.assertEqual((companion.RESTART, companion.ALREADY, companion.CONFIG_ERROR),
+                         (Companion.RESTART, Companion.ALREADY, Companion.CONFIG_ERROR))
+        tree = ast.parse(Path(companion.__file__).read_text(encoding="utf-8"))
+        handler = next(n for n in ast.walk(tree) if isinstance(n, ast.ExceptHandler)
+                       and "ConfigError" in ast.unparse(n.type))
+        returned = [ast.unparse(n.value) for n in ast.walk(handler) if isinstance(n, ast.Return)]
+        self.assertEqual(returned, ["CONFIG_ERROR"], "a config.json the companion cannot read ends with CONFIG_ERROR")
+
 if __name__ == "__main__":
     unittest.main()

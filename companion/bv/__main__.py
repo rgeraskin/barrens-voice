@@ -277,6 +277,7 @@ STATE_FILE = DATA_DIR / "tmp" / "state.json"
 STOP_FILE = DATA_DIR / "tmp" / "stop"
 RESTART = 3               # exit code: start me again (online) - the launcher does it
 ALREADY = 4               # exit code: another companion runs
+CONFIG_ERROR = 5          # exit code: config.json cannot be read - the player's file, not the version (no rollback)
 LAUNCHED = "BV_LAUNCHER"  # set in the environment of a companion the launcher started
 
 
@@ -453,7 +454,7 @@ def main() -> int:
         log("    исправьте файл или удалите его — компаньон создаст новый с настройками по умолчанию")
         from . import state
         state.init(STATE_FILE, phase="error", error=str(e))
-        return 1
+        return CONFIG_ERROR
     for game in ("retail", "forever"):                # --retail / --forever (the launcher's): the game to read
         if f"--{game}" in sys.argv:
             config["game"] = game
