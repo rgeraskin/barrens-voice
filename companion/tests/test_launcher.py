@@ -860,3 +860,47 @@ class OldClients(unittest.TestCase):
             from bv.paths import CODE_DIR  # noqa: F401 - the new launcher's start puts its starter in place
             install.place_starter(root, root / "app" / "0.4.0b7")
             self.assertEqual((root / "Barrens Voice.exe").read_bytes(), b"starter")
+
+    def test_beta6_client_updates_through_its_updater(self):
+        # beta.6 and beta.7 have the launcher's Updater: check, download, prepare (uv, build), apply when idle
+        import base64
+        import io
+        import json
+        from unittest import mock
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+        from compat.v0_4_0b6 import install as old_install, update as old_update
+        from bv import install
+        archive, manifest = ReleaseBuild.build(self, "v0.4.0-beta.8", exe=b"starter")
+        base = old_update.STABLE
+        raw = json.dumps(manifest).encode()
+        key = Ed25519PrivateKey.generate()
+        public = base64.b64encode(key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)).decode()
+        files = {base + "manifest.json": raw, base + "manifest.json.sig": base64.b64encode(key.sign(raw)),
+                 base + archive.name: archive.read_bytes()}
+
+        class Stream(io.BytesIO):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+        said = []
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d) / "BarrensVoice"
+            (root / "app" / "0.4.0b7").mkdir(parents=True)
+            (root / "uv.exe").write_bytes(b"uv")
+            old_install.point_current(root, root / "app" / "0.4.0b7")
+            updater = old_update.Updater(root, "0.4.0b7", lambda: {"update_channel": "stable", "auto_update": True},
+                                         lambda m, level="INFO": said.append(m), fetch=files.__getitem__,
+                                         fetch_stream=lambda req, timeout=0: Stream(files[req.full_url]), public=public)
+            with mock.patch.object(old_install, "build") as build, \
+                    mock.patch.object(old_update, "release_uv", return_value=root / "uv.exe"):
+                self.assertIsNotNone(updater.check())
+                build.assert_called_once()
+            self.assertEqual(updater.status, "ready", said)
+            self.assertFalse(updater.due(game_running=True, companion_running=False, busy=False))
+            self.assertTrue(updater.due(game_running=False, companion_running=False, busy=False))
+            updater.apply()
+            self.assertEqual(install.current_version(root), "0.4.0b8")                 # the old client switched
+
