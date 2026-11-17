@@ -858,7 +858,7 @@ class UpdaterFlow(unittest.TestCase):
 class ReleaseBuild(unittest.TestCase):
     """tools/release.py: what CI publishes is what bv.install puts in place."""
 
-    def build(self, tag, exe=None):
+    def build(self, tag, exe=None, uv=None):
         import importlib
         import sys
         from unittest import mock
@@ -870,7 +870,7 @@ class ReleaseBuild(unittest.TestCase):
         dist = Path(tmp.name)
         if exe is not None:
             (dist / "Barrens Voice.exe").write_bytes(exe)
-        uv = {"version": "0.13.7", "url": "https://x/uv.zip", "sha256": "0" * 64}
+        uv = uv or {"version": "0.13.7", "url": "https://x/uv.zip", "sha256": "0" * 64}
         with mock.patch.object(release, "DIST", dist), mock.patch.object(release, "uv_entry", return_value=uv), \
              mock.patch.dict("os.environ", {"RELEASE_TAG": tag} if tag else {}, clear=False):
             if not tag:
@@ -984,6 +984,10 @@ class OldClients(unittest.TestCase):
     def test_beta8_client_updates_through_its_updater(self):
         self.updater_client("v0_4_0b8", "0.4.0b8")
 
+    def test_beta9_client_updates_through_its_updater(self):
+        # beta.9 and beta.10: the Windows «Apps» entry follows the version (note_version)
+        self.updater_client("v0_4_0b9", "0.4.0b9")
+
     def test_beta11_client_updates_through_its_updater(self):
         self.updater_client("v0_4_0b11", "0.4.0b11")
 
@@ -994,17 +998,24 @@ class OldClients(unittest.TestCase):
         from unittest import mock
         from cryptography.hazmat.primitives import serialization
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+        import hashlib
         import importlib
+        import zipfile
         old_install = importlib.import_module(f"compat.{client}.install")
         old_update = importlib.import_module(f"compat.{client}.update")
         from bv import install
-        archive, manifest = ReleaseBuild.build(self, "v0.4.0-beta.99", exe=b"starter")
+        uv_zip = io.BytesIO()                            # the release names another uv: the old client fetches it
+        with zipfile.ZipFile(uv_zip, "w") as z:
+            z.writestr("uv.exe", b"new uv")
+        uv_zip = uv_zip.getvalue()
+        uv = {"version": "0.99.0", "url": "https://x/uv-0.99.0.zip", "sha256": hashlib.sha256(uv_zip).hexdigest()}
+        archive, manifest = ReleaseBuild.build(self, "v0.4.0-beta.99", exe=b"starter", uv=uv)
         base = old_update.STABLE
         raw = json.dumps(manifest).encode()
         key = Ed25519PrivateKey.generate()
         public = base64.b64encode(key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)).decode()
         files = {base + "manifest.json": raw, base + "manifest.json.sig": base64.b64encode(key.sign(raw)),
-                 base + archive.name: archive.read_bytes()}
+                 base + archive.name: archive.read_bytes(), uv["url"]: uv_zip}
 
         class Stream(io.BytesIO):
             def __enter__(self):
@@ -1021,11 +1032,15 @@ class OldClients(unittest.TestCase):
             updater = old_update.Updater(root, current, lambda: {"update_channel": "stable", "auto_update": True},
                                          lambda m, level="INFO": said.append(m), fetch=files.__getitem__,
                                          fetch_stream=lambda req, timeout=0: Stream(files[req.full_url]), public=public)
+            # the old release_uv reads the manifest's "uv" (its own get(), the installed uv's version asked)
             with mock.patch.object(old_install, "build") as build, \
-                    mock.patch.object(old_update, "release_uv", return_value=root / "uv.exe"):
+                    mock.patch.object(old_update, "get", side_effect=lambda url, timeout=0: files[url]), \
+                    mock.patch.object(old_update, "uv_version", return_value="0.13.7"):
                 self.assertIsNotNone(updater.check())
                 build.assert_called_once()
+                self.assertEqual(build.call_args[0][3].name, "uv.new.exe")          # built with the release's uv
             self.assertEqual(updater.status, "ready", said)
+            self.assertEqual((root / "uv.exe").read_bytes(), b"new uv")                 # then put in place
             self.assertFalse(updater.due(game_running=True, companion_running=False, busy=False))
             self.assertTrue(updater.due(game_running=False, companion_running=False, busy=False))
             updater.apply()
