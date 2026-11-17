@@ -11,7 +11,9 @@ import re
 import threading
 
 MARKED = re.compile(r"\x02([^\x02\x03]*)\x03")
-PREVIOUS = re.compile(r"([а-яё]+)\W*$", re.IGNORECASE)
+# the whole word before a replacement: not the unit glued to a number ("10к хп", "5с кд": no "к", "с"),
+# nor the end of a hyphenated one ("из-за")
+PREVIOUS = re.compile(r"(?<![\w'+-])([а-яё]+(?:-[а-яё]+)?)\W*$", re.IGNORECASE)
 WORD = re.compile(r"[\w'+]+(?:-[\w'+]+)*|[^\w'+]+")   # "рейд-лидер" is one word: its second half declines
 
 # Preposition -> case. "в"/"на" can be "where" (prepositional) as well as "where to" (accusative);
@@ -20,6 +22,7 @@ CASES = {
     "в": "accs", "во": "accs", "на": "accs", "за": "accs", "через": "accs", "про": "accs",
     "из": "gent", "изо": "gent", "у": "gent", "до": "gent", "для": "gent", "после": "gent", "от": "gent",
     "без": "gent", "возле": "gent", "около": "gent", "кроме": "gent", "вместо": "gent", "из-за": "gent",
+    "из-под": "gent",
     "к": "datv", "ко": "datv", "по": "datv",
     "с": "ablt", "со": "ablt", "под": "ablt", "над": "ablt", "перед": "ablt", "между": "ablt",
     "о": "loct", "об": "loct", "при": "loct",

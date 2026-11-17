@@ -382,6 +382,13 @@ class Pipeline(unittest.TestCase):
             "скидка 50%": "скидка пятьдесят процентов",
         })
 
+    def test_a_unit_glued_to_a_number_is_no_preposition(self):
+        self.check({
+            "5с кд": "пять секунд кулд+аун", "через 5с кд": "через пять секунд кулд+аун",
+            "30с кд на сапе": "тридцать секунд кулд+аун на сапе", "2к голды": "две тысячи г+олды",
+            "из-за ОП вайп": "из-за Огненной пр+опасти в+айп", "из-под БГ": "из-под поля боя",
+        })
+
 
 class PlayerStop(unittest.TestCase):
     def test_stop_drops_queued_and_late_lines(self):

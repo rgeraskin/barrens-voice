@@ -54,6 +54,16 @@ class Declension(unittest.TestCase):
         self.check("с " + m("рейд-лидер"), "с рейд-лидером")
         self.check("для " + m("рейд-лидер"), "для рейд-лидера")
 
+    def test_whole_word_before(self):
+        # a unit glued to a number is no preposition: "10к хп", "5с кд"
+        self.check("у босса 10к " + m("здоровье"), "у босса 10к здоровье")
+        self.check("5с " + m("кулд+аун"), "5с кулд+аун")
+        self.check("2к " + m("г+олды"), "2к г+олды")
+        # a hyphenated preposition is one word
+        self.check("из-за " + m("Огненная пропасть"), "из-за Огненной пропасти")
+        self.check("из-под " + m("поле боя"), "из-под поля боя")
+        self.check("кто-то в " + m("Огненная пропасть"), "кто-то в Огненную пропасть")
+
 
 if __name__ == "__main__":
     unittest.main()

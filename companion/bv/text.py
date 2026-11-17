@@ -128,10 +128,10 @@ NUMBERED = {"уровень", "этаж", "число", "ранг", "фаза", 
 # a numbered noun whose singular the stress model takes for the plural ("числ+а" - "two numbers"):
 # after an ordinal it is the singular, stressed here
 SINGULAR_STRESS = {"числа": "ч+исла", "места": "м+еста"}
-PREV_WORD = re.compile(r"([а-яёА-ЯЁ]+)\s+$")
+PREV_WORD = re.compile(r"(?<![\w'+-])([а-яёА-ЯЁ]+(?:-[а-яёА-ЯЁ]+)?)\s+$")   # a whole word, as morph.PREVIOUS
 # the cases a preposition asks of the word after it (only those a count never takes in the singular)
 GOVERNS = {**dict.fromkeys(("с", "со"), {"gent", "ablt"}),
-           **dict.fromkeys(("до", "от", "из", "для", "без", "после", "около", "у", "кроме"), {"gent"}),
+           **dict.fromkeys(("до", "от", "из", "для", "без", "после", "около", "у", "кроме", "из-за", "из-под"), {"gent"}),
            **dict.fromkeys(("к", "ко", "по"), {"datv"}),
            **dict.fromkeys(("в", "во", "на", "о", "об", "при"), {"loct"}),
            **dict.fromkeys(("за", "под", "над", "перед"), {"ablt"})}
