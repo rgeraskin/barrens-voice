@@ -301,7 +301,7 @@ class F5Speaker:
             raise RuntimeError("в клиенте игры нет русской озвучки: голоса рас не из чего собрать")
         self.ref_text = {s.id: self.accentor.accent(s.text) for s in slots}
         self.ref_seconds = {s.id: sf.info(s.path).duration for s in slots}
-        paces = sorted(s.speech / max(1, len(s.text.encode("utf-8"))) for s in slots if s.shift == 0 and s.speech)
+        paces = sorted(self.pace(s) for s in slots if s.shift == 0 and s.speech)
         quantile = self.config.get("voice_pace_quantile", 0.25)
         self.target_pace = paces[min(len(paces) - 1, int(len(paces) * quantile))] if paces else 0.0
         self._synth(first, "Проверка.", 100)   # warm-up: the first call is slow
@@ -341,12 +341,16 @@ class F5Speaker:
         """(clip, its text, its seconds)."""
         return slot.path, self.ref_text[slot.id], self.ref_seconds[slot.id]
 
+    def pace(self, slot) -> float:
+        """The voice's seconds of speech per byte of its reference's text as F5 gets it - stressed, as
+        the lines are counted (`duration`): the bank's target pace and each voice's own in one unit."""
+        return (slot.speech or self.ref_seconds[slot.id]) / max(1, len(self.ref_text[slot.id].encode("utf-8")))
+
     def duration(self, slot, text: str, rate: int, character: str = "") -> float:
         """Total seconds (reference + line) to give F5 - which fits the speech into exactly that
         length, so this sets the voice's tempo: see `line_seconds`."""
-        _, ref_text, ref = self.reference(slot, text)
-        pace = (slot.speech or ref) / max(1, len(ref_text.encode("utf-8")))
-        return ref + line_seconds(pace, self.target_pace, len(text.encode("utf-8")), rate, character,
+        ref = self.ref_seconds[slot.id]
+        return ref + line_seconds(self.pace(slot), self.target_pace, len(text.encode("utf-8")), rate, character,
                                   self.config)
 
     def _synth(self, slot, text: str, rate: int, character: str = ""):

@@ -175,7 +175,7 @@ class EnginesTest(unittest.TestCase):
 
 class Accent:
     def accent(self, text):
-        return text
+        return text.replace("о", "+о")          # stress marks: the bytes F5 is given are more than typed
 
     def load(self):
         pass
@@ -184,17 +184,84 @@ class Accent:
 class F5SpeakerLoad(unittest.TestCase):
     """F5Speaker's own thread with ONNX Runtime and the game client faked (they are Windows only)."""
 
-    def speaker(self, home, slots):
+    def speaker(self, home, slots, onnx=None, player=None):
         from bv import f5engine
+        from bv.__main__ import DEFAULT_CONFIG
         from bv.assign import Assigner
         logged = []
-        speaker = f5engine.F5Speaker({"max_queue": 8, "players": {}}, logged.append, home, Accent(),
-                                     player=types.SimpleNamespace(generation=0))
+        speaker = f5engine.F5Speaker(dict(DEFAULT_CONFIG), logged.append, home, Accent(),
+                                     player=player or types.SimpleNamespace(generation=0))
 
         def load_onnx():
             speaker.assigner = Assigner(slots, home / "assignments.json", {})
+            speaker.onnx, speaker.ref_audio, speaker.device = onnx, {}, "test"
         speaker._load_onnx = load_onnx
         return speaker, logged
+
+    def voice(self, home, speech=2.0):
+        """One voice of the bank: a 3 s reference clip with 2 s of speech in it."""
+        import numpy as np
+        import soundfile as sf
+        from bv.gamevoices import Slot
+        path = home / "orc-male.wav"
+        sf.write(str(path), np.zeros(72000, dtype="float32"), 24000)
+        return Slot("orc-male", "orc-male", "orc", "male", 0.0, str(path), "Мне это не по силам.", speech)
+
+    def test_the_banks_pace_in_the_units_of_a_line(self):
+        # the target pace counted the reference's bytes without stress marks, a voice's own pace with
+        # them: the same voice was drawn toward itself by ~7 %
+        import tempfile
+        from bv import f5engine
+
+        class Onnx:
+            in_rate = 24000
+
+            def synth(self, ref_audio, ref_text, text, total):
+                return __import__("numpy").zeros(2400, dtype="float32"), 24000
+        with tempfile.TemporaryDirectory() as d:
+            slot = self.voice(Path(d))
+            speaker, _ = self.speaker(Path(d), [slot], Onnx())
+            speaker._load()
+            self.assertAlmostEqual(speaker.target_pace, speaker.pace(slot))
+            config = speaker.config
+            text = "Привет всем"
+            expected = 3.0 + f5engine.line_seconds(speaker.pace(slot), 0.0, len(text.encode("utf-8")), 100, "",
+                                                   {**config, "character_tempo": 0})
+            config["character_tempo"] = 0
+            self.assertAlmostEqual(speaker.duration(slot, text, 100), expected)   # its own pace: not drawn
+
+    def test_a_line_from_the_queue_to_the_player(self):
+        import tempfile
+
+        import numpy as np
+        made, played = [], []
+
+        class Onnx:
+            in_rate = 24000
+
+            def synth(self, ref_audio, ref_text, text, total):
+                made.append(text)
+                tone = np.sin(np.arange(24000) / 24000 * 2 * np.pi * 200).astype("float32") * 0.3
+                return np.concatenate([tone, np.zeros(4800, dtype="float32")]), 24000
+
+        class Player:
+            generation = 0
+
+            def play(self, data, generation):
+                played.append((data[:4], generation))
+        with tempfile.TemporaryDirectory() as d:
+            speaker, logged = self.speaker(Path(d), [self.voice(Path(d))], Onnx(), Player())
+            loop = threading.Thread(target=speaker._synth_loop)
+            loop.start()
+            self.assertTrue(speaker.ready.wait(5))
+            self.assertIsNone(speaker.error)
+            speaker.say(Line("say", "Громмаш", "Orc", "2", "", "", "Кто в рейд", 100, "f5"))
+            speaker.lines.put(None)                  # the end, after that line
+            loop.join(5)
+            self.assertFalse(loop.is_alive())
+        self.assertEqual(made, ["Проверка.", "Кт+о в рейд."])   # the warm-up; the line stressed, a full stop
+        self.assertIsNone(speaker.onnx)              # the model freed at the end
+        self.assertEqual(played, [(b"RIFF", 0)])
 
     def test_an_empty_voice_bank_is_an_error(self):
         # a client without the Russian voice-over: the bank is made with no voices in it
