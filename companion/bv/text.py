@@ -192,7 +192,7 @@ def agree(n: int, spoken: str, following: str, morph, before: str = "") -> str:
     asked = GOVERNS.get(before.lower(), set())
     parts = spoken.split()
     one = n % 10 == 1 and not 10 < n % 100 < 20
-    if "gent" in asked and word == "до":
+    if "gent" in asked and word in ("до", "по"):
         return " ".join(to_case(parts, "gent", morph))  # a range: "с 5 до 10" - "с пяти до десяти"
     if asked == {"gent"} and not one:
         # a count after a preposition that asks only the genitive is in the genitive whatever word
@@ -327,6 +327,40 @@ def long_preposition(before: str, spoken: str) -> str:
     return before[:m.start()] + m.group(1) + LONG_FORM[letter] + m.group(2)
 
 
+# a range "с N по M": both are ordinals of the noun after M ("с 1 по 5 уровень" - "с первого по пятый",
+# "с 1 по 3 босса" - "с первого по третьего босса"); the dictionary may have made M's ordinal already
+RANGE_START = re.compile(r"\s+по\s+(?:\d+\s+)?([а-яёА-ЯЁ+]+(?:-[а-яёА-ЯЁ+]+)*)")
+RANGE_END = re.compile(r"(?<![\w'+-])(?:с|со)\s+\d+\s+по\s+$", re.IGNORECASE)
+
+
+def range_tag(word: str, morph):
+    """The singular noun closing a range, in the case "по" gives it there - the accusative (or the
+    nominative it shares), never the dative of "по 5 золотых" - or the gender of an ordinal standing
+    for it ("по пятый уровень"); None when there is no such word ("с 1 по 5 января" is a date)."""
+    word = word.replace("+", "").lower()
+    if not morph.word_is_known(word):
+        return None
+    parses = morph.parse(word)
+    anum = [p for p in parses if p.tag.POS == "ADJF" and "Anum" in p.tag and p.tag.number == "sing"]
+    nouns = [p for p in parses if p.tag.POS == "NOUN" and p.tag.number == "sing" and p.tag.case in ("accs", "nomn")]
+    found = sorted(nouns or anum, key=lambda p: p.tag.case != "accs")
+    return found[0].tag if found else None
+
+
+def ordinal_as(n: int, tag, case: str, morph) -> str | None:
+    """`n` as an ordinal in `case`, of the gender (and animacy, in the accusative) of `tag`."""
+    from num2words import num2words
+    grammemes = {case, tag.gender or "masc", "sing"}
+    if case == "accs" and tag.animacy and (tag.gender or "masc") == "masc":
+        grammemes.add(tag.animacy)                     # "по третьего босса", "по пятый уровень"
+    parts = num2words(n, lang="ru", to="ordinal").split()
+    form = morph.parse(parts[-1])[0].inflect(grammemes)
+    if not form:
+        return None
+    parts[-1] = form.word
+    return " ".join(parts)
+
+
 def numbers_to_words(text: str) -> str:
     """Digits as Russian words, agreeing with the word after them where pymorphy3 can tell how."""
     try:
@@ -360,6 +394,17 @@ def numbers_to_words(text: str) -> str:
         following = NEXT_WORD.match(m.string, m.end())
         if GLUED.search(m.string, 0, m.start()):
             following = None                           # "20:00 сбор", "1.12 патч": no "нулевой сбор"
+        if morph is not None and following and before.lower() in ("с", "со") and following.group(1).lower() == "по":
+            closing = RANGE_START.match(m.string, m.end())
+            tag = range_tag(closing.group(1), morph) if closing else None
+            as_ordinal = ordinal_as(n, tag, "gent", morph) if tag else None
+            if as_ordinal:
+                return as_ordinal, m.end()             # "с первого по пятый уровень"
+        if morph is not None and following and before.lower() == "по" and RANGE_END.search(m.string, 0, m.start()):
+            tag = range_tag(following.group(1), morph)
+            as_ordinal = ordinal_as(n, tag, "accs", morph) if tag and tag.POS == "NOUN" else None
+            if as_ordinal:
+                return as_ordinal, m.end()             # "по третьего босса"
         if morph is not None and following and following.group(1).lower() in SIGNS:
             # "от 50+" - "от пятидесяти плюс"; "на 3+ человек" stays "на три плюс" (the accusative)
             case = "gent" if "gent" in GOVERNS.get(before.lower(), set()) else None

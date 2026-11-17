@@ -32,7 +32,8 @@ DECLINABLE = {"ADJF", "PRTF", "NOUN"}
 # names pymorphy knows: a word it knows only as one, written in small letters, is slang it took for a name
 # («кача», as the town Кача: «для кача» became «для качи») - left as typed
 PROPER = ("Geox", "Name", "Surn", "Patr", "Orgn", "Trad")
-CONJUNCTIONS = {"и", "или", "либо", "да"}   # "с танком и чернокнижником": the case carries over
+CONJUNCTIONS = {"и", "или", "либо", "да"}
+RANGE = re.compile(r"(?<![\w'+-])(?:с|со)\s+\S+\s+по\W*$", re.IGNORECASE)   # "с 1 по ..." - a range   # "с танком и чернокнижником": the case carries over
 
 
 def strip_marks(text: str) -> str:
@@ -69,7 +70,9 @@ class Inflector:
                 out.append(before)
                 prev = PREVIOUS.search(strip_marks("".join(out)))
                 word = prev.group(1).lower() if prev else ""
-                if word in CASES:
+                if word == "по" and RANGE.search(strip_marks("".join(out))):
+                    case = "accs"           # "с 1 по <5> уровень": up to, not the dative of "по 5 золотых"
+                elif word in CASES:
                     case = CASES[word]
                 elif word in CONJUNCTIONS and re.fullmatch(r"\s*\w+\s*", before):
                     case = carried          # "X и Y": Y takes X's case

@@ -425,6 +425,18 @@ class Pipeline(unittest.TestCase):
         # the default's «рл» entries make «рейд-лидер»: a count, not «второй рейд-лидера»
         self.check({"2 рла": "два рейд-лидера", "5 рлов": "пять рейд-лидеров", "2 топ-гильдии": "две топ-гильдии"})
 
+    def test_a_range_of_ordinals(self):
+        # "с N по M": both number what comes after M, in its case after "по" ("по" of a range asks the accusative)
+        self.check({
+            "с 1 по 5 уровень": "с первого по пятый уровень", "с 10 по 20 уровень": "с десятого по двадцатый уровень",
+            "с 5 по 10 лвл": "с пятого по десятый уровень", "с 1 по 3 босса": "с первого по третьего босса",
+            "с 2 по 4 фазу": "со второй по четвёртую фазу", "с 1 по 3 место": "с первого по третье место",
+            # no noun after it, or a date (not read as one): a count, the first in the genitive
+            "с 1 по 5": "с одного по пять", "с 1 по 5 января": "с одного по пять января",
+            # "по" alone gives each its share, in the dative
+            "дам по 5 золотых": "дам по пять золотых", "по 1 золотому": "по одному золотому",
+        })
+
     def test_a_time_after_a_preposition_is_not_a_count(self):
         self.assertTrue(self.say("до 20:00").startswith("до двадцать"))     # an hour, not "до двадцати"
 
