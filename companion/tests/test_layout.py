@@ -1,0 +1,211 @@
+"""The launcher's windows in every state they draw, checked for text running over text, over a button that is
+not its own, or out of its panel or window. Drawn on a hidden Tk window: Tk measures the text as on the
+screen (on Windows - the fonts the players have; elsewhere their stand-ins, so CI on Windows is the check
+that counts). Skipped where Tk has no display.
+
+Run alone, it also writes what failed: `python -m unittest test_layout` from companion/tests.
+"""
+from __future__ import annotations
+
+import itertools
+import sys
+import unittest
+from pathlib import Path
+from types import SimpleNamespace
+from unittest import mock
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+try:
+    import tkinter as tk
+    _root = tk.Tk()
+    _root.withdraw()
+except Exception:  # noqa: BLE001 - no display (a headless Linux box): nothing to measure
+    _root = None
+
+PANEL_FILL = "#160f09"   # paint.Painter.panel's fill: a text that starts in a panel ends in it
+TOLERANCE = 1            # pixels two boxes may share (antialiasing, rounding at a scale)
+BUTTON_HEIGHT = 44       # a tagged box lower than this is a button (game cards are 48, panels more)
+
+
+def problems(c: "tk.Canvas") -> list[str]:
+    """What runs over what on this canvas, in words."""
+    c.update_idletasks()
+    width, height = int(float(c.cget("width"))), int(float(c.cget("height")))
+    items = []
+    for i in c.find_all():
+        box = c.bbox(i)
+        if not box:
+            continue
+        kind, tags = c.type(i), c.gettags(i)
+        items.append(SimpleNamespace(id=i, kind=kind, box=box, group=tags[0] if tags else None, tags=tags,
+                                     text=c.itemcget(i, "text") if kind == "text" else "",
+                                     fill=c.itemcget(i, "fill") if kind in ("polygon", "rectangle") else ""))
+    texts = [t for t in items if t.kind == "text" and t.text.strip()]
+    buttons = [b for b in items if b.kind == "polygon" and any(t.endswith("box") for t in b.tags)
+               and b.box[3] - b.box[1] < BUTTON_HEIGHT]
+    panels = [p for p in items if p.kind == "polygon" and not p.tags and p.fill == PANEL_FILL]
+
+    def meet(a, b) -> bool:
+        return (min(a[2], b[2]) - max(a[0], b[0]) > TOLERANCE) and (min(a[3], b[3]) - max(a[1], b[1]) > TOLERANCE)
+
+    def inside(a, b) -> bool:
+        return a[0] >= b[0] - TOLERANCE and a[1] >= b[1] - TOLERANCE and a[2] <= b[2] + TOLERANCE and a[3] <= b[3] + TOLERANCE
+
+    out = []
+    for a, b in itertools.combinations(texts, 2):
+        if a.text != b.text and meet(a.box, b.box):          # the same text twice: a title over its shadow
+            out.append(f"«{a.text}» и «{b.text}» наложились")
+    for t in texts:
+        for b in buttons:
+            if b.group != t.group and meet(t.box, b.box):
+                out.append(f"«{t.text}» залезает на кнопку {b.group}")
+        x0, y0, x1, y1 = t.box
+        if x0 < -TOLERANCE or y0 < -TOLERANCE or x1 > width + TOLERANCE or y1 > height + TOLERANCE:
+            out.append(f"«{t.text}» за краем окна ({x0},{y0})-({x1},{y1}), окно {width}×{height}")
+        for p in panels:
+            px0, py0, px1, py1 = p.box
+            if px0 <= x0 <= px1 and py0 <= (y0 + y1) / 2 <= py1 and x1 > px1 + TOLERANCE:
+                out.append(f"«{t.text}» вылезает за правый край панели на {x1 - px1} px")
+    for t in (i for i in items if i.kind == "window"):        # text boxes (settings) inside the window
+        if t.box[2] > width + TOLERANCE or t.box[3] > height + TOLERANCE:
+            out.append(f"поле ввода за краем окна: {t.box}")
+    return out
+
+
+class FakeCompanion:
+    def __init__(self, *_):
+        self.running, self.st, self.code = False, {}, None
+
+    def state(self):
+        return self.st
+
+    def poll(self):
+        return self.code
+
+
+class FakeTray:
+    def __init__(self, *_):
+        pass
+
+    def start(self):
+        return False
+
+    def notify(self, *_):
+        pass
+
+    def tooltip(self, *_):
+        pass
+
+
+def game(key, addon, root=None):
+    from bv.launcher.model import GAME_NAMES, Game
+    return Game(key, GAME_NAMES[key], Path(root or f"E:/World of Warcraft/_{key}_"), addon)
+
+
+LONG_ROOT = "E:/Games/Blizzard Entertainment/Очень длинная папка/World of Warcraft/_forever_"
+GAMES = {
+    "none": [],
+    "no addon": [game("forever", None)],
+    "old addon": [game("forever", "0.2.1", LONG_ROOT), game("retail", "0.3.1")],
+    "older and newer": [game("forever", "0.3.0"), game("retail", "0.10.0")],
+}
+STATES = [   # the companion's state file: every line describe() can say
+    ({}, False, None),
+    ({"phase": "running", "voices": "bank", "linked": False, "window": False}, True, None),
+    ({"phase": "running", "voices": "ready", "device": "NVIDIA GeForce RTX 5070 Ti Laptop GPU", "linked": True}, True, None),
+    ({"phase": "running", "voices": "error", "damaged": True}, True, None),
+    ({"phase": "running", "voices": "off"}, True, None),
+    ({"phase": "error", "error": "очень длинная ошибка " * 8}, False, 1),
+    ({"phase": "stopped"}, False, 3),
+]
+LOG = [("04:45:32", "INFO", "компаньон запущен (WoW Forever)"),
+       ("04:45:46", "INFO", "собираю голоса рас: 23 из 66"),
+       ("04:46:00", "WARN", "в WoW Forever нет аддона — «установить аддон» справа"),
+       ("04:46:01", "ERROR", "очень длинная строка журнала без пробелов " + "x" * 80),
+       ("04:46:02", "INFO", "строка " * 30)]
+UPDATES = [None,
+           {"version": "0.4.0b7", "url": "u"},
+           {"version": "0.4.10b12", "url": "u", "addon": "0.10.1"},
+           {"version": "0.10.10", "url": "u", "addon": "0.3.1"}]
+STATUSES = ["", "downloading", "preparing", "ready", "error"]
+
+
+@unittest.skipIf(_root is None, "no display for Tk")
+class Layout(unittest.TestCase):
+    def make(self, scale=1.0, config=None):
+        from bv.launcher import app, model
+        top = tk.Toplevel(_root)
+        top.withdraw()
+        patches = [mock.patch.object(app, "Companion", FakeCompanion), mock.patch.object(app, "Tray", FakeTray),
+                   mock.patch.object(app, "launcher_log", lambda *_: None),
+                   mock.patch.object(app, "window_icon", lambda *_: None),
+                   mock.patch.object(model, "read_config", lambda: dict(config or {})),
+                   mock.patch.object(model, "update_config", lambda **kw: dict(config or {}, **kw)),
+                   mock.patch.object(model, "find_games", lambda *a, **k: []),
+                   mock.patch.object(model, "autostart", lambda: False),
+                   mock.patch.object(model, "app_version", lambda: "0.4.0b7"),
+                   mock.patch.object(model, "addon_version", lambda: "0.3.1"),
+                   mock.patch.object(app, "INSTALL_DIR", None)]
+        for p in patches:
+            p.start()
+            self.addCleanup(p.stop)
+        a = app.App(top, model.parse_args([]), scale)
+        a.root.after_cancel = lambda *_: None
+        for job in a.root.tk.call("after", "info"):         # no ticks: the test draws, nothing else
+            a.root.after_cancel(job)
+        self.addCleanup(top.destroy)
+        return a
+
+    def check(self, canvas, what: str, found: list):
+        for p in problems(canvas):
+            found.append((p, what))
+
+    def test_main_window_in_every_state(self):
+        found: list[tuple[str, str]] = []
+        for scale in (1.0, 1.25, 1.5):
+            a = self.make(scale)
+            a.lines.extend(LOG)
+            for (gname, games), (st, running, code), running_game in itertools.product(
+                    GAMES.items(), STATES, (None, "forever")):
+                a.games, a.selected = games, games[0].key if games else None
+                a.companion.st, a.companion.running, a.companion.code = st, running, code
+                a.running_game = running_game if games else None
+                for u, status, busy in itertools.product(UPDATES, STATUSES, ("", "stopping")):
+                    if u is None and status:
+                        continue
+                    a.update, a.busy = u, busy
+                    a.updater = SimpleNamespace(status=status, ready="x" if status == "ready" else None) if u else None
+                    a.config = {"launch_wow": True, "exit_with_wow": True}
+                    a.drawn = None
+                    a.redraw()
+                    self.check(a.canvas, f"главное окно ×{scale}, игры «{gname}», {st.get('phase')}/{st.get('voices')}, "
+                                         f"игра {running_game}, обновление {u and u['version']} {status} {busy}", found)
+        self.report(found)
+
+    def test_settings_and_help(self):
+        found: list[tuple[str, str]] = []
+        for scale in (1.0, 1.25, 1.5):
+            for config in ({}, {"game_dirs": {"forever": LONG_ROOT}, "hf_home": "D:/" + "очень/" * 20}):
+                a = self.make(scale, config)
+                a.games = GAMES["old addon"]
+                a.open_settings()
+                self.check(a.settings_win.winfo_children()[0], f"настройки ×{scale}", found)
+                a.settings_win.destroy()
+                a.open_help()
+                self.check(a.help_win.winfo_children()[0], f"помощь ×{scale}", found)
+                a.help_win.destroy()
+        self.report(found)
+
+    def report(self, found: list[tuple[str, str]]):
+        """Each problem once, with how often and the first state it was seen in."""
+        seen: dict[str, list[str]] = {}
+        for problem, what in found:
+            seen.setdefault(problem, []).append(what)
+        if seen:
+            self.fail(f"{len(seen)} наложений:\n" + "\n".join(
+                f"- {problem}  [{len(whats)} раз; например: {whats[0]}]" for problem, whats in seen.items()))
+
+
+if __name__ == "__main__":
+    unittest.main()
