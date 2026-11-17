@@ -17,8 +17,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / "dist"
-UV_VERSION = "0.13.7"           # the uv the installer ships; the updates use it too
-UV_ZIP = f"https://github.com/astral-sh/uv/releases/download/{UV_VERSION}/uv-x86_64-pc-windows-msvc.zip"
+sys.path.insert(0, str(ROOT / "tools"))
+from release import UV_VERSION, UV_ZIP  # noqa: E402 - one place for the uv version (the manifest names it too)
 ISCC = [os.environ.get("INNO_ISCC", ""), r"C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
         str(Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Inno Setup 6" / "ISCC.exe")]
 

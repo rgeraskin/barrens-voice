@@ -430,3 +430,31 @@ class Starter(unittest.TestCase):
                 v = update.prepare(root, release(d, "0.4.2", None))
                 update.apply(root, v)
                 self.assertEqual(starter.read_bytes(), b"v2")                       # a release without it: kept
+
+
+class ReleaseUv(unittest.TestCase):
+    """The uv a release names: kept when installed already, else fetched, checked and put in place after the build."""
+
+    def test_kept_fetched_refused(self):
+        import hashlib
+        import io
+        import zipfile
+        from unittest import mock
+        from bv import update
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            z.writestr("uv.exe", b"new uv")
+        data = buf.getvalue()
+        want = {"uv": {"version": "0.14.0", "url": "https://x/uv.zip", "sha256": hashlib.sha256(data).hexdigest()}}
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "uv.exe").write_bytes(b"old uv")
+            with mock.patch("bv.update.uv_version", return_value="0.14.0"):
+                self.assertEqual(update.release_uv(root, want, fetch=lambda u: data), root / "uv.exe")   # same: kept
+            with mock.patch("bv.update.uv_version", return_value="0.13.7"):
+                fresh = update.release_uv(root, want, log=lambda *a: None, fetch=lambda u: data)
+                self.assertEqual((fresh.name, fresh.read_bytes()), ("uv.new.exe", b"new uv"))
+                with self.assertRaises(ValueError):                                                # tampered: refused
+                    update.release_uv(root, {"uv": {**want["uv"], "sha256": "0" * 64}}, log=lambda *a: None,
+                                      fetch=lambda u: data)
+            self.assertEqual(update.release_uv(root, {}), root / "uv.exe")                          # an old manifest

@@ -18,6 +18,18 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / "dist"
+# the uv the installer ships and the updates bring (the manifest names it: an install with another fetches it)
+UV_VERSION = "0.13.7"
+UV_ZIP = f"https://github.com/astral-sh/uv/releases/download/{UV_VERSION}/uv-x86_64-pc-windows-msvc.zip"
+
+
+def uv_entry() -> dict:
+    """The uv of this release for the manifest: version, where its Windows build is, its published SHA-256."""
+    import urllib.request
+    request = urllib.request.Request(UV_ZIP + ".sha256", headers={"User-Agent": "barrens-voice-build"})
+    with urllib.request.urlopen(request, timeout=60) as r:  # noqa: S310
+        sha = r.read().decode().split()[0]
+    return {"version": UV_VERSION, "url": UV_ZIP, "sha256": sha}
 SKIP_DIRS = {"__pycache__", "tests", ".venv", "tmp", "logs", "voices", "voices-retail", "models", "hf", "f5test"}
 SKIP_FILES = {"config.json", "assignments.json", ".models_ready", "requirements.txt", "BarrensVoice.cmd", ".DS_Store"}
 
@@ -78,7 +90,8 @@ def build() -> Path:
                 data = re.sub(rb'(?m)^version = "[^"]*"', f'version = "{info["version"]}"'.encode(), data, count=1)
             z.writestr(info_, data)
     data = archive.read_bytes()
-    manifest = {**info, "archive": archive.name, "size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+    manifest = {**info, "archive": archive.name, "size": len(data), "sha256": hashlib.sha256(data).hexdigest(),
+                "uv": uv_entry()}
     (DIST / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (DIST / "notes.md").write_text(notes(base), encoding="utf-8")
     print(f"{archive.name}: {len(data) / 1e6:.1f} MB; manifest: {manifest}")

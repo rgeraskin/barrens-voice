@@ -90,10 +90,43 @@ def download(manifest: dict, folder: Path, progress=None, fetch_stream=None) -> 
     return target
 
 
-def prepare(root: Path, archive: Path, log=print) -> str:
-    """The version unpacked beside the current one and its environment built; not made current yet."""
+def uv_version(uv: Path) -> str | None:
+    """The version of an uv.exe («uv 0.13.7 (…)» -> "0.13.7"); None when it does not run."""
+    import subprocess
+    try:
+        out = subprocess.run([str(uv), "--version"], capture_output=True, text=True, timeout=30,
+                             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).stdout.split()
+        return out[1] if len(out) > 1 else None
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def release_uv(root: Path, manifest: dict, log=print, fetch=get) -> Path:
+    """The uv the release names (manifest "uv"): the installed uv.exe when it is that version, else that
+    one downloaded, checked against the signed manifest's SHA-256 and unpacked beside as uv.new.exe."""
+    import io
+    import zipfile
+    want, current = manifest.get("uv"), root / "uv.exe"
+    if not want or uv_version(current) == want.get("version"):
+        return current
+    log(f"uv {want['version']} ...")
+    data = fetch(want["url"])
+    if hashlib.sha256(data).hexdigest() != want.get("sha256"):
+        raise ValueError("uv не совпал с подписанным описанием выпуска — не ставлю")
+    fresh = root / "uv.new.exe"
+    with zipfile.ZipFile(io.BytesIO(data)) as z:
+        fresh.write_bytes(z.read("uv.exe"))
+    return fresh
+
+
+def prepare(root: Path, archive: Path, log=print, manifest: dict | None = None) -> str:
+    """The version unpacked beside the current one and its environment built (with the uv the release names,
+    which then replaces the installed one); not made current yet."""
     version, folder = install.unpack(archive, root)
-    install.build(root, folder, install.runtime_of(root), root / "uv.exe", log)
+    uv = release_uv(root, manifest or {}, log)
+    install.build(root, folder, install.runtime_of(root), uv, log)
+    if uv.name == "uv.new.exe":
+        os.replace(uv, root / "uv.exe")
     return version
 
 

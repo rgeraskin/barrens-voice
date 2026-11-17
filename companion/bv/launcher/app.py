@@ -462,7 +462,7 @@ class App:
             self.updating = "preparing"
             self.say(f"готовлю версию {display_version(found['version'])} ...")
             version = update.prepare(INSTALL_DIR, archive, log=lambda m: self.incoming.put(
-                f"{datetime.now():%H:%M:%S} DEBUG [обновление] {m}"))
+                f"{datetime.now():%H:%M:%S} DEBUG [обновление] {m}"), manifest=found)
             self.update_ready, self.updating = version, "ready"
             self.say(f"версия {display_version(version)} готова — включится после игры")
         except Exception as e:  # noqa: BLE001 - the current version goes on
