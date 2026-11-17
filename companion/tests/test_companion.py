@@ -75,6 +75,30 @@ class LoadConfig(unittest.TestCase):
         from bv.logs import level_of
         self.assertEqual({level_of(m) for m in logged}, {"WARN"})
 
+    def test_numbers_that_are_no_numbers(self):
+        # "inf" raised OverflowError before state.init, NaN and 1e999 (Infinity) were kept, a pace limit of 0
+        # divided by zero in every F5 line, a null gain killed the F5 thread
+        huge = "1" + "0" * 400                          # an integer no float holds
+        config, saved, logged = self.load(
+            '{"max_queue": "inf", "f5_margin": NaN, "f5_tail": "nan", "volume": 1e999, "rate": -Infinity, '
+            f'"log_keep_days": {huge}, "voice_pace_limit": 0, "onnx_threads": 0, "voice_pace_quantile": -3, '
+            '"same_speaker_gap": true, '
+            '"capture_height": 2.5, "kind_gain_db": null, "players": null, "voice_shifts": "1.5", '
+            '"question_intonation": 5}')
+        default = companion.DEFAULT_CONFIG
+        for key in ("max_queue", "f5_margin", "f5_tail", "volume", "rate", "log_keep_days", "same_speaker_gap",
+                    "kind_gain_db", "players", "voice_shifts", "question_intonation"):
+            self.assertEqual(config[key], default[key], key)
+        self.assertEqual((config["voice_pace_limit"], config["onnx_threads"], config["voice_pace_quantile"]), (1.0, 1, 0))
+        self.assertEqual(config["capture_height"], 2)  # an int setting stays an int
+        self.assertEqual(len(logged), 14, logged)
+        from bv.logs import level_of
+        self.assertEqual({level_of(m) for m in logged}, {"WARN"})
+        self.assertIn("не удалось прочитать «kind_gain_db» в config.json (None): беру {\"yell\": 3", "\n".join(logged))
+        from bv.f5engine import line_seconds
+        line_seconds(0.2, 0.1, 40, 100, "Тралл", config)  # a slow voice with the pace limit settled
+        json.dumps(config, allow_nan=False)             # nothing that is no finite number is left
+
 
 class LiveSettings(unittest.TestCase):
     """`LiveConfig`: the launcher's «Закрываться вместе с игрой» taken while the companion runs, whatever

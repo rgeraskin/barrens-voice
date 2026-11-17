@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import math
 import os
 import re
 import sys
@@ -188,23 +189,38 @@ class ConfigError(Exception):
     """config.json cannot be read: the companion stops and says why, in words for the player."""
 
 
-# the least a number setting may be: a queue of 0 lines, a poll every 0 s would break the reading
-LEAST = {"max_queue": 1, "poll_interval": 0.01, "capture_height": 1}
+# the least a number setting may be: a queue of 0 lines, a poll every 0 s would break the reading; a pace
+# limit of 0 divides by zero (and under 1 would slow voices down), a quantile under 0 picks no voice of the
+# bank, a thread count under 1 is ONNX Runtime's "all of them" or an error
+LEAST = {"max_queue": 1, "poll_interval": 0.01, "capture_height": 1, "voice_pace_limit": 1.0,
+         "voice_pace_quantile": 0.0, "onnx_threads": 1}
 
 
 def settle_numbers(config: dict, log) -> None:
-    """Number settings as numbers: one typed as text ("8") is read as the number, one that is no number
-    at all gets its default (logged), and none goes under its LEAST."""
+    """Settings as the companion can use them. A number setting typed as text ("8") is read as the number,
+    one that is no finite number (text, null, NaN, Infinity) gets its default, none goes under its LEAST;
+    a setting of a list or of settings ({...}, [...]) that is something else (null) gets its default.
+    Each such change is logged."""
     for key, default in DEFAULT_CONFIG.items():
+        value = config.get(key)
+        if isinstance(default, (dict, list)):
+            if not isinstance(value, type(default)):
+                log(f"не удалось прочитать «{key}» в config.json ({value!r}): "
+                    f"беру {json.dumps(default, ensure_ascii=False)}")
+                config[key] = default
+            continue
         if not isinstance(default, (int, float)) or isinstance(default, bool):
             continue
-        value = config.get(key)
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
-            try:
-                value = type(default)(float(value))
-            except (TypeError, ValueError):
-                log(f"не удалось прочитать «{key}» в config.json ({value!r}): беру {default}")
-                value = default
+        try:
+            if isinstance(value, bool):
+                raise TypeError(key)
+            number = float(value)                       # "8" as 8; OverflowError for an int too big for a float
+            if not math.isfinite(number):
+                raise ValueError(key)
+            value = type(default)(number)
+        except (TypeError, ValueError, OverflowError):
+            log(f"не удалось прочитать «{key}» в config.json ({value!r}): беру {default}")
+            value = default
         if key in LEAST and value < LEAST[key]:
             log(f"не удалось взять «{key}» = {value} из config.json: беру {LEAST[key]}")
             value = LEAST[key]

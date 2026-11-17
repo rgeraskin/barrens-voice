@@ -263,6 +263,38 @@ class F5SpeakerLoad(unittest.TestCase):
         self.assertIsNone(speaker.onnx)              # the model freed at the end
         self.assertEqual(played, [(b"RIFF", 0)])
 
+    def test_a_bad_gain_costs_the_line_not_the_thread(self):
+        # "kind_gain_db": {"yell": null} raised outside the loop's try: the f5-synth thread died, F5 still "ready"
+        import tempfile
+
+        import numpy as np
+        played = []
+
+        class Onnx:
+            in_rate = 24000
+
+            def synth(self, ref_audio, ref_text, text, total):
+                return np.sin(np.arange(24000) / 24000 * 2 * np.pi * 200).astype("float32") * 0.3, 24000
+
+        class Player:
+            generation = 0
+
+            def play(self, data, generation):
+                played.append(data[:4])
+        with tempfile.TemporaryDirectory() as d:
+            speaker, logged = self.speaker(Path(d), [self.voice(Path(d))], Onnx(), Player())
+            speaker.config["kind_gain_db"] = {"yell": None}
+            loop = threading.Thread(target=speaker._synth_loop)
+            loop.start()
+            self.assertTrue(speaker.ready.wait(5))
+            speaker.say(Line("yell", "Громмаш", "Orc", "2", "", "", "За Орду", 100, "f5"))
+            speaker.say(Line("say", "Громмаш", "Orc", "2", "", "", "Кто в рейд", 100, "f5"))
+            speaker.lines.put(None)
+            loop.join(5)
+            self.assertFalse(loop.is_alive())
+        self.assertEqual(played, [b"RIFF"])                  # the yell lost, the next line said
+        self.assertTrue(any(m.startswith("F5-TTS: ") for m in logged), logged)
+
     def test_an_empty_voice_bank_is_an_error(self):
         # a client without the Russian voice-over: the bank is made with no voices in it
         import tempfile

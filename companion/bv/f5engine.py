@@ -449,13 +449,14 @@ class F5Speaker:
                     if generation != self.player.generation:
                         break                       # stopped meanwhile: no need to finish
                 wav = np.concatenate(pieces)
+                if self.config.get("debug"):
+                    self.log(f"  синтез {time.perf_counter() - started:.2f} с, {len(wav) / sr:.1f} с звука")
+                # in the try too: a gain typed wrong in config.json ("yell": null) costs the line, not the thread
+                data = wav_bytes(wav, sr, line.gain(self.config), self.config["kind_gain_db"].get(line.kind, 0))
             except Exception as e:  # noqa: BLE001 - one bad line must not stop the reader
                 self.log(f"F5-TTS: {e}")
                 continue
-            if self.config.get("debug"):
-                self.log(f"  синтез {time.perf_counter() - started:.2f} с, {len(wav) / sr:.1f} с звука")
-            gain = self.config["kind_gain_db"].get(line.kind, 0)
-            self.player.play(wav_bytes(wav, sr, line.gain(self.config), gain), generation)
+            self.player.play(data, generation)
 
     # --- the reader's side ------------------------------------------------------------------
 
