@@ -885,15 +885,23 @@ class OldClients(unittest.TestCase):
 
     def test_beta6_client_updates_through_its_updater(self):
         # beta.6 and beta.7 have the launcher's Updater: check, download, prepare (uv, build), apply when idle
+        self.updater_client("v0_4_0b6", "0.4.0b7")
+
+    def test_beta8_client_updates_through_its_updater(self):
+        self.updater_client("v0_4_0b8", "0.4.0b8")
+
+    def updater_client(self, client: str, current: str):
         import base64
         import io
         import json
         from unittest import mock
         from cryptography.hazmat.primitives import serialization
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-        from compat.v0_4_0b6 import install as old_install, update as old_update
+        import importlib
+        old_install = importlib.import_module(f"compat.{client}.install")
+        old_update = importlib.import_module(f"compat.{client}.update")
         from bv import install
-        archive, manifest = ReleaseBuild.build(self, "v0.4.0-beta.8", exe=b"starter")
+        archive, manifest = ReleaseBuild.build(self, "v0.4.0-beta.9", exe=b"starter")
         base = old_update.STABLE
         raw = json.dumps(manifest).encode()
         key = Ed25519PrivateKey.generate()
@@ -910,10 +918,10 @@ class OldClients(unittest.TestCase):
         said = []
         with tempfile.TemporaryDirectory() as d:
             root = Path(d) / "BarrensVoice"
-            (root / "app" / "0.4.0b7").mkdir(parents=True)
+            (root / "app" / current).mkdir(parents=True)
             (root / "uv.exe").write_bytes(b"uv")
-            old_install.point_current(root, root / "app" / "0.4.0b7")
-            updater = old_update.Updater(root, "0.4.0b7", lambda: {"update_channel": "stable", "auto_update": True},
+            old_install.point_current(root, root / "app" / current)
+            updater = old_update.Updater(root, current, lambda: {"update_channel": "stable", "auto_update": True},
                                          lambda m, level="INFO": said.append(m), fetch=files.__getitem__,
                                          fetch_stream=lambda req, timeout=0: Stream(files[req.full_url]), public=public)
             with mock.patch.object(old_install, "build") as build, \
@@ -924,7 +932,7 @@ class OldClients(unittest.TestCase):
             self.assertFalse(updater.due(game_running=True, companion_running=False, busy=False))
             self.assertTrue(updater.due(game_running=False, companion_running=False, busy=False))
             updater.apply()
-            self.assertEqual(install.current_version(root), "0.4.0b8")                 # the old client switched
+            self.assertEqual(install.current_version(root), "0.4.0b9")                 # the old client switched
 
 
 class UpdateInWindow(unittest.TestCase):
@@ -1006,3 +1014,5 @@ class Changelog(unittest.TestCase):
         self.assertTrue(newest.startswith("### "), newest[:80])
         self.assertNotIn("\n## ", newest)
         self.assertNotIn("]: https://github.com/", newest)
+
+
