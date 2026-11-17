@@ -84,7 +84,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Dictionary
 
-  «95%» is read «95 процентов» (1 процент, 2 процента), «кача» as «к+ача», «ЛИ» (in capitals only: «ли» is a particle) as «Лабиринты Иглошкурых», «пздц» as «пиздец».
+  «95%» is read «95 процентов» (1 процент, 2 процента), «кача» as «к+ача», «ЛИ» (in capitals only: «ли» is a particle) as «Лабиринты Иглошкурых», «пздц» as «пиздец», «импрувед» as «импр+увед».
 
 - Library notices left out of the model download
 
