@@ -17,6 +17,11 @@ AppSupportURL=https://github.com/rgeraskin/barrens-voice/issues
 DefaultDirName={localappdata}\BarrensVoice
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
+; Off: RedirectionGuard (on by default) is inherited by what [Run] starts, runasoriginaluser or not when Setup
+; is not elevated, and the install is made of junctions - uv's Python (cpython-3.13 -> 3.13.x) and our
+; app\current: traversing them failed with «untrusted mount point» (error 448). The guard protects elevated
+; installers from junctions planted by a lesser user; this one runs as that same user in that user's folder.
+RedirectionGuard=no
 OutputDir=..\dist
 OutputBaseFilename=BarrensVoice-Setup-{#AppVersion}
 SetupIconFile=..\companion\bv\launcher\icon.ico
@@ -44,13 +49,10 @@ Source: "..\companion\bv\install.py"; DestDir: "{app}\setup"; Flags: ignoreversi
 Source: "..\dist\barrens-voice-{#AppVersion}.zip"; DestDir: "{app}\setup"; Flags: ignoreversion
 
 [Run]
-; runasoriginaluser: Setup's RedirectionGuard (on by default) is inherited by what it runs, and uv
-; then cannot follow the junction it makes itself (cpython-3.13 -> 3.13.x): «untrusted mount point», error 448.
-; These entries run as the user's own processes instead; Setup keeps its guard.
 ; Python and the libraries: uv's own Python runs install.py, which builds app\{#AppVersion} from its uv.lock
-Filename: "{cmd}"; Parameters: "/c ""set UV_PYTHON_INSTALL_DIR={app}\python&& set UV_CACHE_DIR={app}\cache\uv&& set UV_PYTHON_PREFERENCE=only-managed&& ""{app}\uv.exe"" run --no-project --python 3.13 ""{app}\setup\install.py"" --root ""{app}"" --archive ""{app}\setup\barrens-voice-{#AppVersion}.zip"" || pause"""; StatusMsg: "Скачиваю Python и библиотеки (0,6–2,5 ГБ, несколько минут)…"; Flags: waituntilterminated runasoriginaluser
+Filename: "{cmd}"; Parameters: "/c ""set UV_PYTHON_INSTALL_DIR={app}\python&& set UV_CACHE_DIR={app}\cache\uv&& set UV_PYTHON_PREFERENCE=only-managed&& ""{app}\uv.exe"" run --no-project --python 3.13 ""{app}\setup\install.py"" --root ""{app}"" --archive ""{app}\setup\barrens-voice-{#AppVersion}.zip"" || pause"""; StatusMsg: "Скачиваю Python и библиотеки (0,6–2,5 ГБ, несколько минут)…"; Flags: waituntilterminated
 ; the models now, not at the first start (~3 GB once)
-Filename: "{app}\app\current\.venv\Scripts\python.exe"; Parameters: "-m bv --fetch-models"; WorkingDir: "{app}\app\current\companion"; StatusMsg: "Скачиваю модели голосов (около 3 ГБ)…"; Flags: waituntilterminated runasoriginaluser
+Filename: "{app}\app\current\.venv\Scripts\python.exe"; Parameters: "-m bv --fetch-models"; WorkingDir: "{app}\app\current\companion"; StatusMsg: "Скачиваю модели голосов (около 3 ГБ)…"; Flags: waituntilterminated
 Filename: "{app}\app\current\.venv\Scripts\pythonw.exe"; Parameters: """{app}\app\current\companion\BarrensVoice.pyw"""; WorkingDir: "{app}\app\current\companion"; Description: "Запустить Barrens Voice"; Flags: postinstall nowait skipifsilent
 
 [Icons]
