@@ -357,9 +357,11 @@ end
 -- checksum of the whole layer: "id=..;part=i;of=n". Sent when it changes (2 s after the last edit),
 -- at login, and every 2 minutes when it changed in this session (else a program started after the
 -- game reads the same layer from the saved variables, which the game writes on /reload and logout).
--- The default itself the program reads from Dictionary.lua.
+-- The default itself the program reads from Dictionary.lua. A line longer than a part is not sent:
+-- cut, a regex would be another rule (or a broken one); the player is told once.
 local DICT_PART = 480
 local lastLayer
+local toldLong = {}
 
 --- The layer as sent and its id (CRC-16, hex).
 local function LayerSet()
@@ -375,8 +377,13 @@ function ns.SendDictionary(force)
     lastLayer = id
     local parts, current = {}, ""
     for line in (text .. "\n"):gmatch("(.-)\n") do
-        line = ns.Protocol.TrimUTF8(line, DICT_PART)
-        if current ~= "" and #current + 1 + #line > DICT_PART then
+        if #line > DICT_PART then
+            if not toldLong[line] then
+                toldLong[line] = true
+                print(PREFIX .. ("строка словаря длиннее %d байт, компаньону она не передаётся. Разбейте её на "
+                    .. "несколько: %s…"):format(DICT_PART, ns.Protocol.TrimUTF8(line, 60)))
+            end
+        elseif current ~= "" and #current + 1 + #line > DICT_PART then
             parts[#parts + 1] = current
             current = line
         else

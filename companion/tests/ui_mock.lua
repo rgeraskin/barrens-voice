@@ -225,6 +225,45 @@ assert(#sent == 1 and sent[1]:find("^test\31"), "the layer unchanged since: not 
 ns.Dictionary.Reset()
 UnitName, UnitClass, UnitRace, UnitSex = nil, nil, nil, nil
 print("try a line ok")
+-- the layer in parts: each at most 480 bytes, cut at line ends, "id=..;part=i;of=n"; joined, the layer
+local function parts()
+    local out, id = {}, nil
+    for i, p in ipairs(sent) do
+        local f = {}
+        for x in (p .. "\31"):gmatch("(.-)\31") do f[#f + 1] = x end
+        assert(f[1] == "dict" and #f == 8, p)
+        local pid, part, of = f[7]:match("^id=(%x+);part=(%d+);of=(%d+)$")
+        assert(pid and tonumber(part) == i and tonumber(of) == #sent, f[7])
+        assert(id == nil or pid == id, "one id for all the parts")
+        id = pid
+        assert(#f[8] <= 480, "a part of " .. #f[8] .. " bytes")
+        out[#out + 1] = f[8]
+    end
+    return table.concat(out, "\n")
+end
+local many = ns.Dictionary.Text()
+for i = 1, 40 do many = many .. ("моёслово%d=очень длинная замена номер %d для проверки частей\n"):format(i, i) end
+ns.Dictionary.SetText(many)
+sent = {}
+ns.SendDictionary(true)
+assert(#sent > 3 and parts() == ns.Dictionary.UserLayer(), "the parts joined are the layer: " .. #sent)
+-- a line longer than a part is not sent cut (another rule, or a broken one): left out, the player told once
+local long = "~" .. ("(?:сказала?|говорит|пишет)"):rep(12) .. "=слишком длинная регулярка"
+ns.Dictionary.SetText(many .. long .. "\n")
+local toldLong, print0 = {}, print
+print = function(t) toldLong[#toldLong + 1] = t end
+sent = {}
+ns.SendDictionary(true)
+local kept = {}
+for line in ns.Dictionary.UserLayer():gmatch("[^\n]+") do if line ~= long then kept[#kept + 1] = line end end
+local withoutLong = table.concat(kept, "\n")
+assert(#kept == 40 and ns.Dictionary.UserLayer():find(long, 1, true), "the long line is in the layer")
+assert(parts() == withoutLong, "the rest goes whole")
+ns.SendDictionary(true)
+print = print0
+assert(#toldLong == 1 and toldLong[1]:find("длиннее 480 байт", 1, true), toldLong[1] or "not told")
+ns.Dictionary.Reset()
+print("dictionary parts ok")
 
 -- while CatQuest reads a quest, chat lines wait; they go when it is done; stale ones are dropped
 local clock = 100
