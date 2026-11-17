@@ -502,6 +502,7 @@ def main() -> int:
     seen = None
     linked = False
     window, window_checked = None, 0.0
+    grab_failed = False
     first_check = True
     misses = 0
     damaged_since = None      # a strip in view whose frames do not check out, since when
@@ -557,9 +558,13 @@ def main() -> int:
             try:
                 grabbed = capturer.grab()
             except Exception as e:  # noqa: BLE001 - window moved or closed between checks
-                log(f"снимок не удался: {e}")
-                window = None
+                if not grab_failed:                # once, not every second while it keeps failing
+                    log(f"снимок не удался: {e}")
+                grab_failed = True
+                window_checked = 0.0               # the window looked for again, after a pause
+                time.sleep(1)
                 continue
+            grab_failed = False
             if grabbed is None:
                 time.sleep(config["poll_interval"])
                 continue
