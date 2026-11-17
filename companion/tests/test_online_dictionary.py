@@ -163,7 +163,8 @@ class Newer(unittest.TestCase):
                                   'io.write(o.revision, "|", o.renamed[\'~o"ld\'], "|", o.text)', encoding="utf-8")
                 out = subprocess.run([LUAJIT, str(script), str(Path(t) / "DictionaryOnline.lua")],
                                      capture_output=True, check=True).stdout.decode()
-                self.assertEqual(out, "100|~new|" + data["text"])
+                # Windows' stdout writes "\n" as "\r\n"; the long string itself has "\n" (Lua normalises line ends in it)
+                self.assertEqual(out.replace("\r\n", "\n"), "100|~new|" + data["text"])
 
 
 class Release(unittest.TestCase):
