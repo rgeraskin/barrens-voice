@@ -475,3 +475,8 @@ def main_lines(items, keep: int = 14) -> tuple:
         if len(shown) == keep:
             break
     return tuple(reversed(shown))
+
+
+def addons_to_update(games, version: str, running: str | None) -> list:
+    """The games whose installed addon is older than `version` and not running now."""
+    return [g for g in games if g.addon is not None and g.key != running and newer(version, g.addon)]

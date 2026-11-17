@@ -285,6 +285,20 @@ class LogLines(unittest.TestCase):
         self.assertEqual([m for _, _, m in main_lines(many)], [str(i) for i in range(16, 30)])
 
 
+class AddonsFollowTheApp(unittest.TestCase):
+    def test_older_addons_of_closed_games(self):
+        from bv.launcher.model import Game, addons_to_update
+
+        def game(key, addon):
+            return Game(key=key, name=key, root=Path("/x") / key, addon=addon)
+        games = [game("forever", "0.3.0"), game("retail", "0.3.0")]
+        self.assertEqual([g.key for g in addons_to_update(games, "0.3.1", None)], ["forever", "retail"])
+        self.assertEqual([g.key for g in addons_to_update(games, "0.3.1", "forever")], ["retail"])   # the game runs: later
+        self.assertEqual(addons_to_update(games, "0.3.0", None), [])                                  # the same version
+        self.assertEqual(addons_to_update([game("forever", "0.4.0")], "0.3.1", None), [])           # newer (CurseForge): kept
+        self.assertEqual(addons_to_update([game("forever", None)], "0.3.1", None), [])              # not installed: asked
+
+
 class CommandLine(unittest.TestCase):
     def test_parse(self):
         from bv.launcher.model import parse_args
@@ -904,3 +918,33 @@ class OldClients(unittest.TestCase):
             updater.apply()
             self.assertEqual(install.current_version(root), "0.4.0b8")                 # the old client switched
 
+
+class UpdateInWindow(unittest.TestCase):
+    """The launcher's own update steps, on a stand-in for its window (no Tk drawn)."""
+
+    def setUp(self):
+        from types import SimpleNamespace
+        from bv.launcher import app, model
+        from bv.launcher.model import Game
+        self.app, self.ns = app, SimpleNamespace
+        self.installed = []
+        self.win = SimpleNamespace(updater=SimpleNamespace(ready="0.4.1"), config={"auto_update": True},
+                                   addon_version="0.3.1", running_game=None, busy="", addons_tried=set(),
+                                   games=[Game("forever", "WoW Forever", Path("/f"), "0.3.0"),
+                                          Game("retail", "WoW Retail", Path("/r"), "0.4.0")],
+                                   install_addon=self.installed.append)
+
+    def test_addons_follow_only_with_automatic_updates(self):
+        self.app.App.update_addons(self.win)
+        self.assertEqual([g.key for g in self.installed], ["forever"])                 # older only; newer kept
+        self.app.App.update_addons(self.win)
+        self.assertEqual(len(self.installed), 1)                                       # tried once, not every 15 s
+        self.installed.clear()
+        self.win.addons_tried.clear()
+        self.win.config["auto_update"] = False
+        self.app.App.update_addons(self.win)
+        self.assertEqual(self.installed, [])                                           # off: by hand («обновить аддон»)
+        self.win.config["auto_update"] = True
+        self.win.updater = None                                                        # run from the source: never
+        self.app.App.update_addons(self.win)
+        self.assertEqual(self.installed, [])

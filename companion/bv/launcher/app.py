@@ -81,6 +81,7 @@ class App:
         self.config = model.read_config()
         self.version = model.app_version()
         self.addon_version = model.addon_version()
+        self.addons_tried: set[tuple[str, str]] = set()
         self.updater = None              # an install's updates (bv/update.py Updater); None run from the source
         if INSTALL_DIR is not None:
             from ..update import Updater
@@ -262,6 +263,16 @@ class App:
             self.restart_companion(["--no-launch"])
         self.redraw()
 
+    def update_addons(self) -> None:
+        """An installed Barrens Voice keeps the games' addon at its own version: an older one is replaced
+        while that game is closed (a newer one, from CurseForge say, stays). Not from the source folder."""
+        if self.updater is None or not self.config.get("auto_update", True):   # off: «обновить аддон» by hand
+            return
+        for g in model.addons_to_update(self.games, self.addon_version, self.running_game):
+            if (g.key, g.addon) not in self.addons_tried:      # a failed one is said once, not every 15 s
+                self.addons_tried.add((g.key, g.addon))
+                self.install_addon(g)
+
     def install_addon(self, g, ask=False) -> bool:
         source = model.addon_source()
         if source is None:
@@ -275,7 +286,9 @@ class App:
         except OSError as e:
             self.say(f"аддон не установлен: {e}", "WARN")
             return False
-        self.say(f"аддон {self.addon_version} установлен в {g.name}" + (" — в игре нужен /reload" if self.running_game == g.key else ""))
+        done = (f"аддон обновлён до {self.addon_version} в {g.name}" if g.addon not in (None, self.addon_version)
+                else f"аддон {self.addon_version} установлен в {g.name}")
+        self.say(done + (" — в игре нужен /reload" if self.running_game == g.key else ""))
         self.games = model.find_games(self.config)
         self.redraw()
         return True
@@ -399,6 +412,7 @@ class App:
         if now - self.checked["games"] > 15:
             self.checked["games"] = now
             self.games = model.find_games(self.config)
+            self.update_addons()
         self.apply_update_when_idle()
         if self.closed:
             return

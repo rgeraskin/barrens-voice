@@ -38,6 +38,7 @@
 - The strip («мост») is at the bottom edge of the screen by default (it was the top): «Внизу (обычно)» in «Мост к компаньону…». An addon with saved settings keeps its place.
 - The launcher reads the companion's stderr apart from its log lines: a library writing below Python (a progress bar without its line end) glued itself to the next log line, which the main window then did not show — the first «собираю голоса рас из игры» among them. Such output is a `DEBUG [stderr]` line of its own, its last state, without colour codes.
 - Building the voice bank (once, and after each game update) shows its progress: «собираю голоса рас: N из M» every 10 s, then «голоса рас собраны: N из M за X мин»; the launcher's main window keeps them in one line that moves on.
+- The addon follows the app: with «Обновлять автоматически» an installed Barrens Voice replaces an older addon in each game that is not running (a newer one, from CurseForge, stays); otherwise a game's card offers «обновить аддон».
 - The links to more Windows voices (RHVoice, Silero) on «Голоса» are rows of the same kind: the address to see and copy, «Копировать» and «Открыть».
 
 ## 0.3.0
