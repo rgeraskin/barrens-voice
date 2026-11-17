@@ -19,6 +19,9 @@ LUA_USER = re.compile(r'\["dictionaryUser"\]\s*=\s*"((?:[^"\\]|\\.)*)"', re.S)
 DEFAULT_BLOCK = re.compile(r"D\.DEFAULT\s*=\s*\[\[(.*?)\]\]", re.S)
 REVISION = re.compile(r"^D\.REVISION\s*=\s*(\d+)", re.M)      # the default's revision (tools/release.py)
 WORD = re.compile(r"[^\W_]+")
+# a word joined to the one before or after it by an apostrophe: one word ("Лок'тар огар!" is no "лок")
+APOSTROPHE_BEFORE = re.compile(r"[^\W_]['’]$")
+APOSTROPHE_AFTER = re.compile(r"['’][^\W_]")
 LUA_ESCAPE = re.compile(r'\\(\d{1,3}|.)', re.S)
 SIMPLE = {"n": "\n", "t": "\t", "r": "\r", "a": "\a", "b": "\b", "f": "\f", "v": "\v"}
 
@@ -338,7 +341,7 @@ class Dictionary:
                     if word.startswith(stem):
                         value, span, took_ending = entry.replace("*", t.group()[len(stem):]), 1, True
                         break
-            if value is None:
+            if value is None or self._glued(text, t.start(), tokens[i + span - 1].end()):
                 i += 1
                 continue
             out.append(text[last:t.start()])
@@ -347,6 +350,11 @@ class Dictionary:
             i += span
         out.append(text[last:])
         return "".join(out)
+
+    @staticmethod
+    def _glued(text: str, start: int, end: int) -> bool:
+        """Whether text[start:end] is part of a word with an apostrophe ("Лок'тар", "ок'ей"): no entry."""
+        return bool(APOSTROPHE_BEFORE.search(text, 0, start) or APOSTROPHE_AFTER.match(text, end))
 
     @staticmethod
     def _match(words, star, tokens, i):

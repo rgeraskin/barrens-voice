@@ -417,6 +417,10 @@ class Pipeline(unittest.TestCase):
         self.check(cases, declension=False)
         self.assertEqual(self.say("идём в ОП", declension=False), "идём в Огненная пр+опасть")
 
+    def test_a_word_with_an_apostrophe_is_one_word(self):
+        self.check({"Лок'тар огар!": "Лок'тар огар!", "За Орду! Лок’тар!": "За Орду! Лок’тар!",
+                    "'лок', привет": "'чернокнижник', привет", "идём в ЗГ": "идём в Зул'Гур+уб"})
+
     def test_hyphenated_words_after_a_number(self):
         # the default's «рл» entries make «рейд-лидер»: a count, not «второй рейд-лидера»
         self.check({"2 рла": "два рейд-лидера", "5 рлов": "пять рейд-лидеров", "2 топ-гильдии": "две топ-гильдии"})
