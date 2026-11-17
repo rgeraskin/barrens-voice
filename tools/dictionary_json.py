@@ -8,9 +8,10 @@ commit that changed Dictionary.lua - the same number tools/release.py writes int
 from __future__ import annotations
 
 import json
-import re
+import shutil
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -18,11 +19,19 @@ ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / "dist"
 LUA = ROOT / "addon" / "BarrensVoice" / "Dictionary.lua"
 sys.path.insert(0, str(ROOT / "companion"))
-from bv.dictionary import DEFAULT_BLOCK, unescape  # noqa: E402
+from bv.dictionary import DEFAULT_BLOCK  # noqa: E402
 from bv.online_dictionary import FORMAT, regexes_ok  # noqa: E402
 
-RENAMED_BLOCK = re.compile(r"^D\.RENAMED\s*=\s*\{(.*?)^\}", re.S | re.M)
-PAIR = re.compile(r'\[\s*"((?:[^"\\]|\\.)*)"\s*\]\s*=\s*"((?:[^"\\]|\\.)*)"')
+# D.RENAMED as the addon builds it, whichever way the table is written (a constructor, assignments, long
+# strings): Dictionary.lua run by LuaJIT, the pairs written out separated by NUL bytes
+RENAMED_LUA = """
+local ns = { db = {} }
+assert(loadfile(arg[1]))("BarrensVoice", ns)
+local renamed, keys = ns.Dictionary.RENAMED or {}, {}
+for k in pairs(renamed) do keys[#keys + 1] = k end
+table.sort(keys)
+for _, k in ipairs(keys) do io.write(k, "\\0", renamed[k], "\\0") end
+"""
 
 
 def revision(path: Path = LUA) -> int:
@@ -34,17 +43,32 @@ def revision(path: Path = LUA) -> int:
     return int(out)
 
 
+def renamed(lua: str) -> dict[str, str]:
+    """The renamed default keys (D.RENAMED) of the Lua text of Dictionary.lua, as LuaJIT loads it."""
+    luajit = shutil.which("luajit")
+    if not luajit:
+        sys.exit("luajit not found (mise install): D.RENAMED is read by running Dictionary.lua")
+    with tempfile.TemporaryDirectory() as d:
+        # files, not -e: on Windows luajit is a .CMD shim, and cmd mangles quotes in arguments
+        source, script = Path(d) / "Dictionary.lua", Path(d) / "renamed.lua"
+        source.write_text(lua, encoding="utf-8")
+        script.write_text(RENAMED_LUA, encoding="utf-8")
+        done = subprocess.run([luajit, str(script), str(source)], capture_output=True)
+    if done.returncode != 0:
+        sys.exit(f"Dictionary.lua does not load: {done.stderr.decode('utf-8', 'replace').strip()}")
+    parts = done.stdout.decode("utf-8").split("\0")[:-1]
+    return dict(zip(parts[::2], parts[1::2]))
+
+
 def build(text: str | None = None, rev: int | None = None) -> dict:
     lua = text if text is not None else LUA.read_text(encoding="utf-8")
     default = DEFAULT_BLOCK.search(lua)
     if not default:
         sys.exit("Dictionary.lua: no D.DEFAULT = [[...]]")
-    block = RENAMED_BLOCK.search(lua)
-    renamed = {unescape(a): unescape(b) for a, b in PAIR.findall(block.group(1))} if block else {}
     rev = rev if rev is not None else revision()
     return {"format": FORMAT, "revision": rev,
             "date": datetime.fromtimestamp(rev, timezone.utc).strftime("%Y-%m-%d"),
-            "text": default.group(1), "renamed": renamed}
+            "text": default.group(1), "renamed": renamed(lua)}
 
 
 def write(data: dict, out: Path) -> Path:

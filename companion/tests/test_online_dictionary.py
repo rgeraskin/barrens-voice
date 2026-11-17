@@ -37,6 +37,7 @@ def entry(text="кд=кулд+аун\nимба=имб+а\n~(\\d+)\\s*к\\b=\\g<1
 
 
 class Build(unittest.TestCase):
+    @unittest.skipUnless(LUAJIT, "luajit not installed")
     def test_from_the_addon(self):
         import dictionary_json
         data = dictionary_json.build(rev=1794864817)
@@ -54,10 +55,24 @@ class Build(unittest.TestCase):
         self.assertNotIn(b"\r", raw)
         self.assertEqual(json.loads(raw)["text"], "а=б\nв=г")
 
+    @unittest.skipUnless(LUAJIT, "luajit not installed")
     def test_renamed(self):
+        # D.RENAMED as the addon builds it, however the table is written
         import dictionary_json
-        lua = 'D.DEFAULT = [[\nа=б\n]]\nD.RENAMED = {\n    ["~old\\\\d"] = "~new\\\\d",\n}\n'
-        self.assertEqual(dictionary_json.build(lua, rev=1)["renamed"], {"~old\\d": "~new\\d"})
+        head = 'local _, ns = ...\nlocal D = {}\nns.Dictionary = D\nD.DEFAULT = [[\nа=б\n]]\n'
+        forms = {
+            "constructor": 'D.RENAMED = {\n    ["~old\\\\d"] = "~new\\\\d",\n}\n',
+            "one line": 'D.RENAMED = { ["~old\\\\d"] = "~new\\\\d" }\n',
+            "assignment": 'D.RENAMED = {}\nD.RENAMED["~old\\\\d"] = "~new\\\\d"\n',
+            "long strings": 'D.RENAMED = {\n    [ [[~old\\d]] ] = [[~new\\d]],\n}\n',
+            "indented close": 'D.RENAMED = {\n    ["~old\\\\d"] = "~new\\\\d",\n    }\n',
+        }
+        for name, lua in forms.items():
+            self.assertEqual(dictionary_json.build(head + lua, rev=1)["renamed"], {"~old\\d": "~new\\d"}, name)
+        self.assertEqual(dictionary_json.build(head + "D.RENAMED = {}\nlocal x = {\n    [\"a\"] = \"b\",\n}\n",
+                                               rev=1)["renamed"], {})
+        with self.assertRaises(SystemExit):                     # a Lua error is no empty table
+            dictionary_json.build(head + "D.RENAMED = {\n", rev=1)
 
 
 class Load(unittest.TestCase):
