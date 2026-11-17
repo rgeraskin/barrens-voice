@@ -32,6 +32,13 @@ class LoadConfig(unittest.TestCase):
         self.assertEqual(saved["players"], {"Тралл": "orc-male"})
         self.assertEqual(saved["max_queue"], companion.DEFAULT_CONFIG["max_queue"])   # new settings written in
 
+    def test_help_of_this_version(self):
+        # config.update kept the file's old _help: a corrected text never reached an existing config.json
+        old = dict(companion.DEFAULT_CONFIG, _help="players: also takes F5 voice ids (orc-male#60).")
+        config, saved, _ = self.load(json.dumps(old))
+        self.assertEqual(config["_help"], companion.DEFAULT_CONFIG["_help"])
+        self.assertEqual(saved["_help"], companion.DEFAULT_CONFIG["_help"])
+
     def test_bom_is_read(self):
         # Notepad's «UTF-8 with BOM»: the launcher read it, the companion stopped with CONFIG_ERROR
         with tempfile.TemporaryDirectory() as d:

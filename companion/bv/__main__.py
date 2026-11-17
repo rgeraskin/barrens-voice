@@ -253,8 +253,10 @@ def load_config_stamped(path: Path | None = None, log=log) -> tuple[dict, object
         return config, None
     stamp, saved = read_config(path)
     config.update(saved)
+    config["_help"] = DEFAULT_CONFIG["_help"]           # this version's text, not the one the file was made with
     settle_numbers(config, log)
-    if any(key not in saved for key in DEFAULT_CONFIG):   # new settings: write them in
+    if any(key not in saved for key in DEFAULT_CONFIG) or saved["_help"] != config["_help"]:
+        # new settings or a new _help: write them in
         _write_config(path, config)
         stamp = None
     return config, stamp
