@@ -30,8 +30,9 @@ def uv_entry() -> dict:
     with urllib.request.urlopen(request, timeout=60) as r:  # noqa: S310
         sha = r.read().decode().split()[0]
     return {"version": UV_VERSION, "url": UV_ZIP, "sha256": sha}
-SKIP_DIRS = {"__pycache__", "tests", ".venv", "tmp", "logs", "voices", "voices-retail", "models", "hf", "f5test"}
-SKIP_FILES = {"config.json", "assignments.json", ".models_ready", "requirements.txt", "BarrensVoice.cmd", ".DS_Store"}
+# only tracked files are packed (files()): what is left out of those - the tests and the source-run setup
+SKIP_DIRS = {"tests"}
+SKIP_FILES = {"requirements.txt", "BarrensVoice.cmd"}
 
 
 def files() -> list[tuple[Path, str]]:
@@ -42,7 +43,7 @@ def files() -> list[tuple[Path, str]]:
     out = []
     for name in filter(None, tracked):
         parts = Path(name).parts
-        if SKIP_DIRS & set(parts) or parts[-1] in SKIP_FILES or parts[-1].startswith("._"):
+        if SKIP_DIRS & set(parts) or parts[-1] in SKIP_FILES:
             continue
         out.append((ROOT / name, name))
     return out

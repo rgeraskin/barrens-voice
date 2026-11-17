@@ -772,10 +772,9 @@ class App:
             return changes
 
         def differs(changes: dict) -> bool:
-            """Whether `changes` differ from the file: an empty field is the same as a key not set."""
-            unset = {"f5_end_check": "silence", "log_details": True, "log_keep_days": 90, "auto_update": True,
-                     "update_channel": "stable"}
-            return any((cfg.get(k) if cfg.get(k) is not None else unset.get(k, "")) != v for k, v in changes.items())
+            """Whether `changes` differ from the file (cfg has the defaults under it): an empty field is the same
+            as a key set to null."""
+            return any((cfg.get(k) if cfg.get(k) is not None else "") != v for k, v in changes.items())
 
         def save():
             changes = edited()
