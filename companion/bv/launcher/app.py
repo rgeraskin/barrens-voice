@@ -278,15 +278,17 @@ class App:
         """How the companion's end counts for a freshly applied version (update.record_start): True - an error,
         the version's failed start; False - a good end (0); None - no verdict: 3 (started again online), 4
         (another companion runs), 5 (config.json cannot be read) or an error this very run explained itself
-        (state.json's phase "error" with its pid: no addon, say). Those say nothing of the version either way:
-        going back would not help, and taking them for a good run settled a version that had not started yet."""
+        (state.json's phase "error": no addon, say). Those say nothing of the version either way: going back
+        would not help, and taking them for a good run settled a version that had not started yet.
+        state.json is this run's: Companion.start deletes it before every start (its pid is not compared - in a
+        venv on Windows python.exe may start the interpreter as a child, so Popen's pid is not the one written).
+        An explained error is no verdict, not a good run: a version that "explains" every start is never settled
+        or pruned, and its first crash still counts."""
         if code == 0:
             return False
         if code in (None, Companion.RESTART, Companion.ALREADY, Companion.CONFIG_ERROR):
             return None
-        state = self.companion.state()
-        proc = getattr(self.companion, "proc", None)
-        if state.get("phase") == "error" and proc is not None and state.get("pid") == proc.pid:
+        if self.companion.state().get("phase") == "error":
             return None
         return True
 

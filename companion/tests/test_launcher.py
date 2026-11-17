@@ -1364,10 +1364,27 @@ class UpdateInWindow(unittest.TestCase):
         self.assertFalse(failed(0))                                                    # a good end
         self.assertEqual([failed(c) for c in (None, 3, 4, 5)], [None] * 4)            # no verdict either way
         self.assertTrue(failed(1))                                                     # died: the version's fault
-        state.update(phase="error", error="аддон не установлен", pid=7)
-        self.assertIsNone(failed(1))                                                   # this run said why itself
-        state["pid"] = 6
-        self.assertTrue(failed(1))                                                     # an earlier run's state
+        state.update(phase="error", error="аддон не установлен", pid=6)
+        self.assertIsNone(failed(1))           # this run said why itself (its pid may be the venv launcher's child)
+        state.update(phase="starting")
+        self.assertTrue(failed(1))                                                     # died after its start
+
+    def test_state_file_is_this_runs(self):
+        # start_failed trusts state.json's phase without a pid: every start deletes the one of the run before
+        from unittest import mock
+        from bv.launcher import process
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "bv").mkdir()
+            (Path(d) / "bv" / "__init__.py").write_text("")
+            (Path(d) / "bv" / "__main__.py").write_text("")
+            state = Path(d) / "state.json"
+            state.write_text('{"phase": "error", "error": "аддон не установлен"}', encoding="utf-8")
+            with mock.patch.object(process, "STATE_FILE", state):
+                companion = process.Companion(Path(d), lambda line: None)
+                companion.start()
+                companion.proc.wait(timeout=30)
+                self.assertFalse(state.exists())
+                self.assertEqual(companion.state(), {})
 
 
     def ended_with_the_game(self, exit_with_wow, resident=False):
