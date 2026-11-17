@@ -7,6 +7,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 VERSION = 1
+# the strip's versions this companion reads: a new protocol keeps reading the one before, so a companion updated
+# during the game (the old addon until /reload) and an addon updated before the program both still work
+SUPPORTED = (1,)
 HEADER_CELLS = 6
 HEADER_BITS = 48
 BITS_PER_CELL = 6
@@ -61,28 +64,39 @@ def _cell_size(img: Image) -> int | None:
     return size if size <= MAX_CELL else None
 
 
-# Why the last decode() found no frame: "absent" (no strip there) or "damaged" (a strip - sync and
-# calibration cells in place - whose frame does not check out: something drawn over it?).
+# Why the last decode() found no frame: "absent" (no strip there), "damaged" (a strip - sync and
+# calibration cells in place - whose frame does not check out: something drawn over it?) or "version" (a
+# strip of a protocol this companion does not read: `other_version`; the addon newer or older than it).
 last_failure = ""
+other_version = 0
 
 
 def decode(img: Image) -> Frame | None:
     """The frame on the strip at the top of `img` - drawn from the left edge or the right - or None
     when there is none (or it is damaged; see `last_failure`)."""
     global last_failure
-    damaged = False
+    damaged = foreign = False
     for mirrored in (False, True):
         frame, synced = _decode(Image(img.raw, img.width, img.height, mirrored))
         if frame is not None:
             last_failure = ""
             return frame
-        damaged = damaged or synced
-    last_failure = "damaged" if damaged else "absent"
+        damaged = damaged or bool(synced)
+        foreign = foreign or synced == "version"
+    last_failure = "version" if foreign else "damaged" if damaged else "absent"
     return None
 
 
-def _decode(img: Image) -> tuple[Frame | None, bool]:
-    """(the frame or None, whether the sync and calibration cells were there)."""
+def mismatch(other: int) -> tuple[str, str]:
+    """For a strip of protocol `other`: ("newer" | "older", what the player should do)."""
+    if other > VERSION:
+        return "newer", "аддон новее Barrens Voice — обновите Barrens Voice («Обновить» в лаунчере)"
+    return "older", "аддон старше Barrens Voice — «обновить аддон» в лаунчере, потом в игре /reload"
+
+
+def _decode(img: Image) -> tuple[Frame | None, bool | str]:
+    """(the frame or None, whether the sync and calibration cells were there: "version" when they were and
+    the frame is of a protocol not SUPPORTED, its number in `other_version`)."""
     cell = _cell_size(img)
     if not cell:
         return None, False
@@ -135,11 +149,15 @@ def _decode(img: Image) -> tuple[Frame | None, bool]:
         del bits[:count]
         return value
 
+    global other_version
     version = read_bits(4)
+    if version is not None and version not in SUPPORTED:
+        other_version = version
+        return None, "version"
     seq = read_bits(16)
     length = read_bits(12)
     crc = read_bits(16)
-    if None in (version, seq, length, crc) or version != VERSION:
+    if None in (version, seq, length, crc):
         return None, True
     payload = bytearray()
     for _ in range(length):

@@ -118,6 +118,8 @@ STATES = [   # the companion's state file: every line describe() can say
     ({"phase": "running", "voices": "off"}, True, None),
     ({"phase": "error", "error": "очень длинная ошибка " * 8}, False, 1),
     ({"phase": "stopped"}, False, 3),
+    ({"phase": "running", "voices": "ready", "mismatch": "newer"}, True, None),
+    ({"phase": "running", "voices": "ready", "mismatch": "older"}, True, None),
 ]
 LOG = [("04:45:32", "INFO", "компаньон запущен (WoW Forever)"),
        ("04:45:46", "INFO", "собираю голоса рас: 23 из 66"),

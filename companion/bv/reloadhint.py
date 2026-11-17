@@ -45,7 +45,7 @@ def strip_in_view(config: dict) -> bool:
             grabbed = capturer.grab()
             if grabbed is not None:
                 frame = protocol.decode(protocol.Image(*grabbed))
-                return frame is not None or protocol.last_failure == "damaged"
+                return frame is not None or protocol.last_failure in ("damaged", "version")
             time.sleep(0.1)
         return False
     except Exception:  # noqa: BLE001 - only a hint

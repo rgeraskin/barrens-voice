@@ -410,6 +410,7 @@ def main() -> int:
     damaged_since = None      # a strip in view whose frames do not check out, since when
     last_speaker = None       # (kind, sender, channel) of the last chat line passed on
     damaged_told = False
+    foreign_since, foreign_told = None, False   # a strip of a protocol this companion does not read
     wow_seen, wow_gone_since, wow_checked = False, None, 0.0
     unknown_kinds: set[str] = set()
     capturer = Capturer(config, log)
@@ -474,6 +475,20 @@ def main() -> int:
                         log(f"полоска найдена в другом месте: x {hit[0]}, y {hit[1]}, ширина {hit[2]}")
             elif frame is not None:
                 absent_since = None
+            if frame is None and protocol.last_failure == "version":
+                now = time.monotonic()
+                foreign_since = foreign_since or now
+                if not foreign_told and now - foreign_since > 3.0:      # held a while: not a damaged frame's chance
+                    which, words = protocol.mismatch(protocol.other_version)
+                    log(words)
+                    log(f"    протокол полоски: у аддона {protocol.other_version}, у программы {protocol.VERSION}")
+                    foreign_told = True
+                    state.report(mismatch=which)
+            elif foreign_since is not None:
+                foreign_since = None
+                if foreign_told:
+                    foreign_told = False
+                    state.report(mismatch="")
             if frame is None:
                 misses += 1
                 if protocol.last_failure == "damaged":

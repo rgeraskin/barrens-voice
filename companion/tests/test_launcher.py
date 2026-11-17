@@ -285,6 +285,14 @@ class LogLines(unittest.TestCase):
         self.assertEqual([m for _, _, m in main_lines(many)], [str(i) for i in range(16, 30)])
 
 
+class Mismatch(unittest.TestCase):
+    def test_bridge_line(self):
+        from bv.launcher.model import RED, describe
+        self.assertEqual(describe({"mismatch": "newer", "linked": True}, True, None, "WoW Forever", False)[3],
+                         (RED, "Мост: аддон новее программы — обновите Barrens Voice"))
+        self.assertIn("/reload", describe({"mismatch": "older"}, True, None, "WoW Forever", False)[3][1])
+
+
 class AddonsFollowTheApp(unittest.TestCase):
     def test_older_addons_of_closed_games(self):
         from bv.launcher.model import Game, addons_to_update

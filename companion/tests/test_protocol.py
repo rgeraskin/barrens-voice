@@ -126,6 +126,23 @@ class RoundTrip(unittest.TestCase):
         decode(Image(bytes(1920 * 4 * 2), 1920, 2))
         self.assertEqual(protocol.last_failure, "absent")
 
+    def test_another_protocol(self):
+        # an addon of another protocol: told apart from a damaged strip, with its number
+        from bv import protocol
+        from bv.logs import level_of
+        cells = encode(5, self.PAYLOAD, 960)
+        _, _, b = cells[6]
+        cells[6] = (0, 2, b)                      # the first header cell: version 0001 -> 0010 (r, g carry its 4 bits)
+        self.assertIsNone(decode(render(cells, 1920, 2, 1)))
+        self.assertEqual((protocol.last_failure, protocol.other_version), ("version", 2))
+        which, words = protocol.mismatch(2)
+        self.assertEqual(which, "newer")
+        self.assertIn("обновите Barrens Voice", words)
+        self.assertEqual(protocol.mismatch(0)[0], "older")
+        self.assertEqual({level_of(protocol.mismatch(v)[1]) for v in (0, 2)}, {"WARN"})
+        self.assertIsNotNone(decode(render(encode(5, self.PAYLOAD, 960), 1920, 2, 1)))   # ours still read
+        self.assertIn(protocol.VERSION, protocol.SUPPORTED)
+
     def test_covered_from_the_right(self):
         # a minimap at the top edge: the strip drawn from the right, cells 19+ covered by the scene
         from bv import protocol
