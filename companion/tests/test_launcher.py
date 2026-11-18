@@ -281,6 +281,38 @@ class Config(unittest.TestCase):
 
 
 class LiveFromTheWindow(unittest.TestCase):
+    def test_a_hand_edit_made_while_the_window_was_open_is_taken_at_the_next_start(self):
+        # the window read config.json at its start; the player then opened it from Settings and set both off.
+        # The next start must go by the file (no --launch, live.json with exit_with_wow false) unless the window
+        # holds a change of its own the file did not take (pending)
+        import json
+        import tempfile
+        from unittest import mock
+        import bv.__main__ as companion
+        from bv.launcher import app, model
+        file = {"game": "forever", "launch_wow": False, "exit_with_wow": False}
+        for pending, launch, exit_with_wow in (({}, "--no-launch", False),
+                                               ({"exit_with_wow": True}, "--no-launch", True)):
+            got = []
+            win = SimpleNamespace(companion=SimpleNamespace(running=False, start=got.append), busy="", selected="forever",
+                                  addon_missing=lambda: False, pending=dict(pending), extra=[], say=lambda *a: None,
+                                  settle_due=False, config={"game": "forever", "launch_wow": True, "exit_with_wow": True})
+            with tempfile.TemporaryDirectory() as d, mock.patch.object(companion, "LIVE_FILE", Path(d) / "live.json"), \
+                    mock.patch.object(model, "read_config", lambda strict=False: dict(file)):
+                self.assertTrue(app.App.start_companion(win))
+                self.assertEqual(json.loads((Path(d) / "live.json").read_text(encoding="utf-8")),
+                                 {"exit_with_wow": exit_with_wow})
+            self.assertEqual(got[0], ["--forever", launch])
+        # a file that cannot be read now: the window's copy
+        got = []
+        win = SimpleNamespace(companion=SimpleNamespace(running=False, start=got.append), busy="", selected="forever",
+                              addon_missing=lambda: False, pending={}, extra=[], say=lambda *a: None, settle_due=False,
+                              config={"game": "forever", "launch_wow": True, "exit_with_wow": True})
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(companion, "LIVE_FILE", Path(d) / "live.json"), \
+                mock.patch.object(model, "read_config", side_effect=model.BrokenConfig("config.json не читается")):
+            app.App.start_companion(win)
+        self.assertEqual(got[0], ["--forever", "--launch"])
+
     def test_a_change_config_json_did_not_take_reaches_the_running_companion(self):
         # «Закрываться вместе с игрой» unchecked with config.json read-only: the companion still ended with the game
         import json
@@ -2020,8 +2052,9 @@ class UpdateInWindow(unittest.TestCase):
             win = self.ns(companion=self.ns(running=False, start=got.append), busy="", selected=selected,
                           addon_missing=lambda: False,
                           config={"game": selected, "launch_wow": launch_wow, "exit_with_wow": not launch_wow},
-                          extra=list(extra), say=lambda *a: None, settle_due=False)
-            with tempfile.TemporaryDirectory() as d, mock.patch.object(companion, "LIVE_FILE", Path(d) / "live.json"):
+                          extra=list(extra), say=lambda *a: None, settle_due=False, pending={})
+            with tempfile.TemporaryDirectory() as d, mock.patch.object(companion, "LIVE_FILE", Path(d) / "live.json"), \
+                    mock.patch.object(self.app.model, "read_config", lambda strict=False: dict(win.config)):
                 self.assertTrue(self.app.App.start_companion(win, args))
                 # «Закрываться вместе с игрой» as the window has it, for the companion's LiveConfig
                 self.assertEqual(json.loads((Path(d) / "live.json").read_text(encoding="utf-8")),

@@ -255,6 +255,13 @@ class App:
         if self.addon_missing():
             self.say(f"в {GAME_NAMES[self.selected]} нет аддона — «установить аддон» справа", "WARN")
             return False
+        try:
+            # config.json as it is now - edited by hand while the window was open (it may sit in the tray for days) -
+            # with what it did not take over it: the launch choice and tmp/live.json go by this, not by the window's
+            # copy from its start
+            self.config = {**model.read_config(strict=True), **self.pending}
+        except model.BrokenConfig:
+            pass                                 # unreadable now: the window's copy (the companion says what is wrong)
         if self.config.get("game") != self.selected:
             self.set_config(game=self.selected)
         self.companion_game = self.selected
