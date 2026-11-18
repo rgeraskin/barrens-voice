@@ -143,7 +143,8 @@ PAIR_NEXT = re.compile(r"\s*[-–/]\s*([1-9]\d*)\b")
 PAIR_BEFORE = re.compile(r"(?<![\d:.,])\d+\s*[-–/]\s*$")
 PREV_WORD = re.compile(r"(?<![\w'+-])([а-яёА-ЯЁ]+(?:-[а-яёА-ЯЁ]+)?)\s+$")   # a whole word, as morph.PREVIOUS
 # the cases a preposition asks of the word after it (only those a count never takes in the singular);
-# "нет" is no preposition but asks the genitive the same way ("нет 5 места", "нет 5 игроков")
+# "нет" is no preposition but asks the genitive the same way ("нет 5 места", "нет 5 игроков") - or is an
+# answer ("нет 2 хила уже есть"), see `asked_by`
 GOVERNS = {**dict.fromkeys(("с", "со"), {"gent", "ablt"}),
            **dict.fromkeys(("до", "от", "из", "для", "без", "после", "около", "у", "кроме", "из-за", "из-под", "нет"), {"gent"}),
            **dict.fromkeys(("к", "ко", "по"), {"datv"}),
@@ -164,6 +165,24 @@ AMOUNT_FROM = 100
 YEAR = "год"
 # a time of day: "до 5 утра", "с 8 вечера" - the hour counted, not "до пятого утра"
 DAYTIME = {"утро", "день", "вечер", "ночь"}   # "до 2 дня" - "до двух дня" (an event's day would be "второго")
+AT_HOUR = {"до", "с", "со", "после", "около", "от", "к", "ко", "в", "во", "на"}   # "для 2 дня" is the second day
+
+
+def asked_by(before: str, n: int, word: str, morph) -> set[str]:
+    """The cases `before`, the word before the number `n`, asks of `word` after it (GOVERNS). "нет" asks
+    the genitive only where the line has no other reading: before a noun in the genitive plural ("нет 2
+    хилов", "нет 5 игроков") or in the singular after 1 or 5+ ("нет 5 места"); "нет 2 хила уже есть" and
+    "нет 5" alone are an answer and a count."""
+    cases = GOVERNS.get(before.lower(), set())
+    if before.lower() != "нет":
+        return cases
+    if not word:
+        return set()
+    few = 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14
+    if few and not any(p.tag.POS == "NOUN" and p.tag.case == "gent" and p.tag.number == "plur"
+                       for p in morph.parse(word.replace("+", "").lower())):
+        return set()
+    return cases
 _morph = None
 _morph_lock = threading.Lock()
 
@@ -206,7 +225,7 @@ def agree(n: int, spoken: str, following: str, morph, before: str = "") -> str:
     Left as it is when the word is not a noun or adjective, not in pymorphy's dictionary (slang:
     "2 дамагера"), or could be the plain nominative ("1 золотой")."""
     word = following.replace("+", "").lower()
-    asked = GOVERNS.get(before.lower(), set())
+    asked = asked_by(before, n, word, morph)
     parts = spoken.split()
     one = n % 10 == 1 and not 10 < n % 100 < 20
     if "gent" in asked and word in ("до", "по"):
@@ -265,10 +284,10 @@ def ordinal(n: int, before: str, following: str, morph) -> str | None:
         return None                                    # "до 200 опыта", "из 100 золота": an amount
     if n >= AMOUNT_FROM and not any(p.normal_form in NUMBERED or p.normal_form == YEAR for p in parses):
         return None                                    # "от 300 защиты"
-    if any(p.normal_form in DAYTIME and p.tag.case == "gent" for p in parses):
+    if before.lower() in AT_HOUR and any(p.normal_form in DAYTIME and p.tag.case == "gent" for p in parses):
         return None                                    # "до 3 ночи": an hour
     numbered = any(p.normal_form in NUMBERED for p in parses)
-    asked = GOVERNS.get(before.lower(), set())
+    asked = asked_by(before, n, word, morph)
     governed = [p for p in parses if p.tag.case in asked]
     if numbered:
         parses = [p for p in parses if p.tag.number == "sing"]   # "с 3 фазы", not "3 фазы" (plural)
@@ -488,7 +507,7 @@ def numbers_to_words(text: str) -> str:
         if own and (word := glued_word(n, spoken, own.group(), morph)):
             return word, own.end()                     # "до 5ти" - "до пяти", "в 40ку" - "в сороковку"
         if LETTERS_AFTER.match(m.string, m.end()):
-            if morph is not None and GOVERNS.get(before.lower()) == {"gent"}:
+            if morph is not None and asked_by(before, n, "", morph) == {"gent"}:
                 spoken = " ".join(to_case(spoken.split(), "gent", morph))
             return spoken + " ", m.end()                # "200ХП" - "двести ХП", "до 5м" - "до пяти м"
         following = NEXT_WORD.match(m.string, m.end())
@@ -511,7 +530,7 @@ def numbers_to_words(text: str) -> str:
                 return date, m.end()                   # "до пятого мая"
         if morph is not None and following and following.group(1).lower() in SIGNS:
             # "от 50+" - "от пятидесяти плюс"; "на 3+ человек" stays "на три плюс" (the accusative)
-            case = "gent" if "gent" in GOVERNS.get(before.lower(), set()) else None
+            case = "gent" if "gent" in asked_by(before, n, "", morph) else None
             if case:
                 spoken = " ".join(to_case(spoken.split(), case, morph))
             return spoken, m.end()
@@ -535,7 +554,7 @@ def numbers_to_words(text: str) -> str:
                 spoken = agree(n, spoken, noun.group(1).rsplit("-", 1)[-1], morph, before)
             except Exception:  # noqa: BLE001 - a number read in the nominative is still a number
                 pass
-        elif (morph is not None and GOVERNS.get(before.lower()) == {"gent"}
+        elif (morph is not None and asked_by(before, n, "", morph) == {"gent"}
               and not GOES_ON.match(m.string, m.end())):
             spoken = " ".join(to_case(spoken.split(), "gent", morph))   # "ждём до 10." - "до десяти"
         return spoken, m.end()

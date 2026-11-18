@@ -147,7 +147,7 @@ def plurals(text: str) -> str:
     """"5 [дамагер|дамагера|дамагеров]" -> "5 дамагеров" (written by the dictionary's regexes). After a
     preposition that asks the genitive, 2-4 take the plural too ("для 2 танк" - "для 2 танков", said
     "двух"): the form for 2-4 is the nominative count's, which the numbers would read as an ordinal
-    ("для второго танка")."""
+    ("для второго танка"); not after "нет", which may be an answer ("нет 2 танк" - "нет, два танка")."""
     from .text import GOVERNS
 
     unmarked = text.replace("\x02", " ").replace("\x03", " ")   # the same offsets
@@ -155,7 +155,7 @@ def plurals(text: str) -> str:
     def form(m):
         n, one, few, many = int(m.group(1)), m.group(3), m.group(4), m.group(5)
         before = WORD_BEFORE.search(unmarked, 0, m.start())
-        if before is not None and GOVERNS.get(before.group(1).lower()) == {"gent"}:
+        if before is not None and before.group(1).lower() != "нет" and GOVERNS.get(before.group(1).lower()) == {"gent"}:
             few = many
         return m.group(1) + (m.group(2) or " ") + plural_form(n, one, few, many)
     return PLURAL.sub(form, text)
