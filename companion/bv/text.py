@@ -345,8 +345,12 @@ def ordinal(n: int, before: str, following: str, morph) -> str | None:
         return None                                    # "до 225 навыка", "10000 репа"
     if before.lower() in AT_HOUR and any(p.normal_form in DAYTIME and p.tag.case == "gent" for p in parses):
         return None                                    # "до 3 ночи": an hour
-    # a year in the singular numbers too ("в 2021 году" - "двадцать первом"); "1 год", "21 год", "1000 лет" count
-    numbered = any(p.normal_form in NUMBERED or (p.normal_form == YEAR and p.tag.number == "sing" and n >= 1000)
+    # a year in the singular numbers too ("в 2021 году" - "двадцать первом"); "1 год", "21 год", "1000 лет" count;
+    # in the prepositional any year numbers, a count never takes it: "в 21 году" - "в двадцать первом году" (not
+    # "по 1 году", the dative spelt the same)
+    prepositional = "loct" in GOVERNS.get(before.lower(), ())
+    numbered = any(p.normal_form in NUMBERED or (p.normal_form == YEAR and p.tag.number == "sing" and
+                                                 (n >= 1000 or prepositional and p.tag.case in ("loct", "loc2")))
                    for p in parses)
     asked = asked_by(before, n, word, morph)
     governed = [p for p in parses if SAME_CASE.get(p.tag.case, p.tag.case) in asked]   # "в 2026 году": loc2
