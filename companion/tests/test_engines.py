@@ -222,6 +222,11 @@ class F5SpeakerLoad(unittest.TestCase):
             slot = self.voice(Path(d))
             speaker, _ = self.speaker(Path(d), [slot], Onnx())
             speaker._load()
+            # the unit: seconds of speech per byte of the reference's text as F5 gets it, stress marks
+            # included - as a line is counted (its text is stressed before `duration`)
+            stressed = Accent().accent(slot.text).encode("utf-8")
+            self.assertGreater(len(stressed), len(slot.text.encode("utf-8")))
+            self.assertAlmostEqual(speaker.pace(slot), slot.speech / len(stressed))
             self.assertAlmostEqual(speaker.target_pace, speaker.pace(slot))
             config = speaker.config
             text = "Привет всем"
@@ -324,6 +329,21 @@ class F5SpeakerLoad(unittest.TestCase):
             self.assertTrue(speaker.ready.is_set())
             self.assertIn("русской озвучки", speaker.error)
             self.assertEqual(loaded, [])
+
+    def test_an_error_without_words_is_still_an_error(self):
+        # str(e) of KeyError() or RuntimeError() is "": an error of "" would read as a load that worked
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            speaker, _ = self.speaker(Path(d), [])
+
+            def load_onnx():
+                raise RuntimeError()
+            speaker._load_onnx = load_onnx
+            loop = threading.Thread(target=speaker._synth_loop)
+            loop.start()
+            loop.join(5)
+            self.assertTrue(speaker.ready.is_set())
+            self.assertEqual(speaker.error, "RuntimeError")
 
 
 class PrepareVoices(unittest.TestCase):
