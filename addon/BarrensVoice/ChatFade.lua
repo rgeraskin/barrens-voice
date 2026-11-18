@@ -58,15 +58,16 @@ function F.MouseOnChat()
     end)
     if not ok or ns.Secret(focus) then return false end
     if not focus or focus == WorldFrame then return true end
+    -- (called on every frame while the chat is hidden: no closure per frame looked at)
     local f = focus
-    while f and not ns.Secret(f) do
-        local fine, name = pcall(function() return f.GetName and f:GetName() end)
+    while f and not ns.Secret(f) and type(f) == "table" do
+        local fine, name = pcall(f.GetName or error, f)
         if fine and not ns.Secret(name) and type(name) == "string" then
             for _, pattern in ipairs(CHAT_NAMES) do
                 if name:find(pattern) then return true end
             end
         end
-        local up, parent = pcall(function() return f.GetParent and f:GetParent() end)
+        local up, parent = pcall(f.GetParent or error, f)
         f = up and parent or nil
     end
     return false
