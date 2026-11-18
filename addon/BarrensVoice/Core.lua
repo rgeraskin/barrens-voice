@@ -113,7 +113,9 @@ function ns.Send(kind, sender, race, sex, class, channel, text)
     if text == "" then ns.Skip("пусто после очистки разметки", sender, raw) return end
     local place = Where(kind, channel)
     if ns.db.sayNames and sender and sender ~= "" then
-        local name = Ambiguate and Ambiguate(sender, "none") or sender:match("^[^-]+")
+        -- the spoken name never has the realm ("short": «Вася», not the «Вася-Степи» the chat shows for
+        -- another realm); the payload keeps the whole sender: a voice per character
+        local name = Ambiguate and Ambiguate(sender, "short") or sender:match("^[^-]+")
         if not ns.db.sayLastNames then name = name:match("^%S+") or name end
         if kind == "emote" then
             text = name .. KEPT_NAME_MARK .. " " .. text   -- "Вася смеётся"

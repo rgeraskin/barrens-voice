@@ -236,6 +236,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - A screen grab that keeps failing no longer spins the companion, and a voice bank file cut short counts as missing
 
+- A character from another realm is named without the realm
+
+  The name before a line was said as the chat shows it, with the realm of a character from another realm («Вася-Степи»). It is said without it now; the companion still tells characters apart by the whole name, so each keeps their voice.
+
 ## [0.3.0] - 2026-11-15
 
 ### Added

@@ -212,6 +212,22 @@ ns.Send("emote", "Вася-Степи", "Orc", 2, "WARRIOR", "", "смеётся
 ns.db.sayVerb = false
 ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "го")
 for _, p in ipairs(sent) do print((p:gsub("\31", " | "):gsub("[\2\3]", ""))) end
+do  -- the realm: never said (the client's "short"; "none" keeps another realm's, as the chat shows it), kept in the payload
+    local asked
+    Ambiguate = function(name, context)
+        asked = context
+        return context == "short" and name:match("^[^-]+") or name
+    end
+    local n = #sent
+    ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "с другого сервера")
+    local fields = {}
+    for f in (sent[n + 1] .. "\31"):gmatch("(.-)\31") do fields[#fields + 1] = f end
+    assert(asked == "short", tostring(asked))
+    assert(fields[2] == "Вася-Степи", "the payload keeps the whole sender: " .. fields[2])
+    assert(fields[8]:find("^Вася[:,]") and not fields[8]:find("Степи"), "the spoken name has no realm: " .. fields[8])
+    Ambiguate = nil
+    print("realm not said ok")
+end
 
 -- Only what the chat windows show: window 1 is open (say, party, the zone channel "Общий"),
 -- window 2 (guild) is closed, and a chat filter hides lines with "спам".
