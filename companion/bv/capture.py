@@ -120,6 +120,13 @@ class Capturer:
         self.place = place
         self._fit()
 
+    def remember(self, place) -> None:
+        """Keep the strip's place (locate.Place) for a restart before the game saves it: the addon's
+        saved variables are written only at /reload and logout (locate.known_place)."""
+        from .dictionary import game_of
+        from .locate import STORE, remember
+        remember(STORE, game_of(self.config), place)
+
     def use(self, rect: tuple[int, int, int, int]) -> None:
         """Grab this rectangle of the client area (x, y, width, height) from now on."""
         self.rect = rect

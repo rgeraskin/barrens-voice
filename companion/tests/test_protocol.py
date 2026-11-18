@@ -256,6 +256,37 @@ class StripPlace(unittest.TestCase):
             with mock.patch("bv.dictionary.find_saved", return_value=path):
                 self.assertEqual(locate.saved_place({}), (0, 1078, 1920, 2, 1920, 1080))
 
+    def test_known_place_is_the_newer(self):
+        # the game writes its saved variables only at /reload and logout: a restart mid-game after the strip
+        # moved takes the program's own record, when it is newer
+        import os
+        import tempfile
+        from unittest import mock
+        from bv import locate
+        with tempfile.TemporaryDirectory() as d:
+            saved, store = Path(d) / "BarrensVoice.lua", Path(d) / "tmp" / "strip.json"
+            saved.write_text('BarrensVoiceDB = {\n["stripGeometry"] = "600,400,1320,2,1920,1080",\n}\n', encoding="utf-8")
+            os.utime(saved, (1000, 1000))
+            with mock.patch("bv.dictionary.find_saved", return_value=saved):
+                self.assertEqual(locate.known_place({}, store), ((600, 400, 1320, 2, 1920, 1080), "saved"))  # none of its own
+                top = (0, 0, 1920, 2, 1920, 1080)
+                self.assertTrue(locate.remember(store, "forever", top, now=2000))
+                self.assertFalse(locate.remember(store, "forever", top, now=3000))          # the same: not written
+                self.assertEqual(locate.remembered(store, "forever"), (top, 2000.0))
+                self.assertEqual(locate.known_place({}, store), (top, "own"))                # newer than the saved
+                self.assertEqual(locate.known_place({"game": "retail"}, store),             # the other game's: not
+                                 ((600, 400, 1320, 2, 1920, 1080), "saved"))
+                os.utime(saved, (2500, 2500))                                               # a /reload since
+                self.assertEqual(locate.known_place({}, store), ((600, 400, 1320, 2, 1920, 1080), "saved"))
+                self.assertTrue(locate.remember(store, "retail", top, now=2600))
+                self.assertEqual(locate.remembered(store, "forever"), (top, 2000.0))         # the games apart
+            with mock.patch("bv.dictionary.find_saved", return_value=None):
+                self.assertEqual(locate.known_place({}, store), (top, "own"))                # no saved variables
+                store.write_text("not json", encoding="utf-8")
+                self.assertIsNone(locate.known_place({}, store))                             # a broken file: nothing
+                self.assertTrue(locate.remember(store, "forever", top, now=1))               # and written anew
+            self.assertFalse(list(store.parent.glob("*.tmp")))
+
     def test_control_frame_option(self):
         line = parse("\x1f".join(["control", "", "", "", "", "", "rate=100;vol=100;voice=f5;strip=0,1078,1920,2,1920,1080", "-"]).encode())
         from bv.locate import parse_place

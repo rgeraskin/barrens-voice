@@ -4,6 +4,9 @@ player's choosing (another addon may draw in the same corner).
 The addon says where: `strip=x,y,width,height,screen width,screen height` (physical pixels) in its
 settings frame - at login, every 2 minutes and before it moves the strip, on the strip where it
 still is - and in its saved variables (`stripGeometry`) for a program started while the game runs.
+Those the game writes only at /reload and logout, so the program keeps the last place it knew too
+(`STORE`, per game: from the settings frame and from a search that found the strip) and starts with
+whichever is newer (`known_place`): a restart mid-game after the strip moved finds it at once.
 When that is wrong or missed and no strip is in view, the program looks for it over the whole
 window, every 5 seconds: the corner where the first sync cell (purple) meets the second (green).
 Knowing nothing yet (the very first game, before the addon has saved anything), the program grabs the
@@ -11,12 +14,19 @@ top rows: the bottom strip's height depends on the addon's settings, so that fir
 """
 from __future__ import annotations
 
+import json
+import os
 import re
+import time
+from pathlib import Path
 
+from .paths import DATA_DIR
 from .protocol import MAX_CELL, Frame, Image, decode
 
 Place = tuple[int, int, int, int, int, int]   # x, y, width, height, screen width, screen height
 SAVED = re.compile(r'\["stripGeometry"\]\s*=\s*"([\d,]+)"')
+# the place the program last knew, per game: {"forever": {"place": "x,y,w,h,sw,sh", "time": <unix time>}}
+STORE = DATA_DIR / "tmp" / "strip.json"
 
 
 def parse_place(value: str) -> Place | None:
@@ -45,11 +55,71 @@ def region(place: Place, client_w: int, client_h: int, capture_height: int) -> t
 def saved_place(config: dict) -> Place | None:
     """The strip's place as the addon last saved it (written at /reload and logout)."""
     from .dictionary import find_saved
-    path = find_saved(config)
-    if path is None:
+    found = _saved(find_saved(config))
+    return found[0] if found else None
+
+
+def _saved(path: Path | None) -> tuple[Place, float] | None:
+    """The saved variables' place and when the game wrote them."""
+    try:
+        if path is None:
+            return None
+        match = SAVED.search(path.read_text(encoding="utf-8", errors="replace"))
+        place = parse_place(match.group(1)) if match else None
+        return (place, path.stat().st_mtime) if place else None
+    except OSError:
         return None
-    match = SAVED.search(path.read_text(encoding="utf-8", errors="replace"))
-    return parse_place(match.group(1)) if match else None
+
+
+def _store(path: Path) -> dict:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def remembered(path: Path, game: str) -> tuple[Place, float] | None:
+    """The place the program last knew for this game, and when it learnt it; None if none."""
+    entry = _store(path).get(game)
+    if not isinstance(entry, dict) or not isinstance(entry.get("time"), (int, float)):
+        return None
+    place = parse_place(str(entry.get("place", "")))
+    return (place, float(entry["time"])) if place else None
+
+
+def remember(path: Path, game: str, place: Place, now: float | None = None) -> bool:
+    """Keep `place` as the strip's last known place for `game` (written only when it changed; a file
+    that cannot be written is left as it is). True if written."""
+    known = remembered(path, game)
+    if known and known[0] == place:
+        return False
+    data = _store(path)
+    data[game] = {"place": ",".join(str(v) for v in place), "time": time.time() if now is None else now}
+    tmp = path.with_name(path.name + ".tmp")
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp.write_text(json.dumps(data), encoding="utf-8")
+        os.replace(tmp, path)
+    except OSError:
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
+        return False
+    return True
+
+
+def known_place(config: dict, store: Path | None = None) -> tuple[Place, str] | None:
+    """Where the strip should be at start: the addon's saved place or the program's own, whichever is
+    newer, with where it came from ("saved" or "own"); None when neither is known. The saved variables
+    and the store are this game's (`game` in config.json): the other game's strip may be elsewhere."""
+    from .dictionary import find_saved, game_of
+    saved = _saved(find_saved(config))
+    own = remembered(STORE if store is None else store, game_of(config))
+    if own and (saved is None or own[1] > saved[1]):
+        return own[0], "own"
+    return (saved[0], "saved") if saved else None
 
 
 def find(raw: bytes, width: int, height: int, width_hint: int | None = None, capture_height: int = 16,

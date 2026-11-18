@@ -150,3 +150,5 @@ class StripReader:
         if hit and hit[:4] != self.capturer.rect:
             self.capturer.use(hit[:4])
             self.log(f"полоска найдена в другом месте: x {hit[0]}, y {hit[1]}, ширина {hit[2]}")
+            # kept for a restart: in the window's pixels, the window taken for the "screen"
+            self.capturer.remember((*hit[:4], whole[1], whole[2]))

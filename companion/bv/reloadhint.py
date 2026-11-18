@@ -38,9 +38,9 @@ def strip_in_view(config: dict) -> bool:
     try:
         if not capturer.find():
             return False
-        place = locate.saved_place(config)
-        if place:
-            capturer.set_place(place)
+        known = locate.known_place(config)
+        if known:
+            capturer.set_place(known[0])
         for _ in range(20):                         # Windows Graphics Capture: its first frame takes a moment
             grabbed = capturer.grab()
             if grabbed is not None:

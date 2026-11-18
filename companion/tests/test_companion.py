@@ -274,7 +274,7 @@ class ServiceFrames(unittest.TestCase):
             for first in (True, False):
                 self.assertEqual(self.run_frame(kind, first)[0], [call], kind)
         calls, logged = self.run_frame("control", True, options={"strip": "0,0,1920,16,1920,1080"})
-        self.assertEqual(calls, ["set_place"])
+        self.assertEqual(calls, ["set_place", "remember"])       # kept for a restart mid-game too
         self.assertTrue(logged[0].startswith("полоска: верх"), logged)
 
 

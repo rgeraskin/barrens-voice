@@ -22,7 +22,7 @@ class FakeCapturer:
         self.window, self.grabs, self.whole = WINDOW, [], None
         self.rect = (0, 0, 1920, 16)
         self.finds = self.fulls = 0
-        self.used = []
+        self.used, self.kept = [], []
 
     def find(self):
         self.finds += 1
@@ -41,6 +41,9 @@ class FakeCapturer:
     def use(self, rect):
         self.used.append(rect)
         self.rect = rect
+
+    def remember(self, place):
+        self.kept.append(place)
 
 
 def frame(seq, cell=2):
@@ -170,6 +173,7 @@ class Bookkeeping(Base):
         self.assertEqual(self.found, [((b"picture", 1920, 1080), {"width_hint": 1920, "capture_height": 64})])
         self.assertEqual(self.capturer.used, [(0, 1064, 600, 64)])
         self.assertEqual(self.take()[0], ["полоска найдена в другом месте: x 0, y 1064, ширина 600"])
+        self.assertEqual(self.capturer.kept, [(0, 1064, 600, 64, 1920, 1080)])   # kept for a restart, in window pixels
         self.at(7.0)
         self.assertEqual(len(self.found), 1)                       # every 5 s, not every poll
         self.at(7.2)

@@ -457,6 +457,8 @@ def service(line, first: bool, engines, player, dictionary, capturer) -> None:
         if place and place != capturer.place:
             capturer.set_place(place)
             log("полоска: " + describe_place(place))
+        if place:                       # kept for a restart before the game saves it (/reload, logout)
+            capturer.remember(place)
     elif kind == "dict":
         dictionary.receive(line.options, line.text)
     elif kind == "pause":
@@ -724,10 +726,13 @@ def main() -> int:
     wow_seen, wow_gone_since, wow_checked = False, None, 0.0
     capturer = Capturer(config, log)
     from . import locate
-    place = locate.saved_place(config)
-    if place:                     # where the addon last put the strip; its settings frame says it again
+    known = locate.known_place(config)
+    if known:                     # where the strip last was; the addon's settings frame says it again
+        place, source = known
         capturer.set_place(place)
-        log("полоска (по сохранённым настройкам аддона): " + describe_place(place))
+        log(("полоска (по сохранённым настройкам аддона): " if source == "saved" else
+             "полоска (где её последний раз видел компаньон — новее сохранённых настроек аддона): ")
+            + describe_place(place))
     from .bridge import StripReader
     strip = StripReader(capturer, config, log, state.report)
     lines = Lines(config, log, engines, sapi, player, dictionary, capturer, inflector, restore_yo, seen_lines)

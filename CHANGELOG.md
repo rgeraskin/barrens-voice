@@ -142,6 +142,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- The strip is found at once after a restart mid-game
+
+  The addon's saved variables keep the strip's place only from the last /reload or logout, so a companion restarted during the game (saving the launcher's settings, «Установить сейчас», a crash) after the strip moved looked in the old place and searched the window for some 8 s. The companion keeps the last place it knew itself now, per game, and starts with whichever is newer; the log says which.
+
 - «Закрываться вместе с игрой» works when changed during the game
 
   The companion read it once, at its start: unchecked while the game ran, the companion still stopped when the game closed («игра закрыта — выхожу») while the launcher stayed. It takes the check from config.json again when that changes — also a change made while the voice bank was built and the game launched, or while the file was busy for a moment. A value other than true or false is not taken.
