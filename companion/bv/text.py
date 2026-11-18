@@ -303,27 +303,65 @@ def ordinal(n: int, before: str, following: str, morph) -> str | None:
 # which is not a noun the number counts or numbers ("пятидесятый плюс"): a cardinal, in the preposition's case
 SIGNS = {"плюс", "минус"}
 # an ordinal's ending glued to its number: "40го", "2007-го", "на 4м этаже" - the ordinal in that form
+# ("2х2" is no "двух": a digit after the ending)
 ENDING = re.compile(r"-?(ого|его|ому|ему|ыми|ими|ым|им|ом|ем|ый|ий|ой|ая|яя|ое|ее|ую|юю|ых|их|ые|ие|ух|ех|го|му|м|й|я|е|ю|х)"
-                    r"(?![а-яёa-z])", re.IGNORECASE)
-LETTERS_AFTER = re.compile(r"[а-яёa-z]{2,}", re.IGNORECASE)   # "200ХП": letters glued to a number, read apart
-# "идём в 4м" (and no noun after it): together, so many of us - not "в четвёртом"
-TOGETHER = re.compile(r"\b([вВ])\s*([2-9]|10)\s*-?м\b(?!\s*[а-яёa-z])")
+                    r"(?![а-яёa-z\d])", re.IGNORECASE)
+LETTERS_AFTER = re.compile(r"[а-яёa-z]+", re.IGNORECASE)   # "200ХП", "5м": letters glued to a number, read apart
+# a cardinal's case ending glued to it: "до 5ти человек" - "пяти", "с 3мя" - "тремя"
+CARDINAL_ENDING = re.compile(r"-?([а-яё]{2,3})(?![а-яёa-z\d])", re.IGNORECASE)
+CASES = ("gent", "datv", "ablt", "loct")
+# a number and "-ка": a noun of its own ("ходим в 40ку" - "в сороковку", "10ка" - "десятка")
+NOUN_OF = {5: "пятёрк", 10: "десятк", 20: "двадцатк", 40: "сороковк", 100: "сотк"}
+NOUN_ENDING = re.compile(r"-?к(а|у|е|и|ой|ами|ах|ам)(?![а-яёa-z\d])", re.IGNORECASE)
+# "идём в 4м" (and no noun after it): together, so many of us - not "в четвёртом"; "стоим в 5 м" is metres
+TOGETHER = re.compile(r"\b([вВ])\s*([2-9]|10)-?м\b(?!\s*[а-яёa-z])")
 COLLECTIVE = {2: "двоём", 3: "троём", 4: "четвером", 5: "пятером", 6: "шестером", 7: "семером", 8: "восьмером",
               9: "девятером", 10: "десятером"}
+SAME_CASE = {"loc2": "loct", "gen2": "gent", "acc2": "accs"}
 
 
-def ending_form(n: int, ending: str, before: str, morph) -> str | None:
-    """`n` as the ordinal whose form ends in `ending` ("40го" - "сорокового"), the case the preposition
-    before it asks for preferred ("в 4м" - "четвёртом", "с 4м" - "четвёртым"); None when none ends so."""
+def ending_form(n: int, ending: str, before: str, morph, noun: str = "") -> str | None:
+    """`n` as the ordinal whose form ends in `ending` ("40го" - "сорокового"), agreeing with the noun
+    after it ("на 10й минуте" - "десятой", "по 5-й уровень" - "пятый"), the case the preposition before it
+    asks for preferred ("на 4м этаже" - "четвёртом"). A lone "м" only with such a noun: "до 5м", "за 5м до
+    рейда" are minutes or metres. None when none ends so."""
     from num2words import num2words
     parts = num2words(n, lang="ru", to="ordinal").split()
-    asked = GOVERNS.get(before.lower(), set()) | ({"accs"} if before.lower() in ("в", "во", "на", "за", "про") else set())
+    asked = GOVERNS.get(before.lower(), set()) | ({"accs"} if before.lower() in ("в", "во", "на", "за", "про", "по") else set())
     forms = [f for f in morph.parse(parts[-1])[0].lexeme if f.word.endswith(ending.lower())]
+    word = noun.replace("+", "").lower()
+    parses = morph.parse(word) if word and morph.word_is_known(word) else []
+    nouns = [p.tag for p in parses if p.tag.POS == "NOUN"] if parses and parses[0].tag.POS == "NOUN" else []
+
+    def agrees(form, tag) -> bool:
+        if form.tag.case != SAME_CASE.get(tag.case, tag.case) or form.tag.number != tag.number:
+            return False
+        return tag.number == "plur" or form.tag.gender == tag.gender
+
+    agreeing = [f for f in forms if any(agrees(f, t) for t in nouns)]
+    if agreeing:
+        forms = agreeing
+    elif ending.lower() == "м":
+        return None
     if not forms:
         return None
     best = next((f for f in forms if f.tag.case in asked), forms[0])
     parts[-1] = best.word
     return " ".join(parts)
+
+
+def glued_word(n: int, spoken: str, letters: str, morph) -> str | None:
+    """`n` with letters glued to it that make a form of the number itself: a cardinal's case ending
+    ("5ти" - "пяти", "7ми" - "семи"), or "-ка" of a noun ("40ку" - "сороковку")."""
+    noun = NOUN_ENDING.fullmatch(letters)
+    if noun and n in NOUN_OF:
+        return NOUN_OF[n] + noun.group(1).lower()
+    ending = letters.lstrip("-").lower().replace("ё", "е")
+    for case in CASES:
+        words = to_case(spoken.split(), case, morph)
+        if words[-1].replace("ё", "е").endswith(ending):
+            return " ".join(words)
+    return None
 
 
 # a preposition said in its long form before the number's word: "со второго", "со ста", "во втором",
@@ -441,11 +479,18 @@ def numbers_to_words(text: str) -> str:
                 return " ".join(to_case(spoken.split(), "gent", morph)), glued.end()
             # a lone "м" is an ordinal only after a preposition ("на 4м этаже"); "через 5м" is minutes or metres
             if ending != "м" or before.lower() in GOVERNS:
-                as_ordinal = ending_form(n, glued.group(1), before, morph)
+                noun = NEXT_WORD.match(m.string, glued.end())
+                as_ordinal = ending_form(n, glued.group(1), before, morph,
+                                         noun.group(1).rsplit("-", 1)[-1] if noun else "")
                 if as_ordinal:
                     return as_ordinal, glued.end()
+        own = (NOUN_ENDING.match(m.string, m.end()) or CARDINAL_ENDING.match(m.string, m.end())) if morph else None
+        if own and (word := glued_word(n, spoken, own.group(), morph)):
+            return word, own.end()                     # "до 5ти" - "до пяти", "в 40ку" - "в сороковку"
         if LETTERS_AFTER.match(m.string, m.end()):
-            return spoken + " ", m.end()                # "200ХП" - "двести ХП"
+            if morph is not None and GOVERNS.get(before.lower()) == {"gent"}:
+                spoken = " ".join(to_case(spoken.split(), "gent", morph))
+            return spoken + " ", m.end()                # "200ХП" - "двести ХП", "до 5м" - "до пяти м"
         following = NEXT_WORD.match(m.string, m.end())
         if GLUED.search(m.string, 0, m.start()):
             following = None                           # "20:00 сбор", "1.12 патч": no "нулевой сбор"

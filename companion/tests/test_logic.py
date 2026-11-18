@@ -520,6 +520,18 @@ class Pipeline(unittest.TestCase):
             "с 100 игроков": "со ста игроков", "с 2 магами": "с двумя магами",
         })
 
+    def test_endings_typed_with_a_number(self):
+        # an ordinal's ending agrees with the noun after it; a lone «м» with no such noun is minutes or
+        # metres, not an ordinal; a cardinal's ending and «-ка» are forms of the number; «2х2» is a match
+        self.check({
+            "на 10й минуте": "на десятой минуте", "с 1-го по 5-й уровень": "с первого по пятый уровень",
+            "на 4м этаже": "на четвёртом этаже", "в 5м ряду": "в пятом ряду", "на 2-м месте": "на втором месте",
+            "до 5м": "до пяти м", "за 5м до рейда": "за пять м до рейда", "стоим в 5 м": "стоим в пять м",
+            "через 5м": "через пять м", "идем в 4м": "идём вчетвером",
+            "до 5ти человек": "до пяти человек", "с 3мя магами": "с тремя магами", "ходим в 40ку": "ходим в сороковку",
+            "арена 2х2": "арена два на два", "5х5": "пять на пять", "3v3": "три на три", "из 2х": "из двух",
+        })
+
     def test_raid_leader_after_a_number(self):
         # «рл» after a number is the raid leader, not the ruins of Lordaeron
         self.check({"нужен 1 рл": "нужен один рейд-лидер", "нужно 2 рл": "нужно два рейд-лидера",
