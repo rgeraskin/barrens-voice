@@ -143,7 +143,7 @@ class LiveSettings(unittest.TestCase):
         for text in ("null", "5", "true", '"exit_with_wow"', "[]", '{"exit_with_wow": fal', '{"exit_with_wow": "false"}'):
             self.write(text)
             live.refresh()
-            self.assertTrue(config["exit_with_wow"], text)
+            self.assertIs(config["exit_with_wow"], True, text)
         self.write('{"exit_with_wow": false}')               # saved whole at last: taken
         live.refresh()
         self.assertFalse(config["exit_with_wow"])
