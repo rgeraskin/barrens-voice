@@ -273,7 +273,8 @@ end
 -- companion does both on a click: the addon sends only the name, and the companion keeps its own
 -- list of the same addresses (bv/links.py) and touches nothing else. The address also stands in a
 -- box in the settings, to select and copy with Ctrl+C when the companion is not running. A third field is
--- a Battle.net community's invite (club ticket): «Открыть» opens it in the game itself (OpenInGame).
+-- a Battle.net community's invite (club ticket): «Открыть» puts its link in the chat, one click opens it in
+-- the game (LinkInChat).
 ns.LINKS = {
     -- Barrens Voice's community in Battle.net (the game's «Сообщества»); the ticket is the invite address's code
     community = { "Сообщество", "https://launch.battle.net/invite/N9KR2WNHDgW", "N9KR2WNHDgW" },
@@ -290,13 +291,13 @@ end
 
 local CLUB_LINK_COLOR = "|cff82c5ff"   -- the colour the client gives a Battle.net community's link
 
---- A community's invite opened in the game, as a click on its link in the chat does
+--- A community's invite as a link in the chat, for the player to click: the click is the game's own
 --- (ItemRefHandlersShared.lua: LinkTypes.ClubTicket -> CommunitiesHyperlink.OnClickLink, which asks for the
---- ticket and on CLUB_TICKET_RECEIVED shows the «Сообщества» window on the community, ShowUIPanel): the link
---- goes to the chat - to click if the window did not open - and the game is asked at once. No companion
---- needed, so it works with the voice-over off too. Not in combat (the window would not open then: the
---- link stays). False when the client has no communities or they are off: the browser it is, then.
-local function OpenInGame(link)
+--- ticket and on CLUB_TICKET_RECEIVED opens the «Сообщества» window on the community). The addon does not
+--- call that itself: the ticket listener it creates would then be the addon's, and every later invite
+--- click would open the window from addon code (taint). No companion needed, so it works with the
+--- voice-over off too. False when the client has no communities or they are off: the browser it is, then.
+local function LinkInChat(link)
     local ticket = link[3]
     local club = rawget(_G, "C_Club")
     if not ticket or type(club) ~= "table" or type(club.IsEnabled) ~= "function" then return false end
@@ -316,21 +317,17 @@ local function OpenInGame(link)
         end
         chatLink = CLUB_LINK_COLOR .. util.FormatLink(types.ClubTicket, "[Barrens Voice]", ticket) .. "|r"
     end
-    print(PREFIX .. ("%s: %s — откроется окно «Сообщества». Не открылось — щёлкните по ссылке."):format(link[1], chatLink))
-    local hyperlink = rawget(_G, "CommunitiesHyperlink")
-    local fighting = InCombatLockdown and InCombatLockdown()
-    if not fighting and type(hyperlink) == "table" and type(hyperlink.OnClickLink) == "function" then
-        pcall(hyperlink.OnClickLink, ticket)
-    end
+    print(PREFIX .. ("%s: щёлкните по ссылке %s — откроется окно «Сообщества», там можно вступить.")
+        :format(link[1], chatLink))
     return true
 end
 
 --- Ask the companion to open one of ns.LINKS in the browser; the address goes to the chat too. A
---- community's invite opens in the game itself (OpenInGame), where the client can.
+--- community's invite goes to the chat as a link to click (LinkInChat), where the client can.
 function ns.OpenLink(key)
     local link = ns.LINKS[key]
     if not link then return end
-    if OpenInGame(link) then return end
+    if LinkInChat(link) then return end
     if not ns.db.enabled then
         print(PREFIX .. ("%s: озвучка выключена, и компаньон страницу не откроет. Адрес: %s"):format(link[1], link[2]))
         return

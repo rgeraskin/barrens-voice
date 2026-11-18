@@ -169,8 +169,8 @@ do  -- «Скачать дополнительные голоса …: RHVoice, 
     assert(saidLink[2]:find("буфер обмена", 1, true), saidLink[2])
     print("links ok")
 end
-do  -- «Открыть» for the community: its invite in the game itself (a link in the chat, the game asked at once)
-    local pushed, told, asked, push0, print0 = {}, {}, {}, ns.Strip.Push, print
+do  -- «Открыть» for the community: its invite as a link in the chat, for the player to click (the click is the game's)
+    local pushed, told, push0, print0 = {}, {}, ns.Strip.Push, print
     ns.Strip.Push = function(p) pushed[#pushed + 1] = p end
     print = function(t) told[#told + 1] = t end
     local enabled = true
@@ -180,27 +180,21 @@ do  -- «Открыть» for the community: its invite in the game itself (a li
         assert(clubType == 0, "a Battle.net community")
         return "|cff82c5ff|HclubTicket:" .. ticket .. "|h[" .. name .. "]|h|r"
     end
-    CommunitiesHyperlink = { OnClickLink = function(ticket) asked[#asked + 1] = ticket end }
+    CommunitiesHyperlink = { OnClickLink = function() error("the addon must not open it itself (taint)") end }
     ns.OpenLink("community")
     assert(#pushed == 0, "the companion is not asked")
     assert(#told == 1 and told[1]:find("|HclubTicket:N9KR2WNHDgW|h[Barrens Voice]|h", 1, true), told[1] or "nothing said")
-    assert(#asked == 1 and asked[1] == "N9KR2WNHDgW", "the game asked for the invite")
+    assert(told[1]:find("щёлкните по ссылке", 1, true), "the player is told to click it: " .. told[1])
     ns.db.enabled = false                                    -- no companion needed: with the voice-over off too
     ns.OpenLink("community")
     ns.db.enabled = true
-    assert(#told == 2 and #asked == 2 and #pushed == 0, "off: in the game all the same")
+    assert(#told == 2 and #pushed == 0, "off: the link all the same")
     GetClubTicketLink = function() error("no CLUB_INVITE_HYPERLINK_TEXT") end      -- the client's helper fails
     LinkUtil, LinkTypes = { FormatLink = function(kind, text, ...)
         return ("|H%s:%s|h%s|h"):format(kind, table.concat({ ... }, ":"), text)
     end }, { ClubTicket = "clubTicket" }
-    InCombatLockdown = function() return true end
     ns.OpenLink("community")
     assert(told[3]:find("|HclubTicket:N9KR2WNHDgW|h[Barrens Voice]|h", 1, true), "LinkUtil.FormatLink's link: " .. told[3])
-    assert(#asked == 2, "in combat: only the link (the window would not open)")
-    CommunitiesHyperlink = { OnClickLink = function() error("a Blizzard error") end }
-    InCombatLockdown = function() return false end
-    ns.OpenLink("community")
-    assert(#told == 4, "an error in the client's code is not the addon's")
     enabled = false                                          -- communities off: the browser, through the companion
     ns.OpenLink("community")
     assert(#pushed == 1 and pushed[1]:find("^open\31") and pushed[1]:find("\31community$"), pushed[1] or "nothing")
@@ -211,9 +205,9 @@ do  -- «Открыть» for the community: its invite in the game itself (a li
     assert(#pushed == 3 and pushed[3]:find("\31discord$"), "other links: the browser as before")
     ns.CopyLink("community")
     assert(#pushed == 4 and pushed[4]:find("^copy\31") and pushed[4]:find("\31community$"), "«Копировать»: the web address")
-    C_Club, Enum, GetClubTicketLink, CommunitiesHyperlink, LinkUtil, LinkTypes, InCombatLockdown = nil
+    C_Club, Enum, GetClubTicketLink, CommunitiesHyperlink, LinkUtil, LinkTypes = nil
     ns.Strip.Push, print = push0, print0
-    print("community in the game ok")
+    print("community link ok")
 end
 for _, name in ipairs({ "reading", "general", "no such tab" }) do ns.Options.Open(name) end
 assert(ns.Options.Current() == "general", "an unknown tab: the first one")
