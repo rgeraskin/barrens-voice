@@ -139,6 +139,32 @@ assert(ns.Retail() == true, "retail by its interface version")
 GetBuildInfo = function() return "1.60.1", "70938", "Nov 2026", 16001 end
 assert(ns.Retail() == false, "Forever")
 GetBuildInfo = nil
+do  -- CatQuest and Wayfarer are Forever's addons: on retail /bv debug names neither, and no one watches them
+    local told, tickers, print0, ticker0, debug0 = {}, {}, print, C_Timer.NewTicker, ns.db.debug
+    print = function(t) told[#told + 1] = t end
+    C_Timer.NewTicker = function(seconds, f) tickers[#tickers + 1] = f end
+    local function debugWord(interface)
+        GetBuildInfo = function() return "", "", "", interface end
+        ns.db.debug = false
+        SlashCmdList.BARRENSVOICE("debug")
+        return told[#told]
+    end
+    local function watched(interface)
+        GetBuildInfo = function() return "", "", "", interface end
+        tickers = {}
+        local word, control, dictionary = ns.LoginWord, ns.SendControl, ns.SendDictionary   -- only the tickers here
+        ns.LoginWord, ns.SendControl, ns.SendDictionary = function() end, function() end, function() end
+        ns.OnEvent("PLAYER_LOGIN")
+        ns.LoginWord, ns.SendControl, ns.SendDictionary = word, control, dictionary
+        for _, f in ipairs(tickers) do if f == ns.WatchCatQuest then return true end end
+        return false
+    end
+    assert(debugWord(16001):find("CatQuest", 1, true), "Forever: CatQuest's speech is in the debug log")
+    assert(not debugWord(120105):find("CatQuest", 1, true), "retail: no word of it")
+    assert(watched(16001) and not watched(120105), "the quest voice-overs watched on Forever only")
+    GetBuildInfo, print, C_Timer.NewTicker, ns.db.debug = nil, print0, ticker0, debug0
+    print("Forever's addons not on retail ok")
+end
 do  -- the channels' tooltips: Battle.net whispers are not read; retail's closed group chat is said on retail only
     local function tooltips(retail)
         local all = {}

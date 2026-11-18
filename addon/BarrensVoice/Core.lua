@@ -706,7 +706,8 @@ local function OnEvent(self, event, name, ...)
         -- the layer the saved variables hold now (the game wrote them at the last logout or /reload)
         local _, saved = LayerSet()
         if C_Timer and C_Timer.NewTicker then
-            C_Timer.NewTicker(0.25, ns.WatchCatQuest)
+            -- the quest voice-overs (CatQuest, Wayfarer) are Forever's addons: no watching them on retail
+            if not ns.Retail() then C_Timer.NewTicker(0.25, ns.WatchCatQuest) end
             -- For a program started after the game: the settings (a short frame) every 2 minutes.
             -- The dictionary layer - frames up to half a screen long - only when it changed in this
             -- session: otherwise the program reads the very same layer from the saved variables.
@@ -759,8 +760,11 @@ SlashCmdList.BARRENSVOICE = function(msg)
         ns.Replay(tonumber(msg:match("%d+")) or 5)
     elseif msg == "debug" then
         ns.db.debug = not ns.db.debug
+        -- CatQuest and Wayfarer are Forever's addons: not a word of them on retail
         print(PREFIX .. (ns.db.debug
-            and "отладка включена: строки чата, которые аддон не отправил, с причиной, и речь CatQuest и Wayfarer — в журнале компаньона (кнопка «Журнал» в окне Barrens Voice, строки «диагностика аддона»)."
+            and ("отладка включена: строки чата, которые аддон не отправил, с причиной%s — в журнале компаньона "
+                .. "(кнопка «Журнал» в окне Barrens Voice, строки «диагностика аддона»).")
+                :format(ns.Retail() and "" or ", и речь CatQuest и Wayfarer")
             or "отладка выключена."))
     elseif msg == "on" or msg == "off" then
         ns.SetEnabled(msg == "on")

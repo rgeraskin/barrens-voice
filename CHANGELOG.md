@@ -256,6 +256,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   On retail a frame's name or parent can be secret. Under the mouse, such a frame could raise a Lua error while the hidden chat looked for the chat window under it; it now counts as not the chat.
 
+- Retail leaves CatQuest and Wayfarer out
+
+  They are Forever's addons. On retail `/bv debug` no longer promises their speech in the log, and the addon no longer checks four times a second whether they speak.
+
 ## [0.3.0] - 2026-11-15
 
 ### Added

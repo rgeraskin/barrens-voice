@@ -275,10 +275,12 @@ local function BuildGeneral(tab, description)
 
     -- "Мост к компаньону": folded, as it is needed rarely - when another addon covers the line.
     y = UI.Header(tab, "Дополнительно", y)
+    -- CatQuest and Wayfarer are Forever's addons: not a word of them on retail
     checks[#checks + 1] = UI.Check(tab, LEFT, y, "Отладка (/bv debug)", "Аддон пишет в журнал компаньона каждую "
         .. "строку чата, которую не отправил, с причиной (канал выключен, строку не видно ни в одном окне чата, "
-        .. "её скрыл другой аддон), и когда CatQuest или Wayfarer начинает и заканчивает говорить. Строки отладки "
-        .. "идут по мосту вместе с чатом, поэтому включайте её, только когда ищете, почему что-то не прочитано.",
+        .. "её скрыл другой аддон)" .. (ns.Retail() and "" or ", и когда CatQuest или Wayfarer начинает и заканчивает "
+        .. "говорить") .. ". Строки отладки идут по мосту вместе с чатом, поэтому включайте её, только когда ищете, "
+        .. "почему что-то не прочитано.",
         function() return ns.db.debug end, function(v) ns.db.debug = v end)
     y = y - 30
     local fold = UI.Button(tab, "", 272, nil)
