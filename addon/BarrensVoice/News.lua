@@ -145,9 +145,33 @@ function N.Unseen(installed)
     return out
 end
 
---- Where the whole of it is, at the end of the chat line.
+-- The chat line's [Что нового]: a link of the clients' own "addon" type (LinkTypes.AddOn, LinkUtil.lua). A click
+-- in a chat window goes ChatFrameMixin:OnHyperlinkClick -> SetItemRef -> LinkUtil.ProcessLink, whose handler for
+-- the type (ItemRefHandlersShared.lua) only fires EventRegistry's "SetItemRef" and counts the link handled: no
+-- ItemRefTooltip, and with Shift nothing goes into the edit box (SetItemRef's modified-click branch comes after).
+-- EventRegistry calls each callback through securecallfunction, so the game's code is not tainted; ours only opens
+-- our window. The same code in the forever and live branches of the UI source.
+N.LINK = "addon:BarrensVoice:news"
+local LINK_COLOR = "|cffffd100"
+
+--- EventRegistry's "SetItemRef": our link opens the window, any other addon's link is left alone.
+function N.OnLink(_, link)
+    if ns.Secret(link) or link ~= N.LINK then return end
+    if ns.NewsWindow then ns.NewsWindow.Show() end
+end
+
+do
+    local registry, types = rawget(_G, "EventRegistry"), rawget(_G, "LinkTypes")
+    if type(registry) == "table" and type(registry.RegisterCallback) == "function" and type(types) == "table"
+            and types.AddOn == "addon" then
+        N.linked = pcall(registry.RegisterCallback, registry, "SetItemRef", N.OnLink, N)
+    end
+end
+
+--- Where the whole of it is, at the end of the chat line: the link, or the command where a click would go nowhere.
 function N.More()
-    return "Что нового — /bv news."
+    if not N.linked then return "Что нового — /bv news." end
+    return LINK_COLOR .. "|H" .. N.LINK .. "|h[Что нового]|h|r"
 end
 
 --- The chat line for an update: the addon's icon, «Barrens Voice:», the version and the newest entry's summary,
