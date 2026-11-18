@@ -1272,6 +1272,39 @@ class ReleaseBuild(unittest.TestCase):
         self.assertNotIn("b", manifest["version"])                                  # no tag: pyproject's own
 
 
+class InstallerScript(unittest.TestCase):
+    """installer/BarrensVoice.iss, as Inno Setup hands its lines on (not compiled here)."""
+
+    @staticmethod
+    def expand(text: str, app: str) -> str:
+        """Inno's reading of a parameter that takes constants: "{{" is "{", "{...}" a constant, a lone "}" itself
+        (its help, "Constants"); then "" is " in a quoted value."""
+        out, i = [], 0
+        while i < len(text):
+            if text.startswith("{{", i):
+                out.append("{")
+                i += 2
+            elif text[i] == "{":
+                end = text.index("}", i)
+                out.append(app if text[i + 1:end] in ("app", "code:AppForPowerShell") else "<" + text[i + 1:end] + ">")
+                i = end + 1
+            else:
+                out.append(text[i])
+                i += 1
+        return "".join(out).replace('""', '"')
+
+    def test_uninstall_command_is_whole(self):
+        # "}}" stayed "}}": PowerShell got one brace too many and the uninstaller stopped no process
+        import re
+        iss = (Path(__file__).resolve().parents[2] / "installer" / "BarrensVoice.iss").read_text(encoding="utf-8")
+        line = next(l for l in iss.splitlines() if 'RunOnceId: "StopBarrensVoice"' in l)
+        command = self.expand(re.search(r'Parameters: "((?:[^"]|"")*)"', line).group(1), r"C:\BV")
+        script = command.split("-Command ", 1)[1].strip('"')
+        self.assertEqual(script.count("{"), script.count("}"), script)
+        self.assertIn("Where-Object { $_.ExecutablePath", script)
+        self.assertTrue(script.endswith("Stop-Process -Id $_.ProcessId -Force }"), script)
+
+
 class UvSyncFails(unittest.TestCase):
     def test_build_raises_on_uv_error(self):
         from unittest import mock

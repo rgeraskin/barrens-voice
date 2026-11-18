@@ -72,8 +72,9 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: 
 
 [UninstallRun]
 ; the launcher and the companion of this install, not other Python programs. StartsWith, not -like: "[" in a
-; folder name is a wildcard there; the folder's "'" doubled for PowerShell's quotes (AppForPowerShell)
-Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -Command ""$app = '{code:AppForPowerShell}\'; Get-CimInstance Win32_Process | Where-Object {{ $_.ExecutablePath -and $_.ExecutablePath.StartsWith($app, [StringComparison]::OrdinalIgnoreCase) }} | ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force }}"""; Flags: runhidden; RunOnceId: "StopBarrensVoice"
+; folder name is a wildcard there; the folder's "'" doubled for PowerShell's quotes (AppForPowerShell). Inno
+; reads "{{" as "{" and leaves "}" as it is (its help, "Constants": "You do not need to double } characters")
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -Command ""$app = '{code:AppForPowerShell}\'; Get-CimInstance Win32_Process | Where-Object {{ $_.ExecutablePath -and $_.ExecutablePath.StartsWith($app, [StringComparison]::OrdinalIgnoreCase) } | ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force }"""; Flags: runhidden; RunOnceId: "StopBarrensVoice"
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\app"
