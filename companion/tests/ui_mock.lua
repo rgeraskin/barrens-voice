@@ -282,7 +282,6 @@ local cases = {
 for _, c in ipairs(cases) do
     assert(fire(c[1], c[2], c[3], c[4]) == c[5], c[1] .. " " .. c[2])
 end
-assert(ns.askingFilters == false, "the filters asked, the mark is off again")
 -- a client with the old global list only (no ChatFrameUtil), and one with neither
 local util = ChatFrameUtil
 ChatFrameUtil = nil
@@ -733,13 +732,11 @@ do
     print("what to read ok")
 end
 
--- the chat windows out of sight: transparent without the mouse; a line not read aloud shows its window
-local filters = {}
-ChatTypeGroup = { SYSTEM = { "CHAT_MSG_SYSTEM" }, PARTY = { "CHAT_MSG_PARTY", "CHAT_MSG_PARTY_LEADER" } }
--- the filter goes in through ChatFrameUtil (the old global is only a deprecation alias in Forever)
-ChatFrame_AddMessageEventFilter = function() error("the deprecated alias is not needed") end
+-- the chat windows out of sight: transparent without the mouse; a line not read aloud shows its window.
+-- No chat filter: the window's AddMessage gets the event and its arguments (ChatFrameOverrides.lua).
+ChatFrame_AddMessageEventFilter = function() error("no chat filter is needed") end
 local addFilter = ChatFrameUtil.AddMessageEventFilter
-ChatFrameUtil.AddMessageEventFilter = function(event, f) filters[event] = f; addFilter(event, f) end
+ChatFrameUtil.AddMessageEventFilter = function() error("no chat filter is needed") end
 hooksecurefunc = function(t, name, f)
     local orig = t[name]
     t[name] = function(...) if orig then orig(...) end f(...) end
@@ -769,22 +766,43 @@ assert(editBox:GetAlpha() == 1 and ChatFrame1:GetAlpha() == 1, "typing: the wind
 editBox._focus = false
 settle(2)
 assert(editBox:GetAlpha() == 0, "done typing: out of sight again")
-local function line(event, text, guid)
-    filters[event](ChatFrame1, event, text, "Вася-Степи", "", "", "", "", 0, 0, "", 0, 1, guid)
-    ChatFrame1:AddMessage(text)
+-- a chat event's line as the chat window adds it: AddMessage(msg, r, g, b, id, accessID, typeID, event,
+-- eventArgs, MessageFormatter), eventArgs SafePack'ed (n); an event the window does not show never gets here
+local function args(text, guid, channel, base)
+    return { text, "Вася-Степи", "", channel or "", "", "", 0, 0, base or "", 0, 1, guid, 0, false, n = 14 }
+end
+local function line(event, text, guid, frame)
+    frame = frame or ChatFrame1
+    frame:AddMessage("[Вася]: " .. text, 1, 1, 1, 1, 1, 1, event, args(text, guid), function(m) return m end)
 end
 line("CHAT_MSG_PARTY", "привет", "Player-1-2")
 settle(0.3)
 assert(ChatFrame1:GetAlpha() == 0, "a line read aloud: the window stays out of sight")
--- a General line: CHAT_MSG_CHANNEL is in no ChatTypeGroup list, yet it is read - no flash either
+-- a General line read aloud: no flash either
 ns.db.channels = true
-assert(filters.CHAT_MSG_CHANNEL, "the channels' messages have the filter too")
-line("CHAT_MSG_CHANNEL", "кто в ОП?", "Player-1-3")
+ChatFrame1:AddMessage("[1. Общий] [Вася]: кто в ОП?", 1, 1, 1, 1, 1, 1, "CHAT_MSG_CHANNEL",
+    args("кто в ОП?", "Player-1-3", "1. Общий", "Общий"))
 settle(0.3)
 assert(ChatFrame1:GetAlpha() == 0, "a General line read aloud: the window stays out of sight")
-line("CHAT_MSG_SYSTEM", "Вы получили 5 серебра")
+ns.db.chTrade = false
+ChatFrame1:AddMessage("[2. Торговля] [Вася]: WTS", 1, 1, 1, 1, 1, 1, "CHAT_MSG_CHANNEL",
+    args("WTS", "Player-1-3", "2. Торговля", "Торговля"))
+settle(0.3)
+assert(ChatFrame1:GetAlpha() == 1, "a channel switched off: the window shows")
+ns.db.chTrade = nil
+now = now + 11
+settle(2)
+ChatFrame1:AddMessage("Вы получили 5 серебра", 1, 1, 0, 1)            -- a system line: no event passed
 settle(0.3)
 assert(ChatFrame1:GetAlpha() == 1, "a system line is not read: the window shows")
+-- a line leaves nothing behind (no mark for the next AddMessage): an addon's print right after a read line
+-- shows the window
+now = now + 11
+settle(2)
+line("CHAT_MSG_PARTY", "привет", "Player-1-2")
+ChatFrame1:AddMessage("|cff40c0ffДругой аддон:|r готово")
+settle(0.3)
+assert(ChatFrame1:GetAlpha() == 1, "an addon's print right after a read line: shows")
 now = now + 11
 settle(2)
 assert(ChatFrame1:GetAlpha() == 0, "10 s later: out of sight again")
@@ -796,9 +814,10 @@ settle(2)
 ChatFrame1:AddMessage("|cff40c0ffДругой аддон:|r что-то")
 settle(0.3)
 assert(ChatFrame1:GetAlpha() == 1, "an addon's print (no chat event): shows")
-ns.askingFilters = true
-assert(filters.CHAT_MSG_PARTY(ChatFrame1, "CHAT_MSG_PARTY", "x") == false, "the filter never hides a line")
-ns.askingFilters = false
+assert(ns.ChatFade.Verdict("x", "CHAT_MSG_PARTY", setmetatable({}, { __index = function() error("no") end })) == "unknown",
+    "arguments that cannot be looked at: shown, no error")
+assert(ns.ChatFade.Verdict("x", 5, {}) == "other" and ns.ChatFade.Verdict("x", "CHAT_MSG_SAY", "args") == "other",
+    "another addon's AddMessage with other arguments: not a chat event's line")
 -- the mouse over the chat counts only when nothing else lies over it there
 now = now + 20
 settle(2)
@@ -878,8 +897,7 @@ GENERAL_CHAT_DOCK.overflowButton = false
 ChatFrame1.isDocked = true
 FCFDock_GetSelectedWindow = function() return ChatFrame1 end
 settle(2)                                     -- hooks the new window; the new tab strip fades
-filters.CHAT_MSG_SYSTEM(ChatFrame2, "CHAT_MSG_SYSTEM", "Hobby Warrior создает: Медный слиток.")
-ChatFrame2:AddMessage("Hobby Warrior создает: Медный слиток.")
+ChatFrame2:AddMessage("Hobby Warrior создает: Медный слиток.", 1, 1, 1, 1)
 settle(0.5)
 assert(ChatFrame1:GetAlpha() == 0 and GENERAL_CHAT_DOCK:GetAlpha() == 0, "a background tab's line: no flash")
 -- switched to that tab: its lines show the chat like any other
@@ -897,17 +915,7 @@ ns.db.fadeChat = false
 ns.ChatFade.Apply()
 assert(ChatFrame1:GetAlpha() == 1, "the setting off: the chat as it was")
 assert(editBox:GetAlpha() == 1, "and its edit box")
--- the visible-check asks every filter, ours among them: ours never hides a line, nor marks a window then
-rawset(ChatFrame1, "messageTypeList", { "PARTY" })
-rawset(ChatFrame1, "channelList", {})
-ns.db.onlyVisible, ns.db.party = true, true
-assert(fire("CHAT_MSG_PARTY", "через все фильтры"), "our own filter does not hide the line")
-ns.db.onlyVisible = false
--- a client with no filter API at all: the fading still starts
-local util2 = ChatFrameUtil
-ChatFrameUtil, ChatFrame_AddMessageEventFilter = nil, nil
-ns.ChatFade.Initialize()
-ChatFrameUtil = util2
+ChatFrameUtil.AddMessageEventFilter, ChatFrame_AddMessageEventFilter = addFilter, nil
 print("chat fade ok")
 
 -- is the companion running: the time it writes into CompanionStatus.lua, read when the addon loads
@@ -1075,18 +1083,32 @@ event("кто идёт?", "Вася-Степи", "Player-1-2")
 assert(#pushed == 1, "an open line after it is sent")
 event(SECRET, SECRET, SECRET)
 assert(#told == 2, "closed again later: told again")
--- the chat window: a secret line shows it (the filter does not read it)
+-- the chat window: a closed line comes to AddMessage with no chat filter called (the client calls them only
+-- for a line addons can read): secret text and secret event arguments; it shows the window, and /bv debug
+-- says why without looking at it
 ns.db.fadeChat = true
-ChatFrame1:SetAlpha(1)
-now = now + 30
-for _ = 1, 10 do ns.ChatFade.Update(nil, 0.3) end
-assert(ChatFrame1:GetAlpha() == 0, "hidden before")
+local function closedLine(text, eventArgs)
+    ChatFrame1:SetAlpha(1)
+    now = now + 30
+    for _ = 1, 10 do ns.ChatFade.Update(nil, 0.3) end
+    assert(ChatFrame1:GetAlpha() == 0, "hidden before")
+    pushed = {}
+    ChatFrame1:AddMessage(text, 1, 1, 1, 1, 1, 1, "CHAT_MSG_PARTY", eventArgs, function(m) return m end)
+    for _ = 1, 2 do ns.ChatFade.Update(nil, 0.3) end
+    assert(ChatFrame1:GetAlpha() == 1, "a closed-chat line shows the window")
+    assert(#pushed == 1 and pushed[1]:find("закрытый чат", 1, true) and pushed[1]:find("(закрытый текст)", 1, true)
+        or not ns.db.debug, pushed[1] or "no debug line")
+end
 ns.db.debug = true
-filters.CHAT_MSG_PARTY(ChatFrame1, "CHAT_MSG_PARTY", SECRET, SECRET, "", "", "", "", 0, 0, "", 0, 1, SECRET)
-ChatFrame1:AddMessage(SECRET)
-for _ = 1, 2 do ns.ChatFade.Update(nil, 0.3) end
-assert(ChatFrame1:GetAlpha() == 1, "a closed-chat line shows the window")
-ns.db.debug, ns.db.fadeChat = false, false
+closedLine(SECRET, { SECRET, SECRET, "", "", "", "", 0, 0, "", 0, 1, SECRET, 0, false, n = 14 })
+closedLine(SECRET, SECRET)                                   -- the whole table secret
+assert(ns.ChatFade.Verdict("[Вася]: го", "CHAT_MSG_PARTY", { "го", SECRET, n = 14 }) == "closed", "a secret argument")
+canaccesstable = function() return false end                 -- a table the addon may not index
+assert(ns.ChatFade.Verdict("[Вася]: го", "CHAT_MSG_PARTY", { "го", n = 14 }) == "closed")
+canaccesstable = nil
+ns.db.debug = false
+closedLine(SECRET, { SECRET, SECRET, "", "", "", "", 0, 0, "", 0, 1, SECRET, 0, false, n = 14 })
+ns.db.fadeChat = false
 ns.ChatFade.Apply()
 print = quiet2
 issecretvalue = nil

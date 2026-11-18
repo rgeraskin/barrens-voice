@@ -9,13 +9,17 @@
 --
 -- Transparency is SetAlpha on the chat frames and on the dock (GENERAL_CHAT_DOCK): the game sets
 -- the alpha of their textures, tabs and buttons, never of the frames themselves, so nothing fights
--- over it. Which lines are read: a chat filter - called for each window about to show a line, with
--- the event, before it is shown - marks the window with whether the addon reads that line (the
--- same rule as for sending it, ns.Reads); the window's AddMessage right after takes the mark. An
--- AddMessage with no mark (an addon's print, a message not from a chat event) is not read. Only the
--- tab on screen counts: a line in a tab that is not the one shown shows nothing (unseen without the
--- fading too: the game flashes the tab) - so the combat log in the background, with crafting nearby
--- every few seconds, does not keep the chat up; switched to, its lines show it like any other.
+-- over it. Which lines are read: the chat window hands a chat event's line to its AddMessage with
+-- the event and the event's arguments (ChatFrameOverrides.lua, MessageEventHandler: AddMessage(msg,
+-- r, g, b, id, accessID, typeID, event, eventArgs, MessageFormatter), Forever and retail alike) -
+-- only for a line it shows, after its filters and its channel and whisper checks - and the hook asks
+-- ns.Reads of them (the same rule as for sending it). An AddMessage without them (an addon's print, a
+-- system message, loot) is not read. Retail's closed chat comes as secret values: not looked at, not
+-- read (no chat filter could tell: the client calls addons' filters only for a line they can read,
+-- ChatFrameFilters.lua). Only the tab on screen counts: a line in a tab that is not the one shown
+-- shows nothing (unseen without the fading too: the game flashes the tab) - so the combat log in the
+-- background, with crafting nearby every few seconds, does not keep the chat up; switched to, its
+-- lines show it like any other.
 -- The mouse counts only where nothing else is over the chat: IsMouseOver knows the rectangle, not
 -- that a map or a bag lies on it - the frame really under the mouse (GetMouseFoci) tells.
 local _, ns = ...
@@ -27,9 +31,8 @@ local FADE_IN = 0.15   -- seconds to appear
 local FADE_OUT = 0.5   -- seconds to disappear
 local HIDE_DELAY = 1   -- seconds after the mouse leaves before the window fades
 F.REVEAL = 10          -- seconds a line not read aloud keeps its window up
-local MARK_FOR = 0.5   -- seconds a filter's mark waits for its AddMessage
 
-local hiddenFor, revealUntil, marks, hooked = {}, {}, {}, {}
+local hiddenFor, revealUntil, hooked = {}, {}, {}
 local driver
 
 local function Shown(f)
@@ -115,23 +118,44 @@ local ALWAYS_SHOW = { CHAT_MSG_WHISPER = "fadeWhisper", CHAT_MSG_GUILD = "fadeGu
     CHAT_MSG_INSTANCE_CHAT_LEADER = "fadeGroup" }
 F.ALWAYS_SHOW = ALWAYS_SHOW   -- for the tests
 
-local function OnAddMessage(self, text)
-    local mark = marks[self]
-    marks[self] = nil
-    local asked = mark and ALWAYS_SHOW[mark.event] and ns.db and ns.db[ALWAYS_SHOW[mark.event]]
-    if mark and mark.read and GetTime() - mark.at <= MARK_FOR and not asked then return end
-    if ns.db and ns.db.fadeChat and F.Reveal(self) then
-        if ns.db.debug then        -- /bv debug: which line showed the window, and why
-            local line = "(закрытый текст)"   -- a secret one (retail) cannot be looked at
-            if not (ns.Secret and ns.Secret(text)) then
-                line = tostring(text):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|H.-|h(.-)|h", "%1")
-            end
-            ns.Diag(("окно чата %s показано: %s — %s"):format(self.GetName and self:GetName() or "?",
-                asked and mark.read and "так просили в настройках (шёпот, гильдия или группа)"
-                    or mark and mark.secret and "закрытый чат (подземелье, рейд, PvP), компаньону не передать"
-                    or mark and "строку компаньон не читает" or "строка не из события чата (вывод аддона?)",
-                ns.Protocol.TrimUTF8(line, 90)))
+--- What becomes of a line a chat window shows: "read" (the companion reads it), "skipped" (a chat
+--- event's line it does not read), "closed" (retail's closed chat, secret), "other" (no chat event's:
+--- an addon's print, a system message) or "unknown" (its arguments could not be looked at).
+local function Verdict(text, event, args)
+    if ns.Secret(text, event, args) then return "closed" end
+    if type(event) ~= "string" or event:sub(1, 9) ~= "CHAT_MSG_" or type(args) ~= "table" then return "other" end
+    local ok, verdict = pcall(function()
+        local canaccesstable = rawget(_G, "canaccesstable")
+        if canaccesstable and not canaccesstable(args) then return "closed" end
+        -- the event's arguments: text (1), sender (2), the channel's "2. Торговля" (4), its base name (9), GUID (12)
+        local message, channelString, baseName, guid = args[1], args[4], args[9], args[12]
+        if ns.Secret(message, args[2], channelString, baseName, guid) then return "closed" end
+        return ns.Reads(event, guid, message, baseName, channelString) and "read" or "skipped"
+    end)
+    return ok and verdict or "unknown"
+end
+F.Verdict = Verdict   -- for the tests
+
+local REASONS = {
+    read = "так просили в настройках (шёпот, гильдия или группа)",
+    skipped = "строку компаньон не читает",
+    closed = "закрытый чат (подземелье, рейд, PvP), компаньону не передать",
+    other = "строка не из события чата (вывод аддона?)",
+    unknown = "строку не удалось разобрать",
+}
+
+local function OnAddMessage(self, text, _, _, _, _, _, _, event, args)
+    if not (ns.db and ns.db.fadeChat) then return end
+    local verdict = Verdict(text, event, args)
+    local asked = verdict == "read" and ALWAYS_SHOW[event] and ns.db[ALWAYS_SHOW[event]]
+    if verdict == "read" and not asked then return end
+    if F.Reveal(self) and ns.db.debug then        -- /bv debug: which line showed the window, and why
+        local line = "(закрытый текст)"            -- a secret one (retail) cannot be looked at
+        if not ns.Secret(text) then
+            line = tostring(text):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|H.-|h(.-)|h", "%1")
         end
+        ns.Diag(("окно чата %s показано: %s — %s"):format(self.GetName and self:GetName() or "?", REASONS[verdict],
+            ns.Protocol.TrimUTF8(line, 90)))
     end
 end
 
@@ -140,19 +164,6 @@ local function Hook(cf)
         hooksecurefunc(cf, "AddMessage", OnAddMessage)
         hooked[cf] = true
     end
-end
-
---- The chat filter: never hides a line, only marks the window with whether the addon reads it.
-function F.Filter(frame, event, text, _, ...)
-    if ns.askingFilters then return false end    -- Core's "is it visible" check calls the filters too
-    if ns.Secret and ns.Secret(text, (select(10, ...))) then
-        -- retail's closed chat (Core.lua): not read, so the window shows the line
-        marks[frame] = { read = false, secret = true, at = GetTime(), event = event }
-        return false
-    end
-    marks[frame] = { read = ns.Reads(event, (select(10, ...)), text, (select(7, ...)), (select(2, ...))), at = GetTime(),
-                     event = event }
-    return false
 end
 
 function F.Update(_, elapsed)
@@ -212,35 +223,8 @@ function F.Apply()
     end
 end
 
---- The client's way to add a chat filter: ChatFrameUtil.AddMessageEventFilter (Forever, retail); the
---- old global is only a deprecation alias there (loaded with the CVar loadDeprecationFallbacks), the
---- only one on older clients. nil when there is neither: no line is marked, so each shows its window.
-local function AddFilter()
-    local util = rawget(_G, "ChatFrameUtil")
-    if type(util) == "table" and type(util.AddMessageEventFilter) == "function" then
-        return util.AddMessageEventFilter
-    end
-    local old = rawget(_G, "ChatFrame_AddMessageEventFilter")
-    return type(old) == "function" and old or nil
-end
-
 function F.Initialize()
     driver = CreateFrame("Frame")
-    local add = AddFilter()
-    local seen = {}
-    local function Watch(event)
-        if add and not seen[event] then
-            seen[event] = true
-            add(event, F.Filter)
-        end
-    end
-    -- the events the addon reads, and every other the chat windows show; the channels' own messages
-    -- (CHAT_MSG_CHANNEL: General, Trade...) are in no ChatTypeGroup list - the windows take them by
-    -- channel - so without the first loop each read General line showed the window
-    for event in pairs(ns.EVENTS or {}) do Watch(event) end
-    for _, events in pairs(ChatTypeGroup or {}) do
-        for _, event in ipairs(events) do Watch(event) end
-    end
     for _, name in ipairs(CHAT_FRAMES or {}) do Hook(_G[name]) end
     F.Apply()
 end

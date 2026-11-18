@@ -244,6 +244,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   The name before a line was said as the chat shows it, with the realm of a character from another realm («Вася-Степи»). It is said without it now; the companion still tells characters apart by the whole name, so each keeps their voice.
 
+- The hidden chat goes by the line each window shows
+
+  A channel line read aloud marked every chat window as read, also one that does not show that channel: an addon's message or a system line there within half a second did not show the window. On retail, `/bv debug` called a line of the closed chat «строка не из события чата». The addon now judges the line the window actually adds, by the event the window passes with it: nothing is left marked, and a closed line is «закрытый чат».
+
 ## [0.3.0] - 2026-11-15
 
 ### Added

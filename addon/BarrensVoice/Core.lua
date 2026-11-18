@@ -458,12 +458,10 @@ end
 
 --- Whether a chat filter of another addon (a spam blocker and the like) hides this line in `frame`:
 --- the client's own ChatFrameUtil.ProcessMessageEventFilters (Forever, retail: its first result says
---- "discard"), else the old clients' ChatFrame_GetMessageEventFilters(event) list. Our own filter
---- (ChatFade.lua) keeps out of it while ns.askingFilters is set; another addon's filter that errors
---- counts as not hiding.
+--- "discard"), else the old clients' ChatFrame_GetMessageEventFilters(event) list. Another addon's
+--- filter that errors counts as not hiding.
 local function Filtered(frame, event, ...)
     local util = rawget(_G, "ChatFrameUtil")
-    ns.askingFilters = true
     local ok, hidden
     if type(util) == "table" and type(util.ProcessMessageEventFilters) == "function" then
         ok, hidden = pcall(util.ProcessMessageEventFilters, frame, event, ...)
@@ -477,7 +475,6 @@ local function Filtered(frame, event, ...)
             if fine and hide then hidden = true break end
         end
     end
-    ns.askingFilters = false
     return hidden
 end
 
@@ -519,7 +516,7 @@ local function Visible(event, ...)
     return true
 end
 
-ns.EVENTS = EVENTS   -- the chat events the addon reads (ChatFade.lua marks their lines with a filter)
+ns.EVENTS = EVENTS   -- the chat events the addon reads (for the tests)
 
 --- Whether a chat event's line is one the addon hands to the program (the channel on, not an addon's
 --- line, one's own lines only when they are on) - for the chat windows' fading too (ChatFade.lua).
