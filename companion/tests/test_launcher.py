@@ -624,6 +624,25 @@ class Install(unittest.TestCase):
             self.assertEqual(sorted(p.name for p in (root / "app").iterdir()),
                              ["0.3.8", "0.4.0", "0.4.1", "0.4.2", "0.4.3", "0.5.0b1", "current", "current.old"])
 
+    def test_prune_takes_only_versions(self):
+        # any folder in app\\ whose name is no version (a player's «backup», «Новая папка», a copy) sorted as the
+        # oldest version, and went
+        from bv import install
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            for v in ("0.3.0", "0.4.0b9", "0.4.0", "0.4.1"):
+                make_version(root, v)
+            app = root / "app"
+            theirs = ("backup", "Новая папка", "0.4.0 - копия", "0.4.0rc1", "v0.3.9", "0.2.0.part", "x.pruned")
+            for name in theirs:
+                (app / name / "sub").mkdir(parents=True)
+            (app / "0.1.0.pruned" / "sub").mkdir(parents=True)                       # a prune cut short: goes
+            (app / "notes.txt").write_text("", encoding="utf-8")
+            install.point_current(root, app / "0.4.1")
+            self.assertEqual(sorted(install.prune(root)), ["0.3.0", "0.4.0b9"])
+            self.assertEqual(sorted(p.name for p in app.iterdir()),
+                             sorted(["0.4.0", "0.4.1", "current", "notes.txt", *theirs]))
+
     def test_prune_cut_short_leaves_no_half_version(self):
         # the launcher ends (a daemon thread) or a file is in use: never a half version under a version's name
         # (one the next update could take as its previous, or a repair as whole); the rest goes next time

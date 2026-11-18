@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -233,18 +234,24 @@ def release_tag(version: str) -> str:
     return "v" + re.sub(r"b(\d+)$", r"-beta.\1", version)
 
 
+# a version's folder in app\\ is named by its pyproject.toml version: "0.4.1", "0.4.0b5"
+VERSION_NAME = re.compile(r"\d+(?:\.\d+)*(?:b\d+)?")
+
+
 def prune(root: Path, keep: int = KEEP, also=()) -> list[str]:
     """Versions older than the current one removed but the newest keep-1 of them (to go back to) and those named
     in `also` (update.json's previous). A version newer than the current one is never removed: it may be prepared
     and waiting for its switch, or refused here (it goes once a newer one is current) - by number alone a refused
     test build left on disk kept itself and pruned the prepared version, and the switch pointed at nothing.
     Nor what current.new or current.old points at (a switch cut short), nor anything while there is no current
-    version. A version is renamed to <version>.pruned before it is removed: a prune cut short (the launcher
+    version, nor a folder whose name is not a version's (VERSION_NAME: «backup», «0.4.1 - копия» are the
+    player's). A version is renamed to <version>.pruned before it is removed: a prune cut short (the launcher
     ended) leaves no half version under a version's name, and the rest goes at the next prune. What is in use
     stays (Windows will not delete a loaded file, nor rename a folder with one) and goes next time."""
     app = root / "app"
     for leftover in app.glob("*.pruned"):
-        shutil.rmtree(leftover, ignore_errors=True)
+        if leftover.is_dir() and VERSION_NAME.fullmatch(leftover.name.removesuffix(".pruned")):
+            shutil.rmtree(leftover, ignore_errors=True)
     current = current_version(root)
     if current is None:
         return []
@@ -252,9 +259,8 @@ def prune(root: Path, keep: int = KEEP, also=()) -> list[str]:
     for link in (app / "current.new", app / "current.old"):
         if os.path.lexists(link):
             keep_names.add(Path(os.path.realpath(link)).name)
-    older = sorted((p for p in app.iterdir() if p.is_dir() and not p.name.startswith("current")
-                    and not p.is_symlink() and not p.is_junction() and not p.name.endswith((".part", ".pruned"))
-                    and version_key(p.name) < version_key(current)),
+    older = sorted((p for p in app.iterdir() if VERSION_NAME.fullmatch(p.name) and p.is_dir()
+                    and not p.is_symlink() and not p.is_junction() and version_key(p.name) < version_key(current)),
                    key=lambda p: version_key(p.name), reverse=True)
     keep_names.update(v.name for v in older[: max(0, keep - 1)])
     removed = []
