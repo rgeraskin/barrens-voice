@@ -1424,6 +1424,7 @@ class ReleaseBuild(unittest.TestCase):
             self.assertIn('version = "0.4.0b7"', z.read("pyproject.toml").decode())
         for need in ("pyproject.toml", "uv.lock", "LICENSE", "Barrens Voice.exe", "companion/BarrensVoice.pyw",
                      "companion/bv/__main__.py", "companion/bv/update.py", "companion/bv/launcher/app.py",
+                     "companion/bv/selfcheck.py",
                      "addon/BarrensVoice/BarrensVoice.toc"):
             self.assertIn(need, names)
         self.assertFalse(any(n.startswith("companion/tests/") or "__pycache__" in n for n in names))
