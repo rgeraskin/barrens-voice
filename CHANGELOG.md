@@ -50,13 +50,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - A «Помощь» tab in the settings
 
-  Where to write about bugs, ideas and words read wrong — Barrens Voice's community in Battle.net (the game's «Сообщества»: news and questions), Discord, Telegram and the GitHub issues, each with its icon, its address in a box (a click selects it, Ctrl+C copies), «Копировать» and «Открыть». The game gives an addon neither the browser nor the clipboard, so the companion does both (bridge kinds `open` and `copy`, only for the addresses it knows). The welcome on the first run and the line after an update point to it.
+  Where to write about bugs, ideas and words read wrong — Barrens Voice's community in Battle.net (the game's «Сообщества»: news and questions), Discord, Telegram and the GitHub issues, each with its icon, its address in a box (a click selects it, Ctrl+C copies), «Копировать» and «Открыть». The game gives an addon neither the browser nor the clipboard, so the companion does both (bridge kinds `open` and `copy`, only for the addresses it knows). The community needs no browser: its «Открыть» puts its clickable link in the chat and opens it in the game's «Сообщества» window, where the player can join, with or without the companion and with the voice-over off too; the browser only where the game has no communities. Its icon is the Blizzard logo the chat shows. The welcome on the first run and the line after an update point to it.
 
 - «Отладка (/bv debug)» in the addon's settings
 
   Under «Дополнительно», with a tooltip on what it writes and why to keep it off otherwise.
 
+- The hidden chat shows on a group line
+
+  «Показывать при строке группы/рейда» under «Прятать окно чата», on by default: a party, raid, raid warning or dungeon or battleground group line shows the faded chat window though it is read aloud, as a whisper or a guild line can.
+
+- Where a line was said
+
+  «и где: «Громмаш пишет в гильдии: …»» under the names, on by default: the verb gets the place — «в группе», «в рейде», «объявляет рейду», «в гильдии», «в офицерском чате», «в общем», «в торговле», «в канале <имя>». Only when the place changes from the last line read or after a minute's quiet, so a run of guild lines names the guild once; say, yell, whisper and emote have no place. Without the verb: «Громмаш, в гильдии: …».
+
+- «Что читать»: only the selected chat tab
+
+  A choice under the channels: «Все включённые каналы, даже не показанные в чате» (every channel on, also one taken out of every chat tab or hidden by a spam filter), «Что показывают окна чата» (as before, the default: any chat window or tab, the tabs not selected too) or the new «Только выбранная вкладка» — of the chat window's tabs only the one on screen, separate chat windows still. In a dungeon: move the group's chat to a tab of its own, select it, and only the group is read.
+
 ### Changed
+
+- A raid warning is «объявляет»
+
+  With the verb on, a raid warning is read «Тралл объявляет: …» (it was «пишет»), and never «спрашивает».
 
 - BREAKING: the mod is called Barrens Voice
 
