@@ -133,7 +133,7 @@ WITH_HALF = re.compile(r"\s+(?:половиной|лишним|хвостико�
 GENDERS = {"masc", "femn", "neut"}
 # words that number rather than count: "15 уровня" is the fifteenth (a count is "15 уровней")
 NUMBERED = {"уровень", "этаж", "число", "ранг", "фаза", "сезон", "глава", "акт", "волна", "слот", "босс"}
-# what a move "с N на M" goes between: places that number ("со второго на третье место"); a count otherwise
+# a move "с N на M" after a number ending in 1, where a count and an ordinal read the same: only to these
 MOVED = NUMBERED | {"место", "позиция", "строчка", "строка", "этап", "стадия", "ступень", "страница", "ряд"}
 # a noun whose singular the stress model may take for the plural ("числ+а", "мест+а" - "two of them"):
 # after an ordinal it is the singular, stressed here ("до пятнадцатого м+еста")
@@ -529,7 +529,7 @@ def range_tag(word: str, morph) -> tuple[str, str | None] | None:
     return tag.gender or "masc", tag.animacy if tag.case == "accs" else None
 
 
-def closing_tag(word: str, to: str, typed: bool, morph) -> tuple[str, str | None] | None:
+def closing_tag(word: str, to: str, typed: bool, morph, m: int | None = None) -> tuple[str, str | None] | None:
     """`range_tag` of the word closing "с N по M" or "с N на M" (`to`: "по", "на"); a move ("на") only to a
     typed M (`typed`: a number, else `word` must be an ordinal) and a noun not in the accusative of an
     animate one, which is the genitive a count takes ("на 3 босса")."""
@@ -541,8 +541,17 @@ def closing_tag(word: str, to: str, typed: bool, morph) -> tuple[str, str | None
     parses = morph.parse(word.replace("+", "").lower())
     if not typed and not any(p.tag.POS == "ADJF" and "Anum" in p.tag for p in parses):
         return None
-    if typed and not any(p.normal_form in MOVED for p in parses):
-        return None                                    # "с 10 на 25 человек", "с 20 на 21 час": counts, not places
+    if typed and m is not None:
+        # a move when the noun after M is in a form a count of M cannot take: «на 2 группу», «на 3 сервер»
+        # (a count says «две группы», «три сервера»); «на 25 человек», «на 2 часа», «на 3 босса» are counts.
+        # After a number ending in 1 both read the same («21 час», «21 уровень»): only a place that numbers moves
+        one = m % 10 == 1 and m % 100 != 11
+        few = 2 <= m % 10 <= 4 and not 12 <= m % 100 <= 14
+        count = ("sing", "nomn") if one else ("sing", "gent") if few else ("plur", "gent")
+        nouns = [p for p in parses if p.tag.POS == "NOUN"]
+        if any((p.tag.number, p.tag.case) == count for p in nouns):
+            if not one or not any(p.normal_form in MOVED for p in parses):
+                return None
     return tag
 
 
@@ -615,14 +624,15 @@ def numbers_to_words(text: str) -> str:
                 following = None                       # "1 с половиной часа": "один", no form of it fits better
         if morph is not None and following and before.lower() in ("с", "со") and following.group(1).lower() in ("по", "на"):
             closing = RANGE_START.match(m.string, m.end())
+            to_m = re.match(r"\d+", closing.group(2) or "") if closing else None
             tag = closing_tag(closing_word(closing.group(3), morph), closing.group(1), bool(closing.group(2)),
-                              morph) if closing else None
+                              morph, int(to_m.group()) if to_m else None) if closing else None
             as_ordinal = ordinal_as(n, *tag, "gent", morph) if tag else None
             if as_ordinal:
                 return as_ordinal, m.end()             # "с первого по пятый уровень", "со второго на третье место"
         if morph is not None and following and before.lower() in ("по", "на") and \
                 (start := RANGE_END.search(m.string, 0, m.start())):
-            tag = closing_tag(following.group(1), start.group(1), True, morph)
+            tag = closing_tag(following.group(1), start.group(1), True, morph, n)
             as_ordinal = ordinal_as(n, *tag, "accs", morph) if tag else None
             if as_ordinal:
                 return as_ordinal, m.end()             # "по третьего босса", "по пятое января", "на третье место"
