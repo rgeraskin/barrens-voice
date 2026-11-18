@@ -592,8 +592,13 @@ def numbers_to_words(text: str) -> str:
                 pass
         elif morph is not None and (second := PAIR_NEXT.match(m.string, m.end())) and \
                 (noun := NEXT_WORD.match(m.string, second.end())):
+            last = int(second.group(1))
+            if noun.group(1).lower() in MONTHS and 1 <= n <= 31 and 1 <= last <= 31:
+                date = ordinal_as(n, "neut", None, DATE_CASES.get(before.lower(), "gent"), morph)
+                if date:
+                    return date, m.end()               # "5-6 мая" - "пятого-шестого мая", as the second
             try:                                       # the first of two: "до 2-3 человек" - "до двух-"
-                spoken = first_of_pair(n, int(second.group(1)), spoken, noun.group(1).rsplit("-", 1)[-1], morph, before)
+                spoken = first_of_pair(n, last, spoken, noun.group(1).rsplit("-", 1)[-1], morph, before)
             except Exception:  # noqa: BLE001 - a number read in the nominative is still a number
                 pass
         elif morph is not None and not GOES_ON.match(m.string, m.end()) and \
