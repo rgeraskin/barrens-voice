@@ -50,7 +50,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - A «Помощь» tab in the settings
 
-  Where to write about bugs, ideas and words read wrong — Barrens Voice's community in Battle.net (the game's «Сообщества»: news and questions), Discord, Telegram and the GitHub issues, each with its icon, its address in a box (a click selects it, Ctrl+C copies), «Копировать» and «Открыть». The game gives an addon neither the browser nor the clipboard, so the companion does both (bridge kinds `open` and `copy`, only for the addresses it knows). The community needs no browser: its «Открыть» closes the settings and puts its link in the chat, and one click on it opens the game's «Сообщества» window, where the player can join, with or without the companion and with the voice-over off too; the browser only where the game has no communities. Its icon is the Blizzard logo the chat shows. The welcome on the first run and the line after an update point to it.
+  Where to write about bugs, ideas and words read wrong — Barrens Voice's community in Battle.net (the game's «Сообщества»: news and questions), Discord, Telegram and the GitHub issues, each with its icon, its address in a box (a click selects it, Ctrl+C copies), «Копировать» and «Открыть». The game gives an addon neither the browser nor the clipboard, so the companion does both (bridge kinds `open` and `copy`, only for the addresses it knows). The community needs no browser: its «Открыть» closes the settings and puts a line in the chat, with the addon's icon: the community's link «[Вступить в «Barrens Voice»]» in Battle.net's colour and its web address in grey, then what to do — one click on the link opens the game's communities window with «Вступить», with or without the companion and with the voice-over off too; the browser only where the game has no communities. A player already in the community is told so instead, with the key their game opens the communities window with (whatever it is bound to; none named when none is); one who joins within five minutes of «Открыть» is greeted. Its icon is the Blizzard logo the chat shows. The welcome on the first run and the line after an update point to it.
 
 - «Отладка (/bv debug)» in the addon's settings
 
@@ -66,15 +66,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - «Что читать»: only the selected chat tab
 
-  A choice under the channels: «Все включённые каналы, даже не показанные в чате» (every channel on, also one taken out of every chat tab or hidden by a spam filter), «Что показывают окна чата» (as before, the default: any chat window or tab, the tabs not selected too) or the new «Только выбранная вкладка» — of the chat window's tabs only the one on screen, separate chat windows still. In a dungeon: move the group's chat to a tab of its own, select it, and only the group is read.
+  A choice under the channels: «Все включённые каналы, даже не показанные в чате» (every channel on, also one taken out of every chat tab or hidden by a spam filter), «Что показывают окна чата» (as before, the default: any chat window or tab, the tabs not selected too) or the new «Только выбранная вкладка» — of the chat window's tabs only the one on screen, separate chat windows still. For instance: move the group's chat to a tab of its own, select it, and only the group is read. Whisper tabs count as tabs too: with the game's «Шёпот» set to a new tab, a conversation is read while its tab is selected (or pulled out as a separate window), and the general tab no longer reads a whisper it does not show.
 
 - Battle.net whispers are read
 
-  A Battle.net friend's whisper is read under «Шёпот», as a whisper: «Громмаш шепчет: …». A friend in WoW is named by their character, without the realm, and speaks in their race's voice; a friend in the Battle.net app (or not on a character) by their BattleTag without «#1234», in the race voices' default, a human man's; the companion's log shows them «BN:Вася» too, without the digits (the voice stays tied to the whole BattleTag). The account's real name is never said or written to the log. One's own Battle.net whispers are read like one's own whispers to characters (below). «при шёпоте» under «Прятать окно чата» shows the window for them too, and «Что читать» counts the chat windows that show Battle.net whispers. On retail they are closed to addons in dungeons, raids, boss fights, Mythic+ and PvP, like the rest of the chat.
+  A Battle.net friend's whisper is read under «Шёпот», as a whisper: «Громмаш шепчет: …». A friend in WoW is named by their character, without the realm, and speaks in their race's voice; a friend in the Battle.net app (or not on a character) by their BattleTag without «#1234», in the race voices' default, a human man's; the companion's log shows them «BN:Вася» too, without the digits (the race voice stays tied to the whole BattleTag), and `players` in config.json pins one by that «BN:Вася» or by the whole BattleTag. The history `/bv last` keeps in the saved variables has the BattleTag without the digits as well; a line replayed from it keeps the friend's voice. A whisper from a friend the game does not tell the addon about is not read, and shows the hidden chat. The account's real name is never said or written to the log. One's own Battle.net whispers are read like one's own whispers to characters (below). «при шёпоте» under «Прятать окно чата» shows the window for them too, and «Что читать» counts the chat windows that show Battle.net whispers. On retail they are closed to addons in dungeons, raids, boss fights, Mythic+ and PvP, like the rest of the chat.
 
 - One's own whispers are read with «Свои сообщения»
 
-  The whispers one sends, to a character or to a Battle.net friend, are read under «Шёпот» when «Свои сообщения» is on (as it is by default): «Джайна шепчет: …», by one's own name, in one's own voice, without the name of the one whispered to. With «Свои сообщения» off they are not read and the hidden chat shows them as before; read, they show it only with «при шёпоте», like a whisper one gets.
+  The whispers one sends, to a character or to a Battle.net friend, are read under «Шёпот» when «Свои сообщения» is on (as it is by default): «Джайна шепчет: …», by one's own name, in one's own voice, without the name of the one whispered to. The name is the one the chat gives the character's own lines (on Forever the game's own name parts may differ from it), so one's own whispers are read once the character has written a line the addon heard, in any chat; it is kept per character over `/reload` and restarts. Until then `/bv debug` says why one is not read. With «Свои сообщения» off they are not read and the hidden chat shows them as before; read, they show it only with «при шёпоте», like a whisper one gets.
 
 ### Changed
 
@@ -114,9 +114,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   The model cache's warning about symlinks on Windows (it keeps plain copies without developer mode, which costs nothing here) and two of RUAccent's own notices (a regex string without `r""`, an argument huggingface_hub ignores) are no longer shown.
 
-- The channels' tooltips say what is not read
+- The settings say what retail does not let be read
 
-  On retail, «Группа», «Рейд», «Объявления рейда» and «Подземелье и БГ» say where the game closes them to addons (dungeons, raids, boss fights, Mythic+, PvP): the dungeon and battleground chat is hardly ever read there.
+  On retail, the «Каналы и чтение» tab says on top that the game closes the whole chat to addons in dungeons, raids, boss fights, Mythic+ and PvP: there nothing is read.
 
 ### Removed
 
