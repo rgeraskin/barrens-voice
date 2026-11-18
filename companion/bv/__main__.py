@@ -227,11 +227,23 @@ def settle_numbers(config: dict, log) -> None:
         config[key] = value
 
 
-def _write_config(path: Path, config: dict) -> None:
-    """Through a temporary file, as the launcher writes it: neither ever reads half a file."""
+def _write_config(path: Path, config: dict, log=log) -> bool:
+    """Through a temporary file, as the launcher writes it: neither ever reads half a file. A file that can be
+    read but not replaced (read-only, held by another program for a moment) is no reason not to start: the
+    file stays as it was, no .tmp beside it, a line in the log, and the settings go on as read (what would
+    have been written in - new settings, this version's _help - is only the defaults). Whether it was written."""
     tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
-    os.replace(tmp, path)
+    try:
+        tmp.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
+        os.replace(tmp, path)
+        return True
+    except OSError as e:
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
+        log(f"не удалось записать config.json ({e.strerror or e}) — файл остался как был, компаньон работает дальше")
+        return False
 
 
 def _stamp(path: Path):
@@ -261,11 +273,11 @@ def read_config(path: Path) -> tuple[object, dict]:
 
 def load_config_stamped(path: Path | None = None, log=log) -> tuple[dict, object]:
     """`load_config` and the stamp of the file it read (`LiveConfig` starts from it); None when the companion
-    wrote the file itself, so that the first look reads it again."""
+    wrote the file itself, so that the first look reads it again. A write that fails is logged, not raised."""
     path = path or CONFIG_PATH
     config = dict(DEFAULT_CONFIG)
     if not path.exists():
-        _write_config(path, config)
+        _write_config(path, config, log)
         return config, None
     stamp, saved = read_config(path)
     config.update(saved)
@@ -273,8 +285,8 @@ def load_config_stamped(path: Path | None = None, log=log) -> tuple[dict, object
     settle_numbers(config, log)
     if any(key not in saved for key in DEFAULT_CONFIG) or saved["_help"] != config["_help"]:
         # new settings or a new _help: write them in
-        _write_config(path, config)
-        stamp = None
+        if _write_config(path, config, log):
+            stamp = None
     return config, stamp
 
 

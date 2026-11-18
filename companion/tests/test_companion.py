@@ -39,6 +39,32 @@ class LoadConfig(unittest.TestCase):
         self.assertEqual(config["_help"], companion.DEFAULT_CONFIG["_help"])
         self.assertEqual(saved["_help"], companion.DEFAULT_CONFIG["_help"])
 
+    def test_a_file_that_cannot_be_replaced_is_no_reason_not_to_start(self):
+        # read-only or held for a moment: the write of new settings / this version's _help raised OSError, main()
+        # stopped with CONFIG_ERROR («исправьте файл») for a file that read fine, and config.json.tmp stayed
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "config.json"
+            mine = json.dumps(dict(companion.DEFAULT_CONFIG, rate=3, _help="the text of the version before"))
+            path.write_text(mine, encoding="utf-8")
+            for failure in ({"target": "os.replace"}, {"target": "pathlib.Path.write_text"}):
+                logged = []
+                with self.subTest(**failure), mock.patch(failure["target"], side_effect=PermissionError(13, "Access is denied")):
+                    config, stamp = companion.load_config_stamped(path, logged.append)
+                self.assertEqual(config["rate"], 3)                                   # the settings as read
+                self.assertEqual(config["_help"], companion.DEFAULT_CONFIG["_help"])
+                self.assertEqual(stamp, companion._stamp(path))                       # the file as it is: watched
+                self.assertEqual(path.read_text(encoding="utf-8"), mine)
+                self.assertEqual(sorted(p.name for p in Path(d).iterdir()), ["config.json"])   # no .tmp left
+                self.assertEqual(len(logged), 1)
+                self.assertIn("не удалось записать config.json (Access is denied)", logged[0])
+                from bv.logs import level_of
+                self.assertEqual(level_of(logged[0]), "WARN")
+            path.unlink()
+            with mock.patch("os.replace", side_effect=PermissionError(13, "Access is denied")):
+                self.assertEqual(companion.load_config_stamped(path, lambda *a: None), (companion.DEFAULT_CONFIG, None))
+            self.assertEqual(list(Path(d).iterdir()), [])                             # none made, none left over
+
     def test_bom_is_read(self):
         # Notepad's «UTF-8 with BOM»: the launcher read it, the companion stopped with CONFIG_ERROR
         with tempfile.TemporaryDirectory() as d:
