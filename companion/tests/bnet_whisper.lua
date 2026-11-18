@@ -89,11 +89,13 @@ C_BattleNet.GetAccountInfoByID = function() error("no") end
 whisper("кто я?", 7)
 assert(#sent == 1 and fields(sent[1])[1] == "diag")
 C_BattleNet.GetAccountInfoByID = function(id) return friends[id] end
--- «Шёпот» off: not read, and the note says no name either
+-- «Шёпот» off: not read, and the note says no real name either, nor the BattleTag's digits
 ns.db.whisper = false
 whisper("привет", 7)
 assert(#sent == 1 and fields(sent[1])[1] == "diag", sent[1] or "nothing")
 private(sent[1])
+whisper("привет", 8)
+assert(#sent == 1 and sent[1]:find("BN:Тиранда:", 1, true) and not sent[1]:find("2345", 1, true), sent[1])
 ns.db.whisper, ns.db.debug = true, false
 assert(#whisper("привет", 7) == 1, "on again")
 print("unknown friend ok")

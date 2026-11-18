@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "companion"))
 
-from bv.protocol import Image, decode, parse  # noqa: E402
+from bv.protocol import Image, decode, parse, shown_sender  # noqa: E402
 
 PROTOCOL = ROOT / "addon" / "BarrensVoice" / "Protocol.lua"
 ENCODE = Path(__file__).with_name("encode.lua")
@@ -170,6 +170,18 @@ def scene(width: int, height: int, seed: int = 3) -> bytearray:
             r, g, b = rnd.randint(0, 90), rnd.randint(0, 90), rnd.randint(0, 90)
         raw += bytes((b, g, r, 255))
     return raw
+
+
+class ShownSender(unittest.TestCase):
+    """The log shows a Battle.net friend without their BattleTag's digits; the voice keeps the whole tag."""
+
+    def test_battle_tag_digits_left_out(self):
+        self.assertEqual(shown_sender("BN:Вася#1234"), "BN:Вася")
+        self.assertEqual(shown_sender("BN:Tiranda#23456"), "BN:Tiranda")
+        self.assertEqual(shown_sender("BN:Вася"), "BN:Вася")                     # no digits to drop
+        self.assertEqual(shown_sender("Громмаш-ПиратскаяБухта"), "Громмаш-ПиратскаяБухта")   # a character: as is
+        self.assertEqual(shown_sender("Вася#1234"), "Вася#1234")                 # not a Battle.net sender
+        self.assertEqual(shown_sender(""), "")
 
 
 def paste(raw: bytearray, width: int, img: Image, x: int, y: int) -> None:

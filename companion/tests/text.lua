@@ -20,6 +20,15 @@ eq(ns.ServiceFrame("stop", "rate=125", "-"), "stop\31\31\31\31\31\31rate=125\31-
 eq(ns.ServiceFrame("test", "voice=sapi", "Привет", "Проверка"), "test\31Проверка\31\31\31\31\31voice=sapi\31Привет", "with a sender's name")
 print("service frames ok")
 
+-- ShownSender: how /bv debug names a sender - no realm, no BattleTag digits
+eq(ns.ShownSender("Громмаш-ПиратскаяБухта"), "Громмаш", "a character: without the realm")
+eq(ns.ShownSender("Громмаш"), "Громмаш", "no realm")
+eq(ns.ShownSender("BN:Вася#1234"), "BN:Вася", "a Battle.net friend: without the tag's digits")
+eq(ns.ShownSender("BN:Вася"), "BN:Вася", "no digits")
+eq(ns.ShownSender(""), "?", "none")
+eq(ns.ShownSender(nil), "?", "none at all")
+print("shown sender ok")
+
 -- IsQuestion: a line of questions only
 for _, q in ipairs({ "кто в ОП?", "танк нужен? хил?", "где? ", "что???" }) do assert(ns.IsQuestion(q), q) end
 for _, s in ipairs({ "привет. кто идёт?", "ура! кто со мной?", "кто в ОП", "ну... кто?", "5.5 кто?", "ну… кто?", "" }) do

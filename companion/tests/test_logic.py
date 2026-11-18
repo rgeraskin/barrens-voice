@@ -1506,6 +1506,16 @@ class ReplayQueue(unittest.TestCase):
         self.assertEqual(texts, ["r0", "l2", "l3", "l4"])     # the oldest live ones went, the replayed one stayed
         self.assertEqual(len(said), 2)
 
+    def test_a_dropped_battle_net_line_logged_without_the_digits(self):
+        import queue
+        from bv.audio import queue_line
+        from bv.protocol import parse
+        q, said = queue.Queue(), []
+        friend = parse("\x1f".join(["whisper", "BN:Вася#1234", "", "", "", "", "rate=100", "привет"]).encode())
+        queue_line(q, friend, 1, said.append)
+        queue_line(q, self.line("l0"), 1, said.append)
+        self.assertEqual(said, ["очередь полна (1): не прочитано: BN:Вася: привет"])
+
     def test_made_audio_waits_for_room(self):
         import tempfile
         import threading

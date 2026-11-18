@@ -157,7 +157,7 @@ end
 -- CatQuest or Wayfarer starts and stops speaking - notes in the program's log, which has the time the chat lacks.
 function ns.Skip(reason, sender, text)
     if not ns.db.debug then return end
-    local who = sender and sender:match("^[^-]+") or sender or "?"
+    local who = ns.ShownSender(sender)
     text = (text or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|H.-|h(.-)|h", "%1")
     ns.Diag(("не отправлено (%s): %s: %s"):format(reason, who, ns.Protocol.TrimUTF8(text, 90)))
 end

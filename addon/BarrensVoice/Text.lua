@@ -16,6 +16,14 @@ function ns.ServiceFrame(kind, options, text, sender)
     return table.concat({ kind, sender or "", "", "", "", "", options, text }, SEP)
 end
 
+--- A sender as /bv debug's notes name them: without the realm («Громмаш»), a Battle.net friend's
+--- "BN:<BattleTag>" without the tag's "#1234" («BN:Вася»; the companion's log shows them so too); "?" for none.
+function ns.ShownSender(sender)
+    if type(sender) ~= "string" or sender == "" then return "?" end
+    if sender:find("^BN:") then return (sender:gsub("#%d+$", "")) end
+    return sender:match("^[^-]+") or sender
+end
+
 --- A line that is nothing but a question or questions ("кто в ОП?", "танк нужен? хил?"): no full stop,
 --- exclamation mark or ellipsis anywhere, and it ends with "?". The voices rise at a question mark
 --- unevenly, so such a line is announced "спрашивает" - the ear gets it from the verb.

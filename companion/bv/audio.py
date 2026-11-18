@@ -10,6 +10,8 @@ import threading
 import time
 import wave
 
+from . import protocol
+
 TAIL = 0.25   # seconds of silence after each line
 PAUSE_MAX = 90.0   # a pause whose "resume" never came ends by itself
 
@@ -65,7 +67,7 @@ def queue_line(lines: queue.Queue, line, limit: int, log) -> None:
             i = live.pop(0)
             dropped.add(i)
             old = waiting[i]
-            log(f"очередь полна ({limit}): не прочитано: {old.sender}: {old.text[:80]}")
+            log(f"очередь полна ({limit}): не прочитано: {protocol.shown_sender(old.sender)}: {old.text[:80]}")
         for i, x in enumerate(waiting):
             if i not in dropped:
                 lines.put(x)

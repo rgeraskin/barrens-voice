@@ -364,6 +364,12 @@ class ChatLines(unittest.TestCase):
         self.line("Тралл:\x04 и ещё", raw="и ещё!")
         self.assertNotIn("    исходно:   и ещё!", self.logged)
 
+    def test_a_battle_net_friend_logged_without_the_digits(self):
+        self.line("Вася шепчет:\x04 ты где?", kind="whisper", sender="BN:Вася#1234", raw="ты где?")
+        self.assertEqual(self.logged[0], "[шёпот] BN:Вася (Orc, м) → orc-male: Вася шепчет: ТЫ ГДЕ?")
+        self.assertNotIn("#1234", "\n".join(self.logged))
+        self.assertEqual(self.speaker.said[0].sender, "BN:Вася#1234")     # the voice: by the whole BattleTag
+
     def test_the_same_character_goes_on_without_the_name(self):
         self.line("Тралл:\x04 раз")
         self.line("Тралл:\x04 два")                                       # within same_speaker_gap

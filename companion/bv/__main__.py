@@ -533,7 +533,7 @@ class Lines:
         line = dataclasses.replace(line, text=text)
         speaker = self.engines.for_line(line)
         label = LABELS.get(line.kind, line.kind) + (f" {line.channel}" if line.channel else "")
-        self.log(f"[{label}] {line.sender} ({line.race or '?'}"
+        self.log(f"[{label}] {protocol.shown_sender(line.sender)} ({line.race or '?'}"
                  f"{', м' if line.sex == '2' else ', ж' if line.sex == '3' else ''})"
                  f" → {speaker.describe(line)}: {text}")
         if self.config["log_details"] and line.raw and line.raw != text:

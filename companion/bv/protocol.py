@@ -4,6 +4,7 @@ Standard library only, so the round-trip test runs anywhere.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 VERSION = 1
@@ -194,6 +195,14 @@ class Line:
 
 NAME_MARK = "\x04"   # the addon puts it after the speaker's name ("Вася пишет:\x04 привет")
 KEPT_NAME_MARK = "\x05"   # the same after a name that is never dropped (an emote: "Вася\x05 смеётся")
+
+
+def shown_sender(sender: str) -> str:
+    """A line's sender as the log shows it: a Battle.net friend's "BN:<BattleTag>" without the tag's
+    "#1234" ("BN:Вася"); any other as it is. The voice stays tied to the whole sender (assign.py)."""
+    if sender.startswith("BN:"):
+        return re.sub(r"#\d+$", "", sender)
+    return sender
 
 
 def split_name(text: str) -> tuple[str, str, bool]:
