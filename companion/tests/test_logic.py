@@ -508,6 +508,10 @@ class Pipeline(unittest.TestCase):
 
     def test_a_time_after_a_preposition_is_not_a_count(self):
         self.assertTrue(self.say("до 20:00").startswith("до двадцать"))     # an hour, not "до двадцати"
+        # a time with a dash: a zero after it is no range («до двадцати-пять»)
+        self.check({"до 20-05": "до двадцать-ноль пять", "до 20-00": "до двадцать-ноль ноль",
+                    "в 21-00 рейд": "в двадцать один-ноль ноль рейд", "с 19-00 до 23-00": "с девятнадцать-ноль ноль до двадцать три-ноль ноль",
+                    "счёт 2-0": "счёт два-ноль", "до 5-10": "до пяти-десяти"})
 
     def test_a_count_after_a_preposition_of_the_genitive(self):
         # «5 игроков» is also the nominative count: the preposition says it is the genitive
@@ -751,7 +755,8 @@ class NumberAgreement(unittest.TestCase):
             "с 3 фазы": "с третьей фазы", "3 фазы": "три фазы", "убил 5 боссов": "убил пять боссов",
             "до 11 числа": "до одиннадцатого ч+исла", "2 числа": "два числа", "с 1 места": "с одного места", "на 2 месте": "на втором месте",
             # the second number of a time, a decimal or a version: neither an ordinal nor agreeing
-            "20:00 сбор": "двадцать:ноль сбор", "в 21:30 рейд": "в двадцать один:тридцать рейд",
+            "20:00 сбор": "двадцать:ноль ноль сбор", "в 21:30 рейд": "в двадцать один:тридцать рейд",
+            "в 20:05 сбор": "в двадцать:ноль пять сбор",      # minutes under ten as they are said
             "1.12 патч": "один.двенадцать патч", "2,5 часа": "два,пять часа",
             # a hyphenated word agrees by its last part
             "нужно 5 рейд-лидеров": "нужно пять рейд-лидеров", "2 рейд-группы": "две рейд-группы",

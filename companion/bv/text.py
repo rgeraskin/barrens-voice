@@ -140,7 +140,11 @@ GLUED = re.compile(r"\d[:.,]$")
 # "2 на 2" (an arena: the dictionary's "2х2"), "10 на 10": a size, both numbers cardinals - not "на втором"
 SIZE_AFTER = re.compile(r"\s+на\s+\d")
 SIZE_BEFORE = re.compile(r"(?<![\d:.,])\d+\s+на\s+$")
-GOES_ON = re.compile(r"[:.,]\d")       # ... and a number with one after it: "до 20:00" is a time, not a count
+# ... and a number with one after it: "до 20:00" is a time, not a count; so is "до 20-00", "20-05" (a dash and a
+# zero: no range)
+GOES_ON = re.compile(r"[:.,]\d|-0\d")
+# a time's minutes under ten, after a colon or a dash: "20:05" - "двадцать:ноль пять", "20-00" - "ноль ноль"
+MINUTES = re.compile(r"\d[:-]$")
 # two numbers of one noun: a range "2-3", a share "5/5" - both in the case of the word before the first and
 # agreeing with the word after the second ("до двух-трёх человек", "с двумя-тремя магами"); not "20-00" (a time)
 PAIR_NEXT = re.compile(r"\s*[-–/]\s*([1-9]\d*)\b")
@@ -527,6 +531,8 @@ def numbers_to_words(text: str) -> str:
         if len(m.group()) >= 10:
             return m.group(), m.end()
         n = int(m.group())
+        if len(m.group()) == 2 and m.group()[0] == "0" and MINUTES.search(m.string, 0, m.start()):
+            return "ноль " + num2words(n, lang="ru"), m.end()
         spoken = num2words(n, lang="ru")
         pair = PAIR_BEFORE.search(m.string, 0, m.start()) if not m.group().startswith("0") else None
         before = PREV_WORD.search(m.string, 0, pair.start() if pair else m.start())   # "до 2-3": "до" for both
