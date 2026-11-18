@@ -84,7 +84,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Dictionary
 
-  «95%» is read «95 процентов» (1 процент, 2 процента), «кача» as «к+ача», «ЛИ» (in capitals only: «ли» is a particle) as «Лабиринты Иглошкурых», «пздц» as «пиздец», «импрувед» as «импр+увед», «лк» as «эл к+а», «бк» as «бэ к+а», «дс» as «диск+орд» (it was «дисконнект»: in chat it is mostly Discord), «х3» as «икс три», «+-» as «плюс-минус».
+  «95%» is read «95 процентов» (1 процент, 2 процента), «кача» as «к+ача», «ЛИ» (in capitals only: «ли» is a particle) as «Лабиринты Иглошкурых», «пздц» as «пиздец», «импрувед» as «импр+увед», «лк» as «эл к+а», «бк» as «бэ к+а», «дс» as «диск+орд» (it was «дисконнект»: in chat it is mostly Discord), «х3» and «х2» as «икс три», «икс два», «+-» as «плюс-минус» (also before a number: «+-5 минут» — «плюс-минус пять минут»), «2х2», «5x5», «3v3» as «два на два»; Discord's emoji codes («:lol:», «:+1:») are dropped before the dictionary.
 
 - Library notices left out of the model download
 
@@ -108,7 +108,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Numbers in chat are read as meant
 
-  A number before «+» (the addon says it as «плюс») was taken for an ordinal of the noun «плюс»: «От 50+ лвл» was «от пятидесятый плюс уровень», «18+» — «восемнадцатый плюс». Now «от пятидесяти плюс», «восемнадцать плюс», «на три плюс человек». An ordinal's ending typed with the number is read with it: «с 2007го» — «с две тысячи седьмого», «после 40го» — «сорокового», «на 4м этаже» — «на четвёртом», «идём в 4м» — «вчетвером», «из 2х» — «из двух». Letters glued to a number are read apart: «200ХП» — «двести ХП». «+-» is «плюс-минус».
+  A number before «+» (the addon says it as «плюс») was taken for an ordinal of the noun «плюс»: «От 50+ лвл» was «от пятидесятый плюс уровень», «18+» — «восемнадцатый плюс». Now «от пятидесяти плюс», «восемнадцать плюс», «на три плюс человек». An ordinal's ending typed with the number is read with it: «с 2007го» — «с две тысячи седьмого», «после 40го» — «сорокового», «на 4м этаже» — «на четвёртом», «идём в 4м» — «вчетвером», «из 2х» — «из двух». Letters glued to a number are read apart: «200ХП» — «двести ХП». The ending agrees with the noun after it: «на 10й минуте» — «на десятой»; a case ending of a count is the count's form: «до 5ти человек» — «до пяти»; «в 40ку» — «в сороковку»; a lone «м» without a noun after it is a letter («до 5м» — «до пяти м»). «+-» is «плюс-минус».
 
 - Slang taken for a place name is not declined
 
@@ -158,9 +158,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   «осталось 100 хп» is «сто здоровья», not «сотое здоровье», «нужно 5 рейд-лидеров» keeps its count, and «20:00 сбор» no longer reads «двадцать:нулевой».
 
+- Thousands, gold and seconds after a number
+
+  «к» with a space was always thousands: «+5 к силе» was «плюс пять тысяч силе», «обмен 2 к 1» «две тысячи один». Now «к» after a space is thousands only before an amount (голды, хп, урона…) or at the line's end: «плюс пять к силе», «два к одному», «10к хп» — «десять тысяч здоровья». «100г» was «стог»: «г» glued to a number is gold, «сто золотых». «5 с кд» is «пять секунд кулд+аун», not «с кулд+ауном».
+
 - Numbers after «у», «до», «без» and other prepositions of the genitive
 
-  A count stayed in the nominative: «у 5 игроков» was «у пять игроков», «без 2 танков» «без два танков», «до 5 утра» «до пять утра». Now «у пяти игроков», «без двух танков», «из-за двадцати двух боссов», «до пяти утра», «до двух дня», «с восьми вечера», «с пяти до десяти», «нет пяти игроков». A range numbers what follows it: «с 1 по 5 уровень» — «с первого по пятый уровень» (it was «с один по пятому уровню»), «с 1 по 3 босса» — «с первого по третьего босса». A singular noun in the case the preposition asks is an ordinal: «до 15 места» — «до пятнадцатого места», «с 2 места» — «со второго места» (с, в, к and о take their long form before the number's word: «во второй сумке», «об одиннадцати боссах»). An amount stays an amount: «до 200 опыта» — «до двухсот опыта», «без 50 маны». The dictionary's number forms follow: «для 2 танк» — «для двух т+анков», «до 2%» — «до двух процентов». «рл» after a number is the raid leader: «нужен 1 рл» — «один рейд-лидер», «нужно 2 рл» — «два рейд-лидера» (it was «руины Лордерона»).
+  A count stayed in the nominative: «у 5 игроков» was «у пять игроков», «без 2 танков» «без два танков», «до 5 утра» «до пять утра». Now «у пяти игроков», «без двух танков», «из-за двадцати двух боссов», «до пяти утра», «до двух дня», «с восьми вечера», «с пяти до десяти», «нет пяти игроков». A range numbers what follows it: «с 1 по 5 уровень» — «с первого по пятый уровень» (it was «с один по пятому уровню»), «с 1 по 3 босса» — «с первого по третьего босса». A date numbers its day: «до 5 мая» — «до пятого мая», «с 1 по 5 января» — «с первого по пятое января». «инвайт с 60 лвл» is «с шестидесятого уровня» (it was «с шестидесятым уровнем»), «от 55 лвл» «от пятьдесят пятого уровня». Two numbers joined by «-» or «/» share the case: «до двух-трёх человек». «до 2к» is «до двух тысяч». A singular noun in the case the preposition asks is an ordinal: «до 15 места» — «до пятнадцатого места», «с 2 места» — «со второго места» (с, в, к and о take their long form before the number's word: «во второй сумке», «об одиннадцати боссах»). An amount stays an amount: «до 200 опыта» — «до двухсот опыта», «без 50 маны», «от 300 защиты». The dictionary's number forms follow: «для 2 танк» — «для двух т+анков», «до 2%» — «до двух процентов». «рл» after a number is the raid leader: «нужен 1 рл» — «один рейд-лидер», «нужно 2 рл» — «два рейд-лидера» (it was «руины Лордерона»).
 
 - Spelt abbreviations keep their stress on a vowel
 
