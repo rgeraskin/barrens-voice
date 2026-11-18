@@ -47,6 +47,7 @@ ns.DEFAULTS = {
     volume = 100,      -- loudness, percent (0..200: over 100 the program boosts, easing the peaks), on top of the program's own `volume`
     minimapIcon = true,
     minimapAngle = 160, -- degrees on the minimap ring (CatQuest's sits at 200)
+    newsWindow = true, -- after an update with something big, the «Что нового» window; off: the chat line (News.lua)
     sayNames = true,   -- "Name: text"
     sayVerb = true,    -- "Name says: text" (says / yells / whispers / writes, by chat kind)
     sayLastNames = true,  -- the whole name ("Ивар Седой"); off: up to the first space ("Ивар")

@@ -2,9 +2,9 @@
 -- frame (PanelTabButtonTemplate): "Общее" (the main switch, speed and volume, the chat windows, and the
 -- foldable "Мост", StripWindow.lua), "Каналы и чтение", "Голоса" (the engine and the Windows voices,
 -- VoicesWindow.lua), "Словарь" (DictionaryWindow.lua) and "Помощь" (where to write: the community,
--- Discord, Telegram, GitHub). Each tab opens with a line on what is on it, and
--- the window is as high as the tab needs. One grid: the left column at LEFT, the right one at RIGHT_COL,
--- sub-options indented by SUB.
+-- Discord, Telegram, GitHub; and the «Что нового» window, NewsWindow.lua). Each tab opens with a line on
+-- what is on it, and the window is as high as the tab needs. One grid: the left column at LEFT, the right one
+-- at RIGHT_COL, sub-options indented by SUB.
 local _, ns = ...
 local UI = ns.UI
 
@@ -204,6 +204,11 @@ local function BuildGeneral(tab, description)
     local get, set = Setting("minimapIcon", function() ns.Minimap.Update() end)
     checks[#checks + 1] = UI.Check(tab, LEFT, y, "Значок у миникарты",
         "ЛКМ — эти настройки, ПКМ — включить или выключить озвучку.", get, set)
+    get, set = Setting("newsWindow")
+    checks[#checks + 1] = UI.Check(tab, RIGHT_COL, y, "Окно «Что нового» после обновлений", "Когда в обновлении "
+        .. "есть что-то новое и заметное, через несколько секунд после входа в игру (не в бою) открывается окно с "
+        .. "изменениями. Выключено — вместо окна одна строка в чате со ссылкой [Что нового]. Открыть окно можно в "
+        .. "любой момент: /bv news или кнопка на вкладке «Помощь».", get, set)
     y = y - 30
 
     programState = tab:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -437,7 +442,11 @@ local function BuildHelp(tab, description)
     local _, height = UI.Text(tab, "GameFontHighlight", LEFT + 4, y, TEXT_W,
         "Что прислать: что прозвучало и как надо, а лучше — строку из журнала компаньона (кнопка «Журнал» "
         .. "в окне Barrens Voice). Неверное ударение можно сразу поправить себе на вкладке «Словарь».")
-    return -(y - height - (GAP - 8))                -- the tab is 8 px taller than its height (CHROME)
+    y = y - height - GAP
+    local news = UI.Button(tab, "Что нового", 140, function() ns.NewsWindow.Show() end)
+    news:SetPoint("TOPLEFT", LEFT, y)
+    UI.Tooltip(news, "Что изменилось в последних версиях Barrens Voice (/bv news).")
+    return -(y - 22 - (GAP - 8))                    -- the tab is 8 px taller than its height (CHROME)
 end
 
 -- "Словарь": the editor (DictionaryWindow.lua).

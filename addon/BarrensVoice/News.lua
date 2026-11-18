@@ -180,7 +180,8 @@ function N.ChatLine(entry, installed)
     return ns.ICON .. " " .. ns.PREFIX .. ("обновление %s — %s. %s"):format(N.Shown(installed), entry.summary, N.More())
 end
 
---- What the player has not seen, shown now and marked seen: the window for a big entry, else the chat line.
+--- What the player has not seen, shown now and marked seen: the window for a big entry (unless the setting
+--- «Окно «Что нового» после обновлений» is off), else the chat line.
 function N.Show(installed)
     local unseen = N.Unseen(installed)
     if #unseen == 0 then return end
@@ -190,7 +191,7 @@ function N.Show(installed)
         ns.db.newsSeen[e.version] = true
         if e.kind == "big" then big = true end
     end
-    if big and ns.NewsWindow then
+    if big and ns.db.newsWindow ~= false and ns.NewsWindow then
         ns.NewsWindow.Show()
     else
         print(N.ChatLine(unseen[1], installed))

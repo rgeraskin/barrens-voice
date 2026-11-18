@@ -17,8 +17,8 @@ W.CONTENT_W = W.WIDTH - 2 * BOX - 8 - 28   -- the scroll area's width: the box's
 W.BULLET = 16                 -- an item's indent: its marker sits in it
 local GAP_ENTRY, GAP_ITEM = 18, 6
 
-local TOP_TEXT = "Сверху — самое новое. Снова открыть это окно — /bv news. Ошибки и идеи пиши через вкладку «Помощь» "
-    .. "в настройках (/bv)."
+local TOP_TEXT = "Сверху — самое новое. Снова открыть это окно — /bv news или кнопкой на вкладке «Помощь» в "
+    .. "настройках (/bv). Там же — куда писать об ошибках и идеях."
 
 local window, scroll, content
 local pools = {}   -- the content's font strings by font, and the items' markers, reused at every show
