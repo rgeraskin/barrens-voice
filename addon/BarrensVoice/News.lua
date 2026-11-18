@@ -173,11 +173,9 @@ function N.Show(installed)
         ns.db.newsSeen[e.version] = true
         if e.kind == "big" then big = true end
     end
-    if big and ns.db.newsWindow ~= false and ns.NewsWindow then
-        ns.NewsWindow.Show()
-    else
-        print(N.ChatLine(unseen[1], installed))
-    end
+    -- the line comes with the window too: a window closed by chance (or to read later) opens again from it
+    print(N.ChatLine(unseen[1], installed))
+    if big and ns.db.newsWindow ~= false and ns.NewsWindow then ns.NewsWindow.Show() end
 end
 
 local waiter   -- the frame that waits for the combat to end

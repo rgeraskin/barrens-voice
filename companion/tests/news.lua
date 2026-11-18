@@ -242,7 +242,8 @@ do  -- an update with a big entry (an addon from before this list: only seenVers
         "first the companion's word, nothing else yet")
     assert(#timers == 1 and timers[1].seconds == N.DELAY and N.DELAY >= 3, "a few seconds after login")
     runTimers()
-    assert(W.IsShown() and #news(said) == 0, "the window, no chat line")
+    assert(W.IsShown() and #news(said) == 1 and news(said)[1]:find(LINK, 1, true),
+        "the window, and the chat line to open it again")
     assert(ns.db.newsSeen["0.4.0"] and ns.db.newsSeen["0.3.0"] and ns.db.seenVersion == "0.4.0b16",
         "seen; the program's version kept")
     W.Hide()
@@ -278,7 +279,7 @@ do  -- only small entries: one chat line - the icon, «Barrens Voice:», the new
     assert(#news(login("0.4.2")) == 0, "said once")
     -- a big one among them: the window
     DATA.entries = { entry("0.5.0", "big", "новое"), unpack(DATA.entries) }
-    assert(#news(login("0.5.0")) == 0 and W.IsShown(), "big: the window")
+    assert(#news(login("0.5.0")) == 1 and W.IsShown(), "big: the window, and the line")
     W.Hide()
     out("small update ok")
 end

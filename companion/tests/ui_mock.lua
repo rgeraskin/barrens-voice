@@ -1203,8 +1203,8 @@ assert(#welcome == 1 and welcome[1]:find("озвучка чата"), "nothing ne
 ns.db.seenVersion, ns.db.newsSeen = "0.3.0", nil                     -- an addon from before News.lua
 welcome = {}
 ns.LoginWord()
-assert(#welcome == 1 and welcome[1]:find("озвучка чата") and ns.NewsWindow.IsShown(),
-    "the companion's word, then the window: 0.4.0 is big")
+assert(#welcome == 2 and welcome[1]:find("озвучка чата") and welcome[2]:find("обновление 0.4.0 beta 16", 1, true)
+    and ns.NewsWindow.IsShown(), "the companion's word, then the window and its line: 0.4.0 is big")
 ns.NewsWindow.Hide()
 SlashCmdList.BARRENSVOICE("news")
 assert(ns.NewsWindow.IsShown(), "/bv news opens it")
