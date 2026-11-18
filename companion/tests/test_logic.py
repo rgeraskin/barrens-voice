@@ -677,6 +677,10 @@ class Pipeline(unittest.TestCase):
             "группа 4 с или без танка": "группа четыре с или без танка", "нужен 1 с штанами": "нужен один с штанами",
         })
 
+    def test_spek_is_no_spyok(self):
+        # the «ё» dictionary made the talents' «спек» into the verb «спёк»; a stressed entry keeps it
+        self.check({"какой у тебя спек": "какой у тебя сп+ек", "сменил спек": "сменил сп+ек", "в спеке": "в спеке"})
+
     def test_seconds_after_a_cooldown_and_no_seconds_before_a_half(self):
         self.check({
             "кд 30 с": "кулд+аун тридцать секунд", "каст 2 с": "каст две секунды", "откат 10 с": "откат десять секунд",
