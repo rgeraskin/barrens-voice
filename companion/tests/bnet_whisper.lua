@@ -130,8 +130,8 @@ UnitFullName = function() error("one's own sender is never built from UnitFullNa
 ns.db.self, ns.db.debug = true, true
 for _, event in ipairs({ "CHAT_MSG_WHISPER_INFORM", "CHAT_MSG_BN_WHISPER_INFORM" }) do
     own(event, "рано", 7)
-    assert(#sent == 1 and fields(sent[1])[1] == "diag" and sent[1]:find("ваше имя в чате ещё не известно", 1, true)
-        and sent[1]:find(": вы: рано", 1, true), "not known yet: not read - " .. tostring(sent[1]))
+    assert(#sent == 1 and fields(sent[1])[1] == "diag" and sent[1]:find("твоё имя в чате ещё не известно", 1, true)
+        and sent[1]:find(": ты: рано", 1, true), "not known yet: not read - " .. tostring(sent[1]))
     private(sent[1])
     assert(not sent[1]:find("Тиранда", 1, true) and not sent[1]:find("Громмаш", 1, true), "the recipient unnamed")
 end

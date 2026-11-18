@@ -34,7 +34,7 @@ function C.SayAtLogin()
     if C.State() == "running" then
         print(prefix .. "озвучка чата работает.")
     else
-        print(prefix .. "приложение-компаньон Barrens Voice не запущено — чат будет озвучиваться, как только вы его запустите."
+        print(prefix .. "приложение-компаньон Barrens Voice не запущено — чат будет озвучиваться, как только ты его запустишь."
             .. (ns.db and ns.db.fadeChat and " Прозрачный чат пока выключен: включится после /reload, когда компаньон заработает." or ""))
     end
 end
@@ -42,5 +42,5 @@ end
 --- The state as the settings window says it.
 function C.Describe()
     if C.State() == "running" then return "при входе в игру компаньон |cff40ff40был запущен|r" end
-    return "при входе в игру компаньон |cffffd100не был запущен|r (запустили позже — он читает чат и так)"
+    return "при входе в игру компаньон |cffffd100не был запущен|r (запущен позже — он читает чат и так)"
 end

@@ -83,7 +83,7 @@ local EVENTS = {
 -- never used - the line is the player's (ns.PlayerSender, UnitGUID("player")), read only with «Свои сообщения»
 -- and once the player's own sender is known from a line of theirs.
 local OWN = { CHAT_MSG_WHISPER_INFORM = true, CHAT_MSG_BN_WHISPER_INFORM = true }
-local SELF_WHO = "вы"   -- the debug log's "who" for one's own whisper before the player's sender is known
+local SELF_WHO = "ты"   -- the debug log's "who" for one's own whisper before the player's sender is known
 
 local SEP = ns.SEP   -- Text.lua
 local VERBS = { say = "говорит", yell = "кричит", whisper = "шепчет", warning = "объявляет", test = "говорит" }
@@ -203,7 +203,7 @@ end
 --- for something says so instead of its usual word. True when off.
 function ns.Off()
     if ns.db.enabled then return false end
-    print(PREFIX .. "озвучка выключена, включите её: /bv on.")
+    print(PREFIX .. "озвучка выключена, включи её: /bv on.")
     return true
 end
 
@@ -235,7 +235,7 @@ local function TellLong(long)
         for _, line in ipairs(long) do
             if not seen[line] then
                 -- "|" starts the chat's markup: "||" shows one (a regex is full of them)
-                print(PREFIX .. ("строка словаря длиннее %d байт, компаньону она не передаётся. Разбейте её на "
+                print(PREFIX .. ("строка словаря длиннее %d байт, компаньону она не передаётся. Разбей её на "
                     .. "несколько: %s…"):format(DICT_PART, (ns.Protocol.TrimUTF8(line, 60):gsub("|", "||"))))
                 break
             end
@@ -373,7 +373,7 @@ function ns.OnClubAdded(clubId)
     end
     askedAt = nil
     local key = CommunitiesKey()
-    print(ICON .. " " .. PREFIX .. "вы в сообществе!" .. (key and (" Окно сообществ — клавиша %s."):format(key) or ""))
+    print(ICON .. " " .. PREFIX .. "ты в сообществе!" .. (key and (" Окно сообществ — клавиша %s."):format(key) or ""))
 end
 
 --- A community's invite as a link in the chat, for the player to click: the click is the game's own
@@ -393,14 +393,14 @@ local function LinkInChat(link)
     if joined then
         local key = CommunitiesKey()
         -- "|" starts the chat's markup: "||" shows one
-        print(ICON .. " " .. PREFIX .. ("вы уже в сообществе «%s»"):format((joined:gsub("|", "||")))
+        print(ICON .. " " .. PREFIX .. ("ты уже в сообществе «%s»"):format((joined:gsub("|", "||")))
             .. (key and (" — окно сообществ открывается клавишей %s."):format(key) or "."))
     else
         local chatLink = ClubLink(ticket)
         if not chatLink then return false end
         print(ICON .. " " .. PREFIX .. "сообщество в Battle.net — новости, вопросы, ошибки: " .. chatLink .. "  " .. GREY
             .. "или в браузере: " .. link[2] .. "|r")
-        print(PREFIX .. "щёлкните по ссылке: откроется окно сообществ с кнопкой «Вступить». Не открылось — рядом ссылка для "
+        print(PREFIX .. "щёлкни по ссылке: откроется окно сообществ с кнопкой «Вступить». Не открылось — рядом ссылка для "
             .. "браузера.")
         askedAt = GetTime and GetTime() or 0
     end
@@ -430,13 +430,13 @@ function ns.CopyLink(key)
     local link = ns.LINKS[key]
     if not link then return end
     if not ns.db.enabled then
-        print(PREFIX .. ("%s: озвучка выключена, и компаньон адрес не скопирует. Щёлкните по адресу в настройках и "
-            .. "нажмите Ctrl+C."):format(link[1]))
+        print(PREFIX .. ("%s: озвучка выключена, и компаньон адрес не скопирует. Щёлкни по адресу в настройках и "
+            .. "нажми Ctrl+C."):format(link[1]))
         return
     end
     AskCompanion("copy", key)
-    print(PREFIX .. ("%s: компаньон положит адрес в буфер обмена — вставьте его в браузер (Ctrl+V). Если компаньон не "
-        .. "запущен, щёлкните по адресу в настройках и нажмите Ctrl+C."):format(link[1]))
+    print(PREFIX .. ("%s: компаньон положит адрес в буфер обмена — вставь его в браузер (Ctrl+V). Если компаньон не "
+        .. "запущен, щёлкни по адресу в настройках и нажми Ctrl+C."):format(link[1]))
 end
 
 StaticPopupDialogs["BARRENSVOICE_RESET"] = {
@@ -454,7 +454,7 @@ StaticPopupDialogs["BARRENSVOICE_RESET"] = {
 function ns.ResetVoices()
     if not ns.db.enabled then
         ns.db.resetVoices = true
-        print(PREFIX .. "озвучка выключена: голоса рас будут розданы заново, когда вы её включите (/bv on).")
+        print(PREFIX .. "озвучка выключена: голоса рас будут розданы заново, когда ты её включишь (/bv on).")
         return
     end
     ns.db.resetVoices = nil
@@ -476,7 +476,7 @@ function ns.SetVoices(value)
     ns.SendControl()
     if not ns.db.enabled then        -- the settings go to the companion at /bv on
         print(PREFIX .. (value == "f5" and "голоса рас" or "голоса Windows")
-            .. ". Компаньон переключится на них, когда вы включите озвучку (/bv on).")
+            .. ". Компаньон переключится на них, когда ты включишь озвучку (/bv on).")
     elseif value == "f5" then
         print(PREFIX .. "голоса рас. Компаньон загружает модель — около 15 секунд, пока читают голоса Windows.")
     else
@@ -816,7 +816,7 @@ local function OnChat(event, text, sender, _, channelString, _, _, _, _, baseNam
     end
     if unknownSelf then
         -- (the game's sender for the player is not guessed: their whisper waits for a line of theirs)
-        ns.Skip("ваше имя в чате ещё не известно: свой шёпот читается после вашей первой строки в чате", sender, text)
+        ns.Skip("твоё имя в чате ещё не известно: свой шёпот читается после твоей первой строки в чате", sender, text)
         return
     end
     local addon = db.skipAddons ~= false and ns.AddonLine(text)

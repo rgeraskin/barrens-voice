@@ -21,7 +21,7 @@ local function ShowTooltip(self)
     GameTooltip:AddLine(ns.db.enabled and "|cff40ff40Озвучка чата включена|r" or "|cffff4040Озвучка чата выключена|r")
     GameTooltip:AddLine("ЛКМ — настройки", 1, 1, 1)
     GameTooltip:AddLine("ПКМ — включить или выключить (выключение сразу обрывает фразу)", 1, 1, 1)
-    GameTooltip:AddLine("Перетащите, чтобы передвинуть", 0.6, 0.6, 0.6)
+    GameTooltip:AddLine("Перетащи, чтобы передвинуть", 0.6, 0.6, 0.6)
     GameTooltip:Show()
 end
 

@@ -225,7 +225,7 @@ do  -- «Открыть» for the community: its invite as a link in the chat, f
     assert(told[1] == ICON .. "сообщество в Battle.net — новости, вопросы, ошибки: |cff82c5ff|HclubTicket:N9KR2WNHDgW|h"
         .. "[Вступить в «Barrens Voice»]|h|r  |cff999999или в браузере: https://launch.battle.net/invite/N9KR2WNHDgW|r",
         told[1])
-    assert(told[2] == PREFIX .. "щёлкните по ссылке: откроется окно сообществ с кнопкой «Вступить». Не открылось — рядом ссылка "
+    assert(told[2] == PREFIX .. "щёлкни по ссылке: откроется окно сообществ с кнопкой «Вступить». Не открылось — рядом ссылка "
         .. "для браузера.", told[2])
     for _, line in ipairs(told) do
         assert(line:find("Barrens Voice|r: ", 1, true) and not line:find("→", 1, true) and not line:find("–", 1, true),
@@ -235,7 +235,7 @@ do  -- «Открыть» for the community: its invite as a link in the chat, f
     infos[42] = { name = "Barrens Voice", clubType = 0 }
     clock = clock + 299
     ns.OnEvent("CLUB_ADDED", 42)
-    assert(#told == 3 and told[3] == ICON .. "вы в сообществе! Окно сообществ — клавиша J.", told[3])
+    assert(#told == 3 and told[3] == ICON .. "ты в сообществе! Окно сообществ — клавиша J.", told[3])
     ns.OnClubAdded(42)
     assert(#told == 3, "greeted once")
     -- later than 5 minutes: not greeted
@@ -251,7 +251,7 @@ do  -- «Открыть» for the community: its invite as a link in the chat, f
     -- no key bound: the greeting without one
     GetBindingKeyForAction = function() return nil end
     ns.OnClubAdded(44)
-    assert(#told == 8 and told[8] == ICON .. "вы в сообществе!", told[8])
+    assert(#told == 8 and told[8] == ICON .. "ты в сообществе!", told[8])
     -- never asked: no word for a community the player joined some other way
     local fresh = #told
     ns.OnClubAdded(42)
@@ -260,13 +260,13 @@ do  -- «Открыть» for the community: its invite as a link in the chat, f
     GetBindingKeyForAction = function() return "J" end
     clubs = { { name = "Гильдия котов" }, { name = "Barrens Voice — озвучка чата" } }
     ns.OpenLink("community")
-    assert(#told == fresh + 1 and told[#told] == ICON .. "вы уже в сообществе «Barrens Voice — озвучка чата» — окно "
+    assert(#told == fresh + 1 and told[#told] == ICON .. "ты уже в сообществе «Barrens Voice — озвучка чата» — окно "
         .. "сообществ открывается клавишей J.", told[#told])
     ns.OnClubAdded(42)
     assert(#told == fresh + 1, "already in: no greeting")
     GetBindingKeyForAction = nil
     ns.OpenLink("community")
-    assert(told[#told] == ICON .. "вы уже в сообществе «Barrens Voice — озвучка чата».", told[#told])
+    assert(told[#told] == ICON .. "ты уже в сообществе «Barrens Voice — озвучка чата».", told[#told])
     -- retail: the names secret (chat lockdown) - not looked at, the link given
     local SECRET = setmetatable({}, { __index = function() error("a secret value cannot be read") end,
         __eq = function() error("a secret value cannot be compared") end })
@@ -279,11 +279,11 @@ do  -- «Открыть» for the community: its invite as a link in the chat, f
     end
     infos[45] = { name = SECRET }
     ns.OnClubAdded(45)
-    assert(told[#told] == ICON .. "вы в сообществе!", "a secret name: greeted - " .. told[#told])
+    assert(told[#told] == ICON .. "ты в сообществе!", "a secret name: greeted - " .. told[#told])
     infos[46] = SECRET
     ns.OpenLink("community")
     ns.OnClubAdded(46)
-    assert(told[#told] == ICON .. "вы в сообществе!", "a secret info: greeted")
+    assert(told[#told] == ICON .. "ты в сообществе!", "a secret info: greeted")
     issecretvalue, clubs = nil, {}
     C_Club.GetSubscribedClubs = function() error("clubs not initialized") end
     local n = #told
@@ -738,7 +738,7 @@ do
     print = print0
     assert(#pushed == 0, "nothing for the strip while off: " .. tostring(pushed[1]))
     assert(#said == 8, "a word for each: " .. #said)
-    assert(said[1]:find("когда вы её включите", 1, true) and ns.db.resetVoices, said[1])
+    assert(said[1]:find("когда ты её включишь", 1, true) and ns.db.resetVoices, said[1])
     assert(said[2]:find("озвучка выключена", 1, true) and said[2]:find("discord.gg", 1, true), said[2])
     for i = 3, 6 do assert(said[i]:find("озвучка выключена", 1, true), said[i]) end
     assert(said[7]:find("и так выключена", 1, true), said[7])

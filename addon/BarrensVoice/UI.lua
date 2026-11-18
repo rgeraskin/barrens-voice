@@ -146,13 +146,13 @@ function UI.LinkRow(parent, x, y, width, key, icon)
     name:SetText(link[1])
     local open = UI.Button(parent, "Открыть", 76, function() ns.OpenLink(key) end)
     open:SetPoint("TOPLEFT", x + width - 76, y)
-    UI.Tooltip(open, link[3] and "Закроет настройки и покажет в чате ссылку на сообщество, а если вы уже в нём, скажет "
-        .. "об этом. Щёлкните по ссылке — откроется окно сообществ с кнопкой «Вступить». Если сообщества в игре "
+    UI.Tooltip(open, link[3] and "Закроет настройки и покажет в чате ссылку на сообщество, а если ты уже в нём, скажет "
+        .. "об этом. Щёлкни по ссылке — откроется окно сообществ с кнопкой «Вступить». Если сообщества в игре "
         .. "недоступны, страницу откроет в браузере компаньон, как у других ссылок."
         or "Компаньон откроет страницу в браузере: аддону игра браузер не даёт.")
     local copy = UI.Button(parent, "Копировать", 96, function() ns.CopyLink(key) end)
     copy:SetPoint("RIGHT", open, "LEFT", -4, 0)
-    UI.Tooltip(copy, "Компаньон положит адрес в буфер обмена: аддону игра буфер обмена не даёт. Без компаньона — щёлкните по адресу и нажмите Ctrl+C.")
+    UI.Tooltip(copy, "Компаньон положит адрес в буфер обмена: аддону игра буфер обмена не даёт. Без компаньона — щёлкни по адресу и нажми Ctrl+C.")
     local box = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
     box:SetHeight(20)
     box:SetAutoFocus(false)

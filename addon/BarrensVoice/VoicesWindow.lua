@@ -85,7 +85,7 @@ function V.Create(pane, width)
     local _, h = UI.Text(window, "GameFontHighlight", 22, 0, width,
         "Голоса Windows звучат механически, заметно хуже голосов рас, а для разнообразия их нужно ставить "
         .. "отдельно (в Windows по умолчанию только Ирина). Они оставлены на всякий случай — если голоса рас отвечают "
-        .. "с большой задержкой или не работают на вашем компьютере. Отмеченные раздаются игрокам (по имени и полу), "
+        .. "с большой задержкой или не работают на твоём компьютере. Отмеченные раздаются игрокам (по имени и полу), "
         .. "«>» — послушать.")
     local y = -h - GAP
 
@@ -160,7 +160,7 @@ function V.Create(pane, width)
     empty = window:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     empty:SetPoint("CENTER")
     empty:SetWidth(420)
-    empty:SetText("Список пуст: запустите приложение-компаньон (оно запишет голоса в аддон) и сделайте /reload.")
+    empty:SetText("Список пуст: запусти приложение-компаньон (оно запишет голоса в аддон) и сделай /reload.")
 
     window:SetScript("OnShow", Refresh)
     return -(y - 28)
