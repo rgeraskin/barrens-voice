@@ -219,7 +219,7 @@ class Config(unittest.TestCase):
             mine = json.dumps({"rate": 3})
             path.write_text(mine, encoding="utf-8")
             said = []
-            win = SimpleNamespace(config=model.read_config(path), config_told=False,
+            win = SimpleNamespace(config=model.read_config(path), config_told=set(),
                                   say=lambda m, level="INFO": said.append((level, m)))
             real = model.update_config
             with mock.patch.object(model, "update_config", lambda **kw: real(path, **kw)):
@@ -236,7 +236,7 @@ class Config(unittest.TestCase):
                 self.assertIn("config.json не записывается: Access is denied", said[0][1])
                 app.App.set_config(win, rate=4)                                         # written again: said anew
                 self.assertEqual(json.loads(path.read_text(encoding="utf-8"))["rate"], 4)
-                self.assertFalse(win.config_told)
+                self.assertEqual(win.config_told, set())
                 with mock.patch("pathlib.Path.write_text", side_effect=OSError(28, "No space left on device")):
                     app.App.set_config(win, rate=5)
             self.assertEqual(len(said), 2)
@@ -247,12 +247,22 @@ class Config(unittest.TestCase):
         from unittest import mock
         from bv.launcher import app, model
         said = []
-        win = SimpleNamespace(config={"game": "forever"}, config_told=False, say=lambda m, level="INFO": said.append(level))
+        win = SimpleNamespace(config={"game": "forever"}, config_told=set(), say=lambda m, level="INFO": said.append(level))
         with mock.patch.object(model, "update_config", side_effect=model.BrokenConfig("config.json не читается")):
             app.App.set_config(win, game="retail")
             app.App.set_config(win, launch_wow=True)
         self.assertEqual(win.config, {"game": "retail", "launch_wow": True})
         self.assertEqual(said, ["WARN"])
+        # then the other kind: said too (one flag for both kept it quiet), each once
+        with mock.patch.object(model, "update_config", side_effect=model.ConfigNotWritten("config.json не записывается")):
+            app.App.set_config(win, game="forever")
+            app.App.set_config(win, game="retail")
+        self.assertEqual(said, ["WARN", "WARN"])
+        with mock.patch.object(model, "update_config", return_value={"game": "retail"}):
+            app.App.set_config(win, game="retail")                                   # written: said anew after
+        with mock.patch.object(model, "update_config", side_effect=model.BrokenConfig("config.json не читается")):
+            app.App.set_config(win, game="forever")
+        self.assertEqual(said, ["WARN", "WARN", "WARN"])
 
 
 class StateLines(unittest.TestCase):

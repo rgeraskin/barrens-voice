@@ -93,7 +93,8 @@ class App:
         self.p = Painter(self.canvas, self.title_font)
 
         self.config = model.read_config()
-        self.config_told = False         # config.json does not parse: said once
+        self.config_told: set[str] = set()   # what was said of config.json: "broken" (does not parse, cannot be
+                                             # read), "unwritten" (read, not written) - each once until a good write
         self.version = model.app_version()
         self.addon_version = model.addon_version()
         self.addons_tried: set[tuple[str, str]] = set()
@@ -139,7 +140,7 @@ class App:
         self.say(f"Barrens Voice {display_version(self.version)}" + (", ждёт игру в трее" if resident else ""))
         problem = model.config_problem()
         if problem:
-            self.config_told = True
+            self.config_told.add("broken")
             self.say(f"{problem} — исправьте его («Открыть config.json» в «Настройках»), до тех пор лаунчер "
                      "в него не пишет", "WARN")
         if INSTALL_DIR is not None:                # an update by an older version did not bring the starter yet,
@@ -193,19 +194,21 @@ class App:
     def set_config(self, **changes) -> dict:
         """Settings changed in config.json; when the file does not parse it is not written over (the player's
         settings are in it), and when it cannot be written (read-only, held by another program) it stays as it
-        was - the change holds in this window only, and that is said once (again only after a write that worked)."""
+        was - the change holds in this window only. Each of the two is said once (again only after a write that
+        worked): a file that broke after one that could not be written is said too."""
         try:
             self.config = model.update_config(**changes)
         except model.BrokenConfig as e:
             self.config = {**self.config, **changes}
-            if not self.config_told:
-                self.config_told = True
-                if isinstance(e, model.ConfigNotWritten):
+            kind = "unwritten" if isinstance(e, model.ConfigNotWritten) else "broken"
+            if kind not in self.config_told:
+                self.config_told.add(kind)
+                if kind == "unwritten":
                     self.say(f"{e} — изменения пока действуют только в этом окне", "WARN")
                 else:
                     self.say(f"{e} — изменения не сохраняются, пока файл не исправлен", "WARN")
             return self.config
-        self.config_told = False
+        self.config_told.clear()
         return self.config
 
     def say(self, message: str, level: str = "INFO") -> None:
