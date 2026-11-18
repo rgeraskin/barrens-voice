@@ -156,13 +156,16 @@ OBLIQUE = {"gent", "datv", "ablt", "loct"}
 # "без 50 маны", "без 10 силы", "до 20 ткани"), never an ordinal; pymorphy marks some of them Sgtm, not these:
 # resources, money, a character's stats, materials
 MEASURED = {"опыт", "урон", "здоровье", "мана", "энергия", "ярость", "репутация", "исцеление", "лечение",
-            "золото", "серебро", "медь", "голда",
+            "золото", "золотой", "серебро", "медь", "голда",
             "сила", "ловкость", "выносливость", "интеллект", "дух", "защита", "броня", "бронь", "меткость",
             "точность", "сопротивление", "уклонение", "парирование", "скорость", "рейтинг", "крит",
             "ткань", "кожа", "руда", "трава", "шерсть", "шёлк", "железо", "торий", "олово", "бронза", "сталь"}
-# a number this large before a noun that does not number (NUMBERED) is an amount ("от 300 защиты", "до 1000
-# рейтинга"), not a place in a row - except a year ("до 2020 года")
+# a number this large before a noun in the genitive singular that does not number (NUMBERED) is an amount ("до
+# 225 навыка", "от 300 защиты"), not a place in a row - except a year ("до 2020 года"); in another case it is
+# a place: "100 место", "на 120 странице", "1000 игрок" - "тысячный". Over a thousand it is an amount in any
+# case (the dictionary's "10к" is "10000": "10к репа" - "десять тысяч", not "десятитысячная")
 AMOUNT_FROM = 100
+AMOUNT_OVER = 1000
 YEAR = "год"
 # a time of day: "до 5 утра", "с 8 вечера" - the hour counted, not "до пятого утра"
 DAYTIME = {"утро", "день", "вечер", "ночь"}   # "до 2 дня" - "до двух дня" (an event's day would be "второго")
@@ -314,8 +317,9 @@ def ordinal(n: int, before: str, following: str, morph) -> str | None:
     parses = [p for p in morph.parse(word) if p.tag.POS == "NOUN"]
     if any(p.normal_form in MEASURED or "Sgtm" in p.tag for p in parses):
         return None                                    # "до 200 опыта", "из 100 золота": an amount
-    if n >= AMOUNT_FROM and not any(p.normal_form in NUMBERED or p.normal_form == YEAR for p in parses):
-        return None                                    # "от 300 защиты"
+    if n >= AMOUNT_FROM and (n > AMOUNT_OVER or any(p.tag.case == "gent" and p.tag.number == "sing" for p in parses)) \
+            and not any(p.normal_form in NUMBERED or p.normal_form == YEAR for p in parses):
+        return None                                    # "до 225 навыка", "10000 репа"
     if before.lower() in AT_HOUR and any(p.normal_form in DAYTIME and p.tag.case == "gent" for p in parses):
         return None                                    # "до 3 ночи": an hour
     numbered = any(p.normal_form in NUMBERED for p in parses)
