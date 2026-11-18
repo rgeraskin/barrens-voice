@@ -180,12 +180,16 @@ def analyzer():
 
 def to_case(words: list[str], case: str, morph) -> list[str]:
     """Number words in `case`, as a numeral where pymorphy has one ("сто" - "ста", not the
-    abbreviation "СТО", which it lists first)."""
+    abbreviation "СТО", which it lists first). "тысяча", "миллион" are nouns: plural after any
+    number but one ("две тысячи" - "двух тысяч", "одна тысяча" - "одной тысячи")."""
     out = []
-    for w in words:
+    for i, w in enumerate(words):
         parses = morph.parse(w)
         parse = next((p for p in parses if p.tag.POS == "NUMR"), parses[0])
-        form = parse.inflect({case})
+        grammemes = {case}
+        if parse.normal_form in ("тысяча", "миллион", "миллиард"):
+            grammemes.add("sing" if i and words[i - 1] in ("один", "одна") else "plur")
+        form = parse.inflect(grammemes)
         out.append(form.word if form else w)
     return out
 
