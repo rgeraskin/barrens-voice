@@ -327,6 +327,9 @@ local function LinkInChat(link)
     end
     print(PREFIX .. ("%s: щёлкните по ссылке %s — откроется окно «Сообщества», там можно вступить.")
         :format(link[1], chatLink))
+    -- the settings close so the link is in sight (a hidden chat shows for a line like this one: ChatFade.lua);
+    -- the click itself must be the player's: the game opens a community only from its own chat link
+    if ns.Options and ns.Options.Hide then ns.Options.Hide() end
     return true
 end
 

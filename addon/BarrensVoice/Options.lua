@@ -489,9 +489,19 @@ end
 
 O.Refresh = function() Refresh() end
 
+--- Close the settings window (the community's link waits in the chat under it).
+function O.Hide()
+    if window then window:Hide() end
+end
+
 function O.Toggle()
     if not window then Build() end
     window:SetShown(not window:IsShown())
+end
+
+--- Whether the settings window is up (for the tests).
+function O.IsShown()
+    return window ~= nil and window:IsShown()
 end
 
 --- The tab shown now (for the tests).

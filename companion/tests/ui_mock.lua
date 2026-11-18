@@ -208,8 +208,11 @@ do  -- «Открыть» for the community: its invite as a link in the chat, f
         return "|cff82c5ff|HclubTicket:" .. ticket .. "|h[" .. name .. "]|h|r"
     end
     CommunitiesHyperlink = { OnClickLink = function() error("the addon must not open it itself (taint)") end }
+    ns.Options.Open("help")
+    assert(ns.Options.IsShown(), "the settings are up before the click")
     ns.OpenLink("community")
     assert(#pushed == 0, "the companion is not asked")
+    assert(not ns.Options.IsShown(), "the settings close: the link in the chat is in sight")
     assert(#told == 1 and told[1]:find("|HclubTicket:N9KR2WNHDgW|h[Barrens Voice]|h", 1, true), told[1] or "nothing said")
     assert(told[1]:find("щёлкните по ссылке", 1, true), "the player is told to click it: " .. told[1])
     ns.db.enabled = false                                    -- no companion needed: with the voice-over off too
@@ -225,6 +228,13 @@ do  -- «Открыть» for the community: its invite as a link in the chat, f
     enabled = false                                          -- communities off: the browser, through the companion
     ns.OpenLink("community")
     assert(#pushed == 1 and pushed[1]:find("^open\31") and pushed[1]:find("\31community$"), pushed[1] or "nothing")
+    ns.db.enabled = false                                    -- ... and the voice-over off: no companion to ask
+    local said = #told
+    ns.OpenLink("community")
+    ns.db.enabled = true
+    assert(#pushed == 1, "off: the companion is not asked")
+    assert(#told == said + 1 and told[#told]:find("https://launch.battle.net/invite/N9KR2WNHDgW", 1, true),
+        "off: the address in the chat instead: " .. tostring(told[#told]))
     C_Club = nil
     ns.OpenLink("community")
     assert(#pushed == 2, "no communities at all: the browser")
