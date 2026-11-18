@@ -156,6 +156,15 @@ class GameFolder(unittest.TestCase):
             self.assertEqual(game_folder("", "forever"), "")
 
 
+def config_window(config: dict, say):
+    """A stand-in for the launcher's window with what its settings code uses."""
+    from types import SimpleNamespace
+    from bv.launcher import app
+    win = SimpleNamespace(config=config, config_told=set(), pending={}, say=say)
+    win.write_config = lambda **kw: app.App.write_config(win, **kw)
+    return win
+
+
 class Config(unittest.TestCase):
     def test_update_keeps_the_rest(self):
         from bv.launcher.model import read_config, update_config
@@ -219,8 +228,7 @@ class Config(unittest.TestCase):
             mine = json.dumps({"rate": 3})
             path.write_text(mine, encoding="utf-8")
             said = []
-            win = SimpleNamespace(config=model.read_config(path), config_told=set(),
-                                  say=lambda m, level="INFO": said.append((level, m)))
+            win = config_window(model.read_config(path), lambda m, level="INFO": said.append((level, m)))
             real = model.update_config
             with mock.patch.object(model, "update_config", lambda **kw: real(path, **kw)):
                 with mock.patch("os.replace", side_effect=PermissionError(13, "Access is denied")):
@@ -235,8 +243,10 @@ class Config(unittest.TestCase):
                 self.assertEqual(said[0][0], "WARN")
                 self.assertIn("config.json не записывается: Access is denied", said[0][1])
                 app.App.set_config(win, rate=4)                                         # written again: said anew
-                self.assertEqual(json.loads(path.read_text(encoding="utf-8"))["rate"], 4)
-                self.assertEqual(win.config_told, set())
+                saved = json.loads(path.read_text(encoding="utf-8"))
+                # and the changes the file did not take are written with it, not lost to it
+                self.assertEqual((saved["rate"], saved["game"], saved["game_dirs"]), (4, "retail", {"forever": "W"}))
+                self.assertEqual((win.config_told, win.pending), (set(), {}))
                 with mock.patch("pathlib.Path.write_text", side_effect=OSError(28, "No space left on device")):
                     app.App.set_config(win, rate=5)
             self.assertEqual(len(said), 2)
@@ -247,7 +257,7 @@ class Config(unittest.TestCase):
         from unittest import mock
         from bv.launcher import app, model
         said = []
-        win = SimpleNamespace(config={"game": "forever"}, config_told=set(), say=lambda m, level="INFO": said.append(level))
+        win = config_window({"game": "forever"}, lambda m, level="INFO": said.append(level))
         with mock.patch.object(model, "update_config", side_effect=model.BrokenConfig("config.json не читается")):
             app.App.set_config(win, game="retail")
             app.App.set_config(win, launch_wow=True)
@@ -258,8 +268,12 @@ class Config(unittest.TestCase):
             app.App.set_config(win, game="forever")
             app.App.set_config(win, game="retail")
         self.assertEqual(said, ["WARN", "WARN"])
-        with mock.patch.object(model, "update_config", return_value={"game": "retail"}):
-            app.App.set_config(win, game="retail")                                   # written: said anew after
+        self.assertEqual(win.pending, {"game": "retail", "launch_wow": True})
+        written = []
+        with mock.patch.object(model, "update_config", side_effect=lambda **kw: written.append(kw) or kw):
+            app.App.set_config(win, rate=4)                                            # written: said anew after
+        self.assertEqual(written, [{"game": "retail", "launch_wow": True, "rate": 4}])
+        self.assertEqual(win.pending, {})
         with mock.patch.object(model, "update_config", side_effect=model.BrokenConfig("config.json не читается")):
             app.App.set_config(win, game="forever")
         self.assertEqual(said, ["WARN", "WARN", "WARN"])
@@ -1966,6 +1980,24 @@ class UpdateInWindow(unittest.TestCase):
         win.exit_seen = True
         self.app.App.apply_update_when_idle(win)
         self.assertEqual(done, ["apply", "relaunch"])
+
+    def test_companion_starts_as_the_window_says(self):
+        # a change config.json did not take held in the window only: «компаньон запущен (WoW Retail)» while the
+        # companion read Forever from the file, and with «Запускать игру…» the window went to the tray for a game
+        # the companion did not launch. The game and the launch choice go on its command line
+        def started(selected, launch_wow, args=None, extra=()):
+            got = []
+            win = self.ns(companion=self.ns(running=False, start=got.append), busy="", selected=selected,
+                          addon_missing=lambda: False, config={"game": selected, "launch_wow": launch_wow},
+                          extra=list(extra), say=lambda *a: None)
+            self.assertTrue(self.app.App.start_companion(win, args))
+            return got[0]
+        self.assertEqual(started("retail", True), ["--retail", "--launch"])
+        self.assertEqual(started("forever", False), ["--forever", "--no-launch"])
+        self.assertEqual(started("forever", True, ["--no-launch"]), ["--forever", "--no-launch"])     # Play, a running game
+        self.assertEqual(started("retail", False, ["--launch"]), ["--retail", "--launch"])
+        self.assertEqual(started("forever", True, None, ["--f5", "--no-launch"]), ["--forever", "--f5", "--no-launch"])
+        self.assertEqual(started("forever", False, ["--launch"], ["--f5", "--no-launch"]), ["--forever", "--f5", "--launch"])
 
     def test_start_after_an_update_does_not_start_the_game(self):
         def opened(running_game, launch_wow, updated):

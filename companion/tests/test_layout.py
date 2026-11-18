@@ -221,6 +221,23 @@ class Layout(unittest.TestCase):
         drawn = [a.canvas.itemcget(i, "text") for i in a.canvas.find_all() if a.canvas.type(i) == "text"]
         self.assertTrue(any("голоса рас готовы" in text for text in drawn), drawn)
 
+    def test_settings_saved_with_what_the_file_did_not_take(self):
+        # a change config.json did not take (pending) was lost to the settings window's save
+        from bv.launcher import model, paint
+        a = self.make()
+        a.pending, a.config_told = {"game": "retail"}, {"unwritten"}
+        actions, written, real = {}, [], paint.Painter.button
+
+        def button(p, x0, y0, x1, y1, text, tag, action=None, **k):
+            actions[tag] = action
+            return real(p, x0, y0, x1, y1, text, tag, action, **k)
+        with mock.patch.object(paint.Painter, "button", button), \
+                mock.patch.object(model, "update_config", lambda **kw: written.append(kw) or kw):
+            a.open_settings()
+            actions["save"]()
+        self.assertEqual(written[0]["game"], "retail")
+        self.assertEqual((a.pending, a.config_told), ({}, set()))
+
     def report(self, found: list[tuple[str, str]]):
         """Each problem once, with how often and the first state it was seen in."""
         seen: dict[str, list[str]] = {}

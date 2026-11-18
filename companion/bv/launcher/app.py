@@ -95,6 +95,7 @@ class App:
         self.config = model.read_config()
         self.config_told: set[str] = set()   # what was said of config.json: "broken" (does not parse, cannot be
                                              # read), "unwritten" (read, not written) - each once until a good write
+        self.pending: dict = {}          # changes config.json did not take: written with the next change that it takes
         self.version = model.app_version()
         self.addon_version = model.addon_version()
         self.addons_tried: set[tuple[str, str]] = set()
@@ -194,20 +195,28 @@ class App:
     def set_config(self, **changes) -> dict:
         """Settings changed in config.json; when the file does not parse it is not written over (the player's
         settings are in it), and when it cannot be written (read-only, held by another program) it stays as it
-        was - the change holds in this window only. Each of the two is said once (again only after a write that
-        worked): a file that broke after one that could not be written is said too."""
+        was - the change holds in this window (and in the companion it starts: start_companion) and is written with
+        the next change the file takes (`pending`), not lost to it. Each of the two is said once (again only after a
+        write that worked): a file that broke after one that could not be written is said too."""
         try:
-            self.config = model.update_config(**changes)
+            return self.write_config(**changes)
         except model.BrokenConfig as e:
+            self.pending = changes = {**self.pending, **changes}
             self.config = {**self.config, **changes}
             kind = "unwritten" if isinstance(e, model.ConfigNotWritten) else "broken"
             if kind not in self.config_told:
                 self.config_told.add(kind)
                 if kind == "unwritten":
-                    self.say(f"{e} — изменения пока действуют только в этом окне", "WARN")
+                    self.say(f"{e} — изменения действуют, а в файл запишутся, когда его снова можно будет изменить", "WARN")
                 else:
-                    self.say(f"{e} — изменения не сохраняются, пока файл не исправлен", "WARN")
+                    self.say(f"{e} — изменения действуют, а в файл запишутся, когда он будет исправлен", "WARN")
             return self.config
+
+    def write_config(self, **changes) -> dict:
+        """config.json with `changes` and the ones it did not take before (`pending`); BrokenConfig as
+        model.update_config raises it, nothing changed then."""
+        self.config = model.update_config(**{**self.pending, **changes})
+        self.pending = {}
         self.config_told.clear()
         return self.config
 
@@ -238,9 +247,14 @@ class App:
         self.companion_started = time.monotonic()
         self.exit_seen = False
         self.reload_told = False
+        flags = list(args or [])
         launch_flags = {"--launch", "--no-launch"}
-        extra = [a for a in self.extra if not (launch_flags & set(args or []) and a in launch_flags)]
-        self.companion.start(extra + list(args or []))
+        extra = [a for a in self.extra if not (launch_flags & set(flags) and a in launch_flags)]
+        # the game and «Запускать игру вместе с Barrens Voice» as the window has them: config.json, which the
+        # companion reads, may not have taken them (set_config)
+        if not launch_flags & set(extra + flags):
+            flags.append("--launch" if self.config.get("launch_wow") else "--no-launch")
+        self.companion.start([f"--{self.selected}", *extra, *flags])
         self.say(f"компаньон запущен ({GAME_NAMES[self.selected]})")
         return True
 
@@ -817,7 +831,7 @@ class App:
                 return
             changed = differs(changes)
             try:
-                self.config = model.update_config(**changes)
+                self.write_config(**changes)
             except model.BrokenConfig as e:
                 fix = ("Снимите с него «Только чтение» или закройте программу, которая его держит"
                        if isinstance(e, model.ConfigNotWritten) else "Исправьте его («Открыть config.json»)")
