@@ -17,6 +17,7 @@ import re
 import sys
 import tomllib
 import zipfile
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -25,6 +26,7 @@ sys.path.insert(0, str(ROOT / "companion"))
 from bv import news  # noqa: E402 - news.toml's reading and checks, the companion's own
 
 REPO_URL = "https://github.com/rgeraskin/barrens-voice"
+TOC = "addon/BarrensVoice/BarrensVoice.toc"
 INSTALL = "Установка: скачай `BarrensVoice-Setup.exe` и запусти его."
 # the uv the installer ships and the updates bring (the manifest names it: an install with another fetches it)
 UV_VERSION = "0.13.7"
@@ -59,7 +61,7 @@ def files() -> list[tuple[Path, str]]:
 
 def versions() -> dict:
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
-    toc = (ROOT / "addon" / "BarrensVoice" / "BarrensVoice.toc").read_text(encoding="utf-8")
+    toc = (ROOT / TOC).read_text(encoding="utf-8")
     proto = re.search(r"^VERSION = (\d+)", (ROOT / "companion" / "bv" / "protocol.py").read_text(encoding="utf-8"), re.M)
     return {"version": project["version"], "addon": re.search(r"^## Version:\s*(\S+)", toc, re.M).group(1),
             "protocol": int(proto.group(1))}
@@ -73,7 +75,7 @@ def news_entries() -> list[dict]:
 def notes(version: str, entries: list[dict], tag: str = "") -> str:
     """The GitHub release's description, from news.toml: the release's entry (its title and items, in Russian), then
     a link to the full English list (CHANGELOG.md at the release's tag) and how to install. A test build's starts
-    with the release it leads to and shows that release's entry - or, none written yet, only that line."""
+    with the release it leads to and shows that release's entry (a tagged build has one: news_problem)."""
     release = news.release_of(version)
     entry = next((e for e in entries if e["version"] == release), None)
     parts = []
@@ -98,30 +100,100 @@ def dictionary_revision() -> int:
         return 0
 
 
-def version_of(tag: str, base: str) -> str:
+TAG = re.compile(r"v(\d+\.\d+\.\d+)(?:-beta\.(\d+))?")
+
+
+def tag_version(tag: str, base: str) -> str | None:
     """The release's version from its tag: "v0.4.0" -> "0.4.0", "v0.4.0-beta.5" -> "0.4.0b5" (a test build,
-    older than 0.4.0 for the updater). The tag must name pyproject.toml's version."""
-    m = re.fullmatch(r"v(\d+\.\d+\.\d+)(?:-beta\.(\d+))?", tag)
+    older than 0.4.0 for the updater); None when the tag is of another form or names another version than
+    pyproject.toml's `base`."""
+    m = TAG.fullmatch(tag)
     if not m or m.group(1) != base:
-        sys.exit(f"the tag {tag} and pyproject.toml's version {base} differ (tags: vX.Y.Z or vX.Y.Z-beta.N)")
+        return None
     return f"{base}b{m.group(2)}" if m.group(2) else base
 
 
+def version_of(tag: str, base: str) -> str:
+    """tag_version, or the build stops: the tag must name pyproject.toml's version."""
+    version = tag_version(tag, base)
+    if version is None:
+        sys.exit(f"the tag {tag} and pyproject.toml's version {base} differ (tags: vX.Y.Z or vX.Y.Z-beta.N)")
+    return version
+
+
 def news_problem(version: str, entries: list[dict]) -> str | None:
-    """Why a build cannot go out for its «Что нового» (DEVELOPMENT.md), or None: news.toml must be well formed, and
-    a release (not a test build) needs a dated entry of its own version - the program's: a release of the program
-    alone tells the players what it brought too."""
+    """Why a build cannot go out for its «Что нового» (DEVELOPMENT.md), or None: news.toml must be well formed and
+    have the release's entry - dated for a release, while a test build's release may still be in work. The entry is
+    the program's version's: a release of the program alone tells the players what it brought too."""
     found = news.problems(entries)
     if found:
         return "news.toml: " + "; ".join(found)
-    if version != news.release_of(version):
-        return None
-    entry = next((e for e in entries if e["version"] == version), None)
+    release = news.release_of(version)
+    entry = next((e for e in entries if e["version"] == release), None)
     if entry is None:
-        return f"the release {version} has no «Что нового» entry: add one for {version} to news.toml"
+        return f"news.toml has no «Что нового» entry for {release}: add an [[entry]] with version = \"{release}\""
+    if version != release:
+        return None
     if "date" not in entry:
-        return f"the «Что нового» entry of {version} has no date: add date = \"DD.MM.YYYY\" to it in news.toml"
+        return f"the «Что нового» entry of {release} has no date: add date = \"DD.MM.YYYY\" to it in news.toml"
     return None
+
+
+def changelog_problem(version: str, text: str) -> str | None:
+    """Why a build cannot go out for its CHANGELOG.md, or None: it has the release's section (Keep a Changelog,
+    CLAUDE.md) - for a test build «Unreleased» will do; a release's is dated (the GitHub release's publication day,
+    UTC) and has its link line at the bottom pointing at its tag, not at HEAD."""
+    release = news.release_of(version)
+    heading = re.search(rf"^## \[{re.escape(release)}\] - (\d{{4}}-\d\d-\d\d|Unreleased)$", text, re.M)
+    if heading is None:
+        return f"CHANGELOG.md has no section «## [{release}] - YYYY-MM-DD» (or «- Unreleased» while in work)"
+    if version != release:
+        return None
+    date = heading.group(1)
+    try:
+        datetime.strptime(date, "%Y-%m-%d")
+    except ValueError:
+        return (f"CHANGELOG.md's section [{release}] is «{date}»: give it the release's date, "
+                f"«## [{release}] - YYYY-MM-DD» (the GitHub release's publication day, UTC)")
+    if not re.search(rf"^\[{re.escape(release)}\]: https://github\.com/\S*v{re.escape(release)}$", text, re.M):
+        return (f"CHANGELOG.md has no link line for {release} at the bottom pointing at its tag: "
+                f"«[{release}]: {REPO_URL}/compare/v<previous>...v{release}»")
+    return None
+
+
+def release_problems(tag: str, base: str, addon: str, entries: list[dict] | None, changelog: str | None) -> list[str]:
+    """Why `tag` cannot be released, in words ([] when it can): what the build refuses in CI, and the pre-push hook
+    before the tag is public (tools/check_tag.py) - one list, so the two never disagree. `base`: pyproject.toml's
+    version, `addon`: the .toc's, `entries`: news.toml's (None: no such file), `changelog`: CHANGELOG.md (None: no
+    such file) - all as the tagged commit has them."""
+    version = tag_version(tag, base)
+    if version is None:
+        return [f"the tag {tag} and pyproject.toml's version {base} differ (tags: vX.Y.Z or vX.Y.Z-beta.N)"]
+    out = []
+    if version == base and "b" in addon:
+        out.append(f"the release {tag} would carry a test build of the addon ({addon}): give the addon its "
+                   "release version in BarrensVoice.toc")
+    out.append(news_problem(version, entries) if entries is not None else "news.toml is missing")
+    out.append(changelog_problem(version, changelog) if changelog is not None else "CHANGELOG.md is missing")
+    return [p for p in out if p]
+
+
+def tag_problems(tag: str, read) -> list[str]:
+    """release_problems for a tag from the files at its commit: `read(name)` gives a file's text, None when the commit
+    has no such file."""
+    pyproject, toc, toml = read("pyproject.toml"), read(TOC), read(news.SOURCE)
+    try:
+        base = tomllib.loads(pyproject or "")["project"]["version"]
+    except (ValueError, KeyError, TypeError):
+        return [f"{tag}: pyproject.toml is missing or has no [project] version"]
+    addon = re.search(r"^## Version:\s*(\S+)", toc or "", re.M)
+    entries = None
+    if toml is not None:
+        try:
+            entries = news.parse(toml)
+        except (ValueError, TypeError) as e:
+            return [f"news.toml cannot be read: {e}"]
+    return release_problems(tag, base, addon.group(1) if addon else "?", entries, read("CHANGELOG.md"))
 
 
 def build() -> Path:
@@ -130,13 +202,11 @@ def build() -> Path:
     tag = os.environ.get("RELEASE_TAG", "")
     entries = news_entries()
     if tag:
+        problems = release_problems(tag, base, info["addon"], entries,
+                                    (ROOT / "CHANGELOG.md").read_text(encoding="utf-8"))
+        if problems:
+            sys.exit("\n".join(problems))
         info["version"] = version_of(tag, base)
-        if "b" not in info["version"] and "b" in info["addon"]:
-            sys.exit(f"the release {tag} would carry a test build of the addon ({info['addon']}): give the addon its "
-                     "release version in BarrensVoice.toc")
-        problem = news_problem(info["version"], entries)
-        if problem:
-            sys.exit(problem)
     DIST.mkdir(exist_ok=True)
     archive = DIST / f"barrens-voice-{info['version']}.zip"
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as z:

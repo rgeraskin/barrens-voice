@@ -42,8 +42,12 @@ def release_of(version: str) -> str:
 def load(path: Path) -> list[dict]:
     """The entries of a news.toml, as written (newest first). Raises OSError, ValueError (TOML) or TypeError (no
     list of tables under `entry`)."""
-    data = tomllib.loads(Path(path).read_text(encoding="utf-8"))
-    entries = data.get("entry", [])
+    return parse(Path(path).read_text(encoding="utf-8"))
+
+
+def parse(text: str) -> list[dict]:
+    """The entries of news.toml's text (`load`)."""
+    entries = tomllib.loads(text).get("entry", [])
     if not isinstance(entries, list) or not all(isinstance(e, dict) for e in entries):
         raise TypeError(f"{SOURCE}: [[entry]] tables expected")
     return entries

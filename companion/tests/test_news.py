@@ -114,9 +114,9 @@ class Release(unittest.TestCase):
         # the program's version, not the addon's: a release of the program alone needs its own entry too
         self.assertIn("no «Что нового» entry", problem("0.4.1", [entry("0.4.0")]))
         self.assertIn("has no date", problem("0.4.1", [undated, entry("0.4.0")]))
-        # a test build: its release's entry may be missing or undated yet
-        self.assertIsNone(problem("0.4.1b2", [entry("0.4.0")]))
+        # a test build: its release's entry is there, undated yet will do
         self.assertIsNone(problem("0.4.1b2", [undated, entry("0.4.0")]))
+        self.assertIn("no «Что нового» entry for 0.4.1", problem("0.4.1b2", [entry("0.4.0")]))
         # a news.toml with a problem stops any build: the archive carries it to the game
         self.assertIn("news.toml: ", problem("0.4.1b2", [entry("0.4.1", kind="huge")]))
 
@@ -143,9 +143,6 @@ class Release(unittest.TestCase):
         self.assertEqual(self.release.notes("0.4.1b2", entries, "v0.4.1-beta.2"),
                          "Тестовая сборка выпуска 0.4.1.\n\n### Проверка 0.4.1\n\n- Числа читаются точнее.\n"
                          "- Новые слова в словаре.\n\n" + link.format("v0.4.1-beta.2") + "\n\n" + install)
-        # no entry written for its release yet: that line, the link, the install
-        self.assertEqual(self.release.notes("0.4.2b1", entries, "v0.4.2-beta.1"),
-                         "Тестовая сборка выпуска 0.4.2.\n\n" + link.format("v0.4.2-beta.1") + "\n\n" + install)
         self.assertIn("/blob/master/CHANGELOG.md", self.release.notes("0.4.1", entries))   # a build without a tag
         # the real one: the version in work's entry, in Russian
         real = self.release.news_entries()

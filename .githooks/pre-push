@@ -1,0 +1,34 @@
+#!/bin/sh
+# Refuses to push a release tag (vX.Y.Z, or vX.Y.Z-beta.N for a test build) that CI's tools/release.py would refuse
+# once the tag is public: the tag must name pyproject.toml's version, news.toml needs the release's «Что нового»
+# entry and CHANGELOG.md its section - dated, with the link line, for a release (tools/check_tag.py, files as the
+# tagged commit has them). Branch pushes and deleted tags pass untouched. Offline and quick: no tests are run.
+# On with `mise run hooks` (git config core.hooksPath .githooks); skip once with `git push --no-verify`.
+# BV_CHECK_TAG: another command to check a tag with (the tests).
+
+check() {
+    if [ -n "$BV_CHECK_TAG" ]; then
+        $BV_CHECK_TAG "$@"
+        return
+    fi
+    if ! command -v mise >/dev/null 2>&1; then
+        echo "pre-push: mise not found, so the release tag $1 cannot be checked (tools/check_tag.py)." >&2
+        echo "pre-push: install mise, or push without the check: git push --no-verify" >&2
+        return 1
+    fi
+    mise exec -- uv run --locked python tools/check_tag.py "$@"
+}
+
+status=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+    case "$local_ref" in
+        refs/tags/v*) ;;
+        *) continue ;;                            # branches and other tags
+    esac
+    case "$local_sha" in
+        *[!0]*) ;;
+        *) continue ;;                            # the tag is deleted on the remote
+    esac
+    check "${local_ref#refs/tags/}" "$local_sha" </dev/null || status=1
+done
+exit $status

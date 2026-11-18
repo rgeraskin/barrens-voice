@@ -1,0 +1,168 @@
+"""A release tag ready to push (tools/check_tag.py, .githooks/pre-push): its version, news.toml, CHANGELOG.md -
+release.release_problems, the same list CI's build refuses by."""
+from __future__ import annotations
+
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tools"))
+import release  # noqa: E402
+
+SH = shutil.which("sh")
+
+
+def news_toml(version: str = "0.4.1", date: str | None = "25.11.2026") -> str:
+    dated = f'date = "{date}"\n' if date else ""
+    return (f'[[entry]]\nversion = "{version}"\n{dated}kind = "small"\ntitle = "Числа"\n'
+            'summary = "числа читаются точнее"\nitems = ["Пункт."]\n')
+
+
+def changelog(version: str = "0.4.1", date: str = "2026-11-25", link: str | None = None) -> str:
+    link = link if link is not None else f"compare/v0.4.0...v{version}"
+    return (f"# Changelog\n\n## [{version}] - {date}\n\n### Fixed\n\n- Numbers\n\n  Read right.\n\n"
+            f"## [0.4.0] - 2026-11-20\n\n### Added\n\n- All\n\n"
+            f"[{version}]: https://github.com/rgeraskin/barrens-voice/{link}\n"
+            "[0.4.0]: https://github.com/rgeraskin/barrens-voice/compare/v0.3.0...v0.4.0\n")
+
+
+def problems(tag="v0.4.1", base="0.4.1", addon="0.4.1", toml=None, log=None) -> list[str]:
+    from bv import news
+    entries = news.parse(news_toml() if toml is None else toml)
+    return release.release_problems(tag, base, addon, entries, changelog() if log is None else log)
+
+
+class Checks(unittest.TestCase):
+    def test_a_ready_release(self):
+        self.assertEqual(problems(), [])
+        self.assertEqual(problems(addon="0.4.0"), [])                        # the program alone: the addon kept
+        self.assertEqual(problems(log=changelog(link="releases/tag/v0.4.1")), [])   # the first release's form
+
+    def test_its_news(self):
+        self.assertIn("no «Что нового» entry for 0.4.1", "".join(problems(toml=news_toml("0.4.0"))))
+        self.assertIn("entry of 0.4.1 has no date", "".join(problems(toml=news_toml(date=None))))
+        self.assertIn("news.toml: ", "".join(problems(toml=news_toml().replace('"small"', '"huge"'))))
+
+    def test_its_changelog(self):
+        self.assertIn("no section «## [0.4.1]", "".join(problems(log=changelog("0.4.0"))))
+        self.assertIn("is «Unreleased»", "".join(problems(log=changelog(date="Unreleased"))))
+        self.assertIn("is «2026-02-30»", "".join(problems(log=changelog(date="2026-02-30"))))
+        self.assertIn("no link line for 0.4.1", "".join(problems(log=changelog(link="compare/v0.4.0...HEAD"))))
+        no_link = "\n".join(l for l in changelog().splitlines() if not l.startswith("[0.4.1]:"))
+        self.assertIn("no link line for 0.4.1", "".join(problems(log=no_link)))
+
+    def test_a_test_build(self):
+        # the release's entry and section are there, undated and unreleased will do; a test build of the addon too
+        beta = dict(tag="v0.4.1-beta.3", addon="0.4.1b2")
+        self.assertEqual(problems(**beta, toml=news_toml(date=None),
+                                  log=changelog(date="Unreleased", link="compare/v0.4.0...HEAD")), [])
+        self.assertIn("no «Что нового» entry for 0.4.1", "".join(problems(**beta, toml=news_toml("0.4.0"))))
+        self.assertIn("no section «## [0.4.1]", "".join(problems(**beta, log=changelog("0.4.0"))))
+
+    def test_its_version(self):
+        for tag in ("v0.4.2", "v0.4.1-rc1", "0.4.1", "v0.4.1-beta"):
+            self.assertEqual(problems(tag=tag), [f"the tag {tag} and pyproject.toml's version 0.4.1 differ "
+                                                 "(tags: vX.Y.Z or vX.Y.Z-beta.N)"])
+        self.assertIn("test build of the addon (0.4.1b2)", "".join(problems(addon="0.4.1b2")))
+
+    def test_from_the_tagged_files(self):
+        files = {"pyproject.toml": '[project]\nname = "x"\nversion = "0.4.1"\n', "news.toml": news_toml(),
+                 "CHANGELOG.md": changelog(), release.TOC: "## Interface: 16001\n## Version: 0.4.1\n"}
+        self.assertEqual(release.tag_problems("v0.4.1", files.get), [])
+        self.assertEqual(release.tag_problems("v0.4.1", {**files, "news.toml": None}.get), ["news.toml is missing"])
+        self.assertEqual(release.tag_problems("v0.4.1", {**files, "CHANGELOG.md": None}.get), ["CHANGELOG.md is missing"])
+        self.assertIn("news.toml cannot be read", release.tag_problems("v0.4.1", {**files, "news.toml": "[[entry]"}.get)[0])
+        self.assertIn("pyproject.toml is missing", release.tag_problems("v0.4.1", {**files, "pyproject.toml": None}.get)[0])
+        with_beta_addon = {**files, release.TOC: "## Version: 0.4.1b1\n"}
+        self.assertIn("test build of the addon", release.tag_problems("v0.4.1", with_beta_addon.get)[0])
+
+    def test_the_build_refuses_by_the_same_list(self):
+        # CI: tools/release.py stops a tagged build on any of them
+        from unittest import mock
+        with mock.patch.object(release, "versions", return_value={"version": "0.4.1", "addon": "0.4.1", "protocol": 1}), \
+                mock.patch.object(release, "release_problems", return_value=["one", "two"]) as checked, \
+                mock.patch.dict(os.environ, {"RELEASE_TAG": "v0.4.1"}), self.assertRaises(SystemExit) as stop:
+            release.build()
+        self.assertEqual(str(stop.exception), "one\ntwo")
+        self.assertEqual(checked.call_args.args[:3], ("v0.4.1", "0.4.1", "0.4.1"))
+
+
+@unittest.skipUnless(SH and shutil.which("git"), "no sh or git")
+class Hook(unittest.TestCase):
+    """.githooks/pre-push itself, on a repository of its own: a tag pushed is checked at its commit, a branch not."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.repo = Path(tmp.name)
+        self.env = {**os.environ, "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
+                    "GIT_AUTHOR_NAME": "Test", "GIT_AUTHOR_EMAIL": "test@example.com",
+                    "GIT_COMMITTER_NAME": "Test", "GIT_COMMITTER_EMAIL": "test@example.com",
+                    # the checker run by this Python (the hook runs it through mise): as a shell command line
+                    "BV_CHECK_TAG": f"{Path(sys.executable).as_posix()} {(ROOT / 'tools' / 'check_tag.py').as_posix()}"}
+        if " " in self.env["BV_CHECK_TAG"].split(" ", 1)[0]:
+            self.skipTest("a Python path with spaces")
+        self.git("init", "-q")
+        self.write(pyproject='[project]\nname = "x"\nversion = "0.4.1"\n', news=news_toml(),
+                   log=changelog(date="Unreleased", link="compare/v0.4.0...HEAD"))
+        (self.repo / "addon" / "BarrensVoice").mkdir(parents=True)
+        (self.repo / release.TOC).write_text("## Version: 0.4.1\n", encoding="utf-8")
+        self.commit()
+
+    def git(self, *args: str) -> str:
+        return subprocess.run(["git", *args], cwd=self.repo, env=self.env, capture_output=True, text=True,
+                              check=True).stdout.strip()
+
+    def write(self, pyproject=None, news=None, log=None):
+        for name, text in (("pyproject.toml", pyproject), ("news.toml", news), ("CHANGELOG.md", log)):
+            if text is not None:
+                (self.repo / name).write_text(text, encoding="utf-8")
+
+    def commit(self):
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "x")
+
+    def push(self, *refs: str) -> subprocess.CompletedProcess:
+        """The hook as git runs it for a push of `refs` (a tag: refs/tags/..., a branch: refs/heads/...)."""
+        lines = "".join(f"{ref} {self.git('rev-parse', ref)} {ref} {'0' * 40}\n" for ref in refs)
+        return subprocess.run([SH, str(ROOT / ".githooks" / "pre-push"), "origin", "https://example.invalid/x.git"],
+                              cwd=self.repo, env=self.env, input=lines, capture_output=True, text=True,
+                              encoding="utf-8")
+
+    def test_a_tag_is_checked_at_its_commit(self):
+        self.git("tag", "-a", "v0.4.1", "-m", "0.4.1")
+        refused = self.push("refs/tags/v0.4.1")
+        self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
+        self.assertIn("CHANGELOG.md's section [0.4.1] is «Unreleased»", refused.stderr)
+        self.assertIn("git tag -f v0.4.1", refused.stderr)
+        # fixed in the working tree only: the tagged commit is still what is pushed
+        self.write(log=changelog())
+        self.assertEqual(self.push("refs/tags/v0.4.1").returncode, 1)
+        self.commit()
+        self.git("tag", "-f", "-a", "v0.4.1", "-m", "0.4.1")
+        ready = self.push("refs/tags/v0.4.1")
+        self.assertEqual(ready.returncode, 0, ready.stderr)
+        self.assertIn("v0.4.1: ready", ready.stdout)
+
+    def test_a_test_build_and_a_branch(self):
+        self.git("tag", "v0.4.1-beta.2")                                       # a lightweight tag too
+        self.assertEqual(self.push("refs/tags/v0.4.1-beta.2").returncode, 0)
+        self.git("tag", "v0.4.2-beta.1")                                       # not pyproject.toml's version
+        wrong = self.push("refs/tags/v0.4.1-beta.2", "refs/tags/v0.4.2-beta.1")    # one bad tag refuses the push
+        self.assertEqual(wrong.returncode, 1)
+        self.assertIn("the tag v0.4.2-beta.1 and pyproject.toml's version 0.4.1 differ", wrong.stderr)
+        # a branch alone, however unready the files: not checked; a deleted tag neither
+        branch = subprocess.run([SH, str(ROOT / ".githooks" / "pre-push"), "origin", "x"], cwd=self.repo, env=self.env,
+                                input=f"refs/heads/master {self.git('rev-parse', 'HEAD')} refs/heads/master {'0' * 40}\n"
+                                      f"(delete) {'0' * 40} refs/tags/v0.4.2 {self.git('rev-parse', 'HEAD')}\n",
+                                capture_output=True, text=True)
+        self.assertEqual((branch.returncode, branch.stdout, branch.stderr), (0, "", ""))
+
+
+if __name__ == "__main__":
+    unittest.main()

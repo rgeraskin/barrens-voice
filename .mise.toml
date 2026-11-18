@@ -53,3 +53,11 @@ run = ["uv run --locked python tools/dictionary_json.py", "uv run --locked pytho
 [tasks.installer]
 description = "Windows: release archive, uv.exe and dist/BarrensVoice-Setup.exe (tools/installer.py, Inno Setup 6)"
 run = "uv run --locked python tools/installer.py"
+
+[tasks.check-tag]
+description = "Is a release tag ready to push: its version, news.toml, CHANGELOG.md at the tagged commit (tools/check_tag.py <tag> [<commit>])"
+run = "uv run --locked python tools/check_tag.py"
+
+[tasks.hooks]
+description = "Use the repository's git hooks (.githooks: pre-push checks release tags with tools/check_tag.py)"
+run = "git config core.hooksPath .githooks"
