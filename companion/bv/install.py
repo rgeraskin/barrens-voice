@@ -23,6 +23,7 @@ from pathlib import Path
 INSTALL_MARK = "barrens-voice.install"        # bv.paths tells an install by it
 PYTHON = "3.13"
 KEEP = 2                                      # versions kept: the current one and one to go back to
+LAUNCHER = Path("companion") / "BarrensVoice.pyw"   # what the starter runs (installer/launcher.cs)
 
 
 def uv_env(root: Path, version_dir: Path) -> dict:
@@ -90,7 +91,10 @@ def build(root: Path, version_dir: Path, runtime: str, uv: Path, log=print) -> N
 def point_current(root: Path, version_dir: Path) -> None:
     """app\\current -> this version (a junction on Windows: no administrator needed). The new link is made
     beside as current.new and swapped in by two renames: a failure on the way leaves the old current in place
-    (before, current was removed first and a failed mklink left none - «установлен не до конца»)."""
+    (before, current was removed first and a failed mklink left none - «установлен не до конца»). A folder
+    without the launcher's script is refused (FileNotFoundError): pointed at, it left nothing the starter could run."""
+    if not whole(version_dir):
+        raise FileNotFoundError(f"нет {version_dir / LAUNCHER}")
     app = root / "app"
     current, fresh, old = app / "current", app / "current.new", app / "current.old"
     for leftover in (fresh, old):                       # a swap cut short last time
@@ -116,6 +120,11 @@ def point_current(root: Path, version_dir: Path) -> None:
     except OSError:
         pass
     place_starter(root, version_dir)
+
+
+def whole(version_dir: Path) -> bool:
+    """Whether a version's folder holds the launcher's script: one to point app\\current at."""
+    return (version_dir / LAUNCHER).is_file()
 
 
 def make_link(link: Path, target: Path) -> None:
@@ -203,18 +212,29 @@ def release_tag(version: str) -> str:
     return "v" + re.sub(r"b(\d+)$", r"-beta.\1", version)
 
 
-def prune(root: Path, keep: int = KEEP) -> list[str]:
-    """Old versions removed, the current one and the newest others kept; what is in use stays (Windows
-    will not delete a loaded file) and goes next time."""
+def prune(root: Path, keep: int = KEEP, also=()) -> list[str]:
+    """Versions older than the current one removed but the newest keep-1 of them (to go back to) and those named
+    in `also` (update.json's previous). A version newer than the current one is never removed: it may be prepared
+    and waiting for its switch, or refused here (it goes once a newer one is current) - by number alone a refused
+    test build left on disk kept itself and pruned the prepared version, and the switch pointed at nothing.
+    Nor what current.new or current.old points at (a switch cut short), nor anything while there is no current
+    version. What is in use stays (Windows will not delete a loaded file) and goes next time."""
     current = current_version(root)
-    versions = sorted((p for p in (root / "app").iterdir() if p.is_dir() and not p.name.startswith("current")
-                       and not p.is_symlink() and not p.is_junction() and not p.name.endswith(".part")),
-                      key=lambda p: version_key(p.name), reverse=True)
-    kept = [v for v in versions if v.name == current][:1]
-    kept += [v for v in versions if v.name != current][: max(0, keep - len(kept))]
+    if current is None:
+        return []
+    app = root / "app"
+    keep_names = {current, *(v for v in also if v)}
+    for link in (app / "current.new", app / "current.old"):
+        if os.path.lexists(link):
+            keep_names.add(Path(os.path.realpath(link)).name)
+    older = sorted((p for p in app.iterdir() if p.is_dir() and not p.name.startswith("current")
+                    and not p.is_symlink() and not p.is_junction() and not p.name.endswith(".part")
+                    and version_key(p.name) < version_key(current)),
+                   key=lambda p: version_key(p.name), reverse=True)
+    keep_names.update(v.name for v in older[: max(0, keep - 1)])
     removed = []
-    for v in versions:
-        if v not in kept:
+    for v in older:
+        if v.name not in keep_names:
             shutil.rmtree(v, ignore_errors=True)
             if not v.exists():
                 removed.append(v.name)

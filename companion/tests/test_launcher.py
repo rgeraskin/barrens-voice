@@ -16,6 +16,14 @@ def make_game(root: Path, addon_version: str | None = None) -> Path:
     return root
 
 
+def make_version(root: Path, version: str) -> Path:
+    """An installed version's folder as point_current takes it: with the launcher's script."""
+    folder = root / "app" / version
+    (folder / "companion").mkdir(parents=True)
+    (folder / "companion" / "BarrensVoice.pyw").write_text("", encoding="utf-8")
+    return folder
+
+
 class Versions(unittest.TestCase):
     def test_compare(self):
         from bv.launcher.model import newer, version_key
@@ -513,6 +521,7 @@ class Install(unittest.TestCase):
         with zipfile.ZipFile(archive, "w") as z:
             z.writestr("pyproject.toml", f'[project]\nname = "barrens-voice"\nversion = "{version}"\n')
             z.writestr("uv.lock", "version = 1\n")
+            z.writestr("companion/BarrensVoice.pyw", "")
             z.writestr("companion/bv/__init__.py", "")
         return archive
 
@@ -541,7 +550,7 @@ class Install(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             for v in ("0.4.0", "0.4.1"):
-                (root / "app" / v).mkdir(parents=True)
+                make_version(root, v)
             install.point_current(root, root / "app" / "0.4.0")
             with mock.patch("bv.install.make_link", side_effect=OSError("mklink failed")), self.assertRaises(OSError):
                 install.point_current(root, root / "app" / "0.4.1")
@@ -563,6 +572,37 @@ class Install(unittest.TestCase):
             self.assertEqual(install.prune(root, keep=1), ["0.4.0"])                   # links are never pruned
             self.assertTrue((root / "app" / "0.4.1").is_dir())
 
+
+    def test_prune_never_takes_a_newer_version(self):
+        # by number alone a refused test build left on disk (newer) kept itself and pruned the prepared version
+        # (newer than current too, lower than the build): the switch then pointed app\\current at nothing
+        from bv import install
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            for v in ("0.3.8", "0.3.9", "0.4.0", "0.4.1", "0.4.2", "0.4.3", "0.5.0b1"):
+                make_version(root, v)
+            self.assertEqual(install.prune(root), [])                                   # no current: nothing goes
+            install.point_current(root, root / "app" / "0.4.2")
+            install.make_link(root / "app" / "current.old", root / "app" / "0.3.8")     # a switch cut short
+            self.assertEqual(sorted(install.prune(root, also=["0.4.0", None])), ["0.3.9"])
+            # kept: current, the newer ones (prepared 0.4.3, refused 0.5.0b1), the newest older one (0.4.1),
+            # `also` (update.json's previous) and what current.old points at
+            self.assertEqual(sorted(p.name for p in (root / "app").iterdir()),
+                             ["0.3.8", "0.4.0", "0.4.1", "0.4.2", "0.4.3", "0.5.0b1", "current", "current.old"])
+
+    def test_switch_refuses_a_folder_without_the_launcher(self):
+        # pointed at a version gone (pruned) or half there, app\\current left nothing the starter could run
+        from bv import install
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            make_version(root, "0.4.0")
+            install.point_current(root, root / "app" / "0.4.0")
+            (root / "app" / "0.4.1" / "companion").mkdir(parents=True)               # no BarrensVoice.pyw
+            for target in ("0.4.1", "0.4.2"):                                          # half there, not there
+                with self.assertRaises(FileNotFoundError):
+                    install.point_current(root, root / "app" / target)
+            self.assertEqual(install.current_version(root), "0.4.0")
+            self.assertEqual(sorted(p.name for p in (root / "app").iterdir()), ["0.4.0", "0.4.1", "current"])
 
     def test_junction_on_windows(self):
         # Windows only, so with fakes: _winapi.CreateJunction first; when it is missing or fails, mklink with
@@ -646,7 +686,7 @@ class Update(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             for v in ("0.4.0", "0.4.1"):
-                (root / "app" / v).mkdir(parents=True)
+                make_version(root, v)
             install.point_current(root, root / "app" / "0.4.0")
             update.apply(root, "0.4.1")
             self.assertEqual(install.current_version(root), "0.4.1")
@@ -659,6 +699,22 @@ class Update(unittest.TestCase):
             self.assertFalse(update.state_path(root).exists())
             update.pruning.join(10)
 
+    def test_no_rollback_to_a_version_not_there(self):
+        # the previous version gone or half removed: no rollback onto it (a rollback that raised, every start)
+        import shutil
+        from bv import install, update
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            for v in ("0.4.0", "0.4.1"):
+                make_version(root, v)
+            install.point_current(root, root / "app" / "0.4.0")
+            update.apply(root, "0.4.1")
+            shutil.rmtree(root / "app" / "0.4.0" / "companion")
+            for _ in range(3):
+                self.assertIsNone(update.record_start(root, 5, failed=True))
+            self.assertEqual(install.current_version(root), "0.4.1")
+            self.assertIsNone(update.refused(root))
+
     def test_switch_watched_from_before_it(self):
         # update.json is written before app\\current moves: a switch is never left unwatched, a failed one leaves
         # no watch, an error after it (the old link in use) does not undo it, a retry keeps the version before
@@ -667,7 +723,7 @@ class Update(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             for v in ("0.4.0", "0.4.1"):
-                (root / "app" / v).mkdir(parents=True)
+                make_version(root, v)
             install.point_current(root, root / "app" / "0.4.0")
             with mock.patch("bv.update.write_json", side_effect=PermissionError("denied")), self.assertRaises(OSError):
                 update.apply(root, "0.4.1")
@@ -705,7 +761,7 @@ class Update(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             for v in ("0.4.0", "0.4.1"):
-                (root / "app" / v).mkdir(parents=True)
+                make_version(root, v)
             install.point_current(root, root / "app" / "0.4.0")
             update.state_path(root).parent.mkdir(parents=True)
             update.write_json(update.state_path(root), {"version": "0.4.1", "previous": "0.4.0", "fails": 0})
@@ -723,7 +779,7 @@ class Update(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             for v in ("0.4.0", "0.4.1"):
-                (root / "app" / v).mkdir(parents=True)
+                make_version(root, v)
             install.point_current(root, root / "app" / "0.4.0")
             update.state_path(root).parent.mkdir(parents=True)
             update.write_json(update.state_path(root), {"version": "0.4.1", "previous": "0.4.0", "fails": 1})
@@ -746,7 +802,7 @@ class Update(unittest.TestCase):
             with self.subTest(code=code), tempfile.TemporaryDirectory() as d:
                 root = Path(d)
                 for v in ("0.3.9", "0.4.0", "0.4.1"):
-                    (root / "app" / v).mkdir(parents=True)
+                    make_version(root, v)
                 install.point_current(root, root / "app" / "0.4.0")
                 update.apply(root, "0.4.1")
                 with mock.patch("bv.install.prune") as prune:
@@ -766,13 +822,13 @@ class Update(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             for v in ("0.4.0", "0.4.1", "0.4.2"):
-                (root / "app" / v).mkdir(parents=True)
+                make_version(root, v)
             install.point_current(root, root / "app" / "0.4.1")
             update.apply(root, "0.4.2")
             self.assertIsNone(update.record_start(root, 5, failed=True))                 # not settled: all kept
             self.assertEqual(len(list((root / "app").iterdir())), 4)
             go, real = threading.Event(), install.prune
-            with mock.patch("bv.install.prune", side_effect=lambda r: go.wait(10) and real(r)):
+            with mock.patch("bv.install.prune", side_effect=lambda r, **k: go.wait(10) and real(r, **k)):
                 self.assertIsNone(update.record_start(root, 5, failed=False))            # a good start: settled -
                 self.assertEqual(len(list((root / "app").iterdir())), 4)                 # returned before the prune
                 go.set()                                                                 # (off the window's thread)
@@ -855,6 +911,7 @@ class Starter(unittest.TestCase):
             with zipfile.ZipFile(archive, "w") as z:
                 z.writestr("pyproject.toml", f'[project]\nname = "barrens-voice"\nversion = "{version}"\n')
                 z.writestr("uv.lock", "version = 1\n")
+                z.writestr("companion/BarrensVoice.pyw", "")
                 if exe is not None:
                     z.writestr("Barrens Voice.exe", exe)
             return archive
@@ -921,6 +978,7 @@ class UvInPrepare(unittest.TestCase):
         with zipfile.ZipFile(archive, "w") as z:
             z.writestr("pyproject.toml", '[project]\nname = "barrens-voice"\nversion = "0.4.1"\n')
             z.writestr("uv.lock", "version = 1\n")
+            z.writestr("companion/BarrensVoice.pyw", "")
         return archive
 
     def run_prepare(self, build):
@@ -977,7 +1035,7 @@ class UpdaterFlow(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.d = Path(self.tmp.name)
         self.root = self.d / "BarrensVoice"
-        (self.root / "app" / "0.4.0").mkdir(parents=True)
+        make_version(self.root, "0.4.0")
         (self.root / "uv.exe").write_bytes(b"uv")
         from bv import install
         install.point_current(self.root, self.root / "app" / "0.4.0")
@@ -1008,6 +1066,7 @@ class UpdaterFlow(unittest.TestCase):
         with zipfile.ZipFile(buf, "w") as z:
             z.writestr("pyproject.toml", f'[project]\nname = "barrens-voice"\nversion = "{version}"\n')
             z.writestr("uv.lock", "version = 1\n")
+            z.writestr("companion/BarrensVoice.pyw", "")
         data = archive_bytes or buf.getvalue()
         name = f"barrens-voice-{version}.zip"
         manifest = json.dumps({"version": version, "addon": "0.3.0", "protocol": 1, "archive": name,
@@ -1044,6 +1103,25 @@ class UpdaterFlow(unittest.TestCase):
         self.assertEqual(install.current_version(self.root), "0.4.1")
         self.assertTrue(update.state_path(self.root).is_file())                    # watched for a failed start
         self.assertIsNone(u.ready)
+
+    def test_settle_keeps_the_prepared_version(self):
+        # a refused test build left on disk (0.5.0b1), 0.4.1 applied and watched, 0.4.2 prepared meanwhile: the
+        # settle of 0.4.1 prunes, and the prepared 0.4.2 must still be there to switch to
+        from bv import install, update
+        make_version(self.root, "0.5.0b1")
+        update.refuse(self.root, "0.5.0b1")
+        make_version(self.root, "0.4.1")
+        update.apply(self.root, "0.4.1")
+        self.publish(update.STABLE, "0.4.2")
+        u = self.updater("0.4.1")
+        u.check()
+        self.assertEqual(u.ready, "0.4.2")
+        update.record_start(self.root, 3600, failed=False)
+        update.pruning.join(10)
+        self.assertEqual(sorted(p.name for p in (self.root / "app").iterdir()),
+                         ["0.4.0", "0.4.1", "0.4.2", "0.5.0b1", "current"])
+        self.assertEqual(u.apply(), "0.4.2")
+        self.assertEqual(install.current_version(self.root), "0.4.2")
 
     def test_nothing_newer(self):
         from bv import update
@@ -1379,7 +1457,7 @@ class OldClients(unittest.TestCase):
                 return False
         with tempfile.TemporaryDirectory() as d:
             root = Path(d) / "BarrensVoice"
-            (root / "app" / "0.4.0b5").mkdir(parents=True)
+            make_version(root, "0.4.0b5")
             (root / "uv.exe").write_bytes(b"uv")
             old_install.point_current(root, root / "app" / "0.4.0b5")
             real_verify = old_update.verify      # its default key is bound at definition: give it the test key
@@ -1447,7 +1525,7 @@ class OldClients(unittest.TestCase):
         said = []
         with tempfile.TemporaryDirectory() as d:
             root = Path(d) / "BarrensVoice"
-            (root / "app" / current).mkdir(parents=True)
+            make_version(root, current)
             (root / "uv.exe").write_bytes(b"uv")
             old_install.point_current(root, root / "app" / current)
             updater = old_update.Updater(root, current, lambda: {"update_channel": "stable", "auto_update": True},

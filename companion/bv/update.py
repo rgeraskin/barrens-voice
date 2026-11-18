@@ -273,16 +273,22 @@ def apply(root: Path, version: str) -> None:
 pruning = None          # the last prune_later's thread (the tests wait for it)
 
 
-def prune_later(root: Path):
+def prune_later(root: Path, also=()):
     """install.prune on a thread of its own: removing a version (its .venv: thousands of files) took seconds
     on the window's thread. A daemon: cut short when the launcher ends, the rest goes at the next prune (a version
-    pruned is never the one to go back to - that is the one current when the next update is applied)."""
+    pruned is never the one to go back to - that is the one current when the next update is applied). `also`
+    and a watched version's previous one (update.json) are kept."""
     import threading
     global pruning
 
     def work():
         try:
-            install.prune(root)
+            watched = json.loads(state_path(root).read_text(encoding="utf-8"))
+            kept = [watched.get("previous"), watched.get("version")] if isinstance(watched, dict) else []
+        except (OSError, ValueError):
+            kept = []
+        try:
+            install.prune(root, also=[v for v in (*also, *kept) if isinstance(v, str)])
         except OSError:
             pass
     pruning = threading.Thread(target=work, daemon=True, name="prune")
@@ -309,10 +315,10 @@ def record_start(root: Path, ran_for: float, failed: bool | None) -> str | None:
         return None
     if not failed or ran_for > EARLY:
         path.unlink(missing_ok=True)
-        prune_later(root)                           # settled: the versions before the one to go back to go
+        prune_later(root, also=[state.get("previous")])     # settled: the versions before the one to go back to go
         return None
     state["fails"] = state.get("fails", 0) + 1
-    if state["fails"] < 2 or not state.get("previous") or not (root / "app" / state["previous"]).is_dir():
+    if state["fails"] < 2 or not state.get("previous") or not install.whole(root / "app" / state["previous"]):
         write_json(path, state)
         return None
     install.point_current(root, root / "app" / state["previous"])
