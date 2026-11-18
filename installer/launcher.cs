@@ -36,7 +36,8 @@ static class BarrensVoice
         return 0;
     }
 
-    // a version's folder the launcher can start from: its Python and the launcher's script are there
+    // a version's folder the launcher can start from: its Python and the launcher's script are there - the same
+    // files as bv/install.py STARTS, which the updater checks before it points app\current at a version
     static bool Starts(string version)
     {
         return File.Exists(Path.Combine(version, ".venv", "Scripts", "pythonw.exe")) &&

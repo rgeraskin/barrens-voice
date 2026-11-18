@@ -17,11 +17,20 @@ def make_game(root: Path, addon_version: str | None = None) -> Path:
 
 
 def make_version(root: Path, version: str) -> Path:
-    """An installed version's folder as point_current takes it: with the launcher's script."""
+    """An installed version's folder as point_current takes it: with what the starter runs (its pythonw.exe and the
+    launcher's script)."""
     folder = root / "app" / version
     (folder / "companion").mkdir(parents=True)
     (folder / "companion" / "BarrensVoice.pyw").write_text("", encoding="utf-8")
+    built(root, folder)
     return folder
+
+
+def built(root: Path, version_dir: Path, *rest, **k) -> None:
+    """A stand-in for install.build: the environment's pythonw.exe, the file of it the starter needs."""
+    pythonw = version_dir / ".venv" / "Scripts" / "pythonw.exe"
+    pythonw.parent.mkdir(parents=True, exist_ok=True)
+    pythonw.write_bytes(b"")
 
 
 class Versions(unittest.TestCase):
@@ -566,7 +575,7 @@ class Install(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             d = Path(d)
             root = d / "BarrensVoice"
-            with mock.patch("bv.install.build") as build:
+            with mock.patch("bv.install.build", side_effect=built) as build:
                 for version in ("0.4.0", "0.4.1", "0.4.2"):
                     self.assertEqual(install.install(root, self.release(d, version), "cuda", d / "uv.exe", log=lambda *a: None), version)
             self.assertEqual(build.call_args[0][2], "cuda")
@@ -1181,7 +1190,7 @@ class Starter(unittest.TestCase):
             d = Path(d)
             root = d / "BarrensVoice"
             starter = root / "Barrens Voice.exe"
-            with mock.patch("bv.install.build"), mock.patch("bv.update.version_runs", return_value=None):
+            with mock.patch("bv.install.build", side_effect=built), mock.patch("bv.update.version_runs", return_value=None):
                 install.install(root, release(d, "0.4.0", b"v1"), "cuda", d / "uv.exe", log=lambda *a: None)
                 self.assertEqual(starter.read_bytes(), b"v1")                       # put there by the install
                 v = update.prepare(root, release(d, "0.4.1", b"v2"))
@@ -1190,6 +1199,27 @@ class Starter(unittest.TestCase):
                 v = update.prepare(root, release(d, "0.4.2", None))
                 update.apply(root, v)
                 self.assertEqual(starter.read_bytes(), b"v2")                       # a release without it: kept
+
+
+    def test_one_definition_of_a_version_that_starts(self):
+        # install.whole asked only for the launcher's script, the starter's Starts for pythonw.exe too: a version
+        # pointed at, or gone back to, without its environment left «установлен не до конца»
+        import re
+        from bv import install
+        source = (Path(__file__).resolve().parents[2] / "installer" / "launcher.cs").read_text(encoding="utf-8")
+        body = re.search(r"static bool Starts\(string version\)\s*\{(.*?)\n    \}", source, re.S).group(1)
+        checked = {tuple(re.findall(r'"([^"]+)"', args)) for args in re.findall(r"Path\.Combine\(version, ([^)]*)\)", body)}
+        self.assertEqual(checked, {f.parts for f in install.STARTS})
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            make_version(root, "0.4.0")
+            install.point_current(root, root / "app" / "0.4.0")
+            (make_version(root, "0.4.1") / ".venv" / "Scripts" / "pythonw.exe").unlink()     # never built
+            self.assertFalse(install.whole(root / "app" / "0.4.1"))
+            with self.assertRaises(FileNotFoundError) as refused:
+                install.point_current(root, root / "app" / "0.4.1")
+            self.assertIn("pythonw.exe", str(refused.exception))
+            self.assertEqual(install.current_version(root), "0.4.0")
 
 
 class ReleaseUv(unittest.TestCase):
@@ -1304,7 +1334,7 @@ class UpdaterFlow(unittest.TestCase):
         self.files: dict[str, bytes] = {}
         self.said: list[tuple[str, str]] = []
         self.settings = {"update_channel": "stable", "auto_update": True}
-        self.build = mock.patch("bv.install.build").start()
+        self.build = mock.patch("bv.install.build", side_effect=built).start()
         self.runs = mock.patch("bv.update.version_runs", return_value=None).start()   # no environment built here
         self.addCleanup(mock.patch.stopall)
         self.addCleanup(self.tmp.cleanup)
@@ -1602,7 +1632,7 @@ class ReleaseBuild(unittest.TestCase):
                      "addon/BarrensVoice/BarrensVoice.toc"):
             self.assertIn(need, names)
         self.assertFalse(any(n.startswith("companion/tests/") or "__pycache__" in n for n in names))
-        with tempfile.TemporaryDirectory() as d, mock.patch("bv.install.build"):
+        with tempfile.TemporaryDirectory() as d, mock.patch("bv.install.build", side_effect=built):
             root = Path(d) / "BarrensVoice"
             self.assertEqual(install.install(root, archive, "cuda", Path(d) / "uv.exe", log=lambda *a: None), "0.4.0b7")
             self.assertEqual((root / "Barrens Voice.exe").read_bytes(), b"starter")

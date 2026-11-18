@@ -25,6 +25,9 @@ INSTALL_MARK = "barrens-voice.install"        # bv.paths tells an install by it
 PYTHON = "3.13"
 KEEP = 2                                      # versions kept: the current one and one to go back to
 LAUNCHER = Path("companion") / "BarrensVoice.pyw"   # what the starter runs (installer/launcher.cs)
+PYTHONW = Path(".venv") / "Scripts" / "pythonw.exe"   # and with what
+# a version the starter can start from: its Starts checks these very files (test_launcher.Starter)
+STARTS = (PYTHONW, LAUNCHER)
 
 
 def uv_env(root: Path, version_dir: Path) -> dict:
@@ -93,9 +96,10 @@ def point_current(root: Path, version_dir: Path) -> None:
     """app\\current -> this version (a junction on Windows: no administrator needed). The new link is made
     beside as current.new and swapped in by two renames: a failure on the way leaves the old current in place
     (before, current was removed first and a failed mklink left none - «установлен не до конца»). A folder
-    without the launcher's script is refused (FileNotFoundError): pointed at, it left nothing the starter could run."""
+    the starter cannot start from (not `whole`) is refused (FileNotFoundError): pointed at, it left nothing the
+    starter could run."""
     if not whole(version_dir):
-        raise FileNotFoundError(f"нет {version_dir / LAUNCHER}")
+        raise FileNotFoundError("нет " + next(str(version_dir / f) for f in STARTS if not (version_dir / f).is_file()))
     app = root / "app"
     current, fresh, old = app / "current", app / "current.new", app / "current.old"
     for leftover in (fresh, old):                       # a swap cut short last time
@@ -147,8 +151,9 @@ def repair_current(root: Path, running: Path) -> bool:
 
 
 def whole(version_dir: Path) -> bool:
-    """Whether a version's folder holds the launcher's script: one to point app\\current at."""
-    return (version_dir / LAUNCHER).is_file()
+    """Whether a version's folder holds what the starter runs (STARTS: its pythonw.exe and the launcher's script):
+    one to point app\\current at, or to go back to."""
+    return all((version_dir / f).is_file() for f in STARTS)
 
 
 def make_link(link: Path, target: Path) -> None:
