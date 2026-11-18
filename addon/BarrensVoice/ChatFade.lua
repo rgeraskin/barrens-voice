@@ -167,7 +167,9 @@ local function Verdict(text, event, args)
         local message, channelString, baseName, guid = args[1], args[4], args[9], args[12]
         if ns.Secret(message, args[2], channelString, baseName, guid) then return "closed" end
         if event == "CHAT_MSG_BN_WHISPER" and ns.Secret(args[13]) then return "closed" end
-        return ns.Reads(event, guid, message, baseName, channelString) and "read" or "skipped"
+        -- (a Battle.net friend who cannot be told is not read: Core.lua drops the line, so it shows the window)
+        local bnSenderID = event == "CHAT_MSG_BN_WHISPER" and args[13] or nil
+        return ns.Reads(event, guid, message, baseName, channelString, bnSenderID) and "read" or "skipped"
     end)
     return ok and verdict or "unknown"
 end

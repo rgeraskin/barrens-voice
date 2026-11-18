@@ -165,6 +165,13 @@ local V = ns.ChatFade.Verdict
 local function args(id) return { "привет", TOKEN, "", "", TOKEN, "", 0, 0, "", 0, 1, "", id, false, n = 14 } end
 assert(V("[" .. TOKEN .. "] шепчет: привет", "CHAT_MSG_BN_WHISPER", args(7)) == "read")
 assert(ns.ChatFade.ALWAYS_SHOW.CHAT_MSG_BN_WHISPER == "fadeWhisper", "shown with «шёпот»")
+-- a friend who cannot be told: not read (OnChat drops it), so the hidden chat shows it
+for _, id in ipairs({ 99, "7", false }) do
+    assert(V("[" .. TOKEN .. "] шепчет: привет", "CHAT_MSG_BN_WHISPER", args(id)) == "skipped", tostring(id))
+end
+C_BattleNet.GetAccountInfoByID = function() error("no") end
+assert(V("x", "CHAT_MSG_BN_WHISPER", args(7)) == "skipped", "the lookup fails: shown")
+C_BattleNet.GetAccountInfoByID = function(id) return friends[id] end
 -- one's own whispers: read with «Свои сообщения» (then shown only with «шёпот»), else shown
 local function informArgs(event)
     if event == "CHAT_MSG_BN_WHISPER_INFORM" then return args(7) end

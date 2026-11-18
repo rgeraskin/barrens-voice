@@ -599,14 +599,16 @@ end
 ns.EVENTS = EVENTS   -- the chat events the addon reads (for the tests)
 
 --- Whether a chat event's line is one the addon hands to the program (the channel on, not an addon's
---- line, one's own lines only when they are on) - for the chat windows' fading too (ChatFade.lua).
-function ns.Reads(event, guid, text, baseName, channelString)
+--- line, one's own lines only when they are on, a Battle.net friend's only when the friend can be told by
+--- `bnSenderID`) - for the chat windows' fading too (ChatFade.lua).
+function ns.Reads(event, guid, text, baseName, channelString, bnSenderID)
     local db = ns.db
     local key = EVENTS[event]
     if not (db and db.enabled and key and db[key]) then return false end
     if event == "CHAT_MSG_CHANNEL" and db[ns.ChannelSetting(baseName, channelString)] == false then return false end
     if db.skipAddons ~= false and ns.AddonLine(text) then return false end
     if OWN[event] then return db.self == true end   -- the GUID is the recipient's
+    if event == "CHAT_MSG_BN_WHISPER" and not ns.BNetFriend(bnSenderID) then return false end   -- OnChat drops it
     return db.self or not (guid and guid ~= "" and guid == UnitGUID("player"))
 end
 
