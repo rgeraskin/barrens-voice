@@ -129,6 +129,7 @@ def plain(text: str) -> str:
 
 # the word after a number, hyphenated ones whole: "5 рейд-лидеров" agrees with "лидеров", its last part
 NEXT_WORD = re.compile(r"\s+([а-яёА-ЯЁ+]+(?:-[а-яёА-ЯЁ+]+)*)")
+WITH_HALF = re.compile(r"\s+(?:половиной|лишним|хвостиком)\b", re.IGNORECASE)   # "2 с половиной часа"
 GENDERS = {"masc", "femn", "neut"}
 # words that number rather than count: "15 уровня" is the fifteenth (a count is "15 уровней")
 NUMBERED = {"уровень", "этаж", "число", "ранг", "фаза", "сезон", "глава", "акт", "волна", "слот", "босс"}
@@ -600,6 +601,13 @@ def numbers_to_words(text: str) -> str:
         following = NEXT_WORD.match(m.string, m.end())
         if GLUED.search(m.string, 0, m.start()):
             following = None                           # "20:00 сбор", "1.12 патч": no "нулевой сбор"
+        if following and following.group(1).lower() in ("с", "со"):
+            # the preposition, not pymorphy's "с" for секунда (feminine: "две с хилом"); "2 с половиной часа"
+            # agrees with what comes after the half: "два с половиной часа", "две с половиной минуты"
+            half = WITH_HALF.match(m.string, following.end())
+            following = NEXT_WORD.match(m.string, half.end()) if half else None
+            if n % 10 == 1 and n % 100 != 11:
+                following = None                       # "1 с половиной часа": "один", no form of it fits better
         if morph is not None and following and before.lower() in ("с", "со") and following.group(1).lower() in ("по", "на"):
             closing = RANGE_START.match(m.string, m.end())
             tag = closing_tag(closing_word(closing.group(3), morph), closing.group(1), bool(closing.group(2)),
