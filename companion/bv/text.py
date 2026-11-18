@@ -265,6 +265,37 @@ def agree(n: int, spoken: str, following: str, morph, before: str = "") -> str:
     return " ".join(parts)
 
 
+# where a count of one is in the accusative: "через одну-две минуты", "на один-два часа"
+ACCUSATIVE = {"в", "во", "на", "за", "через", "про"}
+
+
+def first_of_pair(n: int, last: int, spoken: str, following: str, morph, before: str = "") -> str:
+    """`spoken` (num2words' nominative for `n`), the first of two numbers of one noun, `last` the second:
+    in the case the second takes ("до двух-трёх человек", "с двумя-тремя магами"). One ending in 1 does
+    not take the noun's case, which is the form the second number asks ("места" after "два" is a
+    genitive): it takes the case the preposition asks - the noun only choosing among the cases one may
+    ask ("с одним-двумя магами") - and the noun's gender: "осталось одно-два места", "через одну-две
+    минуты", "до одного-двух мест", "21-22 уровня" - "двадцать один-двадцать два"."""
+    if n % 10 != 1 or n % 100 == 11:
+        return agree(n, spoken, following, morph, before)
+    word = following.replace("+", "").lower()
+    nouns = [p for p in morph.parse(word) if p.tag.POS == "NOUN"] if morph.word_is_known(word) else []
+    asked = asked_by(before, last, word, morph)
+    case = next((c for c in CASES if c in asked and any(p.tag.case == c for p in nouns)), None)
+    if case is None and asked in ({"gent"}, {"datv"}):
+        case = next(iter(asked))                       # "до 1-2 человек", "по одному-два человека"
+    if case is None:
+        case = "accs" if before.lower() in ACCUSATIVE else "nomn"
+    gender = next((p.tag.gender for p in nouns if p.tag.gender in GENDERS), "masc")
+    one = morph.parse("один")[0].inflect({case, gender} | ({"inan"} if case == "accs" and gender == "masc" else set()))
+    parts = spoken.split()
+    if one:
+        parts[-1] = one.word
+    if case in OBLIQUE:
+        parts[:-1] = to_case(parts[:-1], case, morph)  # "у двадцати одного-двадцати двух игроков"
+    return " ".join(parts)
+
+
 def ordinal(n: int, before: str, following: str, morph) -> str | None:
     """`n` as an ordinal agreeing with the word after it, when only an ordinal fits the phrase:
     "с 15 уровня" -> "пятнадцатого", "на 2 этаже" -> "втором", "15 уровень" -> "пятнадцатый"
@@ -553,7 +584,7 @@ def numbers_to_words(text: str) -> str:
         elif morph is not None and (second := PAIR_NEXT.match(m.string, m.end())) and \
                 (noun := NEXT_WORD.match(m.string, second.end())):
             try:                                       # the first of two: "до 2-3 человек" - "до двух-"
-                spoken = agree(n, spoken, noun.group(1).rsplit("-", 1)[-1], morph, before)
+                spoken = first_of_pair(n, int(second.group(1)), spoken, noun.group(1).rsplit("-", 1)[-1], morph, before)
             except Exception:  # noqa: BLE001 - a number read in the nominative is still a number
                 pass
         elif morph is not None and not GOES_ON.match(m.string, m.end()) and \
