@@ -28,7 +28,7 @@ from ..install import display_version, release_tag
 from ..paths import DATA_DIR, INSTALL_DIR, starter
 from .model import APP_DIR, GAME_NAMES
 from .paint import DIM, GOLD, PARCHMENT, Painter, ScaledCanvas, register_font, window_icon
-from ..logs import parse
+from ..logs import level_of, parse
 from .process import Companion
 from .tray import Tray
 
@@ -239,6 +239,12 @@ class App:
         self.incoming.put(f"{datetime.now():%H:%M:%S} {level:<5} [лаунчер] {message}")
         launcher_log(message)
 
+    def say_as_companion(self, message: str) -> None:
+        """A line of the companion's code run in the launcher (launch.launch at «Играть»), with the level the
+        companion's own log gives it: «    Battle.net: --exec=launch WoWF» is a detail for the log window,
+        not a line of the main one."""
+        self.say(message, level_of(message))
+
     def game(self, key: str | None):
         return next((g for g in self.games if g.key == key), None)
 
@@ -381,7 +387,7 @@ class App:
             return
         if self.companion.running and self.companion_game == self.selected:
             from .. import launch
-            launch.launch(dict(self.config, game=self.selected), self.say)
+            launch.launch(dict(self.config, game=self.selected), self.say_as_companion)
         elif self.companion.running:
             self.restart_companion(["--launch"])
         else:

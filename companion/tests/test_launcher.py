@@ -280,6 +280,19 @@ class Config(unittest.TestCase):
         self.assertEqual(said, ["WARN", "WARN", "WARN"])
 
 
+class LaunchFromTheWindow(unittest.TestCase):
+    def test_the_launch_details_stay_out_of_the_main_window(self):
+        # «Играть» with the companion running launches from the launcher: launch.launch's lines took the
+        # launcher's INFO, and «Battle.net: --exec=launch WoWF» showed in the main window
+        from bv.launcher import app
+        said = []
+        win = SimpleNamespace(say=lambda message, level="INFO": said.append((level, message)))
+        for line in ("запускаю игру через Battle.net ...", "    Battle.net: --exec=launch WoWF",
+                     "Battle.net не найден: укажите его в «Настройках»"):
+            app.App.say_as_companion(win, line)
+        self.assertEqual([level for level, _ in said], ["INFO", "DEBUG", "WARN"])
+
+
 class LiveFromTheWindow(unittest.TestCase):
     def test_a_hand_edit_made_while_the_window_was_open_is_taken_at_the_next_start(self):
         # the window read config.json at its start; the player then opened it from Settings and set both off.
