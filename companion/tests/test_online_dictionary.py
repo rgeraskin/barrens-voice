@@ -92,6 +92,13 @@ class Build(unittest.TestCase):
         self.assertEqual(addon_renamed(head + table), {"~old\\d{1,2}": "~new\\d{1,2}", "~two": "~a{2}\n~b"})
         self.assertEqual(addon_renamed(head + table), dictionary_json.renamed(head + table))
         self.assertEqual(addon_renamed(head + "D.RENAMED = {}\n"), {})
+        # a commented-out entry is none; an empty table on one line ends there, not at the next table's "}"
+        commented = ('D.RENAMED = {\n    -- [ [[~gone]] ] = [[~x]],\n    --[==[ [ [[~block]] ] = [[~y]], ]==]\n'
+                     '    [ [[~old]] ] = [[~a--b]], -- a "--" in a long string is no comment\n}\n')
+        empty = 'D.RENAMED = {}\nlocal other = {\n    [ [[~not]] ] = [[~renamed]],\n}\n'
+        for lua, renamed in ((commented, {"~old": "~a--b"}), (empty, {})):
+            self.assertEqual(addon_renamed(head + lua), renamed, lua)
+            self.assertEqual(dictionary_json.renamed(head + lua), renamed, lua)
 
 
 class Load(unittest.TestCase):

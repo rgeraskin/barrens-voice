@@ -19,7 +19,10 @@ LUA_USER = re.compile(r'\["dictionaryUser"\]\s*=\s*"((?:[^"\\]|\\.)*)"', re.S)
 DEFAULT_BLOCK = re.compile(r"D\.DEFAULT\s*=\s*\[\[(.*?)\]\]", re.S)
 REVISION = re.compile(r"^D\.REVISION\s*=\s*(\d+)", re.M)      # the default's revision (tools/release.py)
 # D.RENAMED as Dictionary.lua writes it: long strings, "[ [[old]] ] = [[new]]" or "= { [[new]], [[new]] }"
-RENAMED_BLOCK = re.compile(r"^D\.RENAMED\s*=\s*\{(.*?)^\}", re.M | re.S)
+# (an empty one "{}" ends where it starts, not at the next table's "}"); read with Lua's comments taken out
+RENAMED_BLOCK = re.compile(r"^D\.RENAMED\s*=\s*\{(?:\s*\}|(.*?)^\})", re.M | re.S)
+# Lua's comments - a block "--[[ ]]", a line "--" - and its long strings, kept whole (a "--" in one is no comment)
+LUA_COMMENT = re.compile(r"--\[(=*)\[.*?\]\1\]|--[^\n]*|(\[(=*)\[.*?\]\3\])", re.S)
 RENAMED_ENTRY = re.compile(r"\[\s*\[\[(.*?)\]\]\s*\]\s*=\s*(\[\[.*?\]\]|\{(?:\s*\[\[.*?\]\]\s*,?)*\s*\})", re.S)
 LONG_STRING = re.compile(r"\[\[(.*?)\]\]", re.S)
 WORD = re.compile(r"[^\W_]+")
@@ -216,8 +219,8 @@ def addon_renamed(lua: str) -> dict[str, str]:
     """The addon's D.RENAMED from the text of its Dictionary.lua, as dictionary.json carries it (several
     new keys joined by "\\n"): the table written with long strings, as that file writes it (a test holds
     it to what LuaJIT makes of the file)."""
-    block = RENAMED_BLOCK.search(lua)
-    if not block:
+    block = RENAMED_BLOCK.search(LUA_COMMENT.sub(lambda m: m.group(2) or "", lua))
+    if not block or block.group(1) is None:
         return {}
     return {old: "\n".join(LONG_STRING.findall(new)) for old, new in RENAMED_ENTRY.findall(block.group(1))}
 
