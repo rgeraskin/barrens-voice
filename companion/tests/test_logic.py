@@ -670,6 +670,13 @@ class Pipeline(unittest.TestCase):
             "5с": "пять серебра", "за 2г50с": "за два золотых пятьдесят серебра", "5 с кд": "пять секунд кулд+аун",
         })
 
+    def test_a_dative_after_k_is_the_preposition_after_a_price_too(self):
+        self.check({
+            "чант до 5 к силе": "чант до пяти к силе", "до 10 к урону": "до десяти к урону",
+            "до 5 к вечеру буду": "до пяти к вечеру буду", "от 5 к нам идут": "от пяти к нам идут",
+            "за 5 к отдам": "за пять тысяч отдам", "продам за 5 к": "продам за пять тысяч",
+        })
+
     def test_unequal_numbers_around_na_are_no_match(self):
         # a match or a size is two equal numbers; two different ones are a count and a place, or a move
         self.check({
