@@ -328,9 +328,10 @@ def prune_unwatched(root: Path):
     return prune_later(root)
 
 
-def record_start(root: Path, ran_for: float, failed: bool | None) -> str | None:
+def record_start(root: Path, ran_for: float, failed: bool | None, say=None) -> str | None:
     """After the companion of a freshly applied version ends: a failure at its very start (`failed` True)
-    counts; at two, app\\current goes back to the previous version, whose number is returned. A good run
+    counts; at two, app\\current goes back to the previous version, whose number is returned - when there is one
+    whole to go back to; else `say` is told once (update.json "stuck") that going back is impossible. A good run
     (False, or a failure after EARLY) settles it: update.json goes, the versions before the previous one are
     pruned. None is no verdict however long the run was - the companion stopped for a reason that is not the
     version's (started again online, another companion, config.json, an error it explained): nothing changes,
@@ -351,7 +352,15 @@ def record_start(root: Path, ran_for: float, failed: bool | None) -> str | None:
         prune_later(root, also=[state.get("previous")])     # settled: the versions before the one to go back to go
         return None
     state["fails"] = state.get("fails", 0) + 1
-    if state["fails"] < 2 or not state.get("previous") or not install.whole(root / "app" / state["previous"]):
+    previous = state.get("previous")
+    if state["fails"] < 2 or not previous or not install.whole(root / "app" / previous):
+        if state["fails"] >= 2 and not state.get("stuck"):
+            state["stuck"] = True
+            if say is not None:
+                name = install.display_version(state.get("version"))
+                say(f"версия {name} не запускается, а вернуться не на что: " + (
+                    f"версии {install.display_version(previous)} нет целиком" if previous else "прежней версии нет")
+                    + " — установите Barrens Voice заново")
         write_json(path, state)
         return None
     # refused before the switch: a rollback cut short between its renames (install.point_current) is remembered,

@@ -798,6 +798,41 @@ class Update(unittest.TestCase):
             self.assertEqual(install.current_version(root), "0.4.1")
             self.assertIsNone(update.refused(root))
 
+    def test_no_way_back_is_said_once(self):
+        # the previous version not whole: the failures only grew, and nothing said that going back is impossible
+        import shutil
+        from types import SimpleNamespace
+        from unittest import mock
+        from bv import install, update
+        from bv.launcher import app
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            for v in ("0.4.0", "0.4.1"):
+                make_version(root, v)
+            install.point_current(root, root / "app" / "0.4.0")
+            update.apply(root, "0.4.1")
+            shutil.rmtree(root / "app" / "0.4.0" / "companion")
+            said = []
+            win = SimpleNamespace(companion_started=1.0, companion_game=None, running_game=None, resident=False,
+                                  say=lambda m, level="INFO": said.append((level, m)), game=lambda key: None,
+                                  companion=SimpleNamespace(state=dict, running=False), config={},
+                                  tray=SimpleNamespace(notify=lambda m: said.append(("tray", m))))
+            win.start_failed = lambda code: app.App.start_failed(win, code)
+            with mock.patch.object(app, "INSTALL_DIR", root), mock.patch.object(app.time, "monotonic", return_value=6.0):
+                for _ in range(4):
+                    app.App.companion_ended(win, 1)
+            stuck = [m for level, m in said if level == "ERROR" and "вернуться не на что" in m]
+            self.assertEqual(stuck, ["версия 0.4.1 не запускается, а вернуться не на что: версии 0.4.0 нет целиком "
+                                     "— установите Barrens Voice заново"])
+            self.assertEqual(json.loads(update.state_path(root).read_text(encoding="utf-8"))["fails"], 4)
+            self.assertEqual(install.current_version(root), "0.4.1")
+            update.state_path(root).write_text(json.dumps({"version": "0.4.1", "previous": None, "fails": 1}))
+            told = []
+            self.assertIsNone(update.record_start(root, 5, failed=True, say=told.append))
+            self.assertIsNone(update.record_start(root, 5, failed=True, say=told.append))
+            self.assertEqual(told, ["версия 0.4.1 не запускается, а вернуться не на что: прежней версии нет "
+                                    "— установите Barrens Voice заново"])
+
     def test_switch_watched_from_before_it(self):
         # update.json is written before app\\current moves: a switch is never left unwatched, a failed one leaves
         # no watch, an error after it (the old link in use) does not undo it, a retry keeps the version before

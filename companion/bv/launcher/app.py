@@ -263,7 +263,8 @@ class App:
         self.last_code = code
         if INSTALL_DIR is not None and self.companion_started:
             from .. import update
-            back = update.record_start(INSTALL_DIR, time.monotonic() - self.companion_started, self.start_failed(code))
+            back = update.record_start(INSTALL_DIR, time.monotonic() - self.companion_started, self.start_failed(code),
+                                       say=lambda message: self.say(message, "ERROR"))
             if back:
                 self.say(f"версия {self.version} не запускается — вернулся на {back}", "ERROR")
                 self.tray.notify(f"Новая версия Barrens Voice не запустилась, вернулся на {back}. "
