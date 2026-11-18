@@ -58,11 +58,34 @@ def wow_running() -> bool:
 
 
 def wow_may_run() -> bool:
-    """The game may run: `wow_running`, or a program named like the game (`is_wow`) whose path cannot be
-    read (run as another user or as administrator, say). The launch asks this: a second game started by
-    Battle.net is worse than a launch left to the player, who sees «игра уже запущена» in the log."""
+    """The game may run (`game_may_run`). The launch asks this: a second game started by Battle.net is
+    worse than a launch left to the player, who sees why in the log."""
+    return game_may_run() is not None
+
+
+def launch_allowed(log) -> bool:
+    """The companion's start may launch the game: none may run (`game_may_run`). When one may, the log
+    says which program closed the launch - else Play starting no game would look like a fault."""
+    why = game_may_run()
+    if why:
+        log(f"игру не запускаю: {why}")
+    return why is None
+
+
+def game_may_run() -> str | None:
+    """Why the game may run, for the log after «игру не запускаю: », or None: the game runs
+    (`is_game`), or a Wow.exe whose path cannot be read (run as administrator or by another user). Only
+    that exact name: other programs named like the game (another account's WowUp.exe, Windows' own
+    wowreg32.exe run as SYSTEM) are no game, and must not keep the launch closed."""
     unread: list[str] = []
-    return any(is_game(p) for p in process_paths(is_wow, unread)) or bool(unread)
+    for path in process_paths(is_wow, unread):
+        if is_game(path):
+            return f"она уже запущена ({path})"
+    hidden = next((name for name in unread if name.lower() == "wow.exe"), None)
+    if hidden:
+        return (f"уже запущена {hidden}, но откуда, не видно "
+                "(её запустили от администратора или под другим пользователем)")
+    return None
 
 
 def process_paths(match, unread: list[str] | None = None) -> list[str]:
@@ -138,7 +161,7 @@ def launch(config: dict, log, game_running=None) -> bool:
     """Ask Battle.net to start the game of `game` (`launch_product` for Forever, WoWF;
     `launch_product_retail` for retail, WoW) - unless a game runs already: the player may have started it
     while the voice bank was being built before this launch, and a second command starts a second game
-    (`wow_may_run`: a program named like the game whose path cannot be read counts)."""
+    (`wow_may_run`: a Wow.exe whose path cannot be read counts)."""
     running = game_running or (wow_may_run if sys.platform == "win32" else (lambda: False))
     if running():
         log("игра уже запущена — второй раз не запускаю")

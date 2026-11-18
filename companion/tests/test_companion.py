@@ -457,6 +457,9 @@ class GameRunning(unittest.TestCase):
                 ([game], [], True, True),
                 ([r"C:\Programs\WowUp\WowUp.exe"], [], False, False),
                 ([], ["Wow.exe"], False, True),                  # its path hidden from this user: may be the game
+                ([], ["WOW.EXE"], False, True),
+                ([], ["WowUp.exe"], False, False),               # another account's tool: no game, the launch stays open
+                ([], ["wowreg32.exe"], False, False),            # Windows' own, run as SYSTEM
                 ([], ["Battle.net.exe"], False, False)):         # only names like the game's count
             with mock.patch.object(launch, "process_paths", self.processes(readable, unreadable)):
                 self.assertEqual((launch.wow_running(), launch.wow_may_run()), (running, may_run),
@@ -473,6 +476,23 @@ class GameRunning(unittest.TestCase):
                 mock.patch.object(launch, "find_battlenet", lambda config: sent.append(1)):
             self.assertFalse(launch.launch({}, logged.append))
         self.assertEqual((logged, sent), (["игра уже запущена — второй раз не запускаю"], []))
+
+    def test_the_start_says_why_it_does_not_launch(self):
+        # the gate in main() closed without a word: Play started no game and the log said nothing
+        from unittest import mock
+
+        from bv import launch
+        game = r"D:\Games\World of Warcraft\_forever_\Wow.exe"
+        for readable, unreadable, allowed, said in (
+                ([], [], True, []),
+                ([], ["WowUp.exe", "wowreg32.exe"], True, []),
+                ([game], [], False, [f"игру не запускаю: она уже запущена ({game})"]),
+                ([], ["Wow.exe"], False, ["игру не запускаю: уже запущена Wow.exe, но откуда, не видно "
+                                          "(её запустили от администратора или под другим пользователем)"])):
+            logged = []
+            with mock.patch.object(launch, "process_paths", self.processes(readable, unreadable)):
+                self.assertIs(launch.launch_allowed(logged.append), allowed, (readable, unreadable))
+            self.assertEqual(logged, said)
 
 
 
