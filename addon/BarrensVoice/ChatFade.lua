@@ -108,7 +108,12 @@ function F.Reveal(cf)
 end
 
 -- Events whose lines show the window though the companion reads them, if the player asked: setting.
-local ALWAYS_SHOW = { CHAT_MSG_WHISPER = "fadeWhisper", CHAT_MSG_GUILD = "fadeGuild", CHAT_MSG_OFFICER = "fadeGuild" }
+-- (Of the group's chat, the events Core.lua's EVENTS reads.)
+local ALWAYS_SHOW = { CHAT_MSG_WHISPER = "fadeWhisper", CHAT_MSG_GUILD = "fadeGuild", CHAT_MSG_OFFICER = "fadeGuild",
+    CHAT_MSG_PARTY = "fadeGroup", CHAT_MSG_PARTY_LEADER = "fadeGroup", CHAT_MSG_RAID = "fadeGroup",
+    CHAT_MSG_RAID_LEADER = "fadeGroup", CHAT_MSG_RAID_WARNING = "fadeGroup", CHAT_MSG_INSTANCE_CHAT = "fadeGroup",
+    CHAT_MSG_INSTANCE_CHAT_LEADER = "fadeGroup" }
+F.ALWAYS_SHOW = ALWAYS_SHOW   -- for the tests
 
 local function OnAddMessage(self, text)
     local mark = marks[self]
@@ -122,7 +127,7 @@ local function OnAddMessage(self, text)
                 line = tostring(text):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|H.-|h(.-)|h", "%1")
             end
             ns.Diag(("окно чата %s показано: %s — %s"):format(self.GetName and self:GetName() or "?",
-                asked and mark.read and "так просили в настройках (шёпот или гильдия)"
+                asked and mark.read and "так просили в настройках (шёпот, гильдия или группа)"
                     or mark and mark.secret and "закрытый чат (подземелье, рейд, PvP), компаньону не передать"
                     or mark and "строку компаньон не читает" or "строка не из события чата (вывод аддона?)",
                 ns.Protocol.TrimUTF8(line, 90)))

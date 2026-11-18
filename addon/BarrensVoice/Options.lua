@@ -221,13 +221,17 @@ local function BuildGeneral(tab, description)
         .. "Работает, пока озвучка включена.", get, set)
     for i, item in ipairs({
         { "fadeWhisper", "при шёпоте", "Шёпот вам показывает окно чата, хотя и озвучивается: его легко пропустить на слух." },
-        { "fadeGuild", "при строке гильдии", "Строка гильдии (и офицерского чата) показывает окно, хотя и озвучивается." } }) do
+        { "fadeGuild", "при строке гильдии", "Строка гильдии (и офицерского чата) показывает окно, хотя и озвучивается." },
+        { "fadeGroup", "при строке группы/рейда", "Строки группы и рейда показывают окно, хотя и озвучиваются: "
+            .. "группа, рейд, объявления рейда, чат подземелья или поля боя." } }) do
         local g, s = Setting(item[1])
-        local c = UI.Check(tab, LEFT + SUB + (i - 1) * 250, y - 24, "Показывать " .. item[2], item[3], g, s)
+        -- two in a row: the third under the first
+        local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
+        local c = UI.Check(tab, LEFT + SUB + col * 250, y - 24 - row * 24, "Показывать " .. item[2], item[3], g, s)
         checks[#checks + 1] = c
         fadeSubs[#fadeSubs + 1] = c
     end
-    y = y - 54
+    y = y - 78
 
     -- "Мост к компаньону": folded, as it is needed rarely - when another addon covers the line.
     y = UI.Header(tab, "Дополнительно", y)

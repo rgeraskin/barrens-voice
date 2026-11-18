@@ -660,6 +660,27 @@ ns.db.fadeWhisper, ns.db.fadeGuild = false, false
 line("CHAT_MSG_GUILD", "ещё раз", "Player-1-5")
 settle(0.3)
 assert(ChatFrame1:GetAlpha() == 0, "options off again: a guild line does not show it")
+-- the group's lines (party, raid, raid warning, instance chat) too - on by default
+assert(ns.DEFAULTS.fadeGroup == true, "the group's lines show the window by default")
+for event, setting in pairs(ns.ChatFade.ALWAYS_SHOW) do
+    assert(ns.EVENTS[event], "an event the addon reads: " .. event)
+    assert(ns.DEFAULTS[setting] ~= nil, "a setting of its own: " .. setting)
+end
+ns.db.raid, ns.db.warning = true, true
+for _, event in ipairs({ "CHAT_MSG_PARTY", "CHAT_MSG_RAID_WARNING" }) do
+    ns.db.fadeGroup = true
+    now = now + 20
+    settle(2)
+    line(event, "пул через 5", "Player-1-6")
+    settle(0.3)
+    assert(ChatFrame1:GetAlpha() == 1, event .. " with the option on: the window shows")
+    ns.db.fadeGroup = false
+    now = now + 20
+    settle(2)
+    line(event, "пул через 5", "Player-1-6")
+    settle(0.3)
+    assert(ChatFrame1:GetAlpha() == 0, event .. " with the option off: read, out of sight")
+end
 -- a line in a tab that is not the one shown, and the combat log: no flash
 local log = widget()
 log._shown, log.isDocked, log.buttonFrame, log.editBox, log.ResizeButton = false, true, false, false, false
