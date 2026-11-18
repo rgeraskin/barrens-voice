@@ -1,13 +1,13 @@
--- «Что нового»: what each release brought, for players (Russian, «ты»; CHANGELOG.md is the developers' English).
+-- «Что нового»: what each addon version brought, for players (Russian, «ты»; CHANGELOG.md is the developers' English).
 -- After an update, a few seconds after login and never in combat, the entries the player has not seen are shown
 -- once: with a "big" one among them (a feature, something that works differently) the window, else ("small": fixes,
 -- dictionary words) one chat line with the newest one's summary. Seen is kept per entry (`newsSeen` in the saved
 -- variables, by the entry's version), so the first run marks everything seen: a newcomer gets the welcome instead.
 --
--- An entry belongs to a release ("0.4.0"); a test build ("0.4.0b5") shows its release's entry, once, as soon as it
+-- An entry belongs to an addon version ("0.4.0"; a release of the program alone keeps the addon and its entry); a test build ("0.4.0b5") shows its release's entry, once, as soon as it
 -- is written. An entry of a test build's own (version = "0.4.0b6") is shown from that build on: the way to tell the
 -- testers who saw the release's entry already what a later build brought. Keep `version`, `date` and `kind` on an
--- entry's first line: tools/release.py reads them there (a release needs its entry, dated "DD.MM.YYYY").
+-- entry's first line: tools/release.py reads them there (a release needs one for its addon, dated "DD.MM.YYYY").
 local _, ns = ...
 
 local N = {}

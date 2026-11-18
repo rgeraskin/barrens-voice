@@ -587,17 +587,17 @@ class AddonVersion(unittest.TestCase):
 
     def test_every_release_has_its_news(self):
         # the «Что нового» window (News.lua) has an entry for every released addon - a test build's is its
-        # release's - and for the release in work (pyproject.toml's version)
+        # release's - and for the addon in work (BarrensVoice.toc's version, a test build's: its release's)
         import re
         import subprocess
         import sys
-        import tomllib
         root = Path(__file__).resolve().parents[2]
         sys.path.insert(0, str(root / "tools"))
         import release
         entries = release.news_entries()
-        project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
-        self.assertIn(project, entries, f"add a «Что нового» entry for {project} to addon/BarrensVoice/News.lua")
+        toc = (root / "addon" / "BarrensVoice" / "BarrensVoice.toc").read_text(encoding="utf-8")
+        working = re.sub(r"b\d+$", "", re.search(r"## Version:\s*(\S+)", toc).group(1))
+        self.assertIn(working, entries, f"add a «Что нового» entry for {working} to addon/BarrensVoice/News.lua")
         tags = [t for t in subprocess.run(["git", "tag", "-l", "v*"], cwd=root, capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.split()
                 if re.fullmatch(r"v\d+\.\d+\.\d+(-beta\.\d+)?", t)]
         for tag in tags:
@@ -621,6 +621,15 @@ class AddonVersion(unittest.TestCase):
                 '      items = { "y" } },\n    { version = "0.4.0b6", date = "01.12.2026", kind = "small",\n'
                 '      summary = "version = \\"9.9.9\\" in a text is no entry" },\n}\n')
         self.assertEqual(release.news_entries(text), {"0.5.0": None, "0.4.0b6": "01.12.2026"})
+
+    def test_news_of_the_addon_not_the_program(self):
+        # the entry belongs to the addon's version: a release of the program alone keeps the addon and its entry
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
+        import release
+        self.assertIsNone(release.news_problem("v0.4.1", "0.4.0", {"0.4.0": "18.11.2026"}))   # program only
+        self.assertIn("no «Что нового» entry", release.news_problem("v0.4.2", "0.4.2", {"0.4.0": "18.11.2026"}))
+        self.assertIn("has no date", release.news_problem("v0.4.2", "0.4.2", {"0.4.2": None, "0.4.0": "18.11.2026"}))
 
     def test_a_release_has_its_dated_news(self):
         # tools/release.py refuses a release without a «Что нового» entry, or with one not dated yet
