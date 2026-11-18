@@ -98,6 +98,8 @@ class Inflector:
         parsed = {}
         head = None
         for n, i in enumerate(words):
+            if self._cardinal(parts[i]) and self._ordinal_after(parts, words[n + 1:]):
+                continue        # "пятьдесят пятый уровень": a compound ordinal declines its last word only
             p = self._parse(parts[i], adjective_first=n + 1 < len(words))
             if p is None or p.tag.POS not in DECLINABLE:
                 break
@@ -123,6 +125,16 @@ class Inflector:
             if form is not None:
                 parts[i] = self._like(parts[i], form.word)
         return "".join(parts)
+
+    def _cardinal(self, word: str) -> bool:
+        return any(p.tag.POS == "NUMR" for p in self.morph.parse(word.replace("+", "").lower()))
+
+    def _ordinal_after(self, parts: list[str], rest: list[int]) -> bool:
+        """Whether the words at `rest` begin with more cardinals and then an ordinal ("пятый")."""
+        for i in rest:
+            if not self._cardinal(parts[i]):
+                return any("Anum" in p.tag for p in self.morph.parse(parts[i].replace("+", "").lower()))
+        return False
 
     def _parse(self, word: str, adjective_first: bool = False):
         """The nominative reading of `word`; an adjective one first when a word follows ("Мёртвые
