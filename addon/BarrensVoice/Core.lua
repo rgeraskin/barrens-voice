@@ -378,7 +378,7 @@ function ns.OnClubAdded(clubId)
     end
     askedAt = nil
     local key = CommunitiesKey()
-    print(ICON .. " " .. PREFIX .. "ты в сообществе!" .. (key and (" Окно сообществ — клавиша %s."):format(key) or ""))
+    print(ICON .. " " .. PREFIX .. "ты в сообществе!" .. (key and (" Окно сообществ — клавиша «%s»."):format(key) or ""))
 end
 
 --- A community's invite as a link in the chat, for the player to click: the click is the game's own
@@ -399,7 +399,7 @@ local function LinkInChat(link)
         local key = CommunitiesKey()
         -- "|" starts the chat's markup: "||" shows one
         print(ICON .. " " .. PREFIX .. ("ты уже в сообществе «%s»"):format((joined:gsub("|", "||")))
-            .. (key and (" — окно сообществ открывается клавишей %s."):format(key) or "."))
+            .. (key and (" — окно сообществ открывается клавишей «%s»."):format(key) or "."))
     else
         local chatLink = ClubLink(ticket)
         if not chatLink then return false end

@@ -235,7 +235,7 @@ do  -- «Открыть» for the community: its invite as a link in the chat, f
     infos[42] = { name = "Barrens Voice", clubType = 0 }
     clock = clock + 299
     ns.OnEvent("CLUB_ADDED", 42)
-    assert(#told == 3 and told[3] == ICON .. "ты в сообществе! Окно сообществ — клавиша J.", told[3])
+    assert(#told == 3 and told[3] == ICON .. "ты в сообществе! Окно сообществ — клавиша «J».", told[3])
     ns.OnClubAdded(42)
     assert(#told == 3, "greeted once")
     -- later than 5 minutes: not greeted
@@ -261,7 +261,7 @@ do  -- «Открыть» for the community: its invite as a link in the chat, f
     clubs = { { name = "Гильдия котов" }, { name = "Barrens Voice — озвучка чата" } }
     ns.OpenLink("community")
     assert(#told == fresh + 1 and told[#told] == ICON .. "ты уже в сообществе «Barrens Voice — озвучка чата» — окно "
-        .. "сообществ открывается клавишей J.", told[#told])
+        .. "сообществ открывается клавишей «J».", told[#told])
     ns.OnClubAdded(42)
     assert(#told == fresh + 1, "already in: no greeting")
     GetBindingKeyForAction = nil
