@@ -1170,18 +1170,26 @@ print("companion ok")
 -- later (News.lua: the stub's C_Timer.After runs at once; companion/tests/news.lua has the rest)
 local welcome, plainPrint = {}, print
 print = function(text) welcome[#welcome + 1] = text end
+-- the news and the program's version as the companion writes them into NewsData.lua (bv/news.py)
+local function newsEntry(version, kind, date)
+    return { version = version, date = date, kind = kind, title = "Выпуск " .. version, summary = "что нового",
+             items = { "Пункт." } }
+end
+BarrensVoiceNewsData = { version = "0.4.0b15", entries = { newsEntry("0.4.0", "big"),
+                                                          newsEntry("0.1.0", "big", "11.11.2026") } }
 GetAddOnMetadata = function() return "0.4.0b1" end
 ns.firstRun, ns.db.seenVersion, ns.db.newsSeen = true, nil, nil
 ns.LoginWord()
 assert(#welcome == 5 and welcome[1]:find("добро пожаловать") and welcome[2]:find("приложение%-компаньон")
     and welcome[4]:find("«Помощь»", 1, true) and welcome[5]:find("озвучка чата"), "welcome, then whether the reading works")
-assert(ns.db.seenVersion == "0.4.0b1", "the version is kept")
+assert(welcome[1]:find("Barrens Voice 0.4.0b1", 1, true), "the welcome names the addon's version")
+assert(ns.db.seenVersion == "0.4.0b15", "the program's version is kept")
 assert(ns.db.newsSeen["0.4.0"] and ns.db.newsSeen["0.1.0"], "the first run: every entry seen")
 ns.firstRun = false
 welcome = {}
 ns.LoginWord()
 assert(#welcome == 1 and welcome[1]:find("озвучка чата"), "the same version again: only whether the reading works")
-GetAddOnMetadata = function() return "0.4.0b2" end                   -- a test build with nothing new
+BarrensVoiceNewsData.version = "0.4.0b16"                            -- a test build with nothing new
 welcome = {}
 ns.LoginWord()
 assert(#welcome == 1 and welcome[1]:find("озвучка чата"), "nothing new: no word of it")
@@ -1197,7 +1205,7 @@ ns.NewsWindow.Hide()
 SlashCmdList.BARRENSVOICE("что нового")
 assert(ns.NewsWindow.IsShown(), "/bv что нового too")
 ns.NewsWindow.Hide()
-GetAddOnMetadata = nil
+GetAddOnMetadata, BarrensVoiceNewsData = nil, nil
 print = plainPrint
 print("welcome ok")
 

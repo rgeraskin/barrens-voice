@@ -1,7 +1,8 @@
 -- The «Что нового» window (/bv news; by itself after an update with something big, News.lua): every entry the
--- installed version has, newest first - the title, the version and the date, the items - in a scrolling box, and
--- under it the whole changelog on GitHub (UI.LinkRow: the address, «Копировать», «Открыть»). A window of its own
--- (UI.Window: it moves and closes on Escape), unlike the other *Window.lua files, which fill a settings tab.
+-- installed version (the program's) has, newest first - the title, the version and the date, the items - in a
+-- scrolling box, and under it the whole changelog on GitHub (UI.LinkRow: the address, «Копировать», «Открыть»). A
+-- window of its own (UI.Window: it moves and closes on Escape), unlike the other *Window.lua files, which fill a
+-- settings tab.
 local _, ns = ...
 local UI = ns.UI
 
@@ -19,6 +20,9 @@ local GAP_ENTRY, GAP_ITEM = 18, 6
 
 local TOP_TEXT = "Сверху — самое новое. Снова открыть это окно — /bv news или кнопкой на вкладке «Помощь» в "
     .. "настройках (/bv). Там же — куда писать об ошибках и идеях."
+-- no entries: the companion has not written NewsData.lua yet (News.lua)
+W.EMPTY = "Записи «Что нового» приносит приложение-компаньон Barrens Voice: запусти его, и после /reload они "
+    .. "будут здесь."
 
 local window, scroll, content
 local pools = {}   -- the content's font strings by font, and the items' markers, reused at every show
@@ -72,6 +76,7 @@ function W.Fill(entries)
         y = y + Put(font, counts[font], x, y, W.CONTENT_W - x, text)
     end
     local marks = 0
+    if #entries == 0 then put("GameFontHighlight", 0, W.EMPTY) end
     for i, e in ipairs(entries) do
         if i > 1 then y = y + GAP_ENTRY end
         put("GameFontNormalLarge", 0, e.title)
@@ -109,7 +114,7 @@ end
 --- Open the window on top, scrolled to the newest entry.
 function W.Show()
     if not window then Build() end
-    W.Fill(ns.News.Visible(ns.AddonVersion()))
+    W.Fill(ns.News.Visible(ns.News.Installed()))
     scroll:SetVerticalScroll(0)
     window:Show()
     if window.Raise then window:Raise() end

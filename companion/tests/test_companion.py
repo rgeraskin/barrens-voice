@@ -453,7 +453,7 @@ class RestartOnline(unittest.TestCase):
 
 
 class AddonFiles(unittest.TestCase):
-    """VoiceList.lua, CompanionStatus.lua and DictionaryOnline.lua: written whole or not at all."""
+    """VoiceList.lua, CompanionStatus.lua, DictionaryOnline.lua and NewsData.lua: written whole or not at all."""
 
     def test_write_if_changed(self):
         from bv.paths import write_if_changed

@@ -1,5 +1,7 @@
-# «Что нового»: what each release of Barrens Voice brought, for players. The one source of it: tools/release.py makes
-# the GitHub release's description from the release's entry. CHANGELOG.md stays the developers' English list.
+# «Что нового»: what each release of Barrens Voice brought, for players. The one source of it: the companion writes
+# the entries of its version into the addon (NewsData.lua: the window and the chat line after an update), and
+# tools/release.py makes the GitHub release's description from the release's entry. CHANGELOG.md stays the
+# developers' English list.
 #
 # One [[entry]] per release, newest first, keyed by the program's version (pyproject.toml's, which every release
 # raises; the addon's own version does not matter here). Russian, «ты», short: what the player will notice and what

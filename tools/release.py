@@ -1,7 +1,8 @@
 """Build a release into dist/: barrens-voice-<version>.zip and manifest.json (`mise run build`).
 
 The archive is what bv/install.py puts into <install>\\app\\<version>: companion/ (the code, without the
-tests), addon/BarrensVoice, pyproject.toml, uv.lock, LICENSE, and Barrens Voice.exe when built (on Windows). The manifest tells the launcher's updater
+tests), addon/BarrensVoice, pyproject.toml, uv.lock, LICENSE, news.toml (the companion writes the addon's «Что
+нового» from it), and Barrens Voice.exe when built (on Windows). The manifest tells the launcher's updater
 what is there: the app's version, the strip protocol, the addon's version, the archive's name, size
 and SHA-256 (`mise run sign` adds a signature). A release (not a test build) needs the addon at its release version
 and a dated «Что нового» entry of its own version in news.toml - the program's, so a release of the program alone
@@ -46,7 +47,7 @@ def files() -> list[tuple[Path, str]]:
     """(source, name in the archive): only what git tracks, so nothing made on this machine slips in."""
     import subprocess
     tracked = subprocess.run(["git", "ls-files", "-z", "companion", "addon/BarrensVoice", "pyproject.toml", "uv.lock",
-                              "LICENSE"], cwd=ROOT, capture_output=True, check=True).stdout.decode().split("\0")
+                              "LICENSE", news.SOURCE], cwd=ROOT, capture_output=True, check=True).stdout.decode().split("\0")
     out = []
     for name in filter(None, tracked):
         parts = Path(name).parts

@@ -1,8 +1,12 @@
-"""«Что нового»: news.toml, the players' news of every release.
+"""«Что нового»: news.toml, the players' news of every release, and NewsData.lua, its part the addon shows.
 
-news.toml (the repository's root) is the one source: an entry per release of the program, keyed by the program's
-version (pyproject.toml's), newest first; Russian, «ты», for players. `problems` says what is wrong with it (the
-tests check the file by it), `visible` which entries a version shows.
+news.toml (the repository's root, and the release archive's beside pyproject.toml) is the one source: an entry per
+release of the program, keyed by the program's version (pyproject.toml's), newest first; Russian, «ты», for players.
+tools/release.py makes the GitHub release's description from the release's entry. The companion writes the entries
+of its own version (`visible`) into the addon's folder as NewsData.lua at its start, with that version - which the
+addon compares and keys what was seen by (News.lua), so a release of the program alone has its news too. The game
+reads the file at login and /reload; the addon ships it empty (BarrensVoiceNewsData = nil), so the .toc has a file
+to load before the companion first runs, and an addon install keeps the companion's (launcher.model.GENERATED).
 """
 from __future__ import annotations
 
@@ -12,6 +16,7 @@ from datetime import datetime
 from pathlib import Path
 
 SOURCE = "news.toml"
+FILE = "NewsData.lua"
 KINDS = ("big", "small")
 FIELDS = {"version", "date", "kind", "title", "summary", "items"}
 VERSION = re.compile(r"\d+\.\d+\.\d+(?:b\d+)?")
@@ -123,3 +128,74 @@ def visible(entries: list[dict], version: str) -> list[dict]:
     own = version_key(version)
     out = [e for e in entries if version_key(e["version"]) <= (own if "b" in e["version"] else release)]
     return sorted(out, key=lambda e: version_key(e["version"]), reverse=True)
+
+
+def lua_string(text: str) -> str:
+    """`text` as a Lua 5.1 string literal that reads back as `text`: quotes and backslashes escaped, line breaks and
+    the other control characters as decimal escapes (\\ddd, three digits: 5.1 has no \\x). «|», the start of the
+    game's markup (|c, |H, |T), is not changed here: news.toml may not have it (`entry_problems`), and `write` leaves
+    out an entry that does."""
+    out = []
+    for ch in text:
+        if ch in '"\\':
+            out.append("\\" + ch)
+        elif ch == "\n":
+            out.append("\\n")
+        elif ord(ch) < 32 or ord(ch) == 127:
+            out.append(f"\\{ord(ch):03d}")
+        else:
+            out.append(ch)
+    return '"' + "".join(out) + '"'
+
+
+def render(entries: list[dict], version: str) -> str:
+    """NewsData.lua: the version the news are of and its entries, newest first."""
+    q = lua_string
+    rows = []
+    for e in entries:
+        head = f"version = {q(e['version'])}" + (f", date = {q(e['date'])}" if e.get("date") else "")
+        items = "".join(f"\n            {q(i)}," for i in e["items"])
+        rows.append(f"        {{ {head}, kind = {q(e['kind'])},\n"
+                    f"          title = {q(e['title'])},\n"
+                    f"          summary = {q(e['summary'])},\n"
+                    f"          items = {{{items}\n          }} }},")
+    return ("-- Written by the Barrens Voice companion app at its start: «Что нового» of its version, from the\n"
+            "-- release's news.toml; the addon reads it at login and /reload (News.lua).\n"
+            "BarrensVoiceNewsData = {\n"
+            f"    version = {q(version)},\n"
+            "    entries = {\n" + "".join(r + "\n" for r in rows) + "    },\n"
+            "}\n")
+
+
+def program_version(root: Path) -> str:
+    """This program's version: pyproject.toml at `root` (a test build's archive has its own, "0.4.0b16")."""
+    return tomllib.loads((Path(root) / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
+
+
+def write(addon: Path | None, log, root: Path | None = None) -> bool:
+    """NewsData.lua in the addon's folder: the entries of news.toml this program's version shows, written only when
+    it changes; whether it was written. `root`: where news.toml and pyproject.toml are (the companion's parent).
+    An entry with a problem is left out; a file that cannot be read or written is logged and skipped."""
+    if addon is None or not Path(addon).is_dir():
+        return False
+    if root is None:
+        from .paths import CODE_DIR
+        root = CODE_DIR.parent
+    try:
+        version = program_version(root)
+        entries = [e for e in load(Path(root) / SOURCE) if not entry_problems(e)]
+    except (OSError, ValueError, TypeError, KeyError) as e:
+        log(f"не удалось прочитать {SOURCE}: {e}")
+        return False
+    if not VERSION.fullmatch(version):
+        log(f"не удалось записать «Что нового» в аддон: версия программы {version!r}")
+        return False
+    from .paths import write_if_changed
+    try:
+        written = write_if_changed(Path(addon) / FILE, render(visible(entries, version), version))
+    except OSError as e:                  # the game reading it this very moment: the next start writes it
+        log(f"не удалось записать «Что нового» в аддон: {e}")
+        return False
+    if written:
+        log(f"«Что нового» версии {version} записано в аддон: в игре — при входе или после /reload")
+    return written

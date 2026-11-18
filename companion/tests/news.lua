@@ -1,6 +1,7 @@
--- «Что нового» (News.lua, NewsWindow.lua): the entries themselves, the first run, an update with a big entry and
--- with small ones, the setting, the combat, the chat link (on a model of the clients' click path), seen kept over a
--- login, a test build's release entry, and the window's layout.
+-- «Что нового» (News.lua, NewsWindow.lua): the entries and the program's version from the companion's NewsData.lua,
+-- the first run (before the companion ran, too), an update with a big entry and with small ones, the setting, the
+-- combat, the chat link (on a model of the clients' click path), seen kept over a login, a test build's release
+-- entry, and the window's layout (with no news yet, too).
 -- Run: mise run test-lua (from addon/BarrensVoice, it loadfiles the addon by relative path)
 
 -- Widget stubs that remember where a region is put, its size, text and font, its parent and children.
@@ -115,18 +116,42 @@ local function click(line, button)
     SetItemRef(data, "|H" .. data .. "|h" .. shown .. "|h", button or "LeftButton", "ChatFrame1")
 end
 
-local VERSION = "0.4.0b4"
-GetAddOnMetadata = function(addon, field)
+GetAddOnMetadata = function(addon, field)    -- the addon's own version: only the welcome says it
     assert(addon == "BarrensVoice" and field == "Version")
-    return VERSION
+    return "0.4.0b4"
 end
 
 local ns = {}
-dofile("../../companion/tests/toc.lua")(ns)   -- every file, in the .toc's order
+dofile("../../companion/tests/toc.lua")(ns)   -- every file, in the .toc's order (NewsData.lua: the stand-in, nil)
 local N, W = ns.News, ns.NewsWindow
 local said, realPrint = {}, print
 local function out(...) realPrint(...) end
 print = function(t) said[#said + 1] = t end
+
+-- What the companion writes into NewsData.lua (bv/news.py): the program's version and the entries it shows, as
+-- news.toml has them - newest first, the release in work without a date. The texts are made up, of real lengths.
+local function items(n, base)
+    local t = {}
+    for i = 1, n do
+        t[i] = ("%s %d: что ты заметишь и что делать."):format(base, i) .. (" Ещё немного текста."):rep(i % 4)
+    end
+    return t
+end
+local REAL = {
+    { version = "0.4.0", kind = "big", title = "Установщик и обновления без хлопот",
+      summary = "установщик с автообновлением, словарь онлайн, вкладка «Помощь» и шёпот Battle.net",
+      items = items(10, "Новое") },
+    { version = "0.3.0", date = "15.11.2026", kind = "big", title = "Ритейл и прозрачный чат",
+      summary = "ритейл, прозрачный чат и галочка на каждый общий канал", items = items(9, "Ритейл") },
+    { version = "0.2.1", date = "12.11.2026", kind = "small", title = "Одна речь на персонажа",
+      summary = "несколько строк подряд от одного персонажа звучат одной речью", items = items(5, "Речь") },
+    { version = "0.2.0", date = "11.11.2026", kind = "big", title = "Голоса рас из самой игры",
+      summary = "голоса рас из русской озвучки самой игры", items = items(5, "Голоса") },
+    { version = "0.1.0", date = "11.11.2026", kind = "big", title = "Первый выпуск (тогда — WoW Chat Voice)",
+      summary = "первый выпуск", items = items(3, "Начало") },
+}
+local DATA = { version = "0.4.0b16", entries = REAL }
+BarrensVoiceNewsData = DATA
 
 local function fresh(db)
     ns.db = {}
@@ -135,13 +160,16 @@ local function fresh(db)
     ns.Dictionary.Migrate(ns.db)
     ns.Dictionary.Rebuild()
 end
---- A login (PLAYER_LOGIN's word) and the timers after it; what the chat got.
+--- A login (PLAYER_LOGIN's word) with the companion's news of `version` (none: nothing written yet) and the
+--- timers after it; what the chat got.
 local function login(version, firstRun)
-    VERSION = version
+    DATA.version = version
+    BarrensVoiceNewsData = version and DATA or nil
     ns.firstRun = firstRun or false
     said = {}
     ns.LoginWord()
     runTimers()
+    BarrensVoiceNewsData = DATA
     return said
 end
 local function news(lines)   -- the chat lines of News.lua (the companion's word is the other one)
@@ -152,30 +180,21 @@ end
 local LINK = "|cffffd100|Haddon:BarrensVoice:news|h[Что нового]|h|r"
 local HEAD = ns.ICON .. " " .. ns.PREFIX
 
-do  -- the entries: what the window and the chat line are made of
-    local versions = {}
-    for i, e in ipairs(N.ENTRIES) do
-        assert(N.Compare(e.version, e.version) == 0, "a version: " .. tostring(e.version))
-        assert(not versions[e.version], "one entry a version: " .. e.version)
-        versions[e.version] = true
-        assert(e.kind == "big" or e.kind == "small", e.version .. ": kind big or small")
-        assert(e.date == nil and i == 1 or type(e.date) == "string" and e.date:match("^%d%d%.%d%d%.%d%d%d%d$"),
-            e.version .. ": a date DD.MM.YYYY (only the release in work may have none yet)")
-        assert(type(e.title) == "string" and e.title ~= "", e.version .. ": a title")
-        local letters = select(2, e.summary:gsub("[^\128-\191]", ""))
-        assert(letters <= 100 and not e.summary:find("[%.!]$"), e.version .. ": a short summary, no full stop: " .. letters)
-        assert(#e.items > 0 and #e.items <= 10, e.version .. ": a few items")
-        if i > 1 then assert(N.Compare(N.ENTRIES[i - 1].version, e.version) > 0, "newest first in the file") end
-        for _, text in ipairs({ e.title, e.summary, unpack(e.items) }) do
-            -- the game's font has no arrow or en dash; «ты», not «вы»
-            assert(not text:find("→", 1, true) and not text:find("–", 1, true), "no arrow or en dash: " .. text)
-            for _, word in ipairs({ "вы", "вас", "вам", "ваш", "ваша", "ваши", "вашего", "Вы" }) do
-                assert(not (" " .. text .. " "):find("[%s«(]" .. word .. "[%s%.,:!?»)]"), "«ты», not «вы»: " .. text)
-            end
-        end
+do  -- the entries and the version: the companion's NewsData.lua (BarrensVoiceNewsData), nothing before it ran
+    assert(N.Installed() == "0.4.0b16" and #N.Entries() == #REAL and N.Entries()[1] == REAL[1], "read from the global")
+    BarrensVoiceNewsData = { version = "0.5.0", entries = { REAL[1], { version = "x", title = "t", summary = "s",
+        items = {} }, { version = "0.3.0" }, "junk", REAL[2] } }
+    local got = N.Entries()
+    assert(#got == 2 and got[1] == REAL[1] and got[2] == REAL[2], "an entry not well formed is left out")
+    for _, broken in ipairs({ { version = "?" }, { entries = REAL }, "0.4.0", 7 }) do
+        BarrensVoiceNewsData = broken
+        assert(N.Installed() == nil and #N.Visible(N.Installed()) == 0, "no version: nothing")
     end
-    local big = N.ENTRIES[1]
-    assert(big.version == "0.4.0" and big.kind == "big" and #big.items >= 6, "0.4.0: big, 6 to 10 items")
+    BarrensVoiceNewsData = { version = "0.4.0", entries = "junk" }
+    assert(N.Installed() == "0.4.0" and #N.Entries() == 0, "no entries: none")
+    BarrensVoiceNewsData = nil                               -- the stand-in the addon ships
+    assert(N.Installed() == nil and #N.Entries() == 0, "before the companion ran: nothing")
+    BarrensVoiceNewsData = DATA
     out("entries ok")
 end
 
@@ -185,42 +204,57 @@ do  -- versions: a test build is older than its release, newer than the release 
     assert(N.Compare("0.4.1", "0.4.0") == 1 and N.Compare("0.10.0", "0.9.9") == 1)
     assert(N.Compare("?", "0.4.0") == nil and N.Compare(nil, "0.4.0") == nil)
     assert(N.Release("0.4.0b5") == "0.4.0" and N.Shown("0.4.0b5") == "0.4.0 beta 5" and N.Shown("0.4.0") == "0.4.0")
-    assert(#N.Visible("?") == 0, "no version known: nothing to show")
+    assert(#N.Visible("?") == 0 and #N.Visible(nil) == 0, "no version known: nothing to show")
     out("versions ok")
 end
 
 do  -- the first run: the welcome, nothing of the news, every entry seen
     fresh()
-    local lines = login("0.4.0b4", true)
+    local lines = login("0.4.0b16", true)
     assert(lines[1]:find("добро пожаловать", 1, true) and lines[#lines]:find("приложение-компаньон", 1, true)
         and #news(lines) == 0, "the welcome and the companion's word only")
     assert(not W.IsShown(), "no window")
-    for _, e in ipairs(N.ENTRIES) do assert(ns.db.newsSeen[e.version], "seen: " .. e.version) end
-    assert(#news(login("0.4.0b4")) == 0 and not W.IsShown(), "the next login: nothing")
+    for _, e in ipairs(REAL) do assert(ns.db.newsSeen[e.version], "seen: " .. e.version) end
+    assert(#news(login("0.4.0b16")) == 0 and not W.IsShown(), "the next login: nothing")
+    -- the first login before the companion wrote the news: decided when it has - still a newcomer, no history
+    fresh()
+    login(nil, true)
+    assert(ns.db.newsSeen == nil and ns.db.newsFresh and not W.IsShown(), "nothing to mark yet")
+    assert(#news(login(nil)) == 0 and ns.db.newsSeen == nil, "still nothing")
+    assert(#news(login("0.4.0b16")) == 0 and not W.IsShown(), "the news come: nothing shown")
+    for _, e in ipairs(REAL) do assert(ns.db.newsSeen[e.version], "seen: " .. e.version) end
+    assert(ns.db.newsFresh == nil, "done with")
     out("first run ok")
 end
 
 do  -- an update with a big entry (an addon from before this list: only seenVersion): the window, after a while
     fresh({ seenVersion = "0.3.0" })
-    VERSION, ns.firstRun, said = "0.4.0b4", false, {}
+    DATA.version, ns.firstRun, said = "0.4.0b16", false, {}
     ns.LoginWord()
     assert(#said == 1 and said[1]:find("приложение-компаньон", 1, true) and not W.IsShown(),
         "first the companion's word, nothing else yet")
     assert(#timers == 1 and timers[1].seconds == N.DELAY and N.DELAY >= 3, "a few seconds after login")
     runTimers()
     assert(W.IsShown() and #news(said) == 0, "the window, no chat line")
-    assert(ns.db.newsSeen["0.4.0"] and ns.db.newsSeen["0.3.0"] and ns.db.seenVersion == "0.4.0b4", "seen")
+    assert(ns.db.newsSeen["0.4.0"] and ns.db.newsSeen["0.3.0"] and ns.db.seenVersion == "0.4.0b16",
+        "seen; the program's version kept")
     W.Hide()
-    assert(#news(login("0.4.0b4")) == 0 and not W.IsShown(), "seen stays: the next login shows nothing")
-    -- a tester on an earlier test build (0.4.0b3) had seen 0.4.0's one-liner, not the entry: shown once
+    assert(#news(login("0.4.0b16")) == 0 and not W.IsShown(), "seen stays: the next login shows nothing")
+    -- a tester on an earlier test build (the addon's 0.4.0b3, from before) had seen 0.4.0's one-liner, not the entry
     fresh({ seenVersion = "0.4.0b3" })
-    login("0.4.0b4")
+    login("0.4.0b16")
     assert(W.IsShown(), "a test build: its release's entry")
+    W.Hide()
+    -- the companion not run yet at this login: the version last seen stays, and the news wait for it
+    fresh({ seenVersion = "0.3.0" })
+    assert(#news(login(nil)) == 0 and not W.IsShown(), "no news yet")
+    assert(ns.db.seenVersion == "0.3.0" and ns.db.newsSeen == nil, "nothing moved on")
+    login("0.4.0b16")
+    assert(W.IsShown() and ns.db.newsSeen["0.4.0"], "they come with the companion")
     W.Hide()
     out("big update ok")
 end
 
-local REAL = N.ENTRIES
 local function entry(version, kind, summary, date)
     return { version = version, date = date or "20.11.2026", kind = kind, title = "Проверка " .. version,
              summary = summary, items = { "Пункт " .. version .. "." } }
@@ -228,7 +262,7 @@ end
 
 do  -- only small entries: one chat line - the icon, «Barrens Voice:», the newest summary, the link
     fresh({ seenVersion = "0.4.0" })
-    N.ENTRIES = { entry("0.4.2", "small", "словарь: ещё десяток слов"), entry("0.4.1", "small", "числа читаются точнее"),
+    DATA.entries = { entry("0.4.2", "small", "словарь: ещё десяток слов"), entry("0.4.1", "small", "числа читаются точнее"),
                   unpack(REAL) }
     local lines = news(login("0.4.2"))
     assert(#lines == 1 and lines[1] == HEAD .. "обновление 0.4.2 — словарь: ещё десяток слов. " .. LINK, lines[1])
@@ -236,14 +270,14 @@ do  -- only small entries: one chat line - the icon, «Barrens Voice:», the new
     assert(ns.db.newsSeen["0.4.2"] and ns.db.newsSeen["0.4.1"], "both seen")
     assert(#news(login("0.4.2")) == 0, "said once")
     -- a big one among them: the window
-    N.ENTRIES = { entry("0.5.0", "big", "новое"), unpack(N.ENTRIES) }
+    DATA.entries = { entry("0.5.0", "big", "новое"), unpack(DATA.entries) }
     assert(#news(login("0.5.0")) == 0 and W.IsShown(), "big: the window")
     W.Hide()
     out("small update ok")
 end
 
 do  -- «Окно «Что нового» после обновлений» off: the chat line, big or not
-    N.ENTRIES = { entry("0.6.0", "big", "большое и новое"), unpack(N.ENTRIES) }
+    DATA.entries = { entry("0.6.0", "big", "большое и новое"), unpack(DATA.entries) }
     ns.db.newsWindow = false
     local lines = news(login("0.6.0"))
     assert(#lines == 1 and lines[1] == HEAD .. "обновление 0.6.0 — большое и новое. " .. LINK, tostring(lines[1]))
@@ -253,7 +287,7 @@ do  -- «Окно «Что нового» после обновлений» off:
 end
 
 do  -- in combat: nothing until PLAYER_REGEN_ENABLED, then a moment later; a new pull meanwhile waits again
-    N.ENTRIES = { entry("0.7.0", "big", "бой"), unpack(N.ENTRIES) }
+    DATA.entries = { entry("0.7.0", "big", "бой"), unpack(DATA.entries) }
     combat = true
     login("0.7.0")
     assert(not W.IsShown() and not ns.db.newsSeen["0.7.0"], "not in combat")
@@ -271,7 +305,7 @@ do  -- in combat: nothing until PLAYER_REGEN_ENABLED, then a moment later; a new
     assert(W.IsShown() and ns.db.newsSeen["0.7.0"], "out of combat: the window")
     W.Hide()
     -- the chat line waits as well
-    N.ENTRIES = { entry("0.7.1", "small", "мелочь"), unpack(N.ENTRIES) }
+    DATA.entries = { entry("0.7.1", "small", "мелочь"), unpack(DATA.entries) }
     combat = true
     assert(#news(login("0.7.1")) == 0, "no line in combat")
     combat = false
@@ -284,7 +318,7 @@ end
 
 do  -- the link: a click opens the window; Shift too, and nothing goes into the edit box; others' links are left alone
     assert(N.linked, "the link's callback is registered")
-    N.ENTRIES = { entry("0.8.0", "small", "ссылка"), unpack(N.ENTRIES) }
+    DATA.entries = { entry("0.8.0", "small", "ссылка"), unpack(DATA.entries) }
     local line = news(login("0.8.0"))[1]
     assert(not W.IsShown())
     click(line)
@@ -319,8 +353,8 @@ do  -- the link: a click opens the window; Shift too, and nothing goes into the 
 end
 
 do  -- a test build: its release's entry from the first build on, its own entry from that build on
-    N.ENTRIES = { entry("0.9.0", "big", "выпуск"), entry("0.9.0b2", "small", "вторая сборка"), unpack(REAL) }
-    N.ENTRIES[1].date = nil                                  -- not released yet
+    DATA.entries = { entry("0.9.0", "big", "выпуск"), entry("0.9.0b2", "small", "вторая сборка"), unpack(REAL) }
+    DATA.entries[1].date = nil                                  -- not released yet
     fresh({ seenVersion = "0.4.0", newsSeen = { ["0.4.0"] = true, ["0.3.0"] = true } })
     login("0.9.0b1")
     assert(W.IsShown(), "the release's entry for its first test build")
@@ -337,15 +371,15 @@ do  -- a test build: its release's entry from the first build on, its own entry 
     assert(#lines == 1 and lines[1]:find("обновление 0.9.0 beta 2 — вторая сборка.", 1, true), tostring(lines[1]))
     W.Show()
     assert(titles()[2] == "Проверка 0.9.0b2", "its own entry under the release's")
-    assert(W.Heading(N.ENTRIES[1]) == "версия 0.9.0" and W.Heading(N.ENTRIES[2]) == "версия 0.9.0 beta 2 — 20.11.2026")
+    assert(W.Heading(DATA.entries[1]) == "версия 0.9.0" and W.Heading(DATA.entries[2]) == "версия 0.9.0 beta 2 — 20.11.2026")
     W.Hide()
     assert(#news(login("0.9.0")) == 0 and not W.IsShown(), "the release itself: nothing new")
-    N.ENTRIES = REAL
+    DATA.entries = REAL
     out("test builds ok")
 end
 
 do  -- the window: newest first, every item, nothing runs off the box or into another line; the footer in place
-    VERSION = "0.4.0b4"
+    DATA.version = "0.4.0b16"
     W.Show()
     assert(_G.BarrensVoiceNews._strata == "FULLSCREEN_DIALOG", "above the settings")
     local esc = false
@@ -399,6 +433,20 @@ do  -- the window: newest first, every item, nothing runs off the box or into an
         "nothing past the right edge")
     W.Hide()
     out("window layout ok")
+end
+
+do  -- the window before the companion wrote the news: one line, where they come from
+    BarrensVoiceNewsData = nil
+    W.Show()
+    local shown = {}
+    for _, r in ipairs(_G.BarrensVoiceNewsScroll._child._regions) do
+        if r._shown and r._kind == "FontString" then shown[#shown + 1] = r._text end
+    end
+    assert(#shown == 1 and shown[1] == W.EMPTY, "only that line: " .. tostring(shown[1]))
+    assert(not W.EMPTY:find("→", 1, true) and not W.EMPTY:find("–", 1, true), "the game's font has them not")
+    W.Hide()
+    BarrensVoiceNewsData = DATA
+    out("window without news ok")
 end
 
 do  -- the settings: the check box on «Общее», the button on «Помощь»; /bv news and /bv help

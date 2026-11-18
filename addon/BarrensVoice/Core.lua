@@ -864,20 +864,20 @@ local function Version()
     local meta = C_AddOns and C_AddOns.GetAddOnMetadata or GetAddOnMetadata
     return meta and meta(ADDON, "Version") or "?"
 end
-ns.AddonVersion = Version   -- the .toc's ## Version: which entries the «Что нового» window shows
 
 --- The word at login: the welcome on the first run, and every time whether the reading works (Companion.lua);
---- what is new after an update comes a few seconds later, out of combat (News.lua).
+--- what is new after an update comes a few seconds later, out of combat (News.lua) - by the program's version,
+--- which the companion wrote with the news (NewsData.lua), not the addon's.
 -- Where to write about bugs and words read wrong: said at the first run, not at every login.
 local HELP_HINT = "ошибки, неверное произношение, идеи — вкладка «Помощь» в настройках (/bv): там Discord, Telegram и GitHub."
 
 function ns.LoginWord()
-    local version = Version()
-    ns.News.Prepare(version, ns.firstRun)   -- before the version last seen moves on
+    local installed = ns.News.Installed()      -- nil until the companion has written the news
+    ns.News.Prepare(installed, ns.firstRun)    -- before the version last seen moves on
     if ns.firstRun then ns.Welcome() end
-    ns.db.seenVersion = version
+    if installed then ns.db.seenVersion = installed end
     ns.Companion.SayAtLogin()
-    ns.News.AtLogin(version)
+    ns.News.AtLogin(installed)
 end
 
 --- The first run's word (as CatQuest does it): what this is, that it needs the companion app, where

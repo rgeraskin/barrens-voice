@@ -92,6 +92,8 @@ class Games(unittest.TestCase):
             (source / "CompanionStatus.lua").write_text("BarrensVoiceStatus = nil", encoding="utf-8")
             (source / "DictionaryOnline.lua").write_text("BarrensVoiceDictionaryOnline = nil", encoding="utf-8")
             (old / "DictionaryOnline.lua").write_text("BarrensVoiceDictionaryOnline = { revision = 5 }", encoding="utf-8")
+            (source / "NewsData.lua").write_text("BarrensVoiceNewsData = nil", encoding="utf-8")
+            (old / "NewsData.lua").write_text('BarrensVoiceNewsData = { version = "0.4.0b16" }', encoding="utf-8")
             target = install_addon(source, game)
             # the companion's list of voices kept; the status file, not there before, comes from the addon
             self.assertIn("Irina", (target / "VoiceList.lua").read_text(encoding="utf-8"))
@@ -101,8 +103,9 @@ class Games(unittest.TestCase):
             self.assertFalse((target / "Media" / "README.md").exists())
             left = sorted(p.relative_to(target).as_posix() for p in target.rglob("*"))
             self.assertEqual(left, ["BarrensVoice.toc", "CompanionStatus.lua", "DictionaryOnline.lua", "Media",
-                                    "Media/icon.tga", "VoiceList.lua"])        # the old version's own gone
+                                    "Media/icon.tga", "NewsData.lua", "VoiceList.lua"])   # the old version's own gone
             self.assertIn("revision = 5", (target / "DictionaryOnline.lua").read_text(encoding="utf-8"))  # the companion's kept
+            self.assertIn("0.4.0b16", (target / "NewsData.lua").read_text(encoding="utf-8"))  # its «Что нового» too
 
 
 class Paths(unittest.TestCase):
@@ -1720,7 +1723,7 @@ class ReleaseBuild(unittest.TestCase):
         with zipfile.ZipFile(archive) as z:
             names = set(z.namelist())
             self.assertIn('version = "0.4.0b7"', z.read("pyproject.toml").decode())
-        for need in ("pyproject.toml", "uv.lock", "LICENSE", "Barrens Voice.exe", "companion/BarrensVoice.pyw",
+        for need in ("pyproject.toml", "uv.lock", "LICENSE", "news.toml", "Barrens Voice.exe", "companion/BarrensVoice.pyw",
                      "companion/bv/__main__.py", "companion/bv/update.py", "companion/bv/launcher/app.py",
                      "companion/bv/selfcheck.py",
                      "addon/BarrensVoice/BarrensVoice.toc"):

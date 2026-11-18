@@ -655,6 +655,9 @@ def main() -> int:
         state.report(reload_hint=True)
     import atexit
     atexit.register(beat.stop)        # any end - the game closed, a crash, the launcher's stop - but a kill
+    # «Что нового» of this version for the addon (bv/news.py): before the game is launched, so its login has them
+    from . import news
+    news.write(find_addon(config), log)
     seen_lines = SeenLines(DATA_DIR / "tmp" / "seen_lines.txt")
     # --launch / --no-launch: the launcher's Play and its start for a game already running
     want_launch = "--launch" in sys.argv or (config["launch_wow"] and "--no-launch" not in sys.argv)

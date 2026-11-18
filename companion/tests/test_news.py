@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 import tomllib
 import unittest
 from pathlib import Path
@@ -12,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from bv import news  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
+LUAJIT = shutil.which("luajit")
 
 
 def entry(version="0.4.1", kind="small", **more) -> dict:
@@ -149,6 +152,183 @@ class Release(unittest.TestCase):
         body = self.release.notes(real[0]["version"], real, "v" + real[0]["version"])
         self.assertTrue(body.startswith("### " + real[0]["title"] + "\n\n- "), body[:80])
         self.assertEqual(body.count("\n- "), len(real[0]["items"]))
+
+    def test_the_archive_carries_the_news(self):
+        # the companion writes the addon's «Что нового» from the release's own news.toml
+        self.assertIn((ROOT / news.SOURCE, news.SOURCE), self.release.files())
+
+
+# What LuaJIT reads from a NewsData.lua: each string as <bytes>:<text>, into a file (Windows' stdout would turn
+# "\n" into "\r\n"). A script file, not -e: on Windows luajit is a .CMD shim, and cmd mangles quotes in arguments.
+READ_BACK = """
+dofile(arg[1])
+local out = assert(io.open(arg[2], "wb"))
+local function put(s) out:write(#s, ":", s) end
+local d = BarrensVoiceNewsData
+put(d.version)
+for _, e in ipairs(d.entries) do
+    put(e.version); put(e.date or ""); put(e.kind); put(e.title); put(e.summary)
+    out:write(#e.items, "#")
+    for _, item in ipairs(e.items) do put(item) end
+end
+out:close()
+"""
+
+
+def read_back(lua_file: Path) -> dict:
+    """NewsData.lua as LuaJIT loads it: {"version", "entries": [{version, date?, kind, title, summary, items}]}."""
+    with tempfile.TemporaryDirectory() as d:
+        script, got = Path(d) / "read.lua", Path(d) / "out.bin"
+        script.write_text(READ_BACK, encoding="utf-8")
+        subprocess.run([LUAJIT, str(script), str(lua_file), str(got)], capture_output=True, check=True)
+        data, pos = got.read_bytes(), 0
+
+    def text() -> str:
+        nonlocal pos
+        colon = data.index(b":", pos)
+        size = int(data[pos:colon])
+        pos = colon + 1 + size
+        return data[colon + 1:pos].decode("utf-8")
+
+    def count() -> int:
+        nonlocal pos
+        mark = data.index(b"#", pos)
+        n, pos = int(data[pos:mark]), mark + 1
+        return n
+
+    out = {"version": text(), "entries": []}
+    while pos < len(data):
+        e = {"version": text(), "date": text(), "kind": text(), "title": text(), "summary": text()}
+        e["items"] = [text() for _ in range(count())]
+        if not e["date"]:
+            del e["date"]
+        out["entries"].append(e)
+    return out
+
+
+class Companion(unittest.TestCase):
+    """The companion writes the entries of its version into the addon as NewsData.lua (bv/news.py)."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root, self.addon = Path(tmp.name) / "app", Path(tmp.name) / "BarrensVoice"
+        self.root.mkdir()
+        self.addon.mkdir()
+        self.logged = []
+
+    def program(self, version: str, toml: str) -> None:
+        (self.root / "pyproject.toml").write_text(f'[project]\nname = "barrens-voice"\nversion = "{version}"\n',
+                                                  encoding="utf-8")
+        (self.root / news.SOURCE).write_text(toml, encoding="utf-8")
+
+    def write(self) -> bool:
+        return news.write(self.addon, self.logged.append, root=self.root)
+
+    TOML = '''
+[[entry]]
+version = "0.4.1"
+kind = "small"
+title = "Кавычки \\"так\\" и обратная \\\\ косая"
+summary = "строка с \\\\n внутри, а не перевод"
+items = ["Пункт «один».", "Пункт с [[скобками]] и -- не комментарием\\\\"]
+
+[[entry]]
+version = "0.4.1b2"
+date = "19.11.2026"
+kind = "small"
+title = "Вторая сборка"
+summary = "для тестеров"
+items = ["Пункт."]
+
+[[entry]]
+version = "0.4.0"
+date = "18.11.2026"
+kind = "big"
+title = "Выпуск"
+summary = "много нового"
+items = ["Первый.", "Второй."]
+
+[[entry]]
+version = "0.3.9"
+date = "17.11.2026"
+kind = "small"
+title = "С разметкой"
+summary = "цвет |cffff0000красный|r"
+items = ["Пункт."]
+'''
+
+    def test_written_for_its_version(self):
+        self.program("0.4.1b1", self.TOML)
+        self.assertTrue(self.write())
+        text = (self.addon / news.FILE).read_text(encoding="utf-8")
+        self.assertTrue(text.startswith("-- Written by the Barrens Voice companion app"))
+        self.assertIn('    version = "0.4.1b1",\n', text)
+        self.assertEqual(self.logged, ["«Что нового» версии 0.4.1b1 записано в аддон: в игре — при входе или после /reload"])
+        from bv.logs import level_of
+        self.assertEqual(level_of(self.logged[0]), "DEBUG")                  # the details, not the launcher's line
+        self.assertFalse(self.write(), "unchanged: not written again")
+        self.assertEqual(len(self.logged), 1)
+        self.assertEqual([p.name for p in self.addon.iterdir()], [news.FILE])   # no temporary file left
+        if LUAJIT:
+            got = read_back(self.addon / news.FILE)
+            # its release's entry (0.4.1, no date yet) and older ones, not the later test build's own; the entry
+            # with the game's markup in it left out
+            self.assertEqual(got["version"], "0.4.1b1")
+            self.assertEqual([e["version"] for e in got["entries"]], ["0.4.1", "0.4.0"])
+            first = got["entries"][0]
+            self.assertEqual(first, {"version": "0.4.1", "kind": "small", "title": 'Кавычки "так" и обратная \\ косая',
+                                     "summary": "строка с \\n внутри, а не перевод",
+                                     "items": ["Пункт «один».", "Пункт с [[скобками]] и -- не комментарием\\"]})
+            self.assertEqual(got["entries"][1]["date"], "18.11.2026")
+        self.program("0.4.1b2", self.TOML)                                     # the next test build: its own entry
+        self.assertTrue(self.write())
+        if LUAJIT:
+            self.assertEqual([e["version"] for e in read_back(self.addon / news.FILE)["entries"]],
+                             ["0.4.1", "0.4.1b2", "0.4.0"])
+
+    @unittest.skipUnless(LUAJIT, "luajit not installed")
+    def test_any_text_reads_back(self):
+        # what lua_string makes of quotes, backslashes, line breaks and control characters (a digit after \0 too)
+        tricky = 'а "б" \\ в\nг\r\tд \x00' + '2 е\x7f ]] [[ -- «ё» \\"'
+        entries = [{"version": "0.4.1", "kind": "big", "title": tricky, "summary": "\\", "items": [tricky, '"', ""]}]
+        (self.addon / news.FILE).write_text(news.render(entries, "0.4.1"), encoding="utf-8")
+        self.assertEqual(read_back(self.addon / news.FILE), {"version": "0.4.1", "entries": entries})
+
+    @unittest.skipUnless(LUAJIT, "luajit not installed")
+    def test_the_real_news_read_back(self):
+        entries = news.load(ROOT / news.SOURCE)
+        working = news.program_version(ROOT)
+        self.assertTrue(news.write(self.addon, self.logged.append, root=ROOT))
+        self.assertEqual(read_back(self.addon / news.FILE), {"version": working,
+                                                             "entries": news.visible(entries, working)})
+
+    def test_what_cannot_be_read_or_written(self):
+        from unittest import mock
+        self.assertFalse(news.write(None, self.logged.append, root=self.root))          # no addon found
+        self.assertFalse(news.write(self.addon / "gone", self.logged.append, root=self.root))
+        self.assertEqual(self.logged, [])
+        self.assertFalse(self.write())                                                # no news.toml, no pyproject
+        self.program("0.4.1", "[[entry]\nbroken")
+        self.assertFalse(self.write())
+        self.program("0.4.1", self.TOML)
+        with mock.patch("bv.paths.os.replace", side_effect=PermissionError("in use")):
+            self.assertFalse(self.write())
+        from bv.logs import level_of
+        self.assertEqual(len(self.logged), 3)
+        self.assertTrue(self.logged[0].startswith("не удалось прочитать news.toml: "), self.logged[0])
+        self.assertTrue(self.logged[2].startswith("не удалось записать «Что нового» в аддон: in use"), self.logged[2])
+        self.assertEqual({level_of(m) for m in self.logged}, {"WARN"})
+        self.assertFalse((self.addon / news.FILE).exists())
+
+    def test_the_addon_ships_an_empty_one(self):
+        # so the .toc has a file to load before the companion first runs; read before News.lua
+        shipped = ROOT / "addon" / "BarrensVoice" / news.FILE
+        self.assertIn("\nBarrensVoiceNewsData = nil\n", shipped.read_text(encoding="utf-8"))
+        toc = (shipped.parent / "BarrensVoice.toc").read_text(encoding="utf-8")
+        self.assertLess(toc.index("\n" + news.FILE + "\n"), toc.index("\nNews.lua\n"))
+        from bv.launcher.model import GENERATED
+        self.assertIn(news.FILE, GENERATED)                                     # an addon install keeps the companion's
 
 
 if __name__ == "__main__":
