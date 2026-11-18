@@ -270,9 +270,11 @@ end
 -- browser nor put text on the clipboard (LaunchURL and CopyToClipboard are Blizzard's own), so the
 -- companion does both on a click: the addon sends only the name, and the companion keeps its own
 -- list of the same addresses (bv/links.py) and touches nothing else. The address also stands in a
--- box in the settings, to select and copy with Ctrl+C when the companion is not running.
+-- box in the settings, to select and copy with Ctrl+C when the companion is not running. A third field is
+-- a Battle.net community's invite (club ticket): «Открыть» opens it in the game itself (OpenInGame).
 ns.LINKS = {
-    community = { "Сообщество", "https://launch.battle.net/invite/N9KR2WNHDgW" },     -- Barrens Voice's community in Battle.net (the game's «Сообщества»)
+    -- Barrens Voice's community in Battle.net (the game's «Сообщества»); the ticket is the invite address's code
+    community = { "Сообщество", "https://launch.battle.net/invite/N9KR2WNHDgW", "N9KR2WNHDgW" },
     discord = { "Discord", "https://discord.gg/hxpuTQF2Bb" },
     telegram = { "Telegram", "https://t.me/+NwReoOS9x7hhYjgy" },
     github = { "GitHub", "https://github.com/rgeraskin/barrens-voice/issues" },
@@ -284,10 +286,49 @@ local function AskCompanion(kind, key)
     ns.Strip.Push(ns.ServiceFrame(kind, ns.LineOptions(), key))
 end
 
---- Ask the companion to open one of ns.LINKS in the browser; the address goes to the chat too.
+local CLUB_LINK_COLOR = "|cff82c5ff"   -- the colour the client gives a Battle.net community's link
+
+--- A community's invite opened in the game, as a click on its link in the chat does
+--- (ItemRefHandlersShared.lua: LinkTypes.ClubTicket -> CommunitiesHyperlink.OnClickLink, which asks for the
+--- ticket and on CLUB_TICKET_RECEIVED shows the «Сообщества» window on the community, ShowUIPanel): the link
+--- goes to the chat - to click if the window did not open - and the game is asked at once. No companion
+--- needed, so it works with the voice-over off too. Not in combat (the window would not open then: the
+--- link stays). False when the client has no communities or they are off: the browser it is, then.
+local function OpenInGame(link)
+    local ticket = link[3]
+    local club = rawget(_G, "C_Club")
+    if not ticket or type(club) ~= "table" or type(club.IsEnabled) ~= "function" then return false end
+    local ok, enabled = pcall(club.IsEnabled)
+    if not (ok and enabled) then return false end
+    local chatLink
+    local make, enum = rawget(_G, "GetClubTicketLink"), rawget(_G, "Enum")
+    if type(make) == "function" and type(enum) == "table" and enum.ClubType then
+        local fine, made = pcall(make, ticket, "Barrens Voice", enum.ClubType.BattleNet)
+        if fine and type(made) == "string" then chatLink = made end
+    end
+    if not chatLink then
+        local util, types = rawget(_G, "LinkUtil"), rawget(_G, "LinkTypes")
+        if type(util) ~= "table" or type(util.FormatLink) ~= "function" or type(types) ~= "table"
+                or not types.ClubTicket then
+            return false
+        end
+        chatLink = CLUB_LINK_COLOR .. util.FormatLink(types.ClubTicket, "[Barrens Voice]", ticket) .. "|r"
+    end
+    print(PREFIX .. ("%s: %s — откроется окно «Сообщества». Не открылось — щёлкните по ссылке."):format(link[1], chatLink))
+    local hyperlink = rawget(_G, "CommunitiesHyperlink")
+    local fighting = InCombatLockdown and InCombatLockdown()
+    if not fighting and type(hyperlink) == "table" and type(hyperlink.OnClickLink) == "function" then
+        pcall(hyperlink.OnClickLink, ticket)
+    end
+    return true
+end
+
+--- Ask the companion to open one of ns.LINKS in the browser; the address goes to the chat too. A
+--- community's invite opens in the game itself (OpenInGame), where the client can.
 function ns.OpenLink(key)
     local link = ns.LINKS[key]
     if not link then return end
+    if OpenInGame(link) then return end
     if not ns.db.enabled then
         print(PREFIX .. ("%s: озвучка выключена, и компаньон страницу не откроет. Адрес: %s"):format(link[1], link[2]))
         return

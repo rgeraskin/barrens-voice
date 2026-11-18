@@ -146,7 +146,9 @@ function UI.LinkRow(parent, x, y, width, key, icon)
     name:SetText(link[1])
     local open = UI.Button(parent, "Открыть", 76, function() ns.OpenLink(key) end)
     open:SetPoint("TOPLEFT", x + width - 76, y)
-    UI.Tooltip(open, "Компаньон откроет страницу в браузере: аддону игра браузер не даёт.")
+    UI.Tooltip(open, link[3] and "Откроет сообщество в самой игре — в окне «Сообщества», там можно вступить. Ссылка на "
+        .. "него появится и в чате. Если сообщества в игре недоступны, компаньон откроет страницу в браузере."
+        or "Компаньон откроет страницу в браузере: аддону игра браузер не даёт.")
     local copy = UI.Button(parent, "Копировать", 96, function() ns.CopyLink(key) end)
     copy:SetPoint("RIGHT", open, "LEFT", -4, 0)
     UI.Tooltip(copy, "Компаньон положит адрес в буфер обмена: аддону игра буфер обмена не даёт. Без компаньона — щёлкните по адресу и нажмите Ctrl+C.")

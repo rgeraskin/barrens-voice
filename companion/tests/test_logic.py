@@ -1032,8 +1032,11 @@ class Links(unittest.TestCase):
         from bv.links import LINKS
         core = (Path(__file__).resolve().parents[2] / "addon" / "BarrensVoice" / "Core.lua").read_text(encoding="utf-8")
         block = core.split("ns.LINKS = {", 1)[1].split("\n}", 1)[0]
-        addon = dict(re.findall(r'(\w+) = \{ "[^"]+", "([^"]+)" \}', block))
+        addon = dict(re.findall(r'(\w+) = \{ "[^"]+", "([^"]+)"(?:, "[^"]+")? \}', block))
         self.assertEqual(addon, LINKS)
+        # a community's invite code (the game opens it itself) is the code of its web address
+        for key, url, ticket in re.findall(r'(\w+) = \{ "[^"]+", "([^"]+)", "([^"]+)" \}', block):
+            self.assertEqual(url.rsplit("/", 1)[1], ticket, key)
 
 
 class Yo(unittest.TestCase):
