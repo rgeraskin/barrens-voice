@@ -48,6 +48,30 @@ class Checks(unittest.TestCase):
         self.assertIn("entry of 0.4.1 has no date", "".join(problems(toml=news_toml(date=None))))
         self.assertIn("news.toml: ", "".join(problems(toml=news_toml().replace('"small"', '"huge"'))))
 
+    def test_no_test_builds_news_left_in_a_release(self):
+        # their entries are folded into the release's by then - an older release's test build's too
+        leftover = news_toml() + "\n" + news_toml("0.4.1b2", date=None)
+        found = "".join(problems(toml=leftover))
+        self.assertIn("still has test builds' entries (0.4.1b2)", found)
+        self.assertIn("fold what players need of them into the 0.4.1 entry", found)
+        older = news_toml() + "\n" + news_toml("0.4.0", "20.11.2026") + "\n" + news_toml("0.4.0b3", "18.11.2026")
+        self.assertIn("(0.4.0b3)", "".join(problems(toml=older)))
+        # while in work, a test build may carry them
+        beta = dict(tag="v0.4.1-beta.3", log=changelog(date="Unreleased", link="compare/v0.4.0...HEAD"))
+        self.assertEqual(problems(**beta, toml=news_toml(date=None) + "\n" + news_toml("0.4.1b2", date=None)), [])
+
+    def test_no_test_builds_in_a_releases_changelog(self):
+        # betas have no sections or link lines of their own: their changes go into the release's section
+        log = changelog()
+        section = log.replace("## [0.4.0] - 2026-11-20", "## [0.4.1b2] - 2026-11-22\n\n### Fixed\n\n- x\n\n"
+                                                         "## [0.4.0] - 2026-11-20")
+        self.assertIn("test builds (0.4.1b2)", "".join(problems(log=section)))
+        link = log + "[0.4.0-beta.3]: https://github.com/rgeraskin/barrens-voice/compare/v0.4.0-beta.2...v0.4.0-beta.3\n"
+        self.assertIn("test builds (0.4.0-beta.3)", "".join(problems(log=link)))
+        spaced = log.replace("## [0.4.0] - 2026-11-20", "## [0.4.1 beta 2] - 2026-11-22\n\n## [0.4.0] - 2026-11-20")
+        self.assertIn("(0.4.1 beta 2)", "".join(problems(log=spaced)))
+        self.assertEqual(problems(tag="v0.4.1-beta.3", log=section), [])           # a test build is not held to it
+
     def test_its_changelog(self):
         self.assertIn("no section «## [0.4.1]", "".join(problems(log=changelog("0.4.0"))))
         self.assertIn("is «Unreleased»", "".join(problems(log=changelog(date="Unreleased"))))

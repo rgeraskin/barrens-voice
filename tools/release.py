@@ -124,7 +124,8 @@ def version_of(tag: str, base: str) -> str:
 def news_problem(version: str, entries: list[dict]) -> str | None:
     """Why a build cannot go out for its «Что нового» (DEVELOPMENT.md), or None: news.toml must be well formed and
     have the release's entry - dated for a release, while a test build's release may still be in work. The entry is
-    the program's version's: a release of the program alone tells the players what it brought too."""
+    the program's version's: a release of the program alone tells the players what it brought too. A release keeps
+    only release entries: what its test builds' own entries said is folded into its entry by then."""
     found = news.problems(entries)
     if found:
         return "news.toml: " + "; ".join(found)
@@ -136,13 +137,22 @@ def news_problem(version: str, entries: list[dict]) -> str | None:
         return None
     if "date" not in entry:
         return f"the «Что нового» entry of {release} has no date: add date = \"DD.MM.YYYY\" to it in news.toml"
+    leftovers = [e["version"] for e in entries if e["version"] != news.release_of(e["version"])]
+    if leftovers:
+        return (f"news.toml still has test builds' entries ({', '.join(leftovers)}): fold what players need of them "
+                f"into the {release} entry and remove them - a release keeps only release entries")
     return None
+
+
+# a test build's version where CHANGELOG.md names one: "0.4.0b3", "0.4.0-beta.3", "0.4.0 beta 3"
+BETA_IN_CHANGELOG = r"\d+\.\d+\.\d+(?:b\d+|[-. ]?beta[-. ]?\d*)"
 
 
 def changelog_problem(version: str, text: str) -> str | None:
     """Why a build cannot go out for its CHANGELOG.md, or None: it has the release's section (Keep a Changelog,
     CLAUDE.md) - for a test build «Unreleased» will do; a release's is dated (the GitHub release's publication day,
-    UTC) and has its link line at the bottom pointing at its tag, not at HEAD."""
+    UTC) and has its link line at the bottom pointing at its tag, not at HEAD. Test builds never get sections or link
+    lines of their own (their changes go into the release's section): a release refuses any."""
     release = news.release_of(version)
     heading = re.search(rf"^## \[{re.escape(release)}\] - (\d{{4}}-\d\d-\d\d|Unreleased)$", text, re.M)
     if heading is None:
@@ -158,6 +168,11 @@ def changelog_problem(version: str, text: str) -> str | None:
     if not re.search(rf"^\[{re.escape(release)}\]: https://github\.com/\S*v{re.escape(release)}$", text, re.M):
         return (f"CHANGELOG.md has no link line for {release} at the bottom pointing at its tag: "
                 f"«[{release}]: {REPO_URL}/compare/v<previous>...v{release}»")
+    betas = re.findall(rf"^(?:## \[({BETA_IN_CHANGELOG})\]|\[({BETA_IN_CHANGELOG})\]:)", text, re.M)
+    if betas:
+        named = sorted({a or b for a, b in betas})
+        return (f"CHANGELOG.md has sections or link lines of test builds ({', '.join(named)}): test builds have none, "
+                f"their changes go into the [{release}] section")
     return None
 
 
