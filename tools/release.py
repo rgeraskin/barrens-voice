@@ -4,8 +4,8 @@ The archive is what bv/install.py puts into <install>\\app\\<version>: companion
 tests), addon/BarrensVoice, pyproject.toml, uv.lock, LICENSE, and Barrens Voice.exe when built (on Windows). The manifest tells the launcher's updater
 what is there: the app's version, the strip protocol, the addon's version, the archive's name, size
 and SHA-256 (`mise run sign` adds a signature). A release (not a test build) needs the addon at its release version
-and a dated «Что нового» entry for that addon version in the addon's News.lua (a release that changes only the
-program keeps the addon and its entry as they were: nothing to add).
+and a dated «Что нового» entry of its own version in news.toml - the program's, so a release of the program alone
+has one too. dist/notes.md, the GitHub release's description, is made from that entry (`notes`).
 """
 from __future__ import annotations
 
@@ -20,6 +20,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / "dist"
+sys.path.insert(0, str(ROOT / "companion"))
+from bv import news  # noqa: E402 - news.toml's reading and checks, the companion's own
+
+REPO_URL = "https://github.com/rgeraskin/barrens-voice"
+INSTALL = "Установка: скачай `BarrensVoice-Setup.exe` и запусти его."
 # the uv the installer ships and the updates bring (the manifest names it: an install with another fetches it)
 UV_VERSION = "0.13.7"
 UV_ZIP = f"https://github.com/astral-sh/uv/releases/download/{UV_VERSION}/uv-x86_64-pc-windows-msvc.zip"
@@ -59,24 +64,25 @@ def versions() -> dict:
             "protocol": int(proto.group(1))}
 
 
-def news_entries(text: str | None = None) -> dict[str, str | None]:
-    """The addon's «Что нового» entries (addon/BarrensVoice/News.lua): version -> date ("DD.MM.YYYY", None until the
-    release has one), from each entry's first line - `{ version = "0.4.0", date = "18.11.2026", kind = "big",`."""
-    if text is None:
-        text = (ROOT / "addon" / "BarrensVoice" / "News.lua").read_text(encoding="utf-8")
-    entries = {}
-    for m in re.finditer(r'^\s*\{\s*version\s*=\s*"([^"]+)"([^\n]*)', text, re.M):
-        date = re.search(r'\bdate\s*=\s*"(\d\d\.\d\d\.\d{4})"', m.group(2))
-        entries[m.group(1)] = date.group(1) if date else None
-    return entries
+def news_entries() -> list[dict]:
+    """The players' «Что нового» of every release: news.toml at the root (bv/news.py), newest first."""
+    return news.load(ROOT / news.SOURCE)
 
 
-def notes(version: str) -> str:
-    """The release's notes: its CHANGELOG.md section (`## [<version>] - <date or Unreleased>`, Keep a Changelog),
-    up to the next version or the link lines at the bottom."""
-    text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    m = re.search(rf"^## \[{re.escape(version)}\][^\n]*\n(.*?)(?=^## |^\[[^\]\n]+\]: |\Z)", text, re.M | re.S)
-    return (m.group(1).strip() if m else "") + "\n\nУстановка: скачай `BarrensVoice-Setup.exe` и запусти его.\n"
+def notes(version: str, entries: list[dict], tag: str = "") -> str:
+    """The GitHub release's description, from news.toml: the release's entry (its title and items, in Russian), then
+    a link to the full English list (CHANGELOG.md at the release's tag) and how to install. A test build's starts
+    with the release it leads to and shows that release's entry - or, none written yet, only that line."""
+    release = news.release_of(version)
+    entry = next((e for e in entries if e["version"] == release), None)
+    parts = []
+    if version != release:
+        parts.append(f"Тестовая сборка выпуска {release}.")
+    if entry is not None:
+        parts.append(f"### {entry['title']}\n\n" + "\n".join(f"- {item}" for item in entry["items"]))
+    parts.append(f"Полный список изменений, на английском: [CHANGELOG.md]({REPO_URL}/blob/{tag or 'master'}/CHANGELOG.md).")
+    parts.append(INSTALL)
+    return "\n\n".join(parts) + "\n"
 
 
 def dictionary_revision() -> int:
@@ -100,16 +106,20 @@ def version_of(tag: str, base: str) -> str:
     return f"{base}b{m.group(2)}" if m.group(2) else base
 
 
-def news_problem(tag: str, addon: str, entries: dict[str, str | None]) -> str | None:
-    """Why a release cannot go out for its «Что нового» (DEVELOPMENT.md), or None. The entry belongs to the addon's
-    version: a release of the program alone keeps the addon, and its entry is there already; a release of a new
-    addon tells the players what it brought, dated."""
-    if addon not in entries:
-        return (f"the release {tag} carries addon {addon} with no «Что нового» entry: add one for {addon} to "
-                "addon/BarrensVoice/News.lua")
-    if not entries[addon]:
-        return (f"the «Что нового» entry of {addon} has no date: add date = \"DD.MM.YYYY\" to its first line in "
-                "addon/BarrensVoice/News.lua")
+def news_problem(version: str, entries: list[dict]) -> str | None:
+    """Why a build cannot go out for its «Что нового» (DEVELOPMENT.md), or None: news.toml must be well formed, and
+    a release (not a test build) needs a dated entry of its own version - the program's: a release of the program
+    alone tells the players what it brought too."""
+    found = news.problems(entries)
+    if found:
+        return "news.toml: " + "; ".join(found)
+    if version != news.release_of(version):
+        return None
+    entry = next((e for e in entries if e["version"] == version), None)
+    if entry is None:
+        return f"the release {version} has no «Что нового» entry: add one for {version} to news.toml"
+    if "date" not in entry:
+        return f"the «Что нового» entry of {version} has no date: add date = \"DD.MM.YYYY\" to it in news.toml"
     return None
 
 
@@ -117,15 +127,15 @@ def build() -> Path:
     info = versions()
     base = info["version"]
     tag = os.environ.get("RELEASE_TAG", "")
+    entries = news_entries()
     if tag:
         info["version"] = version_of(tag, base)
         if "b" not in info["version"] and "b" in info["addon"]:
             sys.exit(f"the release {tag} would carry a test build of the addon ({info['addon']}): give the addon its "
                      "release version in BarrensVoice.toc")
-        if "b" not in info["version"]:
-            problem = news_problem(tag, info["addon"], news_entries())
-            if problem:
-                sys.exit(problem)
+        problem = news_problem(info["version"], entries)
+        if problem:
+            sys.exit(problem)
     DIST.mkdir(exist_ok=True)
     archive = DIST / f"barrens-voice-{info['version']}.zip"
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as z:
@@ -143,7 +153,7 @@ def build() -> Path:
     manifest = {**info, "archive": archive.name, "size": len(data), "sha256": hashlib.sha256(data).hexdigest(),
                 "uv": uv_entry()}
     (DIST / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    (DIST / "notes.md").write_text(notes(base), encoding="utf-8")
+    (DIST / "notes.md").write_text(notes(info["version"], entries, tag), encoding="utf-8")
     print(f"{archive.name}: {len(data) / 1e6:.1f} MB; manifest: {manifest}")
     return archive
 
