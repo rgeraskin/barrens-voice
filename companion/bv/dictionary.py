@@ -334,7 +334,10 @@ class Dictionary:
     def apply_words(self, text: str) -> str:
         """`text` with the dictionary's words, phrases (longest first) and stems replaced. A
         replacement is marked (\\x02...\\x03) to be declined after a preposition - unless it took
-        the ending typed in chat (a stem, a phrase ending in "*"): its case is right already."""
+        the ending typed in chat (a stem, a phrase ending in "*"): its case is right already. Discord's
+        ":codes:" go first: their words are no entries (":lol:" became ":л+ол:", no code any more)."""
+        from .text import EMOJI_CODE
+        text = EMOJI_CODE.sub(" ", text)
         tokens = list(WORD.finditer(text))
         out, last, i = [], 0, 0
         while i < len(tokens):

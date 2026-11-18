@@ -111,7 +111,8 @@ def _capitals(match) -> str:
     return spell(word)
 
 
-EMOJI_CODE = re.compile(r"(?<![\w:]):[a-z][a-z0-9_+-]*:(?![\w:])")   # ":handshake:" (Discord's): not read out
+# ":handshake:" (Discord's): not read out; ":+1:" comes from the addon as ": плюс 1:"
+EMOJI_CODE = re.compile(r"(?<![\w:]):(?:[a-z][a-z0-9_+-]*|\s*плюс\s*1\s*|-1):(?![\w:])")
 
 
 def plain(text: str) -> str:

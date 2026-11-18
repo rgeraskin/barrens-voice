@@ -539,6 +539,12 @@ class Pipeline(unittest.TestCase):
             "арена 2х2": "арена два на два", "5х5": "пять на пять", "3v3": "три на три", "из 2х": "из двух",
         })
 
+    def test_emoji_codes_go_before_the_dictionary(self):
+        # a code's word is no dictionary entry («:lol:» became «:л+ол:», no code any more); «:+1:» comes
+        # from the addon as «: плюс 1:»
+        self.check({":lol: смешно": "смешно", "ок : плюс 1:": "окей", ":-1: не пойду": "не пойду",
+                    "ок :handshake:": "окей", "ссылка:lol": "ссылка:л+ол"})
+
     def test_raid_leader_after_a_number(self):
         # «рл» after a number is the raid leader, not the ruins of Lordaeron
         self.check({"нужен 1 рл": "нужен один рейд-лидер", "нужно 2 рл": "нужно два рейд-лидера",
