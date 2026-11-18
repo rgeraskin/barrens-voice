@@ -1446,3 +1446,28 @@ print = quiet3
 assert(strip:IsShown() and step(0):find("^control\31"), "/bv on: fresh settings first")
 assert(step(0.25):find("^dict\31"), "and the dictionary layer")
 print("strip off ok")
+
+-- The dictionary window: the game's edit box keeps a typed «|» as «||»; the program must get «|»
+do
+    local before = #frames
+    local pane = widget()
+    ns.DictionaryWindow.Create(pane)
+    local edit
+    for i = before + 1, #frames do
+        if frames[i]._scripts.OnEditFocusLost then edit = frames[i] end
+    end
+    assert(edit, "the dictionary's edit box")
+    ns.Dictionary.Reset()
+    pane._scripts.OnShow(pane)
+    assert(edit._text == ns.Dictionary.Escaped(ns.Dictionary.Text()) and edit._text:find("||", 1, true),
+        "shown escaped: the box has every «|» as «||»")
+    edit._text = edit._text .. "~\\b(тестраз||тестдва)\\b=окей\n"     -- typed: «|» as the box keeps it
+    edit._scripts.OnTextChanged(edit, true)
+    local layer = ns.Dictionary.UserLayer()
+    assert(layer:find("~\\b(тестраз|тестдва)\\b=окей", 1, true) and not layer:find("||", 1, true), layer)
+    edit._scripts.OnEditFocusLost(edit)
+    assert(edit._text == ns.Dictionary.Escaped(ns.Dictionary.Text()), "sorted and shown escaped again")
+    assert(ns.Dictionary.Text():find("~\\b(тестраз|тестдва)\\b=окей", 1, true), "kept with «|»")
+    ns.Dictionary.Reset()
+    print("dictionary window ok")
+end

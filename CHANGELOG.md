@@ -142,6 +142,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- A «|» typed in the dictionary window is a «|»
+
+  The game's edit box keeps a typed or pasted «|» as «||», and the window saved it so: a regex «~\b(тестраз|тестдва)\b=окей» became «(тестраз||тестдва)», whose empty alternative matches everywhere («тестдва привет» was read «окейокейокей окейприветокей»), and the message about a too long line showed «||». The window now shows the text escaped and takes it back unescaped.
+
 - The strip is found at once after a restart mid-game
 
   The addon's saved variables keep the strip's place only from the last /reload or logout, so a companion restarted during the game (saving the launcher's settings, «Установить сейчас», a crash) after the strip moved looked in the old place and searched the window for some 8 s. The companion keeps the last place it knew itself now, per game, and starts with whichever is newer; the log says which.

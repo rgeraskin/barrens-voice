@@ -95,6 +95,12 @@ local function migrated(edits)
     other.Dictionary.Migrate(other.db)                      -- at every load: the same again
     return other.Dictionary, edits
 end
+
+-- «|» in the edit box: the game keeps a typed one as «||»; the window escapes and unescapes, so the layer has «|»
+assert(D.Escaped("~(а|б)=в") == "~(а||б)=в" and D.Unescaped("~(а||б)=в") == "~(а|б)=в")
+for _, t in ipairs({ "", "a|b", "||", "|||", "x|cffff|r" }) do assert(D.Unescaped(D.Escaped(t)) == t, t) end
+print("pipes ok")
+
 assert(#D.RenamedTo(D.RENAMED[OLD_K]) == 6, "the «к» rule's six")
 local Dd, deleted = migrated({ lines = {}, removed = { [OLD_K] = true } })
 assert(not deleted.removed[OLD_K], "the old key's mark goes")

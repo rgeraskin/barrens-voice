@@ -105,14 +105,15 @@ function W.Create(pane)
     edit:SetTextInsets(4, 4, 2, 2)
     edit:SetWidth(480)
     edit:SetScript("OnEscapePressed", edit.ClearFocus)
+    -- the box holds every "|" as "||" (Dictionary.lua D.Escaped): out of it unescaped, into it escaped
     edit:SetScript("OnTextChanged", function(self, userInput)
         if not userInput then return end
-        ns.Dictionary.SetText(self:GetText())
+        ns.Dictionary.SetText(ns.Dictionary.Unescaped(self:GetText()))
     end)
     -- Sorted when editing is done, not while typing (the cursor would jump).
     edit:SetScript("OnEditFocusLost", function(self)
-        Save(self:GetText())
-        local text = ns.Dictionary.Text()
+        Save(ns.Dictionary.Unescaped(self:GetText()))
+        local text = ns.Dictionary.Escaped(ns.Dictionary.Text())
         if self:GetText() ~= text then self:SetText(text) end
     end)
     scroll:SetScrollChild(edit)
@@ -122,7 +123,7 @@ function W.Create(pane)
 
     local reset = UI.Button(window, "Сбросить словарь", 170, function()
         ns.Dictionary.Reset()
-        edit:SetText(ns.Dictionary.Text())
+        edit:SetText(ns.Dictionary.Escaped(ns.Dictionary.Text()))
     end)
     reset:SetPoint("BOTTOMRIGHT", -16, 20)
     UI.Tooltip(reset, "Вернуть стандартный словарь аддона. Твои записи и правки пропадут.")
@@ -148,7 +149,7 @@ function W.Create(pane)
     UI.Tooltip(say, "Прочитать строку слева твоим голосом — со словарём и регулярками.")
 
     window:SetScript("OnShow", function()
-        edit:SetText(ns.Dictionary.Text())
+        edit:SetText(ns.Dictionary.Escaped(ns.Dictionary.Text()))
     end)
 end
 

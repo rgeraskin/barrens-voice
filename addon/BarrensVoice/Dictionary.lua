@@ -540,6 +540,13 @@ local function Diff(text)
     return e
 end
 
+--- The game's edit box keeps a typed or pasted "|" as "||" (its escape: "|c", "|T", "|H" are markup there, as
+--- in the chat; the client's own login form takes "||" back to "|", AccountLogin.lua, forever and live), while
+--- the dictionary has the plain "|" of a regex's "или" and of forms "[а|б|в]". The window puts its text in
+--- escaped and takes it back unescaped: every "|" in the box is then "||", typed or not.
+function D.Escaped(text) return (text:gsub("|", "||")) end
+function D.Unescaped(text) return (text:gsub("||", "|")) end
+
 --- The dictionary window's text, saved as edits of the default.
 function D.SetText(text)
     ns.db.dictionaryEdits = Diff(text)
