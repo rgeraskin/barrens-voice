@@ -445,7 +445,7 @@ local function BuildHelp(tab, description)
         .. "в окне Barrens Voice). Неверное ударение можно сразу поправить себе на вкладке «Словарь».")
     y = y - height - GAP
     local news = UI.Button(tab, "Что нового", 140, function() ns.NewsWindow.Show() end)
-    news:SetPoint("TOPLEFT", LEFT, y)
+    news:SetPoint("TOP", tab, "TOP", 0, y)          -- centred under the links
     UI.Tooltip(news, "Что изменилось в последних версиях Barrens Voice (/bv news).")
     return -(y - 22 - (GAP - 8))                    -- the tab is 8 px taller than its height (CHROME)
 end
