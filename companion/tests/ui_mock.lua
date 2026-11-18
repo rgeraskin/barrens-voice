@@ -491,7 +491,13 @@ do
     assert(said("CHAT_MSG_WHISPER"), "«Что показывают окна чата»: its new tab shows it")
     assert(not said("CHAT_MSG_WHISPER", nil, "GM"), "a GM's whisper: no tab for it, the general one does not show it")
     ns.db.onlyActiveTab = true
-    -- (one's own whisper, CHAT_MSG_WHISPER_INFORM: the recipient is the conversation - the case is in bnet_whisper.lua)
+    -- one's own whisper (CHAT_MSG_WHISPER_INFORM: the recipient is the conversation) to someone with no tab yet:
+    -- in "popout" the client opens its tab and selects it (FloatingChatFrameManager_OnEvent, forever and live),
+    -- so it is read though this addon hears the event first and the general tab is still the selected one
+    ns.db.self, ns.db.ownSender = true, { me = "Джайна-Степи" }
+    assert(said("CHAT_MSG_WHISPER_INFORM"), "one's own whisper in «popout»: its new tab is selected at once")
+    assert(not said("CHAT_MSG_WHISPER_INFORM", nil, "GM"), "... not to a GM: no tab for it")
+    ns.db.self, ns.db.ownSender = false, nil
     -- "inline": whispers in the windows that take them; one moved out to a window of its own stays out of the source
     mode = "inline"
     assert(said("CHAT_MSG_WHISPER"), "inline: the general tab shows whispers")
