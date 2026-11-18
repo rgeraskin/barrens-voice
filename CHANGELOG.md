@@ -42,7 +42,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - A strip of another protocol is told apart
 
-  A strip whose protocol the companion does not read is not taken for a covered one («полоска видна, но не читается»): after 3 seconds the companion says which to update — «аддон новее Barrens Voice — обновите Barrens Voice» or «аддон старше… — «обновить аддон», потом /reload» — and the launcher's «Мост» line says so. A new protocol keeps reading the one before (`protocol.SUPPORTED`).
+  A strip whose protocol the companion does not read is not taken for a covered one («полоска видна, но не читается»): after 3 seconds the companion says which to update — «аддон новее Barrens Voice — обнови Barrens Voice» or «аддон старше… — «обновить аддон», потом /reload» — and the launcher's «Мост» line says so. A new protocol keeps reading the one before (`protocol.SUPPORTED`).
 
 - The hidden chat says it needs a `/reload`
 
@@ -77,6 +77,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   The whispers one sends, to a character or to a Battle.net friend, are read under «Шёпот» when «Свои сообщения» is on (as it is by default): «Джайна шепчет: …», by one's own name, in one's own voice, without the name of the one whispered to. The name is the one the chat gives the character's own lines (on Forever the game's own name parts may differ from it), so one's own whispers are read once the character has written a line the addon heard, in any chat; it is kept per character over `/reload` and restarts. Until then `/bv debug` says why one is not read. With «Свои сообщения» off they are not read and the hidden chat shows them as before; read, they show it only with «при шёпоте», like a whisper one gets.
 
 ### Changed
+
+- The mod speaks to the player with «ты»
+
+  The addon, the launcher, the companion's log, the installer's starter, README and the player's docs say «ты» instead of «вы»: a fan mod for players, like most Russian addons. The test lines spoken to a group keep their plural, and Windows' own wording stays as it is.
 
 - A raid warning is «объявляет»
 
