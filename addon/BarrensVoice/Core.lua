@@ -89,6 +89,7 @@ local SEP = ns.SEP   -- Text.lua
 local VERBS = { say = "говорит", yell = "кричит", whisper = "шепчет", warning = "объявляет", test = "говорит" }
 local NOT_ASKED = { yell = true, whisper = true, warning = true }   -- the verb stays even for a question
 local PREFIX = "|cff66ccffBarrens Voice|r: "
+ns.PREFIX = PREFIX   -- every line of the addon in the chat starts with it (News.lua too)
 
 -- The name before a line is followed by a mark (\4): the program drops it when the same character
 -- goes on while their previous line is still being said or was just said (it knows when a line
@@ -308,6 +309,7 @@ end
 local CLUB_LINK_COLOR = "|cff82c5ff"   -- BATTLENET_FONT_COLOR, when the client's own is not there
 local GREY = "|cff999999"
 local ICON = "|TInterface\\AddOns\\BarrensVoice\\Icon:14:14:0:0:64:64:4:60:4:60|t"
+ns.ICON = ICON       -- before the prefix of a line worth noticing (the community, News.lua)
 local CLUB_NAME = "Barrens Voice"      -- how the community is told among the player's own
 local JOIN_WAIT = 300                  -- seconds after «Открыть» a community joined is greeted
 local askedAt                          -- when «Открыть» last gave the link
@@ -860,35 +862,18 @@ local function Version()
     return meta and meta(ADDON, "Version") or "?"
 end
 
---- For people: a test build "0.4.0b1" -> "0.4.0 beta 1" (the launcher's install.display_version).
-local function Shown(version) return (version:gsub("b(%d+)$", " beta %1")) end
-
---- The release a version leads to: "0.4.0b1" -> "0.4.0" (a test build has its release's news).
-local function Release(version) return (version:gsub("b%d+$", "")) end
-
--- What a version brought, in a few words, for the line after an update (CHANGELOG.md has it all).
-ns.NEWS = {
-    ["0.4.0"] = "Barrens Voice ставится установщиком и обновляется сам, вместе с аддоном, мост к компаньону теперь "
-        .. "внизу экрана, стандартный словарь обновляется без обновления аддона, в настройках появилась вкладка «Помощь»",
-}
-
---- The word at login: the welcome on the first run, a line on what is new after an update (the
---- version last seen is kept), and every time whether the reading works (Companion.lua).
--- Where to write about bugs and words read wrong: said at the first run and after an update, not at
--- every login.
+--- The word at login: the welcome on the first run, and every time whether the reading works (Companion.lua);
+--- what is new after an update comes a few seconds later, out of combat (News.lua).
+-- Where to write about bugs and words read wrong: said at the first run, not at every login.
 local HELP_HINT = "ошибки, неверное произношение, идеи — вкладка «Помощь» в настройках (/bv): там Discord, Telegram и GitHub."
 
 function ns.LoginWord()
     local version = Version()
-    if ns.firstRun then
-        ns.Welcome()
-    elseif ns.db.seenVersion ~= version then
-        print(PREFIX .. ("обновление %s: %s. Настройки — /bv."):format(Shown(version), ns.NEWS[Release(version)]
-            or "что нового — в описании аддона"))
-        print(PREFIX .. HELP_HINT)
-    end
+    ns.News.Prepare(version, ns.firstRun)   -- before the version last seen moves on
+    if ns.firstRun then ns.Welcome() end
     ns.db.seenVersion = version
     ns.Companion.SayAtLogin()
+    ns.News.AtLogin(version)
 end
 
 --- The first run's word (as CatQuest does it): what this is, that it needs the companion app, where

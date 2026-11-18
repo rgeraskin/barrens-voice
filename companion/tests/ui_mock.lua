@@ -1166,28 +1166,30 @@ ns.ChatFade.Apply()
 print = realPrint
 print("companion ok")
 
--- the word at login: the welcome on the first run, a line after an update, then the companion's line
+-- the word at login: the welcome on the first run, then the companion's line; what is new after an update comes
+-- later (News.lua: the stub's C_Timer.After runs at once; companion/tests/news.lua has the rest)
 local welcome, plainPrint = {}, print
 print = function(text) welcome[#welcome + 1] = text end
 GetAddOnMetadata = function() return "0.4.0b1" end
-ns.firstRun, ns.db.seenVersion = true, nil
+ns.firstRun, ns.db.seenVersion, ns.db.newsSeen = true, nil, nil
 ns.LoginWord()
 assert(#welcome == 5 and welcome[1]:find("добро пожаловать") and welcome[2]:find("приложение%-компаньон")
     and welcome[4]:find("«Помощь»", 1, true) and welcome[5]:find("озвучка чата"), "welcome, then whether the reading works")
 assert(ns.db.seenVersion == "0.4.0b1", "the version is kept")
+assert(ns.db.newsSeen["0.4.0"] and ns.db.newsSeen["0.1.0"], "the first run: every entry seen")
 ns.firstRun = false
 welcome = {}
 ns.LoginWord()
 assert(#welcome == 1 and welcome[1]:find("озвучка чата"), "the same version again: only whether the reading works")
-GetAddOnMetadata = function() return "0.4.0b2" end                   -- a test build: shown so, its release's news
+GetAddOnMetadata = function() return "0.4.0b2" end                   -- a test build with nothing new
 welcome = {}
 ns.LoginWord()
-assert(#welcome == 3 and welcome[1]:find("обновление 0.4.0 beta 2: Barrens Voice ставится установщиком", 1, true)
-    and welcome[2]:find("«Помощь»", 1, true), tostring(welcome[1]))
-GetAddOnMetadata = function() return "9.9.9" end
+assert(#welcome == 1 and welcome[1]:find("озвучка чата"), "nothing new: no word of it")
+ns.db.seenVersion, ns.db.newsSeen = "0.3.0", nil                     -- an addon from before News.lua
 welcome = {}
 ns.LoginWord()
-assert(welcome[1]:find("что нового — в описании аддона"), "a version with no news of its own")
+assert(#welcome == 2 and welcome[1]:find("озвучка чата") and welcome[2]:find("обновление 0.4.0 beta 2 —", 1, true),
+    "the companion's word, then what is new: " .. tostring(welcome[2]))
 GetAddOnMetadata = nil
 print = plainPrint
 print("welcome ok")

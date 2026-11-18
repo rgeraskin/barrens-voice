@@ -18,6 +18,7 @@ Core.lua
 ChatFade.lua
 CompanionStatus.lua
 Companion.lua
+News.lua
 UI.lua
 DictionaryWindow.lua
 StripWindow.lua
