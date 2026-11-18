@@ -299,37 +299,112 @@ local function AskCompanion(kind, key)
     ns.Strip.Push(ns.ServiceFrame(kind, ns.LineOptions(), key))
 end
 
-local CLUB_LINK_COLOR = "|cff82c5ff"   -- the colour the client gives a Battle.net community's link
+-- The community's word in the chat. The link is the client's own kind (LinkUtil.FormatLink with
+-- LinkTypes.ClubTicket, as GetClubTicketLink makes it, in BATTLENET_FONT_COLOR - Forever and retail alike) with
+-- a text of the addon's; each line starts with the addon's icon (Icon.tga without its bevelled frame: 4 of its
+-- 64 pixels on each side). Every call here is open to addons in both clients' API docs (C_Club.IsEnabled,
+-- GetSubscribedClubs, GetClubInfo and the event CLUB_ADDED: no HasRestrictions; the clubs' names can be secret
+-- on retail, so they are looked at only when not).
+local CLUB_LINK_COLOR = "|cff82c5ff"   -- BATTLENET_FONT_COLOR, when the client's own is not there
+local GREY = "|cff999999"
+local ICON = "|TInterface\\AddOns\\BarrensVoice\\Icon:14:14:0:0:64:64:4:60:4:60|t"
+local CLUB_NAME = "Barrens Voice"      -- how the community is told among the player's own
+local JOIN_WAIT = 300                  -- seconds after «Открыть» a community joined is greeted
+local askedAt                          -- when «Открыть» last gave the link
+
+--- The invite as a chat link: "[Вступить в «Barrens Voice»]" in the colour of Battle.net's links; nil when the
+--- client cannot make one.
+local function ClubLink(ticket)
+    local util, types = rawget(_G, "LinkUtil"), rawget(_G, "LinkTypes")
+    if type(util) ~= "table" or type(util.FormatLink) ~= "function" or type(types) ~= "table" or not types.ClubTicket then
+        return nil
+    end
+    local ok, link = pcall(util.FormatLink, types.ClubTicket, "[Вступить в «" .. CLUB_NAME .. "»]", ticket)
+    if not ok or type(link) ~= "string" then return nil end
+    local color = rawget(_G, "BATTLENET_FONT_COLOR")
+    if type(color) == "table" and type(color.WrapTextInColorCode) == "function" then
+        local fine, wrapped = pcall(color.WrapTextInColorCode, color, link)
+        if fine and type(wrapped) == "string" then return wrapped end
+    end
+    return CLUB_LINK_COLOR .. link .. "|r"
+end
+
+--- Whether a club's info is Barrens Voice's community: its name, when it can be looked at (not secret).
+local function OurClub(info)
+    local canaccesstable = rawget(_G, "canaccesstable")
+    if ns.Secret(info) or type(info) ~= "table" or (canaccesstable and not canaccesstable(info)) then return nil end
+    local name = info.name
+    if ns.Secret(name) or type(name) ~= "string" then return nil end
+    return name:find(CLUB_NAME, 1, true) and name or false
+end
+
+--- The name of the player's own community that is Barrens Voice's (C_Club.GetSubscribedClubs), or nil.
+local function JoinedName()
+    local club = rawget(_G, "C_Club")
+    if type(club) ~= "table" or type(club.GetSubscribedClubs) ~= "function" then return nil end
+    local ok, name = pcall(function()
+        local clubs = club.GetSubscribedClubs()
+        local canaccesstable = rawget(_G, "canaccesstable")
+        if ns.Secret(clubs) or type(clubs) ~= "table" or (canaccesstable and not canaccesstable(clubs)) then return nil end
+        for _, info in ipairs(clubs) do
+            local ours = OurClub(info)
+            if ours then return ours end
+        end
+    end)
+    return ok and name or nil
+end
+
+--- The key the player has for the guild and communities window (the binding TOGGLEGUILDTAB -> ToggleGuildFrame ->
+--- ToggleCommunitiesFrame, both clients), as the client writes it (GetBindingKeyForAction, BindingUtil.lua), or nil.
+--- Its default key is not in the UI source, so the key bound is asked, not assumed.
+local function CommunitiesKey()
+    local ok, key = pcall(rawget(_G, "GetBindingKeyForAction") or error, "TOGGLEGUILDTAB")
+    return ok and not ns.Secret(key) and type(key) == "string" and key ~= "" and key or nil
+end
+
+--- A joined community (CLUB_ADDED) within JOIN_WAIT seconds of «Открыть»: greeted, if it is this one (or its name
+--- cannot be looked at).
+function ns.OnClubAdded(clubId)
+    if not askedAt or (GetTime and GetTime() or 0) - askedAt > JOIN_WAIT then return end
+    local club = rawget(_G, "C_Club")
+    if type(club) == "table" and type(club.GetClubInfo) == "function" and not ns.Secret(clubId) then
+        local ok, info = pcall(club.GetClubInfo, clubId)
+        if ok and OurClub(info) == false then return end   -- another community joined meanwhile
+    end
+    askedAt = nil
+    local key = CommunitiesKey()
+    print(ICON .. " Вы в сообществе " .. CLUB_NAME .. "!" .. (key and (" Окно сообществ — клавиша %s."):format(key) or ""))
+end
 
 --- A community's invite as a link in the chat, for the player to click: the click is the game's own
 --- (ItemRefHandlersShared.lua: LinkTypes.ClubTicket -> CommunitiesHyperlink.OnClickLink, which asks for the
 --- ticket and on CLUB_TICKET_RECEIVED opens the «Сообщества» window on the community). The addon does not
 --- call that itself: the ticket listener it creates would then be the addon's, and every later invite
---- click would open the window from addon code (taint). No companion needed, so it works with the
---- voice-over off too. False when the client has no communities or they are off: the browser it is, then.
+--- click would open the window from addon code (taint). A player already in the community is told so
+--- instead. No companion needed, so it works with the voice-over off too. False when the client has no
+--- communities or they are off: the browser it is, then.
 local function LinkInChat(link)
     local ticket = link[3]
     local club = rawget(_G, "C_Club")
     if not ticket or type(club) ~= "table" or type(club.IsEnabled) ~= "function" then return false end
     local ok, enabled = pcall(club.IsEnabled)
     if not (ok and enabled) then return false end
-    local chatLink
-    local make, enum = rawget(_G, "GetClubTicketLink"), rawget(_G, "Enum")
-    if type(make) == "function" and type(enum) == "table" and enum.ClubType then
-        local fine, made = pcall(make, ticket, "Barrens Voice", enum.ClubType.BattleNet)
-        if fine and type(made) == "string" then chatLink = made end
+    local joined = JoinedName()
+    if joined then
+        local key = CommunitiesKey()
+        -- "|" starts the chat's markup: "||" shows one
+        print(ICON .. (" Вы уже в сообществе «%s»"):format((joined:gsub("|", "||")))
+            .. (key and (" — окно сообществ открывается клавишей %s."):format(key) or "."))
+    else
+        local chatLink = ClubLink(ticket)
+        if not chatLink then return false end
+        print(ICON .. " Сообщество " .. CLUB_NAME .. " — новости, вопросы, ошибки: " .. chatLink .. "  " .. GREY
+            .. "или в браузере: " .. link[2] .. "|r")
+        print("Щёлкните по ссылке: откроется окно сообществ с кнопкой «Вступить». Не открылось — рядом ссылка для "
+            .. "браузера.")
+        askedAt = GetTime and GetTime() or 0
     end
-    if not chatLink then
-        local util, types = rawget(_G, "LinkUtil"), rawget(_G, "LinkTypes")
-        if type(util) ~= "table" or type(util.FormatLink) ~= "function" or type(types) ~= "table"
-                or not types.ClubTicket then
-            return false
-        end
-        chatLink = CLUB_LINK_COLOR .. util.FormatLink(types.ClubTicket, "[Barrens Voice]", ticket) .. "|r"
-    end
-    print(PREFIX .. ("%s: щёлкните по ссылке %s — откроется окно «Сообщества», там можно вступить.")
-        :format(link[1], chatLink))
-    -- the settings close so the link is in sight (a hidden chat shows for a line like this one: ChatFade.lua);
+    -- the settings close so the line is in sight (a hidden chat shows for a line like this one: ChatFade.lua);
     -- the click itself must be the player's: the game opens a community only from its own chat link
     if ns.Options and ns.Options.Hide then ns.Options.Hide() end
     return true
@@ -877,8 +952,10 @@ local function OnEvent(self, event, name, ...)
         self:UnregisterEvent("ADDON_LOADED")
         for e in pairs(EVENTS) do self:RegisterEvent(e) end
         self:RegisterEvent("PLAYER_LOGIN")
+        pcall(self.RegisterEvent, self, "CLUB_ADDED")   -- a community joined (ns.OnClubAdded)
         return
     end
+    if event == "CLUB_ADDED" then ns.OnClubAdded(name) return end
     if event == "PLAYER_LOGIN" then
         ns.LoginWord()
         ns.SendControl()   -- the companion loads the voices chosen here

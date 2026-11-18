@@ -200,53 +200,126 @@ do  -- «Скачать дополнительные голоса …: RHVoice, 
     print("links ok")
 end
 do  -- «Открыть» for the community: its invite as a link in the chat, for the player to click (the click is the game's)
-    local pushed, told, push0, print0 = {}, {}, ns.Strip.Push, print
+    local pushed, told, push0, print0, time0 = {}, {}, ns.Strip.Push, print, GetTime
     ns.Strip.Push = function(p) pushed[#pushed + 1] = p end
     print = function(t) told[#told + 1] = t end
-    local enabled = true
-    C_Club = { IsEnabled = function() return enabled end }
-    Enum = { ClubType = { BattleNet = 0 } }
-    GetClubTicketLink = function(ticket, name, clubType)
-        assert(clubType == 0, "a Battle.net community")
-        return "|cff82c5ff|HclubTicket:" .. ticket .. "|h[" .. name .. "]|h|r"
-    end
+    local clock = 1000
+    GetTime = function() return clock end
+    local enabled, clubs, infos = true, {}, {}
+    C_Club = { IsEnabled = function() return enabled end, GetSubscribedClubs = function() return clubs end,
+               GetClubInfo = function(id) return infos[id] end }
+    LinkUtil, LinkTypes = { FormatLink = function(kind, text, ...)
+        return ("|H%s:%s|h%s|h"):format(kind, table.concat({ ... }, ":"), text)
+    end }, { ClubTicket = "clubTicket" }
+    BATTLENET_FONT_COLOR = { WrapTextInColorCode = function(_, text) return "|cff82c5ff" .. text .. "|r" end }
+    GetBindingKeyForAction = function(action) assert(action == "TOGGLEGUILDTAB") return "J" end
     CommunitiesHyperlink = { OnClickLink = function() error("the addon must not open it itself (taint)") end }
+    local ICON = "|TInterface\\AddOns\\BarrensVoice\\Icon:14:14:0:0:64:64:4:60:4:60|t "
     ns.Options.Open("help")
     assert(ns.Options.IsShown(), "the settings are up before the click")
     ns.OpenLink("community")
     assert(#pushed == 0, "the companion is not asked")
     assert(not ns.Options.IsShown(), "the settings close: the link in the chat is in sight")
-    assert(#told == 1 and told[1]:find("|HclubTicket:N9KR2WNHDgW|h[Barrens Voice]|h", 1, true), told[1] or "nothing said")
-    assert(told[1]:find("щёлкните по ссылке", 1, true), "the player is told to click it: " .. told[1])
+    assert(#told == 2, "two lines: " .. #told)
+    assert(told[1] == ICON .. "Сообщество Barrens Voice — новости, вопросы, ошибки: |cff82c5ff|HclubTicket:N9KR2WNHDgW|h"
+        .. "[Вступить в «Barrens Voice»]|h|r  |cff999999или в браузере: https://launch.battle.net/invite/N9KR2WNHDgW|r",
+        told[1])
+    assert(told[2] == "Щёлкните по ссылке: откроется окно сообществ с кнопкой «Вступить». Не открылось — рядом ссылка "
+        .. "для браузера.", told[2])
+    for _, line in ipairs(told) do
+        assert(not line:find("Barrens Voice|r:", 1, true) and not line:find("→", 1, true) and not line:find("–", 1, true),
+            "no prefix, no arrow or en dash: " .. line)
+    end
+    -- joined within 5 minutes of «Открыть» (CLUB_ADDED): greeted once, with the key the player has for the window
+    infos[42] = { name = "Barrens Voice", clubType = 0 }
+    clock = clock + 299
+    ns.OnEvent("CLUB_ADDED", 42)
+    assert(#told == 3 and told[3] == ICON .. "Вы в сообществе Barrens Voice! Окно сообществ — клавиша J.", told[3])
+    ns.OnClubAdded(42)
+    assert(#told == 3, "greeted once")
+    -- later than 5 minutes: not greeted
+    ns.OpenLink("community")
+    clock = clock + 301
+    ns.OnClubAdded(42)
+    assert(#told == 5, "too late: no word")
+    -- another community joined meanwhile: not greeted; its name secret: greeted (cannot be told apart)
+    ns.OpenLink("community")
+    infos[43] = { name = "Гильдия котов", clubType = 0 }
+    ns.OnClubAdded(43)
+    assert(#told == 7, "another community: no word")
+    -- no key bound: the greeting without one
+    GetBindingKeyForAction = function() return nil end
+    ns.OnClubAdded(44)
+    assert(#told == 8 and told[8] == ICON .. "Вы в сообществе Barrens Voice!", told[8])
+    -- never asked: no word for a community the player joined some other way
+    local fresh = #told
+    ns.OnClubAdded(42)
+    assert(#told == fresh, "no «Открыть», no greeting")
+    -- already in it: said so, with the key; no link, no greeting later
+    GetBindingKeyForAction = function() return "J" end
+    clubs = { { name = "Гильдия котов" }, { name = "Barrens Voice — озвучка чата" } }
+    ns.OpenLink("community")
+    assert(#told == fresh + 1 and told[#told] == ICON .. "Вы уже в сообществе «Barrens Voice — озвучка чата» — окно "
+        .. "сообществ открывается клавишей J.", told[#told])
+    ns.OnClubAdded(42)
+    assert(#told == fresh + 1, "already in: no greeting")
+    GetBindingKeyForAction = nil
+    ns.OpenLink("community")
+    assert(told[#told] == ICON .. "Вы уже в сообществе «Barrens Voice — озвучка чата».", told[#told])
+    -- retail: the names secret (chat lockdown) - not looked at, the link given
+    local SECRET = setmetatable({}, { __index = function() error("a secret value cannot be read") end,
+        __eq = function() error("a secret value cannot be compared") end })
+    issecretvalue = function(v) return rawequal(v, SECRET) end
+    for _, secret in ipairs({ { { name = SECRET } }, SECRET, { SECRET } }) do
+        clubs = secret
+        local n = #told
+        ns.OpenLink("community")
+        assert(#told == n + 2 and told[n + 1]:find("[Вступить в «Barrens Voice»]", 1, true), "secret: the link")
+    end
+    infos[45] = { name = SECRET }
+    ns.OnClubAdded(45)
+    assert(told[#told] == ICON .. "Вы в сообществе Barrens Voice!", "a secret name: greeted - " .. told[#told])
+    infos[46] = SECRET
+    ns.OpenLink("community")
+    ns.OnClubAdded(46)
+    assert(told[#told] == ICON .. "Вы в сообществе Barrens Voice!", "a secret info: greeted")
+    issecretvalue, clubs = nil, {}
+    C_Club.GetSubscribedClubs = function() error("clubs not initialized") end
+    local n = #told
+    ns.OpenLink("community")
+    assert(#told == n + 2, "the list fails: the link")
+    -- no BATTLENET_FONT_COLOR: the same colour by its code
+    BATTLENET_FONT_COLOR = nil
+    ns.OpenLink("community")
+    assert(told[#told - 1]:find("|cff82c5ff|HclubTicket:N9KR2WNHDgW|h[Вступить в «Barrens Voice»]|h|r", 1, true), told[#told - 1])
     ns.db.enabled = false                                    -- no companion needed: with the voice-over off too
+    n = #told
     ns.OpenLink("community")
     ns.db.enabled = true
-    assert(#told == 2 and #pushed == 0, "off: the link all the same")
-    GetClubTicketLink = function() error("no CLUB_INVITE_HYPERLINK_TEXT") end      -- the client's helper fails
-    LinkUtil, LinkTypes = { FormatLink = function(kind, text, ...)
-        return ("|H%s:%s|h%s|h"):format(kind, table.concat({ ... }, ":"), text)
-    end }, { ClubTicket = "clubTicket" }
-    ns.OpenLink("community")
-    assert(told[3]:find("|HclubTicket:N9KR2WNHDgW|h[Barrens Voice]|h", 1, true), "LinkUtil.FormatLink's link: " .. told[3])
-    enabled = false                                          -- communities off: the browser, through the companion
+    assert(#told == n + 2 and #pushed == 0, "off: the link all the same")
+    LinkUtil = nil                                           -- the client cannot make the link: the browser
     ns.OpenLink("community")
     assert(#pushed == 1 and pushed[1]:find("^open\31") and pushed[1]:find("\31community$"), pushed[1] or "nothing")
+    LinkUtil = { FormatLink = function() return "|HclubTicket:x|h[x]|h" end }
+    enabled = false                                          -- communities off: the browser, through the companion
+    ns.OpenLink("community")
+    assert(#pushed == 2 and pushed[2]:find("\31community$"), pushed[2] or "nothing")
     ns.db.enabled = false                                    -- ... and the voice-over off: no companion to ask
     local said = #told
     ns.OpenLink("community")
     ns.db.enabled = true
-    assert(#pushed == 1, "off: the companion is not asked")
+    assert(#pushed == 2, "off: the companion is not asked")
     assert(#told == said + 1 and told[#told]:find("https://launch.battle.net/invite/N9KR2WNHDgW", 1, true),
         "off: the address in the chat instead: " .. tostring(told[#told]))
     C_Club = nil
     ns.OpenLink("community")
-    assert(#pushed == 2, "no communities at all: the browser")
+    assert(#pushed == 3, "no communities at all: the browser")
     ns.OpenLink("discord")
-    assert(#pushed == 3 and pushed[3]:find("\31discord$"), "other links: the browser as before")
+    assert(#pushed == 4 and pushed[4]:find("\31discord$"), "other links: the browser as before")
     ns.CopyLink("community")
-    assert(#pushed == 4 and pushed[4]:find("^copy\31") and pushed[4]:find("\31community$"), "«Копировать»: the web address")
-    C_Club, Enum, GetClubTicketLink, CommunitiesHyperlink, LinkUtil, LinkTypes = nil
-    ns.Strip.Push, print = push0, print0
+    assert(#pushed == 5 and pushed[5]:find("^copy\31") and pushed[5]:find("\31community$"), "«Копировать»: the web address")
+    C_Club, LinkUtil, LinkTypes, CommunitiesHyperlink, BATTLENET_FONT_COLOR, GetBindingKeyForAction = nil
+    ns.Strip.Push, print, GetTime = push0, print0, time0
     print("community link ok")
 end
 for _, name in ipairs({ "reading", "general", "no such tab" }) do ns.Options.Open(name) end
