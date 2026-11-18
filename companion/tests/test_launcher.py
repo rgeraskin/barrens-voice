@@ -887,6 +887,34 @@ class Update(unittest.TestCase):
             self.assertFalse(update.state_path(root).exists())
             self.assertEqual(install.current_version(root), "0.4.0")
 
+    def test_rollback_cut_short_is_remembered(self):
+        # the launcher killed between the rollback's two renames: the refusal came after the switch, so the failed
+        # version was not remembered and was prepared again by itself. The starter runs current.new (the previous
+        # version), whose start repairs app\\current and drops the watch of the failed one at its end
+        from unittest import mock
+        from bv import install, update
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            for v in ("0.4.0", "0.4.1"):
+                make_version(root, v)
+            install.point_current(root, root / "app" / "0.4.0")
+            update.apply(root, "0.4.1")
+            update.record_start(root, 5, failed=True)
+            real = os.rename
+
+            def killed(a, b):
+                if Path(a).name == "current.new":
+                    raise SystemExit("killed")                     # nothing of point_current's own clean-up runs
+                real(a, b)
+            with mock.patch("os.rename", side_effect=killed), self.assertRaises(SystemExit):
+                update.record_start(root, 5, failed=True)
+            self.assertEqual(update.refused(root), "0.4.1")
+            self.assertEqual(sorted(p.name for p in (root / "app").iterdir()), ["0.4.0", "0.4.1", "current.new", "current.old"])
+            self.assertTrue(install.repair_current(root, root / "app" / "0.4.0"))
+            self.assertIsNone(update.record_start(root, 5, failed=True))           # the previous one's end
+            self.assertFalse(update.state_path(root).exists())
+            self.assertEqual((install.current_version(root), update.refused(root)), ("0.4.0", "0.4.1"))
+
     def test_watch_of_a_switch_that_did_not_happen(self):
         # update.json names another version than current (the launcher killed after writing it, before the
         # switch): the current version's failures are not the other's - forgotten, nothing refused

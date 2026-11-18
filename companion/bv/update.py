@@ -354,9 +354,11 @@ def record_start(root: Path, ran_for: float, failed: bool | None) -> str | None:
     if state["fails"] < 2 or not state.get("previous") or not install.whole(root / "app" / state["previous"]):
         write_json(path, state)
         return None
+    # refused before the switch: a rollback cut short between its renames (install.point_current) is remembered,
+    # and the version is not prepared again by itself
+    refuse(root, state.get("version"))
     install.point_current(root, root / "app" / state["previous"])
     note_version(root, state["previous"])
-    refuse(root, state.get("version"))
     path.unlink(missing_ok=True)
     return state["previous"]
 

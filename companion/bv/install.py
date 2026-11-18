@@ -127,9 +127,11 @@ def repair_current(root: Path, running: Path) -> bool:
     """app\\current made again after a switch cut short between its two renames (point_current), which left only
     current.new and current.old: the starter runs one of them, but nothing made current again until the next
     update, which then had no version to go back to. Pointed at `running` - the version this launcher is, the
-    one the starter chose - when one of the two links points at it (current.new: the new version, still watched
-    by update.json; current.old: the one before, and the watch of the switch that did not happen is dropped at
-    the next end). Whether it was made."""
+    one the starter chose - when one of the two links points at it. current.new is the version switched to: the
+    new one of an update, still watched by update.json, or the previous one of a rollback, whose refusal of the
+    failed version is written before it (bv/update.py record_start). current.old is the one switched from. When
+    the running version is not the one update.json watches, that watch is dropped at the companion's next end
+    (a switch that did not happen, or a rollback already done). Whether it was made."""
     app = root / "app"
     if os.path.exists(app / "current"):
         return False
