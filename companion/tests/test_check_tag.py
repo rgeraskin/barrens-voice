@@ -38,6 +38,18 @@ def problems(tag="v0.4.1", base="0.4.1", addon="0.4.1", toml=None, log=None) -> 
     return release.release_problems(tag, base, addon, entries, changelog() if log is None else log)
 
 
+
+class Compat(unittest.TestCase):
+    def test_a_tag_needs_its_update_codes_frozen_copy(self):
+        # players' clients of every release must stay testable (OldClients): a tag whose update.py/install.py no copy
+        # under companion/tests/compat has is refused before it is public, as CI's test would refuse it after
+        from release import compat_problem
+        self.assertIsNone(compat_problem("v0.4.1", "0.4.1", None, []))                  # no updater yet
+        self.assertIsNone(compat_problem("v0.4.1", "0.4.1", "u\0i", ["x\0y", "u\0i"]))   # a copy has it
+        said = compat_problem("v0.4.1-beta.2", "0.4.1b2", "u\0i", ["x\0y"])
+        self.assertIn("companion/tests/compat/v0_4_1b2/", said)
+        self.assertIn("OldClients", said)
+
 class Checks(unittest.TestCase):
     def test_a_ready_release(self):
         self.assertEqual(problems(), [])

@@ -3,7 +3,7 @@
 
 CI builds a release only after its tag is public, and tools/release.py refuses it there when news.toml or
 CHANGELOG.md is not ready; this says the same (release.tag_problems: one list of checks for both) before the push.
-It reads pyproject.toml, news.toml, CHANGELOG.md and the addon's .toc as the tagged commit has them (git show in the
+It reads pyproject.toml, news.toml, CHANGELOG.md, the addon's .toc and the update code with its frozen copies (compat) as the tagged commit has them (git show in the
 current repository), not the working tree. Offline, and only the standard library: no tests are run.
 Exit 0: ready; 1: not ready (what to fix on stderr); 2: wrong use.
 """
@@ -30,6 +30,14 @@ def reader(commit: str):
     return read
 
 
+def lister(commit: str):
+    """listing(folder): the names in `folder` at `commit` ([] when it has no such folder)."""
+    def listing(folder: str) -> list[str]:
+        shown = git("ls-tree", "--name-only", f"{commit}:{folder}")
+        return shown.stdout.decode("utf-8").split() if shown.returncode == 0 else []
+    return listing
+
+
 def main(argv: list[str]) -> int:
     # UTF-8 whatever the pipe: on Windows Python writes a pipe (git's, the hook's) in the ANSI code page (cp1252),
     # which turns «» into bytes git's terminal does not read as UTF-8 and has no Cyrillic for «Что нового» at all
@@ -43,14 +51,15 @@ def main(argv: list[str]) -> int:
     if peeled.returncode != 0:
         print(f"{tag}: {argv[-1]} is no commit here", file=sys.stderr)
         return 2
-    problems = tag_problems(tag, reader(peeled.stdout.decode().strip()))
+    commit = peeled.stdout.decode().strip()
+    problems = tag_problems(tag, reader(commit), lister(commit))
     if problems:
         print(f"{tag} is not ready for a release (CI would refuse it once the tag is public):", file=sys.stderr)
         for problem in problems:
             print(f"  - {problem}", file=sys.stderr)
         print(f"Fix it in a commit, move the tag there (git tag -f {tag}) and push again.", file=sys.stderr)
         return 1
-    print(f"{tag}: ready (its version, news.toml, CHANGELOG.md)")
+    print(f"{tag}: ready (its version, news.toml, CHANGELOG.md, the update code's frozen copy)")
     return 0
 
 

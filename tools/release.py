@@ -178,7 +178,22 @@ def changelog_problem(version: str, text: str) -> str | None:
     return None
 
 
-def release_problems(tag: str, base: str, addon: str, entries: list[dict] | None, changelog: str | None) -> list[str]:
+COMPAT = "companion/tests/compat"     # frozen copies of the released clients' update.py and install.py
+
+
+def compat_problem(tag: str, version: str, updater: str | None, copies: list[str]) -> str | None:
+    """Why a tag's update code has no frozen copy, or None: every release's update.py and install.py stay under
+    COMPAT, so that later releases are tested to install through the clients players have (OldClients). `updater`:
+    the tag's update.py + "\0" + install.py (None: no updater yet), `copies`: the same of each copy under COMPAT."""
+    if updater is None or updater in copies:
+        return None
+    folder = "v" + version.replace(".", "_")
+    return (f"{tag} ships an update.py/install.py no frozen copy has: copy them to {COMPAT}/{folder}/ (with an "
+            "__init__.py) and add an OldClients test in test_launcher.py")
+
+
+def release_problems(tag: str, base: str, addon: str, entries: list[dict] | None, changelog: str | None,
+                     updater: str | None = None, copies: list[str] = ()) -> list[str]:
     """Why `tag` cannot be released, in words ([] when it can): what the build refuses in CI, and the pre-push hook
     before the tag is public (tools/check_tag.py) - one list, so the two never disagree. `base`: pyproject.toml's
     version, `addon`: the .toc's, `entries`: news.toml's (None: no such file), `changelog`: CHANGELOG.md (None: no
@@ -192,12 +207,19 @@ def release_problems(tag: str, base: str, addon: str, entries: list[dict] | None
                    "release version in BarrensVoice.toc")
     out.append(news_problem(version, entries) if entries is not None else "news.toml is missing")
     out.append(changelog_problem(version, changelog) if changelog is not None else "CHANGELOG.md is missing")
+    out.append(compat_problem(tag, version, updater, list(copies)))
     return [p for p in out if p]
 
 
-def tag_problems(tag: str, read) -> list[str]:
+def updater_pair(read, folder: str) -> str | None:
+    """update.py + "\0" + install.py in `folder` (read(name) gives a file's text), None without both."""
+    update, install = read(f"{folder}/update.py"), read(f"{folder}/install.py")
+    return None if update is None or install is None else update + "\0" + install
+
+
+def tag_problems(tag: str, read, listing=None) -> list[str]:
     """release_problems for a tag from the files at its commit: `read(name)` gives a file's text, None when the commit
-    has no such file."""
+    has no such file; `listing(folder)` the names in a folder at the commit (no compat check without it)."""
     pyproject, toc, toml = read("pyproject.toml"), read(TOC), read(news.SOURCE)
     try:
         base = tomllib.loads(pyproject or "")["project"]["version"]
@@ -210,7 +232,11 @@ def tag_problems(tag: str, read) -> list[str]:
             entries = news.parse(toml)
         except (ValueError, TypeError) as e:
             return [f"news.toml cannot be read: {e}"]
-    return release_problems(tag, base, addon.group(1) if addon else "?", entries, read("CHANGELOG.md"))
+    updater, copies = None, []
+    if listing is not None:
+        updater = updater_pair(read, "companion/bv")
+        copies = [c for c in (updater_pair(read, f"{COMPAT}/{name}") for name in listing(COMPAT)) if c is not None]
+    return release_problems(tag, base, addon.group(1) if addon else "?", entries, read("CHANGELOG.md"), updater, copies)
 
 
 def build() -> Path:
@@ -219,8 +245,14 @@ def build() -> Path:
     tag = os.environ.get("RELEASE_TAG", "")
     entries = news_entries()
     if tag:
+        def disk(name: str) -> str | None:
+            path = ROOT / name
+            return path.read_text(encoding="utf-8") if path.is_file() else None
         problems = release_problems(tag, base, info["addon"], entries,
-                                    (ROOT / "CHANGELOG.md").read_text(encoding="utf-8"))
+                                    (ROOT / "CHANGELOG.md").read_text(encoding="utf-8"),
+                                    updater_pair(disk, "companion/bv"),
+                                    [c for c in (updater_pair(disk, f"{COMPAT}/{d.name}")
+                                                 for d in sorted((ROOT / COMPAT).glob("v*"))) if c is not None])
         if problems:
             sys.exit("\n".join(problems))
         info["version"] = version_of(tag, base)
