@@ -539,6 +539,9 @@ class Pipeline(unittest.TestCase):
             "арена 2х2": "арена два на два", "5х5": "пять на пять", "3v3": "три на три", "из 2х": "из двух",
         })
 
+    def test_a_multiplier(self):
+        self.check({"х2 опыт": "икс два опыт", "x2 опыт": "икс два опыт", "х3": "икс три", "лок40 х2": "чернокнижник, уровень сорок икс два"})
+
     def test_emoji_codes_go_before_the_dictionary(self):
         # a code's word is no dictionary entry («:lol:» became «:л+ол:», no code any more); «:+1:» comes
         # from the addon as «: плюс 1:»

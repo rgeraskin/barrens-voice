@@ -320,8 +320,9 @@ def ordinal(n: int, before: str, following: str, morph) -> str | None:
 
 
 # "+" and "-" typed after a number: the addon says "+" as the word "плюс" ("50+ лвл" - "50 плюс лвл"),
-# which is not a noun the number counts or numbers ("пятидесятый плюс"): a cardinal, in the preposition's case
-SIGNS = {"плюс", "минус"}
+# which is not a noun the number counts or numbers ("пятидесятый плюс"): a cardinal, in the preposition's case;
+# so is the dictionary's "икс" ("х2" - "икс два": "уровень 40 икс два")
+SIGNS = {"плюс", "минус", "икс"}
 # an ordinal's ending glued to its number: "40го", "2007-го", "на 4м этаже" - the ordinal in that form
 # ("2х2" is no "двух": a digit after the ending)
 ENDING = re.compile(r"-?(ого|его|ому|ему|ыми|ими|ым|им|ом|ем|ый|ий|ой|ая|яя|ое|ее|ую|юю|ых|их|ые|ие|ух|ех|го|му|м|й|я|е|ю|х)"
