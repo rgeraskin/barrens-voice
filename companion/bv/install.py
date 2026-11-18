@@ -5,7 +5,8 @@ A release archive holds companion/, addon/, pyproject.toml and uv.lock. A versio
 <install>\\app\\<version>, uv builds its environment there from uv.lock (exact: what the lock says and
 nothing else; the libraries come from uv's cache in <install>\\cache\\uv as hard links, so a version
 that keeps them costs no download and almost no disk), then <install>\\app\\current is pointed at it.
-Run with any Python 3.11+: the installer runs this file through uv before any environment exists.
+Run with any Python 3.12+ (os.path.isjunction): the installer runs this file with uv's Python 3.13 before any
+environment exists.
 
     python install.py --root <install> --archive barrens-voice-0.4.1.zip [--runtime cuda|directml]
 """
