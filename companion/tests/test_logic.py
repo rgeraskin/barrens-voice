@@ -101,6 +101,31 @@ class Assign(unittest.TestCase):
         a = Assigner(slots(), self.path, {"Тралл": "creature/saurfang"})
         self.assertEqual(a.slot_for("Тралл-Степи", "Orc", "2").id, "creature/saurfang")
 
+    def test_battle_net_friend_pinned_without_digits(self):
+        # the log shows a friend as "BN:Вася": that key pins them, as does the whole BattleTag
+        a = Assigner(slots(), self.path, {"BN:Вася": "creature/saurfang", "BN:Тиранда#2345": "human-female"})
+        self.assertEqual(a.slot_for("BN:Вася#1234", "", "").id, "creature/saurfang")
+        self.assertEqual(a.slot_for("BN:вася#99", "", "").id, "creature/saurfang")           # any case, any digits
+        self.assertEqual(a.slot_for("BN:Тиранда#2345", "", "").id, "human-female")
+        self.assertNotEqual(a.slot_for("BN:Тиранда#9999", "", "", now=1).id, "human-female")   # another friend
+        self.assertNotEqual(a.slot_for("Вася-Степи", "Orc", "2").id, "creature/saurfang")    # a character named so
+
+    def test_battle_net_replay_without_digits_keeps_the_voice(self):
+        # /bv last from the addon's saved history: "BN:Вася", the friend heard as "BN:Вася#1234"
+        a = Assigner(slots(), self.path)
+        heard = a.slot_for("BN:Вася#1234", "Orc", "2", now=1).id
+        a.slot_for("Орк1", "Orc", "2", now=2)
+        a.slot_for("Орк2", "Orc", "2", now=3)
+        self.assertEqual(a.slot_for("BN:Вася", "Orc", "2", now=4).id, heard)
+        self.assertNotIn("bn:вася", a.known)                                      # no second entry for them
+        self.assertEqual(a.known["bn:вася#1234"]["seen"], 4)
+        # two friends of one name: the one heard last
+        later = a.slot_for("BN:Вася#5678", "Orc", "2", now=5).id
+        self.assertEqual(a.slot_for("BN:Вася", "Orc", "2", now=6).id, later)
+        # no friend of that name heard: a voice of their own
+        self.assertIsNotNone(a.slot_for("BN:Брэнн", "", "", now=7))
+        self.assertIn("bn:брэнн", a.known)
+
 
 class Regexes(unittest.TestCase):
     SAVED = r'WTS=продам\n~(\\d+)\\s*кк\\b=\\g<1>000000\n~(\\d+)\\s*к\\b=\\g<1>000\n~[=битая\n~(?=x)y=z'
@@ -203,6 +228,16 @@ class StableVoices(unittest.TestCase):
         self.assertTrue(moved)
         self.assertTrue(all(before[n] == "Voice3" for n in moved), "only Voice3's people may move")
         self.assertGreater(len(set(before.values())), 8)      # still spread over the voices
+
+    def test_battle_net_friend_by_the_tag_without_digits(self):
+        # pinned as the log shows them ("BN:Вася"); a replay from the addon's history (no digits) sounds the same
+        from bv.speech import Speaker, Voice
+        sp = Speaker({"players": {"BN:Вася": "Voice7"}, "exclude": [], "gender_overrides": {}}, print)
+        sp.all_voices = [Voice(None, f"Voice{i}", "Male", "rhvoice") for i in range(12)]
+        sp.set_disabled(set())
+        self.assertEqual(sp.voice_for("BN:Вася#1234", "2").description, "Voice7")
+        for i in range(30):
+            self.assertEqual(sp.voice_for(f"BN:Друг{i}#1234", "2"), sp.voice_for(f"BN:Друг{i}", "2"))
 
 
 class ResetAssignments(unittest.TestCase):

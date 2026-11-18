@@ -199,7 +199,9 @@ KEPT_NAME_MARK = "\x05"   # the same after a name that is never dropped (an emot
 
 def shown_sender(sender: str) -> str:
     """A line's sender as the log shows it: a Battle.net friend's "BN:<BattleTag>" without the tag's
-    "#1234" ("BN:Вася"); any other as it is. The voice stays tied to the whole sender (assign.py)."""
+    "#1234" ("BN:Вася"); any other as it is. A race voice stays tied to the whole sender, and "BN:Вася"
+    (`players` in config.json, a line replayed from the addon's history) finds it (assign.py); a Windows voice
+    goes by the tag without the digits (speech.py)."""
     if sender.startswith("BN:"):
         return re.sub(r"#\d+$", "", sender)
     return sender

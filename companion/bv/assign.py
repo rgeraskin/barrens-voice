@@ -10,6 +10,7 @@ from __future__ import annotations
 import atexit
 import json
 import os
+import re
 import threading
 import time
 import zlib
@@ -29,6 +30,12 @@ KIN = {
 RECENT = 30 * 60   # seconds: characters heard within this count as "in the conversation"
 FORGET = 60 * 24 * 3600   # seconds: characters not heard for this long are forgotten
 SAVE_EVERY = 30.0         # seconds between writes of the file
+BN_DIGITS = re.compile(r"#\d+$")   # a Battle.net friend's sender is "BN:<BattleTag>": "BN:Вася#1234"
+
+
+def battle_tag_name(key: str) -> str:
+    """A Battle.net sender without the BattleTag's "#1234" ("bn:вася"); any other sender as it is."""
+    return BN_DIGITS.sub("", key) if key.startswith("bn:") else key
 
 
 class Assigner:
@@ -71,7 +78,8 @@ class Assigner:
         now = time.time() if now is None else now
         key = sender.lower()
         short = key.split("-")[0]
-        override = self.overrides.get(key) or self.overrides.get(short)
+        # a Battle.net friend is pinned by the BattleTag with or without its digits ("BN:Вася", as the log shows it)
+        override = self.overrides.get(key) or self.overrides.get(short) or self.overrides.get(battle_tag_name(key))
         if override and override in self.by_id:
             return self.by_id[override]
         pool = self._pool(race, sex)
@@ -79,6 +87,13 @@ class Assigner:
             return None
         ids = {s.id for s in pool}
         entry = self.known.get(key)
+        if entry is None and key.startswith("bn:") and battle_tag_name(key) == key:
+            # "BN:Вася" without the digits: a line replayed from the addon's history (/bv last), which keeps no
+            # friend's whole tag - the voice of the "BN:Вася#1234" heard last
+            same = [(e.get("seen", 0), k) for k, e in self.known.items() if battle_tag_name(k) == key and k != key]
+            if same:
+                key = max(same)[1]
+                entry = self.known[key]
         if entry and entry.get("slot") in ids:
             entry["seen"] = now
             self._changed()

@@ -7,6 +7,7 @@ import re
 import threading
 import zlib
 
+from .assign import BN_DIGITS
 from .audio import Player, drain, wav
 from .text import Accentor, apply_stress
 
@@ -135,12 +136,16 @@ class Speaker(threading.Thread):
         if text and self.english and is_english(text):
             wanted = {"2": "Male", "3": "Female"}.get(sex)
             return pick(sender, [v for v in self.english if v.gender == wanted] or self.english)
-        override = self.config["players"].get(sender) or self.config["players"].get(sender.split("-")[0])
+        # a Battle.net friend ("BN:Вася#1234") by the BattleTag without its digits: so pinned in `players` as the
+        # log shows them, and a line replayed from the addon's history (which keeps no digits) sounds the same
+        tag = BN_DIGITS.sub("", sender) if sender.startswith("BN:") else sender
+        players = self.config["players"]
+        override = players.get(sender) or players.get(sender.split("-")[0]) or players.get(tag)
         if override:
             for v in self.voices:
                 if override.lower() in v.description.lower():
                     return v
-        return pick(sender, self.pool(sex))
+        return pick(tag, self.pool(sex))
 
     def fallback_for(self, sender: str, sex: str, failed: Voice) -> Voice | None:
         """A voice of the same sex on another engine, for when `failed` gives no audio."""
