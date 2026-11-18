@@ -285,7 +285,7 @@ class App:
         from ..__main__ import write_live
         write_live(self.config)                # «Закрываться вместе с игрой» as the window has it, read live
         self.companion.start([f"--{self.selected}", *extra, *flags])
-        self.say(f"компаньон запущен ({GAME_NAMES[self.selected]})")
+        self.say(f"компаньон запускается ({GAME_NAMES[self.selected]})")
         return True
 
     def stop_companion(self, then=None, why="stopping") -> None:
