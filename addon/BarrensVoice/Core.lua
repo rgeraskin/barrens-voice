@@ -865,18 +865,22 @@ local function Version()
     return meta and meta(ADDON, "Version") or "?"
 end
 
---- The word at login: the welcome on the first run, and every time whether the reading works (Companion.lua);
+--- The word at login: every time whether the reading works (Companion.lua), and the welcome on the first run;
 --- what is new after an update comes a few seconds later, out of combat (News.lua) - by the program's version,
 --- which the companion wrote with the news (NewsData.lua), not the addon's.
+-- The welcome waits a few seconds: at login every addon speaks at once, and the first lines scroll out of sight.
+local WELCOME_DELAY = 5
 -- Where to write about bugs and words read wrong: said at the first run, not at every login.
-local HELP_HINT = "ошибки, неверное произношение, идеи — вкладка «Помощь» в настройках (/bv): там Discord, Telegram и GitHub."
+local HELP_HINT = "ошибки, неверное произношение, идеи — вкладка «Помощь» в настройках (/bv): там Discord, Telegram, GitHub и сообщество в Battle.net."
 
 function ns.LoginWord()
     local installed = ns.News.Installed()      -- nil until the companion has written the news
     ns.News.Prepare(installed, ns.firstRun)    -- before the version last seen moves on
-    if ns.firstRun then ns.Welcome() end
     if installed then ns.db.seenVersion = installed end
     ns.Companion.SayAtLogin()
+    if ns.firstRun then
+        if C_Timer then C_Timer.After(WELCOME_DELAY, ns.Welcome) else ns.Welcome() end
+    end
     ns.News.AtLogin(installed)
 end
 

@@ -210,9 +210,16 @@ end
 
 do  -- the first run: the welcome, nothing of the news, every entry seen
     fresh()
-    local lines = login("0.4.0b16", true)
-    assert(lines[1]:find("добро пожаловать", 1, true) and lines[#lines]:find("приложение-компаньон", 1, true)
-        and #news(lines) == 0, "the welcome and the companion's word only")
+    DATA.version, BarrensVoiceNewsData, ns.firstRun, said = "0.4.0b16", DATA, true, {}
+    ns.LoginWord()
+    assert(#said == 1 and said[1]:find("приложение-компаньон", 1, true), "at once only the companion's word")
+    local delays = {}
+    for _, t in ipairs(timers) do delays[#delays + 1] = t.seconds end
+    assert(#delays == 2 and delays[1] == 5, "the welcome a few seconds later")
+    runTimers()
+    local lines = said
+    assert(lines[2]:find("добро пожаловать", 1, true) and lines[#lines]:find("сообщество в Battle.net", 1, true)
+        and #news(lines) == 0, "the companion's word, then the welcome only")
     assert(not W.IsShown(), "no window")
     for _, e in ipairs(REAL) do assert(ns.db.newsSeen[e.version], "seen: " .. e.version) end
     assert(#news(login("0.4.0b16")) == 0 and not W.IsShown(), "the next login: nothing")

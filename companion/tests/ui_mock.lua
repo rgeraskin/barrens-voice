@@ -1186,9 +1186,10 @@ BarrensVoiceNewsData = { version = "0.4.0b15", entries = { newsEntry("0.4.0", "b
 GetAddOnMetadata = function() return "0.4.0b1" end
 ns.firstRun, ns.db.seenVersion, ns.db.newsSeen = true, nil, nil
 ns.LoginWord()
-assert(#welcome == 5 and welcome[1]:find("добро пожаловать") and welcome[2]:find("приложение%-компаньон")
-    and welcome[4]:find("«Помощь»", 1, true) and welcome[5]:find("озвучка чата"), "welcome, then whether the reading works")
-assert(welcome[1]:find("Barrens Voice 0.4.0b1", 1, true), "the welcome names the addon's version")
+assert(#welcome == 5 and welcome[1]:find("озвучка чата") and welcome[2]:find("добро пожаловать")
+    and welcome[3]:find("приложение%-компаньон") and welcome[5]:find("«Помощь»", 1, true)
+    and welcome[5]:find("сообщество в Battle.net", 1, true), "whether the reading works, then the welcome")
+assert(welcome[2]:find("Barrens Voice 0.4.0b1", 1, true), "the welcome names the addon's version")
 assert(ns.db.seenVersion == "0.4.0b15", "the program's version is kept")
 assert(ns.db.newsSeen["0.4.0"] and ns.db.newsSeen["0.1.0"], "the first run: every entry seen")
 ns.firstRun = false
