@@ -270,6 +270,26 @@ def apply(root: Path, version: str) -> None:
     note_version(root, version)
 
 
+pruning = None          # the last prune_later's thread (the tests wait for it)
+
+
+def prune_later(root: Path):
+    """install.prune on a thread of its own: removing a version (its .venv: thousands of files) took seconds
+    on the window's thread. A daemon: cut short when the launcher ends, the rest goes at the next prune (a version
+    pruned is never the one to go back to - that is the one current when the next update is applied)."""
+    import threading
+    global pruning
+
+    def work():
+        try:
+            install.prune(root)
+        except OSError:
+            pass
+    pruning = threading.Thread(target=work, daemon=True, name="prune")
+    pruning.start()
+    return pruning
+
+
 def record_start(root: Path, ran_for: float, failed: bool | None) -> str | None:
     """After the companion of a freshly applied version ends: a failure at its very start (`failed` True)
     counts; at two, app\\current goes back to the previous version, whose number is returned. A good run
@@ -289,10 +309,7 @@ def record_start(root: Path, ran_for: float, failed: bool | None) -> str | None:
         return None
     if not failed or ran_for > EARLY:
         path.unlink(missing_ok=True)
-        try:                                        # settled: the versions before the one to go back to go
-            install.prune(root)
-        except OSError:
-            pass
+        prune_later(root)                           # settled: the versions before the one to go back to go
         return None
     state["fails"] = state.get("fails", 0) + 1
     if state["fails"] < 2 or not state.get("previous") or not (root / "app" / state["previous"]).is_dir():

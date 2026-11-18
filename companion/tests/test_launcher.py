@@ -657,6 +657,7 @@ class Update(unittest.TestCase):
             update.apply(root, "0.4.1")
             self.assertIsNone(update.record_start(root, 300, failed=True))               # ran a while: not a start failure
             self.assertFalse(update.state_path(root).exists())
+            update.pruning.join(10)
 
     def test_switch_watched_from_before_it(self):
         # update.json is written before app\\current moves: a switch is never left unwatched, a failed one leaves
@@ -759,6 +760,8 @@ class Update(unittest.TestCase):
                 self.assertEqual(update.record_start(root, 5, failed=True), "0.4.0")  # twice: back
 
     def test_settled_start_prunes(self):
+        import threading
+        from unittest import mock
         from bv import install, update
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
@@ -768,7 +771,12 @@ class Update(unittest.TestCase):
             update.apply(root, "0.4.2")
             self.assertIsNone(update.record_start(root, 5, failed=True))                 # not settled: all kept
             self.assertEqual(len(list((root / "app").iterdir())), 4)
-            self.assertIsNone(update.record_start(root, 5, failed=False))                # a good start: settled
+            go, real = threading.Event(), install.prune
+            with mock.patch("bv.install.prune", side_effect=lambda r: go.wait(10) and real(r)):
+                self.assertIsNone(update.record_start(root, 5, failed=False))            # a good start: settled -
+                self.assertEqual(len(list((root / "app").iterdir())), 4)                 # returned before the prune
+                go.set()                                                                 # (off the window's thread)
+                update.pruning.join(10)
             self.assertEqual(sorted(p.name for p in (root / "app").iterdir()), ["0.4.1", "0.4.2", "current"])
 
     def test_version_runs(self):
