@@ -249,6 +249,26 @@ class Layout(unittest.TestCase):
         self.assertEqual(written[0]["game"], "retail")
         self.assertEqual((a.pending, a.config_told), ({}, set()))
 
+    def test_an_installs_start(self):
+        # what the window's start does in an install: app\\current made again after a switch cut short, the old
+        # versions pruned a few seconds later; a config.json that does not read said once
+        import tempfile
+        from bv.launcher import app
+        from bv.logs import parse
+        from bv.paths import CODE_DIR
+        with tempfile.TemporaryDirectory() as d, \
+                mock.patch("bv.install.repair_current", return_value=True) as repair, \
+                mock.patch("bv.install.place_starter"), mock.patch("bv.update.note_version"):
+            a = self.make(install=Path(d), problem="config.json не читается")
+        repair.assert_called_once_with(Path(d), CODE_DIR.parent)
+        lines = [m for _, _, m in (parse(a.incoming.get_nowait()) for _ in range(a.incoming.qsize()))]
+        self.assertTrue(any("переход на другую версию в прошлый раз прервался" in m for m in lines), lines)
+        self.assertIn((app.PRUNE_AFTER_MS, a.prune_versions), self.after_calls)
+        self.assertEqual(a.config_told, {"broken"})
+        b = self.make()                                          # run from the source: none of it
+        self.assertNotIn(app.PRUNE_AFTER_MS, [c[0] for c in self.after_calls])
+        self.assertEqual(b.config_told, set())
+
     def test_a_fresh_version_settles_while_its_companion_runs(self):
         # settled only when its companion ended by itself: one the launcher always stops («Закрываться вместе с
         # игрой» off, the window closed first) stayed watched for good - nothing pruned, and two failed starts
