@@ -142,8 +142,9 @@ function F.Reveal(cf)
 end
 
 -- Events whose lines show the window though the companion reads them, if the player asked: setting.
--- (Of the group's chat, the events Core.lua's EVENTS reads.)
-local ALWAYS_SHOW = { CHAT_MSG_WHISPER = "fadeWhisper", CHAT_MSG_GUILD = "fadeGuild", CHAT_MSG_OFFICER = "fadeGuild",
+-- (Of the group's chat, the events Core.lua's EVENTS reads. One's own whispers, CHAT_MSG_WHISPER_INFORM and
+-- CHAT_MSG_BN_WHISPER_INFORM, are not read: they always show the window.)
+local ALWAYS_SHOW = { CHAT_MSG_WHISPER = "fadeWhisper", CHAT_MSG_BN_WHISPER = "fadeWhisper", CHAT_MSG_GUILD = "fadeGuild", CHAT_MSG_OFFICER = "fadeGuild",
     CHAT_MSG_PARTY = "fadeGroup", CHAT_MSG_PARTY_LEADER = "fadeGroup", CHAT_MSG_RAID = "fadeGroup",
     CHAT_MSG_RAID_LEADER = "fadeGroup", CHAT_MSG_RAID_WARNING = "fadeGroup", CHAT_MSG_INSTANCE_CHAT = "fadeGroup",
     CHAT_MSG_INSTANCE_CHAT_LEADER = "fadeGroup" }
@@ -158,9 +159,11 @@ local function Verdict(text, event, args)
     local ok, verdict = pcall(function()
         local canaccesstable = rawget(_G, "canaccesstable")
         if canaccesstable and not canaccesstable(args) then return "closed" end
-        -- the event's arguments: text (1), sender (2), the channel's "2. Торговля" (4), its base name (9), GUID (12)
+        -- the event's arguments: text (1), sender (2), the channel's "2. Торговля" (4), its base name (9), GUID (12),
+        -- a Battle.net whisper's bnSenderID (13; Core.lua drops the line when it is secret)
         local message, channelString, baseName, guid = args[1], args[4], args[9], args[12]
         if ns.Secret(message, args[2], channelString, baseName, guid) then return "closed" end
+        if event:find("^CHAT_MSG_BN_") and ns.Secret(args[13]) then return "closed" end
         return ns.Reads(event, guid, message, baseName, channelString) and "read" or "skipped"
     end)
     return ok and verdict or "unknown"
@@ -183,7 +186,10 @@ local function OnAddMessage(self, text, _, _, _, _, _, _, event, args)
     if F.Reveal(self) and ns.db.debug then        -- /bv debug: which line showed the window, and why
         local line = "(закрытый текст)"            -- a secret one (retail) cannot be looked at
         if not ns.Secret(text) then
-            line = tostring(text):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|H.-|h(.-)|h", "%1")
+            -- (a Battle.net friend's |K…|k, which the chat shows as their real name, is left out - and with no
+            -- end mark seen, the rest of the line from it)
+            line = tostring(text):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|K.-|k", ""):gsub("|K.*", "")
+                :gsub("|H.-|h(.-)|h", "%1")
         end
         ns.Diag(("окно чата %s показано: %s — %s"):format(self.GetName and self:GetName() or "?", REASONS[verdict],
             ns.Protocol.TrimUTF8(line, 90)))

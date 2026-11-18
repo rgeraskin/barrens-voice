@@ -12,7 +12,7 @@ ns.DEFAULTS = {
     instance = true,   -- instance chat (dungeon finder groups, battlegrounds)
     say = true,
     yell = true,
-    whisper = true,    -- whispers to you
+    whisper = true,    -- whispers to you: characters' and Battle.net friends'
     guild = true,
     officer = true,
     channels = true,   -- numbered channels: General, Trade, LookingForGroup, LocalDefense ...
@@ -70,6 +70,7 @@ local EVENTS = {
     CHAT_MSG_SAY = "say",
     CHAT_MSG_YELL = "yell",
     CHAT_MSG_WHISPER = "whisper",
+    CHAT_MSG_BN_WHISPER = "whisper",   -- a Battle.net friend's whisper (ns.BNetFriend tells who)
     CHAT_MSG_GUILD = "guild",
     CHAT_MSG_OFFICER = "officer",
     CHAT_MSG_CHANNEL = "channels",
@@ -107,15 +108,16 @@ end
 local SESSION = ("%x%02x"):format((time and time() or 0) % 0x100000, math.random(0, 255))
 local lineCount = 0
 
-function ns.Send(kind, sender, race, sex, class, channel, text)
+--- `spoken`: the name to say when it is not the sender's own (a Battle.net friend's: ns.BNetFriend).
+function ns.Send(kind, sender, race, sex, class, channel, text, spoken)
     local raw = (text or ""):gsub(SEP, " ")
     text = ns.Clean(text or "")          -- the dictionary is the program's (it reads Dictionary.lua itself)
-    if text == "" then ns.Skip("пусто после очистки разметки", sender, raw) return end
+    if text == "" then ns.Skip("пусто после очистки разметки", spoken or sender, raw) return end
     local place = Where(kind, channel)
     if ns.db.sayNames and sender and sender ~= "" then
         -- the spoken name never has the realm ("short": «Вася», not the «Вася-Степи» the chat shows for
         -- another realm); the payload keeps the whole sender: a voice per character
-        local name = Ambiguate and Ambiguate(sender, "short") or sender:match("^[^-]+")
+        local name = spoken or Ambiguate and Ambiguate(sender, "short") or sender:match("^[^-]+")
         if not ns.db.sayLastNames then name = name:match("^%S+") or name end
         if kind == "emote" then
             text = name .. KEPT_NAME_MARK .. " " .. text   -- "Вася смеётся"
@@ -550,10 +552,60 @@ function ns.SecretLine()
     end
 end
 
-local function OnChat(event, text, sender, _, channelString, _, _, _, _, baseName, _, _, guid)
+-- Battle.net whispers: the event's sender (playerName) is a |K…|k token the chat shows as the friend's
+-- real name - never said, sent or logged; the friend is told by the event's bnSenderID (ns.BNetFriend).
+local BNET = { CHAT_MSG_BN_WHISPER = true }
+local BNET_WHO = "друг Battle.net"   -- the debug log's "who" for a Battle.net line not sent
+
+--- Who a Battle.net whisper is from, by its bnSenderID (C_BattleNet.GetAccountInfoByID, Forever and retail):
+--- the friend's character when they play WoW (BNET_CLIENT_WOW) - its name to say, without the realm; the
+--- payload's sender "Name-Realm", the voice of that character; its GUID, for race and sex - else the
+--- BattleTag without its "#1234" to say and "BN:<BattleTag>" as the sender, no race. Never the account's
+--- real name (accountName). nil when the friend cannot be told: no such API, nothing returned, or a value
+--- that is secret (retail) - not looked at.
+function ns.BNetFriend(id)
+    if ns.Secret(id) or type(id) ~= "number" then return nil end
+    local api = rawget(_G, "C_BattleNet")
+    if type(api) ~= "table" or type(api.GetAccountInfoByID) ~= "function" then return nil end
+    local canaccesstable = rawget(_G, "canaccesstable")
+    local function open(t)
+        return not ns.Secret(t) and type(t) == "table" and (not canaccesstable or canaccesstable(t))
+    end
+    local ok, friend = pcall(function()
+        local info = api.GetAccountInfoByID(id)
+        if not open(info) then return nil end
+        local tag, game = info.battleTag, info.gameAccountInfo
+        if ns.Secret(tag, game) then return nil end
+        if open(game) then
+            local client, character, realm, guid = game.clientProgram, game.characterName, game.realmName,
+                game.playerGuid
+            if not ns.Secret(client, character, realm, guid) and client == (rawget(_G, "BNET_CLIENT_WOW") or "WoW")
+                    and type(character) == "string" and character ~= "" then
+                -- the realm as the chat writes it after a name: no spaces ("Вася-ПиратскаяБухта")
+                realm = type(realm) == "string" and realm:gsub("[%s%-]", "") or ""
+                return { name = character, sender = realm ~= "" and character .. "-" .. realm or character,
+                         guid = type(guid) == "string" and guid ~= "" and guid or nil }
+            end
+        end
+        if type(tag) == "string" then
+            local short = tag:match("^(.-)#") or tag
+            if short ~= "" then return { name = short, sender = "BN:" .. tag } end
+        end
+        return nil
+    end)
+    return ok and friend or nil
+end
+
+local function OnChat(event, text, sender, _, channelString, _, _, _, _, baseName, _, _, guid, bnSenderID)
     local db = ns.db
     local key = EVENTS[event]
     if not (db.enabled and key) then return end
+    local spoken          -- the name to say when it is not the sender's (a Battle.net friend's)
+    if BNET[event] then
+        local friend = ns.BNetFriend(bnSenderID)
+        if not friend then ns.Skip("не удалось узнать, кто пишет в Battle.net", BNET_WHO, text) return end
+        sender, spoken, guid = friend.sender, friend.name, friend.guid or ""
+    end
     if not db[key] then ns.Skip("тип чата выключен в настройках: " .. key, sender, text) return end
     if event == "CHAT_MSG_CHANNEL" then
         local setting = ns.ChannelSetting(baseName, channelString)
@@ -574,11 +626,13 @@ local function OnChat(event, text, sender, _, channelString, _, _, _, _, baseNam
     local race, sex, class
     if guid and guid ~= "" then
         local ok, _, englishClass, _, englishRace, gender = pcall(GetPlayerInfoByGUID, guid)
-        if ok then race, sex, class = englishRace, gender, englishClass end
+        if ok and not ns.Secret(englishClass, englishRace, gender) then
+            race, sex, class = englishRace, gender, englishClass
+        end
     end
     local channel = event == "CHAT_MSG_CHANNEL" and channelString or ""
-    Remember(key, sender, race, sex, class, channel, text)
-    ns.Send(key, sender, race, sex, class, channel, text)
+    Remember(key, sender, race, sex, class, channel, text, spoken)
+    ns.Send(key, sender, race, sex, class, channel, text, spoken)
 end
 
 local TESTS = {
@@ -719,14 +773,16 @@ local function OnEvent(self, event, name, ...)
         end
         return
     end
-    if EVENTS[event] and ns.db.enabled and ns.Secret(name, (...), (select(11, ...))) then
+    -- text, sender, GUID (and a Battle.net whisper's bnSenderID)
+    if EVENTS[event] and ns.db.enabled and (ns.Secret(name, (...), (select(11, ...)))
+            or BNET[event] and ns.Secret((select(12, ...)))) then
         ns.SecretLine()                -- retail: a dungeon, raid, boss fight or PvP keeps chat from addons
         return
     end
     if EVENTS[event] and ns.db.enabled then
         ns.secretTold = false
         local visible, why = Visible(event, name, ...)
-        if not visible then ns.Skip(why, (...), name) return end
+        if not visible then ns.Skip(why, BNET[event] and BNET_WHO or (...), name) return end
     end
     OnChat(event, name, ...)
 end

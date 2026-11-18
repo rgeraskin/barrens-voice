@@ -165,7 +165,7 @@ do  -- CatQuest and Wayfarer are Forever's addons: on retail /bv debug names nei
     GetBuildInfo, print, C_Timer.NewTicker, ns.db.debug = nil, print0, ticker0, debug0
     print("Forever's addons not on retail ok")
 end
-do  -- the channels' tooltips: Battle.net whispers are not read; retail's closed group chat is said on retail only
+do  -- the channels' tooltips: Battle.net whispers are read too; retail's closed group chat is said on retail only
     local function tooltips(retail)
         local all = {}
         for _, item in ipairs(ns.Options.CHANNELS) do all[#all + 1] = ns.Options.ChannelTip(item, retail) end
@@ -173,7 +173,8 @@ do  -- the channels' tooltips: Battle.net whispers are not read; retail's closed
     end
     local forever, retail = tooltips(false), tooltips(true)
     for _, all in ipairs({ forever, retail }) do
-        assert(all:find("Шёпот Battle.net не озвучивается", 1, true), "whispers: Battle.net's are not read")
+        assert(all:find("от друзей Battle.net", 1, true) and not all:find("Battle.net не", 1, true),
+            "whispers: Battle.net's are read too")
     end
     assert(not forever:find("В ритейле", 1, true), "Forever: no word of retail")
     local _, closed = retail:gsub("игра закрывает этот чат от аддонов", "")
