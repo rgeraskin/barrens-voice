@@ -133,6 +133,8 @@ WITH_HALF = re.compile(r"\s+(?:половиной|лишним|хвостико�
 GENDERS = {"masc", "femn", "neut"}
 # words that number rather than count: "15 уровня" is the fifteenth (a count is "15 уровней")
 NUMBERED = {"уровень", "этаж", "число", "ранг", "фаза", "сезон", "глава", "акт", "волна", "слот", "босс"}
+# what a move "с N на M" goes between: places that number ("со второго на третье место"); a count otherwise
+MOVED = NUMBERED | {"место", "позиция", "строчка", "строка", "этап", "стадия", "ступень", "страница", "ряд"}
 # a noun whose singular the stress model may take for the plural ("числ+а", "мест+а" - "two of them"):
 # after an ordinal it is the singular, stressed here ("до пятнадцатого м+еста")
 SINGULAR_STRESS = {"числа": "ч+исла", "места": "м+еста"}
@@ -536,8 +538,11 @@ def closing_tag(word: str, to: str, typed: bool, morph) -> tuple[str, str | None
         return tag
     if tag[1] == "anim":
         return None
-    if not typed and not any(p.tag.POS == "ADJF" and "Anum" in p.tag for p in morph.parse(word.replace("+", "").lower())):
+    parses = morph.parse(word.replace("+", "").lower())
+    if not typed and not any(p.tag.POS == "ADJF" and "Anum" in p.tag for p in parses):
         return None
+    if typed and not any(p.normal_form in MOVED for p in parses):
+        return None                                    # "с 10 на 25 человек", "с 20 на 21 час": counts, not places
     return tag
 
 

@@ -677,6 +677,13 @@ class Pipeline(unittest.TestCase):
             "за 5 к отдам": "за пять тысяч отдам", "продам за 5 к": "продам за пять тысяч",
         })
 
+    def test_a_move_goes_between_places_not_counts(self):
+        self.check({
+            "перешли с 10 на 25 человек": "перешли с десяти на двадцать пять человек",
+            "перенос с 20 на 21 час": "перенос с двадцати на двадцать один час",
+            "с 2 на 3 место": "со второго на третье место", "со 2 на 3 фазу": "со второй на третью фазу",
+        })
+
     def test_unequal_numbers_around_na_are_no_match(self):
         # a match or a size is two equal numbers; two different ones are a count and a place, or a move
         self.check({
