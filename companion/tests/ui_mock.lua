@@ -139,6 +139,22 @@ assert(ns.Retail() == true, "retail by its interface version")
 GetBuildInfo = function() return "1.60.1", "70938", "Nov 2026", 16001 end
 assert(ns.Retail() == false, "Forever")
 GetBuildInfo = nil
+do  -- the channels' tooltips: Battle.net whispers are not read; retail's closed group chat is said on retail only
+    local function tooltips(retail)
+        local all = {}
+        for _, item in ipairs(ns.Options.CHANNELS) do all[#all + 1] = ns.Options.ChannelTip(item, retail) end
+        return table.concat(all, "\n")
+    end
+    local forever, retail = tooltips(false), tooltips(true)
+    for _, all in ipairs({ forever, retail }) do
+        assert(all:find("Шёпот Battle.net не озвучивается", 1, true), "whispers: Battle.net's are not read")
+    end
+    assert(not forever:find("В ритейле", 1, true), "Forever: no word of retail")
+    local _, closed = retail:gsub("игра закрывает этот чат от аддонов", "")
+    assert(closed == 3, "retail: party, raid and raid warnings say where they are closed: " .. closed)
+    assert(retail:find("В ритейле он почти не озвучивается", 1, true), "retail: the instance chat")
+    print("channel tooltips ok")
+end
 do  -- «Скачать дополнительные голоса …: RHVoice, Silero»: the companion is asked to open the page; the address goes to the chat too
     local pushedLink, saidLink, push0, print0 = {}, {}, ns.Strip.Push, print
     ns.Strip.Push = function(p) pushedLink[#pushedLink + 1] = p end

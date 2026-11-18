@@ -26,16 +26,24 @@ local NUMBERED = {
     { "chOther", "Остальные", "Любые другие номерные каналы, например ваши собственные." },
 }
 
+-- Retail closes the group's chat to addons in dungeons and raids (by the map), in boss fights, Mythic+ and
+-- PvP (SecretInChatMessagingLockdown): said under those channels there, not on Forever.
+local CLOSED = "В ритейле в подземельях, рейдах, на боссах, в эпохальных+ и PvP игра закрывает этот чат от аддонов: "
+    .. "там он не озвучивается."
+
 -- Channels, in two columns: setting, label, the client's slash command for it (the SLASH_<key>1..9 globals
--- the client defines, so the label shows what this client takes; the fallback if it has none), tooltip.
+-- the client defines, so the label shows what this client takes; the fallback if it has none), tooltip,
+-- and what the tooltip adds on retail.
 local CHANNELS = {
-    { "party", "Группа", "PARTY", "/p", "Сообщения группы и её лидера." },
+    { "party", "Группа", "PARTY", "/p", "Сообщения группы и её лидера.", CLOSED },
     { "say", "Сказать", "SAY", "/s", "Что говорят игроки рядом." },
-    { "raid", "Рейд", "RAID", "/ra", "Сообщения рейда и его лидера." },
+    { "raid", "Рейд", "RAID", "/ra", "Сообщения рейда и его лидера.", CLOSED },
     { "yell", "Крик", "YELL", "/y", "Что кричат игроки рядом." },
-    { "warning", "Объявления рейда", "RAID_WARNING", "/rw", "Объявления рейда." },
-    { "whisper", "Шёпот", "SMART_WHISPER", "/w", "Шёпот вам." },
-    { "instance", "Подземелье и БГ", "INSTANCE_CHAT", "/i", "Чат подземелья (поиск группы) и поля боя." },
+    { "warning", "Объявления рейда", "RAID_WARNING", "/rw", "Объявления рейда.", CLOSED },
+    { "whisper", "Шёпот", "SMART_WHISPER", "/w", "Шёпот вам от персонажей. Шёпот Battle.net "
+        .. "не озвучивается." },
+    { "instance", "Подземелье и БГ", "INSTANCE_CHAT", "/i", "Чат подземелья (поиск группы) и поля боя.",
+        "В ритейле он почти не озвучивается: в подземельях и на полях боя игра закрывает его от аддонов." },
     { "guild", "Гильдия", "GUILD", "/g", "Чат гильдии." },
     { "officer", "Офицеры", "OFFICER", "/o", "Офицерский чат гильдии." },
     { "emote", "Эмоции", "EMOTE", "/e", "Эмоции, написанные игроками." },
@@ -62,6 +70,12 @@ local function ChannelLabel(item)
     return ("%s (%s)"):format(item[2], best or bestLatin or item[4])
 end
 O.ChannelLabel = ChannelLabel
+
+--- A channel's tooltip, with what it adds on retail.
+local function ChannelTip(item, retail)
+    return retail and item[6] and item[5] .. " " .. item[6] or item[5]
+end
+O.ChannelTip, O.CHANNELS = ChannelTip, CHANNELS   -- for the tests
 
 local LEFT, RIGHT_COL, SUB = 18, 300, 26    -- the grid of every tab
 local CHROME = 40                             -- the window's height beyond a tab's own: the title bar and the edge
@@ -338,8 +352,8 @@ local function BuildReading(tab, description)
     for i, item in ipairs(CHANNELS) do
         local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
         local get, set = Setting(item[1])
-        checks[#checks + 1] = UI.Check(tab, LEFT + col * (RIGHT_COL - LEFT), y - row * 24, ChannelLabel(item), item[5],
-            get, set)
+        checks[#checks + 1] = UI.Check(tab, LEFT + col * (RIGHT_COL - LEFT), y - row * 24, ChannelLabel(item),
+            ChannelTip(item, retail), get, set)
     end
     y = y - math.ceil(#CHANNELS / 2) * 24
     -- "Общие каналы" on a row of its own, the channels it holds under it, indented: as the names above

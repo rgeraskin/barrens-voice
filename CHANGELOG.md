@@ -106,6 +106,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   The model cache's warning about symlinks on Windows (it keeps plain copies without developer mode, which costs nothing here) and two of RUAccent's own notices (a regex string without `r""`, an argument huggingface_hub ignores) are no longer shown.
 
+- The channels' tooltips say what is not read
+
+  «Шёпот» says that Battle.net whispers are not read, only characters' whispers. On retail, «Группа», «Рейд», «Объявления рейда» and «Подземелье и БГ» say where the game closes them to addons (dungeons, raids, boss fights, Mythic+, PvP): the dungeon and battleground chat is hardly ever read there.
+
 ### Removed
 
 - BREAKING: `WowChatVoice-Retail.cmd`
