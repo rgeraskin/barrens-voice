@@ -1330,6 +1330,30 @@ class OldClients(unittest.TestCase):
     """A release must install through the update code players already have (tests/compat: frozen copies of
     released clients). A change to the archive or the manifest that an old client cannot take strands it."""
 
+    # released before tests/compat existed: their install.py is beta 5's but for version_key (numbers only: 0.4.0
+    # is older than 0.4.0b4 to them, so they skip 0.4.0 itself and update by themselves from 0.4.1 or a later beta)
+    BEFORE_COMPAT = {"v0.4.0-beta.1", "v0.4.0-beta.2", "v0.4.0-beta.3", "v0.4.0-beta.4"}
+
+    def test_every_release_has_its_copy(self):
+        # CLAUDE.md: a release that changes update.py or install.py adds a frozen copy of them to tests/compat
+        import re
+        import subprocess
+        root = Path(__file__).resolve().parents[2]
+        tags = [t for t in subprocess.run(["git", "tag", "-l", "v*"], cwd=root, capture_output=True, text=True,
+                                          encoding="utf-8", errors="replace").stdout.split()
+                if re.fullmatch(r"v\d+\.\d+\.\d+(-beta\.\d+)?", t)]
+        if not tags:
+            self.skipTest("no release tags here (a shallow clone)")
+        copies = [(c / "update.py").read_bytes() + b"\0" + (c / "install.py").read_bytes()
+                  for c in (root / "companion" / "tests" / "compat").glob("v*") if (c / "update.py").is_file()]
+        for tag in sorted(set(tags) - self.BEFORE_COMPAT):
+            files = [subprocess.run(["git", "show", f"{tag}:companion/bv/{name}"], cwd=root, capture_output=True)
+                     for name in ("update.py", "install.py")]
+            if any(f.returncode for f in files):
+                continue                                                # before the installer: no updater
+            self.assertTrue(files[0].stdout + b"\0" + files[1].stdout in copies,
+                          f"{tag}: add its update.py and install.py to companion/tests/compat (and to OldClients)")
+
     def test_beta5_client_installs_a_new_release(self):
         import base64
         import io
