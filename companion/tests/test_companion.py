@@ -406,6 +406,20 @@ class AddonFiles(unittest.TestCase):
             with self.assertRaises(OSError):
                 write_if_changed(Path(d) / "gone" / "VoiceList.lua", "x")
 
+    def test_no_temporary_file_left_when_the_swap_fails(self):
+        # the game holding the file open: VoiceList.lua.tmp stayed in the addon's folder
+        from unittest import mock
+
+        from bv import paths
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "VoiceList.lua"
+            path.write_text("a = 1\n", encoding="utf-8")
+            with mock.patch.object(paths.os, "replace", side_effect=PermissionError("in use")), \
+                    self.assertRaises(PermissionError):
+                paths.write_if_changed(path, "a = 2\n")
+            self.assertEqual([p.name for p in Path(d).iterdir()], ["VoiceList.lua"])
+            self.assertEqual(path.read_text(encoding="utf-8"), "a = 1\n")
+
     def test_a_voice_list_that_cannot_be_written_does_not_stop_the_companion(self):
         # voicelist.write ran bare at the start: a locked VoiceList.lua ended the companion
         from unittest import mock

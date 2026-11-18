@@ -56,7 +56,8 @@ def starter() -> str:
 def write_if_changed(path: Path, text: str) -> bool:
     """`text` into `path` unless the file already holds it; whether it was written. Through a
     temporary file: the game (or the launcher) reading the file at that moment gets the old one or the
-    new one, never half. Raises OSError (a file the game holds open, a folder gone)."""
+    new one, never half. Raises OSError (a file the game holds open, a folder gone), leaving no
+    temporary file behind."""
     path = Path(path)
     try:
         if path.read_text(encoding="utf-8") == text:
@@ -64,6 +65,13 @@ def write_if_changed(path: Path, text: str) -> bool:
     except (OSError, ValueError):
         pass
     tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(text, encoding="utf-8")
-    os.replace(tmp, path)
+    try:
+        tmp.write_text(text, encoding="utf-8")
+        os.replace(tmp, path)
+    except OSError:
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise
     return True
