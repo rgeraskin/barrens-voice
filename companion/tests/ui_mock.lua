@@ -1,4 +1,5 @@
 -- Minimal WoW API stubs: run the addon's files and open every window, to catch nil calls and typos.
+local created = {}    -- what widgets made (textures, font strings)
 local function widget()
     local w = { _text = "", _shown = false, _checked = false, _scripts = {} }
     return setmetatable(w, { __index = function(t, k)
@@ -27,7 +28,10 @@ local function widget()
             self._value = v
             if self._scripts.OnValueChanged then self._scripts.OnValueChanged(self, v) end
         end end
-        if k:match("^Create") then return function() return widget() end end
+        if k == "SetTexture" then return function(self, v) self._texture = v end end
+        if k == "SetTexCoord" then return function(self, ...) self._coords = { ... } end end
+        if k == "SetSize" then return function(self, w, h) self._w, self._h = w, h end end
+        if k:match("^Create") then return function() local made = widget(); created[#created + 1] = made; return made end end
         return function() end
     end })
 end
@@ -112,6 +116,17 @@ end
 ns.Options.Open("dictionary"); assert(ns.Options.Current() == "dictionary"); print("dictionary ok")
 ns.Options.Open("voices"); assert(ns.Options.Current() == "voices"); print("voices ok")
 ns.Options.Open("help"); assert(ns.Options.Current() == "help"); print("help tab ok")
+do  -- the community's icon: the Blizzard logo as the chat shows it, its 24x16 part, not squashed
+    local logo
+    for _, w in ipairs(created) do
+        if rawget(w, "_texture") == "Interface\\ChatFrame\\UI-ChatIcon-Blizz" then logo = w end
+    end
+    assert(logo, "the community's row has the Blizzard logo")
+    local c = logo._coords
+    assert(c and c[1] == 4 / 32 and c[2] == 28 / 32 and c[3] == 0 and c[4] == 1, "its texcoords")
+    assert(logo._w / logo._h == 24 / 16, "its own proportions")
+    print("community icon ok")
+end
 assert(ns.Retail() == false, "no GetBuildInfo: Forever")
 GetBuildInfo = function() return "12.1.5", "70783", "Nov 2026", 120105 end
 assert(ns.Retail() == true, "retail by its interface version")

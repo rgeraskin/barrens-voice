@@ -119,14 +119,24 @@ end
 --- A page to visit (one of ns.LINKS): an icon if given, its name, the address in a box (a click selects
 --- it, Ctrl+C copies it; typing does not change it), and «Копировать» and «Открыть», which the companion
 --- does (Core.lua ns.CopyLink, ns.OpenLink). `width` from `x` to the last button. Returns the row's height.
+--- `icon` is a texture path (shown 20x20), or { path, width, height, left, right, top, bottom }: a part of a
+--- texture (SetTexCoord) at its own size, centred where a 20x20 one would be.
 function UI.LinkRow(parent, x, y, width, key, icon)
     local link = ns.LINKS[key]
     local left = x
     if icon then
         local t = parent:CreateTexture(nil, "ARTWORK")
-        t:SetSize(20, 20)
-        t:SetPoint("TOPLEFT", x, y)
-        t:SetTexture(icon)
+        if type(icon) == "table" then
+            local w, h = icon[2] or 20, icon[3] or 20
+            t:SetSize(w, h)
+            t:SetPoint("TOPLEFT", x + (20 - w) / 2, y - (20 - h) / 2)
+            t:SetTexture(icon[1])
+            if icon[4] then t:SetTexCoord(icon[4], icon[5], icon[6], icon[7]) end
+        else
+            t:SetSize(20, 20)
+            t:SetPoint("TOPLEFT", x, y)
+            t:SetTexture(icon)
+        end
         left = x + 26
     end
     local name = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")

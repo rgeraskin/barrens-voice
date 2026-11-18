@@ -348,7 +348,8 @@ end
 -- "Помощь": where to write about bugs, ideas and words read wrong - the community in Battle.net first.
 local MEDIA = "Interface\\AddOns\\BarrensVoice\\Media\\"
 local HELP_LINKS = {
-    { "community", "Interface\\FriendsFrame\\Battlenet-Portrait" },   -- the game's own Battle.net icon
+    -- the Blizzard logo the client itself puts in the chat (ChatFrameUtil.lua): the 24x16 part of a 32x16 texture
+    { "community", { "Interface\\ChatFrame\\UI-ChatIcon-Blizz", 24, 16, 4 / 32, 28 / 32, 0, 1 } },
     { "discord", MEDIA .. "discord" }, { "telegram", MEDIA .. "telegram" }, { "github", MEDIA .. "github" },
 }
 local function BuildHelp(tab, description)
