@@ -329,8 +329,9 @@ def prune_unwatched(root: Path):
 
 
 def record_start(root: Path, ran_for: float, failed: bool | None, say=None) -> str | None:
-    """After the companion of a freshly applied version ends: a failure at its very start (`failed` True)
-    counts; at two, app\\current goes back to the previous version, whose number is returned - when there is one
+    """After the companion of a freshly applied version ends, or while it runs once past EARLY (the launcher's
+    settle_running, `failed` False: a run the launcher stops never ends by itself): a failure at its very start
+    (`failed` True) counts; at two, app\\current goes back to the previous version, whose number is returned - when there is one
     whole to go back to; else `say` is told once (update.json "stuck") that going back is impossible. A good run
     (False, or a failure after EARLY) settles it: update.json goes, the versions before the previous one are
     pruned. None is no verdict however long the run was - the companion stopped for a reason that is not the

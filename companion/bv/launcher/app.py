@@ -105,6 +105,7 @@ class App:
             self.updater = Updater(INSTALL_DIR, self.version, lambda: self.config, self.say,
                                    detail=lambda m: self.incoming.put(f"{datetime.now():%H:%M:%S} DEBUG [обновление] {m}"))
         self.companion_started = 0.0
+        self.settle_due = False          # this run of the companion may still settle a fresh version (settle_running)
         self.games = model.find_games(self.config)
         keys = [g.key for g in self.games]
         self.selected = self.config.get("game") if self.config.get("game") in keys else (keys[0] if keys else None)
@@ -245,6 +246,7 @@ class App:
             self.set_config(game=self.selected)
         self.companion_game = self.selected
         self.companion_started = time.monotonic()
+        self.settle_due = True
         self.exit_seen = False
         self.reload_told = False
         flags = list(args or [])
@@ -274,6 +276,18 @@ class App:
     def restart_companion(self, args: list[str] | None = None) -> None:
         self.say("перезапускаю компаньон")
         self.stop_companion(lambda: self.start_companion(args), why="restarting")
+
+    def settle_running(self, now: float) -> None:
+        """A freshly applied version is settled while its companion runs, once the run is past update.EARLY: a
+        companion only ever stopped by the launcher («Закрываться вместе с игрой» off, the window or voice-over
+        closed first) never ended by itself, so its version stayed watched for good - nothing pruned, and two
+        failed starts months later still went back. Once per run; the run's own end then finds nothing watched
+        and counts as nothing."""
+        if self.settle_due and INSTALL_DIR is not None and self.companion.running:
+            from .. import update
+            if now - self.companion_started > update.EARLY:
+                self.settle_due = False
+                update.record_start(INSTALL_DIR, now - self.companion_started, False)
 
     def companion_ended(self, code: int | None) -> None:
         self.exit_seen = True
@@ -513,6 +527,7 @@ class App:
             self.checked["games"] = now
             self.games = model.find_games(self.config)
             self.update_addons()
+        self.settle_running(now)
         if not self.exit_seen and not self.busy and not self.companion.running:
             self.companion_ended(self.companion.poll())   # may close the launcher with the game, or go back a version
             if self.closed:

@@ -1989,8 +1989,9 @@ class UpdateInWindow(unittest.TestCase):
             got = []
             win = self.ns(companion=self.ns(running=False, start=got.append), busy="", selected=selected,
                           addon_missing=lambda: False, config={"game": selected, "launch_wow": launch_wow},
-                          extra=list(extra), say=lambda *a: None)
+                          extra=list(extra), say=lambda *a: None, settle_due=False)
             self.assertTrue(self.app.App.start_companion(win, args))
+            self.assertTrue(win.settle_due)                                            # a run that may settle
             return got[0]
         self.assertEqual(started("retail", True), ["--retail", "--launch"])
         self.assertEqual(started("forever", False), ["--forever", "--no-launch"])

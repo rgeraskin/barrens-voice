@@ -74,6 +74,8 @@ def problems(c: "tk.Canvas") -> list[str]:
 
 
 class FakeCompanion:
+    RESTART, ALREADY, CONFIG_ERROR = 3, 4, 5            # bv.launcher.process.Companion's
+
     def __init__(self, *_):
         self.running, self.st, self.code = False, {}, None
 
@@ -82,6 +84,10 @@ class FakeCompanion:
 
     def poll(self):
         return self.code
+
+    @classmethod
+    def wants_restart(cls, code):
+        return code == cls.RESTART
 
 
 class FakeTray:
@@ -135,21 +141,26 @@ STATUSES = ["", "downloading", "preparing", "ready", "error"]
 
 @unittest.skipIf(_root is None, "no display for Tk")
 class Layout(unittest.TestCase):
-    def make(self, scale=1.0, config=None):
+    def make(self, scale=1.0, config=None, install=None, problem=None):
+        """The window as it opens (a Toplevel of the hidden root); `install`: an install's folder (the updater's
+        steps at the start then run on it), `problem`: what config_problem says."""
         from bv.launcher import app, model
         top = tk.Toplevel(_root)
         top.withdraw()
+        self.after_calls = []
+        real_after = top.after
+        top.after = lambda ms, *a: (self.after_calls.append((ms, *a)), real_after(ms, *a))[1]
         patches = [mock.patch.object(app, "Companion", FakeCompanion), mock.patch.object(app, "Tray", FakeTray),
                    mock.patch.object(app, "launcher_log", lambda *_: None),
                    mock.patch.object(app, "window_icon", lambda *_: None),
                    mock.patch.object(model, "read_config", lambda: dict(config or {})),
                    mock.patch.object(model, "update_config", lambda **kw: dict(config or {}, **kw)),
-                   mock.patch.object(model, "config_problem", lambda: None),
+                   mock.patch.object(model, "config_problem", lambda: problem),
                    mock.patch.object(model, "find_games", lambda *a, **k: []),
                    mock.patch.object(model, "autostart", lambda: False),
                    mock.patch.object(model, "app_version", lambda: "0.4.0b7"),
                    mock.patch.object(model, "addon_version", lambda: "0.3.1"),
-                   mock.patch.object(app, "INSTALL_DIR", None)]
+                   mock.patch.object(app, "INSTALL_DIR", install)]
         for p in patches:
             p.start()
             self.addCleanup(p.stop)
@@ -237,6 +248,48 @@ class Layout(unittest.TestCase):
             actions["save"]()
         self.assertEqual(written[0]["game"], "retail")
         self.assertEqual((a.pending, a.config_told), ({}, set()))
+
+    def test_a_fresh_version_settles_while_its_companion_runs(self):
+        # settled only when its companion ended by itself: one the launcher always stops («Закрываться вместе с
+        # игрой» off, the window closed first) stayed watched for good - nothing pruned, and two failed starts
+        # months later still went back
+        import tempfile
+        from bv import install, update
+        from bv.launcher import app
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            for v in ("0.3.9", "0.4.0", "0.4.1"):
+                folder = root / "app" / v
+                for f in install.STARTS:
+                    (folder / f).parent.mkdir(parents=True, exist_ok=True)
+                    (folder / f).write_bytes(b"")
+            install.point_current(root, root / "app" / "0.4.0")
+            update.apply(root, "0.4.1")
+            with mock.patch("bv.install.repair_current", return_value=False), mock.patch("bv.install.place_starter"), \
+                    mock.patch("bv.update.note_version"):
+                a = self.make(install=root)
+            clock = [1000.0]
+            a.checked = {"game": 1e9, "games": 1e9, "update": 1e9}      # the tick's other checks wait
+            a.companion.running, a.companion_started, a.settle_due = True, 1000.0, True
+            with mock.patch.object(app.time, "monotonic", lambda: clock[0]), \
+                    mock.patch.object(app, "SHOW_FILE", root / "launcher.show"):
+                clock[0] = 1000.0 + update.EARLY - 1
+                a._tick()
+                self.assertTrue(update.state_path(root).exists())                       # not yet
+                clock[0] = 1000.0 + update.EARLY + 1
+                a._tick()
+                self.assertFalse(update.state_path(root).exists())                      # settled while it runs
+                update.pruning.join(10)
+                self.assertEqual(sorted(p.name for p in (root / "app").iterdir()), ["0.4.0", "0.4.1", "current"])
+                update.write_json(update.state_path(root), {"version": "0.4.1", "previous": "0.4.0", "fails": 1})
+                a._tick()                                                               # once per run
+                self.assertTrue(update.state_path(root).exists())
+                update.state_path(root).unlink()
+                a.companion.running, a.companion.code = False, 1                       # then it crashes: nothing
+                a.exit_seen = False
+                a._tick()
+            self.assertEqual((install.current_version(root), update.refused(root)), ("0.4.1", None))
+            self.assertFalse(update.state_path(root).exists())
 
     def report(self, found: list[tuple[str, str]]):
         """Each problem once, with how often and the first state it was seen in."""
