@@ -225,7 +225,7 @@ do  -- «Открыть» for the community: its invite as a link in the chat, f
     assert(told[1] == ICON .. "сообщество в Battle.net — новости, вопросы, ошибки: |cff82c5ff|HclubTicket:N9KR2WNHDgW|h"
         .. "[Вступить в «Barrens Voice»]|h|r  |cff999999или в браузере: https://launch.battle.net/invite/N9KR2WNHDgW|r",
         told[1])
-    assert(told[2] == PREFIX .. "щёлкни по ссылке: откроется окно сообществ с кнопкой «Вступить». Не открылось — рядом ссылка "
+    assert(told[2] == PREFIX .. "щёлкни по ссылке: откроется окно сообществ с кнопкой «Присоединиться». Не открылось — рядом ссылка "
         .. "для браузера.", told[2])
     for _, line in ipairs(told) do
         assert(line:find("Barrens Voice|r: ", 1, true) and not line:find("→", 1, true) and not line:find("–", 1, true),

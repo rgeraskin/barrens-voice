@@ -405,7 +405,7 @@ local function LinkInChat(link)
         if not chatLink then return false end
         print(ICON .. " " .. PREFIX .. "сообщество в Battle.net — новости, вопросы, ошибки: " .. chatLink .. "  " .. GREY
             .. "или в браузере: " .. link[2] .. "|r")
-        print(PREFIX .. "щёлкни по ссылке: откроется окно сообществ с кнопкой «Вступить». Не открылось — рядом ссылка для "
+        print(PREFIX .. "щёлкни по ссылке: откроется окно сообществ с кнопкой «Присоединиться». Не открылось — рядом ссылка для "
             .. "браузера.")
         askedAt = GetTime and GetTime() or 0
     end
