@@ -440,6 +440,11 @@ class Pipeline(unittest.TestCase):
         # the default's «рл» entries make «рейд-лидер»: a count, not «второй рейд-лидера»
         self.check({"2 рла": "два рейд-лидера", "5 рлов": "пять рейд-лидеров", "2 топ-гильдии": "две топ-гильдии"})
 
+    def test_from_a_level_after_s(self):
+        # "с" before the dictionary's ordinal is "from" (the genitive), not "with" (the instrumental)
+        self.check({"инвайт с 60 лвл": "инвайт с шестидесятого уровня", "с 55 лвл": "с пятьдесят пятого уровня",
+                    "со 2 лвл": "со второго уровня", "с 5 магами": "с пятью магами", "с ОП": "с Огненной пр+опастью"})
+
     def test_a_range_of_ordinals(self):
         # "с N по M": both number what comes after M, in its case after "по" ("по" of a range asks the accusative)
         self.check({

@@ -74,6 +74,8 @@ class Inflector:
                 word = prev.group(1).lower() if prev else ""
                 if word == "по" and self._range(strip_marks("".join(out))):
                     case = "accs"           # "с 1 по <5> уровень": up to, not the dative of "по 5 золотых"
+                elif word in ("с", "со") and self._ordinal_first(m.group(1)):
+                    case = "gent"           # "с <60> лвл": from level sixty, not "with the sixtieth level"
                 elif word in CASES:
                     case = CASES[word]
                 elif word in CONJUNCTIONS and re.fullmatch(r"\s*\w+\s*", before):
@@ -90,6 +92,17 @@ class Inflector:
         """Whether `text` ends in "с N по" (N a number or an ordinal word)."""
         m = RANGE.search(text)
         return bool(m) and (m.group(1)[0].isdigit() or any("Anum" in p.tag for p in self.morph.parse(m.group(1).lower())))
+
+    def _ordinal_first(self, phrase: str) -> bool:
+        """Whether `phrase` starts with an ordinal (a compound's cardinal words before it): "шестидесятый
+        уровень", "пятьдесят пятый уровень" - a replacement of the dictionary's `<N>`."""
+        for word in re.findall(r"[а-яё]+", phrase.replace("+", "").lower()):
+            parses = self.morph.parse(word)
+            if any("Anum" in p.tag for p in parses):
+                return True
+            if not any(p.tag.POS == "NUMR" for p in parses):
+                return False
+        return False
 
     def decline(self, phrase: str, case: str) -> str:
         """The start of `phrase` (adjectives up to and including the first noun) put in `case`."""
