@@ -70,7 +70,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Battle.net whispers are read
 
-  A Battle.net friend's whisper is read under «Шёпот», as a whisper: «Громмаш шепчет: …». A friend in WoW is named by their character, without the realm, and speaks in their race's voice; a friend in the Battle.net app (or not on a character) by their BattleTag without «#1234», in the race voices' default, a human man's. The account's real name is never said or written to the log. One's own Battle.net whispers are not read, like one's own whispers to characters. «при шёпоте» under «Прятать окно чата» shows the window for them too, and «Что читать» counts the chat windows that show Battle.net whispers. On retail they are closed to addons in dungeons, raids, boss fights, Mythic+ and PvP, like the rest of the chat.
+  A Battle.net friend's whisper is read under «Шёпот», as a whisper: «Громмаш шепчет: …». A friend in WoW is named by their character, without the realm, and speaks in their race's voice; a friend in the Battle.net app (or not on a character) by their BattleTag without «#1234», in the race voices' default, a human man's; the companion's log shows them «BN:Вася» too, without the digits (the voice stays tied to the whole BattleTag). The account's real name is never said or written to the log. One's own Battle.net whispers are read like one's own whispers to characters (below). «при шёпоте» under «Прятать окно чата» shows the window for them too, and «Что читать» counts the chat windows that show Battle.net whispers. On retail they are closed to addons in dungeons, raids, boss fights, Mythic+ and PvP, like the rest of the chat.
+
+- One's own whispers are read with «Свои сообщения»
+
+  The whispers one sends, to a character or to a Battle.net friend, are read under «Шёпот» when «Свои сообщения» is on (as it is by default): «Джайна шепчет: …», by one's own name, in one's own voice, without the name of the one whispered to. With «Свои сообщения» off they are not read and the hidden chat shows them as before; read, they show it only with «при шёпоте», like a whisper one gets.
 
 ### Changed
 
