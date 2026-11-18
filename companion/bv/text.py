@@ -137,6 +137,9 @@ NUMBERED = {"уровень", "этаж", "число", "ранг", "фаза", 
 SINGULAR_STRESS = {"числа": "ч+исла", "места": "м+еста"}
 # a number that goes on from the one before it - a time, a decimal, a version: neither an ordinal nor agreeing
 GLUED = re.compile(r"\d[:.,]$")
+# "2 на 2" (an arena: the dictionary's "2х2"), "10 на 10": a size, both numbers cardinals - not "на втором"
+SIZE_AFTER = re.compile(r"\s+на\s+\d")
+SIZE_BEFORE = re.compile(r"(?<![\d:.,])\d+\s+на\s+$")
 GOES_ON = re.compile(r"[:.,]\d")       # ... and a number with one after it: "до 20:00" is a time, not a count
 # two numbers of one noun: a range "2-3", a share "5/5" - both in the case of the word before the first and
 # agreeing with the word after the second ("до двух-трёх человек", "с двумя-тремя магами"); not "20-00" (a time)
@@ -540,6 +543,8 @@ def numbers_to_words(text: str) -> str:
                                          noun.group(1).rsplit("-", 1)[-1] if noun else "")
                 if as_ordinal:
                     return as_ordinal, glued.end()
+        if SIZE_AFTER.match(m.string, m.end()) or SIZE_BEFORE.search(m.string, 0, m.start()):
+            return spoken, m.end()                     # "2 на 2 арена" - "два на два"
         own = (NOUN_ENDING.match(m.string, m.end()) or CARDINAL_ENDING.match(m.string, m.end())) if morph else None
         if own and (word := glued_word(n, spoken, own.group(), morph)):
             return word, own.end()                     # "до 5ти" - "до пяти", "в 40ку" - "в сороковку"
