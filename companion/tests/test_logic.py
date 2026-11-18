@@ -545,6 +545,11 @@ class Pipeline(unittest.TestCase):
         self.check({":lol: смешно": "смешно", "ок : плюс 1:": "окей", ":-1: не пойду": "не пойду",
                     "ок :handshake:": "окей", "ссылка:lol": "ссылка:л+ол"})
 
+    def test_plus_minus(self):
+        # «+-» comes from the addon as «плюс -»: «плюс-минус», before a number too
+        self.check({"плюс -5 минут": "плюс-минус пять минут", "плюс -5%": "плюс-минус пять процентов",
+                    "плюс - норм": "плюс-минус норм", "плюс 5 урона": "плюс пять урона"})
+
     def test_raid_leader_after_a_number(self):
         # «рл» after a number is the raid leader, not the ruins of Lordaeron
         self.check({"нужен 1 рл": "нужен один рейд-лидер", "нужно 2 рл": "нужно два рейд-лидера",
