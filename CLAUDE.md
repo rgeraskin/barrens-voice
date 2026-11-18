@@ -29,6 +29,7 @@ Tools come from mise: `.mise.toml` pins Python, uv and LuaJIT, points uv at mise
 
 ## Conventions
 
+- **Retail is supported as well as WoW: Forever.** Check every addon API, global, texture, atlas, chat event and `.toc` load condition in Blizzard's UI source of both clients (Gethe/wow-ui-source branches `forever` and `live`), and say what was checked on which. On retail, chat in instances and encounters comes as secret values (`ns.Secret`): new code must not touch them. Settings that only make sense on one client (CatQuest/Wayfarer waiting) say so or are hidden on the other.
 - Commit messages: no Claude/AI attribution footer. Commits use the repo's git identity (Roman Geraskin; the e-mail stays out of the files). Commit only when asked.
 - Default branch is `master`.
 - Tools through mise only: exact versions in `.mise.toml`; Python libraries are dependencies of `pyproject.toml` (exact versions; `uv add <pkg>==<ver>` updates `uv.lock`, commit both, and add the same pin to `companion/requirements.txt` - `test_repo` keeps the two equal); tests and scripts run as mise tasks (`uv run --locked …`; add a task for a new script). No system Python, Homebrew LuaJIT, `pip install` or ad-hoc `uv run --with`. The companion's runtime on the player's machine is the installer's `uv sync --frozen` from the release's `pyproject.toml`/`uv.lock`; `BarrensVoice.cmd` + `companion/requirements.txt` serve a run from the source.
