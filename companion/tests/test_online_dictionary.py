@@ -77,6 +77,22 @@ class Build(unittest.TestCase):
         several = 'D.RENAMED = {\n    [ [[~old\\d]] ] = {\n        [[~new\\d]],\n        [[~other]],\n    },\n}\n'
         self.assertEqual(dictionary_json.build(head + several, rev=1)["renamed"], {"~old\\d": "~new\\d\n~other"})
 
+    @unittest.skipUnless(LUAJIT, "luajit not installed")
+    def test_the_program_reads_the_addons_renames(self):
+        # the program reads D.RENAMED from the addon's file without Lua (bv.dictionary.addon_renamed): what it
+        # gets is what LuaJIT makes of the file, for the shipped one and both forms of an entry
+        import dictionary_json
+        from bv.dictionary import addon_renamed
+        lua = (ROOT / "addon" / "BarrensVoice" / "Dictionary.lua").read_text(encoding="utf-8")
+        self.assertTrue(addon_renamed(lua))
+        self.assertEqual(addon_renamed(lua), dictionary_json.renamed(lua))
+        head = 'local _, ns = ...\nlocal D = {}\nns.Dictionary = D\nD.DEFAULT = [[\nа=б\n]]\n'
+        table = ('D.RENAMED = {\n    -- a comment\n    [ [[~old\\d{1,2}]] ] = [[~new\\d{1,2}]],\n'
+                 '    [ [[~two]] ] = {\n        [[~a{2}]],\n        [[~b]],\n    },\n}\nD.REVISION = 0\n')
+        self.assertEqual(addon_renamed(head + table), {"~old\\d{1,2}": "~new\\d{1,2}", "~two": "~a{2}\n~b"})
+        self.assertEqual(addon_renamed(head + table), dictionary_json.renamed(head + table))
+        self.assertEqual(addon_renamed(head + "D.RENAMED = {}\n"), {})
+
 
 class Load(unittest.TestCase):
     def setUp(self):

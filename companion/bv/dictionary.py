@@ -18,6 +18,10 @@ SAVED = "BarrensVoice.lua"
 LUA_USER = re.compile(r'\["dictionaryUser"\]\s*=\s*"((?:[^"\\]|\\.)*)"', re.S)
 DEFAULT_BLOCK = re.compile(r"D\.DEFAULT\s*=\s*\[\[(.*?)\]\]", re.S)
 REVISION = re.compile(r"^D\.REVISION\s*=\s*(\d+)", re.M)      # the default's revision (tools/release.py)
+# D.RENAMED as Dictionary.lua writes it: long strings, "[ [[old]] ] = [[new]]" or "= { [[new]], [[new]] }"
+RENAMED_BLOCK = re.compile(r"^D\.RENAMED\s*=\s*\{(.*?)^\}", re.M | re.S)
+RENAMED_ENTRY = re.compile(r"\[\s*\[\[(.*?)\]\]\s*\]\s*=\s*(\[\[.*?\]\]|\{(?:\s*\[\[.*?\]\]\s*,?)*\s*\})", re.S)
+LONG_STRING = re.compile(r"\[\[(.*?)\]\]", re.S)
 WORD = re.compile(r"[^\W_]+")
 # a word joined to the one before or after it by an apostrophe: one word ("Лок'тар огар!" is no "лок")
 APOSTROPHE_BEFORE = re.compile(r"[^\W_]['’]$")
@@ -208,6 +212,16 @@ def renamed_to(new) -> list[str]:
     return [key for key in (new if isinstance(new, list) else str(new).split("\n")) if key]
 
 
+def addon_renamed(lua: str) -> dict[str, str]:
+    """The addon's D.RENAMED from the text of its Dictionary.lua, as dictionary.json carries it (several
+    new keys joined by "\\n"): the table written with long strings, as that file writes it (a test holds
+    it to what LuaJIT makes of the file)."""
+    block = RENAMED_BLOCK.search(lua)
+    if not block:
+        return {}
+    return {old: "\n".join(LONG_STRING.findall(new)) for old, new in RENAMED_ENTRY.findall(block.group(1))}
+
+
 def merged(default: str, user: str, renamed: dict | None = None) -> list[str]:
     """The entry lines of the player's dictionary: the default's, with the player's layer on top -
     its lines replace the default's of the same key or add new ones, and a line "!<default line>"
@@ -239,6 +253,7 @@ class Dictionary:
         self.addon = addon                         # the addon's folder (found by the caller)
         self.default, self.default_stamp = "", None
         self.revision = 0                          # the addon's default's (D.REVISION)
+        self.renamed: dict[str, str] = {}          # ... and its renamed keys (D.RENAMED)
         self.online: dict | None = None            # the default from GitHub (online_dictionary), if newer
         self.user, self.user_path, self.user_stamp = "", None, None
         self.rules: list[tuple[re.Pattern, str]] = []
@@ -282,6 +297,7 @@ class Dictionary:
                     revision = REVISION.search(text)
                     self.default, self.default_stamp = match.group(1), stamp
                     self.revision = int(revision.group(1)) if revision else 0
+                    self.renamed = addon_renamed(text)
                     changed.append("стандартный")
         if not self.from_addon:
             path = self.user_path if self.user_path and self.user_path.exists() else find_saved(self.config)
@@ -305,10 +321,12 @@ class Dictionary:
         self._rebuild(f"онлайн, {data.get('date') or data['revision']}")
 
     def base(self) -> tuple[str, dict]:
-        """The default in use and its renamed keys: the online one when newer than the addon's."""
+        """The default in use and its renamed keys: the online one when newer than the addon's. The
+        addon's own renames count here too: an addon updated during play brings its new default at
+        once, while the player's layer is the old addon's (D.Migrate runs at the next /reload)."""
         if self.online and self.online["revision"] > self.revision:
             return self.online["text"], self.online.get("renamed", {})
-        return self.default, {}
+        return self.default, self.renamed
 
     def _rebuild(self, why: str) -> None:
         default, renamed = self.base()

@@ -334,6 +334,17 @@ class DictionaryInCompanion(unittest.TestCase):
             d.refresh()
             self.assertEqual(d.apply_words("ыыы"), "\x02смех\x03")
 
+    def test_renamed_entries_of_the_addons_default(self):
+        # the addon updated during play: the program takes its new default at once, while the player's layer is
+        # still the old addon's (D.Migrate runs at the next /reload) - the old «к» rule deleted or changed there
+        # brings none of the rules it became
+        d = self.book()
+        self.assertEqual(d.apply("за 5к и 2 к голды"), "за 5000 и 2000 г+олды")
+        d.receive({"id": "old1", "part": "1", "of": "1"}, "!~(\\d+)\\s*к\\b=\\g<1>000")
+        self.assertEqual(d.apply("за 5к и 2 к голды, продам за 3 к"), "за 5к и 2 к голды, продам за 3 к")
+        d.receive({"id": "old2", "part": "1", "of": "1"}, "~(\\d+)\\s*к\\b=\\g<1> тысяч")
+        self.assertEqual(d.apply("за 5к и 2 к голды"), "за 5 тысяч и 2 тысяч голды")      # theirs alone
+
     def test_names_kept_out(self):
         from bv.protocol import split_name
         self.assertEqual(split_name("Лок пишет:\x04 привет"), ("Лок пишет:", " привет", True))
