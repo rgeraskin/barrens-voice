@@ -46,24 +46,28 @@ local CHAT_NAMES = { "^ChatFrame", "^GeneralDockManager", "^FloatingChatFrame", 
 
 --- Whether the mouse is free to count for the chat: the frame under it is part of the chat (a window,
 --- its tab, edit box, buttons, the tab strip) or nothing is (the world) - not another window over it.
+--- On retail a frame's name and parent can be secret (GetName, GetParent: SecretReturnsForAspect): such
+--- a frame is not looked at and counts as not the chat's.
 function F.MouseOnChat()
-    local focus
-    if GetMouseFoci then
-        local foci = GetMouseFoci()
-        focus = foci and foci[1]
-    elseif GetMouseFocus then
-        focus = GetMouseFocus()
-    end
+    local ok, focus = pcall(function()
+        if GetMouseFoci then
+            local foci = GetMouseFoci()
+            return not ns.Secret(foci) and type(foci) == "table" and foci[1] or nil
+        end
+        return GetMouseFocus and GetMouseFocus() or nil
+    end)
+    if not ok or ns.Secret(focus) then return false end
     if not focus or focus == WorldFrame then return true end
     local f = focus
-    while f do
-        local name = f.GetName and f:GetName()
-        if type(name) == "string" then
+    while f and not ns.Secret(f) do
+        local fine, name = pcall(function() return f.GetName and f:GetName() end)
+        if fine and not ns.Secret(name) and type(name) == "string" then
             for _, pattern in ipairs(CHAT_NAMES) do
                 if name:find(pattern) then return true end
             end
         end
-        f = f.GetParent and f:GetParent() or nil
+        local up, parent = pcall(function() return f.GetParent and f:GetParent() end)
+        f = up and parent or nil
     end
     return false
 end

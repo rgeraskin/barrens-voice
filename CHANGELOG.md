@@ -252,6 +252,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   In the «im» chat style the edit box stays under the chat between messages, dimmed by the game. With «Прятать окно чата» it came back fully bright when the window showed or the setting was turned off; now it comes back as the game last set it — dimmed between messages, bright while the player types or with the newcomer's hint.
 
+- The hidden chat leaves frames with a secret name alone
+
+  On retail a frame's name or parent can be secret. Under the mouse, such a frame could raise a Lua error while the hidden chat looked for the chat window under it; it now counts as not the chat.
+
 ## [0.3.0] - 2026-11-15
 
 ### Added

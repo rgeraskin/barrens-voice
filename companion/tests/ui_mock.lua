@@ -1124,6 +1124,16 @@ canaccesstable = nil
 ns.db.debug = false
 closedLine(SECRET, { SECRET, SECRET, "", "", "", "", 0, 0, "", 0, 1, SECRET, 0, false, n = 14 })
 ns.db.fadeChat = false
+-- the frame under the mouse with a secret name or parent: not looked at, no error
+local secretChild = { GetName = function() return SECRET end, GetParent = function() return ChatFrame1 end }
+local orphan = { GetName = function() return "SomeFrame" end, GetParent = function() return SECRET end }
+GetMouseFoci = function() return { secretChild } end
+assert(ns.ChatFade.MouseOnChat() == true, "a secret name: its parent, the chat window, still counts")
+GetMouseFoci = function() return { orphan } end
+assert(ns.ChatFade.MouseOnChat() == false, "a secret parent: not the chat's")
+GetMouseFoci = function() return { SECRET } end
+assert(ns.ChatFade.MouseOnChat() == false, "a secret frame: not the chat's")
+GetMouseFoci = nil
 ns.ChatFade.Apply()
 print = quiet2
 issecretvalue = nil
