@@ -991,8 +991,6 @@ loader:SetScript("OnEvent", OnEvent)
 ns.OnEvent = function(event, ...) OnEvent(loader, event, ...) end   -- for the tests
 
 SLASH_BARRENSVOICE1 = "/bv"
--- /bv news; lower() leaves Cyrillic as typed, so «Что нового» is listed too
-local NEWS_WORDS = { news = true, ["что нового"] = true, ["Что нового"] = true }
 SlashCmdList.BARRENSVOICE = function(msg)
     msg = (msg or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
     if msg == "help" or msg == "?" then
@@ -1005,9 +1003,9 @@ SlashCmdList.BARRENSVOICE = function(msg)
         print("  " .. G .. "/bv last 5|r — ещё раз прочитать последние 5 строк чата (через текущий словарь)")
         print("  " .. G .. "/bv debug|r — отладка: почему строка чата не прочитана — в журнал компаньона")
         print("  " .. G .. "/bv reset-voices|r — раздать голоса рас заново (спросит)")
-        print("  " .. G .. "/bv news|r — что нового в последних версиях (то же: " .. G .. "/bv что нового|r)")
+        print("  " .. G .. "/bv news|r — что нового в последних версиях")
         print("  " .. G .. "/bv help|r — этот список")
-    elseif NEWS_WORDS[msg] then
+    elseif msg == "news" then
         ns.NewsWindow.Show()
     elseif msg == "test" then
         ns.Test()

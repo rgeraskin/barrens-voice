@@ -1212,7 +1212,7 @@ SlashCmdList.BARRENSVOICE("news")
 assert(ns.NewsWindow.IsShown(), "/bv news opens it")
 ns.NewsWindow.Hide()
 SlashCmdList.BARRENSVOICE("что нового")
-assert(ns.NewsWindow.IsShown(), "/bv что нового too")
+assert(not ns.NewsWindow.IsShown(), "commands are English: no /bv что нового")
 ns.NewsWindow.Hide()
 GetAddOnMetadata, BarrensVoiceNewsData = nil, nil
 print = plainPrint

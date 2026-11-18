@@ -490,13 +490,15 @@ do  -- the settings: the check box on «Общее», the button on «Помощ
     SlashCmdList.BARRENSVOICE("  news ")
     assert(W.IsShown(), "/bv news")
     W.Hide()
-    SlashCmdList.BARRENSVOICE("Что нового")
-    assert(W.IsShown(), "/bv Что нового")
+    SlashCmdList.BARRENSVOICE("NEWS")
+    assert(W.IsShown(), "/bv NEWS: any case")
     W.Hide()
+    SlashCmdList.BARRENSVOICE("Что нового")
+    assert(not W.IsShown(), "no Russian twin")
     said = {}
     SlashCmdList.BARRENSVOICE("help")
     local help = table.concat(said, "\n")
-    assert(help:find("/bv news", 1, true) and help:find("/bv что нового", 1, true), "/bv help names it")
+    assert(help:find("/bv news", 1, true) and not help:find("/bv что нового", 1, true), "/bv help names it, in English only")
     out("settings ok")
 end
 
