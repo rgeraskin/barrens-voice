@@ -585,6 +585,57 @@ class AddonVersion(unittest.TestCase):
             release.build()
         self.assertIn("test build of the addon", str(stop.exception))
 
+    def test_every_release_has_its_news(self):
+        # the «Что нового» window (News.lua) has an entry for every released addon - a test build's is its
+        # release's - and for the release in work (pyproject.toml's version)
+        import re
+        import subprocess
+        import sys
+        import tomllib
+        root = Path(__file__).resolve().parents[2]
+        sys.path.insert(0, str(root / "tools"))
+        import release
+        entries = release.news_entries()
+        project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
+        self.assertIn(project, entries, f"add a «Что нового» entry for {project} to addon/BarrensVoice/News.lua")
+        tags = [t for t in subprocess.run(["git", "tag", "-l", "v*"], cwd=root, capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.split()
+                if re.fullmatch(r"v\d+\.\d+\.\d+(-beta\.\d+)?", t)]
+        for tag in tags:
+            listed = subprocess.run(["git", "ls-tree", "-r", "--name-only", tag, "addon"], cwd=root,
+                                    capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.split()
+            toc = next((f for f in listed if re.fullmatch(r"addon/([^/]+)/\1\.toc", f)), None)
+            if toc is None:
+                continue
+            then = re.search(r"## Version:\s*(\S+)", subprocess.run(["git", "show", f"{tag}:{toc}"], cwd=root,
+                                                                       capture_output=True, text=True, encoding="utf-8", errors="replace").stdout)
+            addon = re.sub(r"b\d+$", "", then.group(1))
+            self.assertIn(addon, entries, f"{tag} released addon {then.group(1)}: News.lua needs an entry for {addon}")
+            if "-beta." not in tag:
+                self.assertTrue(entries[addon], f"{tag}: its «Что нового» entry needs the release's date")
+
+    def test_news_entries_read(self):
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
+        import release
+        text = ('N.ENTRIES = {\n    { version = "0.5.0", kind = "big",   -- date: set at release\n      title = "x",\n'
+                '      items = { "y" } },\n    { version = "0.4.0b6", date = "01.12.2026", kind = "small",\n'
+                '      summary = "version = \\"9.9.9\\" in a text is no entry" },\n}\n')
+        self.assertEqual(release.news_entries(text), {"0.5.0": None, "0.4.0b6": "01.12.2026"})
+
+    def test_a_release_has_its_dated_news(self):
+        # tools/release.py refuses a release without a «Что нового» entry, or with one not dated yet
+        import os
+        import sys
+        from unittest import mock
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
+        import release
+        for entries, said in (({"0.4.0": "18.11.2026"}, "no «Что нового» entry"), ({"9.9.9": None}, "has no date")):
+            with mock.patch.object(release, "versions", return_value={"version": "9.9.9", "addon": "9.9.9", "protocol": 1}), \
+                    mock.patch.object(release, "news_entries", return_value=entries), \
+                    mock.patch.dict(os.environ, {"RELEASE_TAG": "v9.9.9"}), self.assertRaises(SystemExit) as stop:
+                release.build()
+            self.assertIn(said, str(stop.exception))
+
 
 class CommandLine(unittest.TestCase):
     def test_parse(self):

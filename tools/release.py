@@ -3,7 +3,8 @@
 The archive is what bv/install.py puts into <install>\\app\\<version>: companion/ (the code, without the
 tests), addon/BarrensVoice, pyproject.toml, uv.lock, LICENSE, and Barrens Voice.exe when built (on Windows). The manifest tells the launcher's updater
 what is there: the app's version, the strip protocol, the addon's version, the archive's name, size
-and SHA-256 (`mise run sign` adds a signature).
+and SHA-256 (`mise run sign` adds a signature). A release (not a test build) needs the addon at its release version
+and a dated «Что нового» entry for the release in the addon's News.lua.
 """
 from __future__ import annotations
 
@@ -57,6 +58,18 @@ def versions() -> dict:
             "protocol": int(proto.group(1))}
 
 
+def news_entries(text: str | None = None) -> dict[str, str | None]:
+    """The addon's «Что нового» entries (addon/BarrensVoice/News.lua): version -> date ("DD.MM.YYYY", None until the
+    release has one), from each entry's first line - `{ version = "0.4.0", date = "18.11.2026", kind = "big",`."""
+    if text is None:
+        text = (ROOT / "addon" / "BarrensVoice" / "News.lua").read_text(encoding="utf-8")
+    entries = {}
+    for m in re.finditer(r'^\s*\{\s*version\s*=\s*"([^"]+)"([^\n]*)', text, re.M):
+        date = re.search(r'\bdate\s*=\s*"(\d\d\.\d\d\.\d{4})"', m.group(2))
+        entries[m.group(1)] = date.group(1) if date else None
+    return entries
+
+
 def notes(version: str) -> str:
     """The release's notes: its CHANGELOG.md section (`## [<version>] - <date or Unreleased>`, Keep a Changelog),
     up to the next version or the link lines at the bottom."""
@@ -95,6 +108,15 @@ def build() -> Path:
         if "b" not in info["version"] and "b" in info["addon"]:
             sys.exit(f"the release {tag} would carry a test build of the addon ({info['addon']}): give the addon its "
                      "release version in BarrensVoice.toc")
+        if "b" not in info["version"]:
+            # every release tells the players what it brought, in the game (DEVELOPMENT.md, «Что нового»)
+            entries = news_entries()
+            if info["version"] not in entries:
+                sys.exit(f"the release {tag} has no «Что нового» entry: add one for {info['version']} to "
+                         "addon/BarrensVoice/News.lua")
+            if not entries[info["version"]]:
+                sys.exit(f"the «Что нового» entry of {info['version']} has no date: add date = \"DD.MM.YYYY\" to its "
+                         "first line in addon/BarrensVoice/News.lua")
     DIST.mkdir(exist_ok=True)
     archive = DIST / f"barrens-voice-{info['version']}.zip"
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as z:
