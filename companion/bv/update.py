@@ -248,7 +248,7 @@ def refuse(root: Path, version: str | None) -> None:
             path.unlink(missing_ok=True)
             return
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({"version": version}), encoding="utf-8")
+        write_json(path, {"version": version})
     except OSError:
         pass
 
@@ -296,7 +296,7 @@ def record_start(root: Path, ran_for: float, failed: bool | None) -> str | None:
         return None
     state["fails"] = state.get("fails", 0) + 1
     if state["fails"] < 2 or not state.get("previous") or not (root / "app" / state["previous"]).is_dir():
-        path.write_text(json.dumps(state), encoding="utf-8")
+        write_json(path, state)
         return None
     install.point_current(root, root / "app" / state["previous"])
     note_version(root, state["previous"])
