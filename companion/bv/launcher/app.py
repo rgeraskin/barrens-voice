@@ -57,6 +57,7 @@ SHOW_FILE = DATA_DIR / "tmp" / "launcher.show"   # a second launcher asks the fi
 LAUNCHER_LOG = DATA_DIR / "logs" / "launcher.log"
 TICK_MS = 400
 UPDATE_EVERY = 3600          # an hour; and at every start
+PRUNE_AFTER_MS = 5000        # old versions removed this long after the start (update.prune_unwatched)
 
 
 def rotate_log(path: Path, limit: int = 1_000_000) -> None:
@@ -147,6 +148,7 @@ class App:
             from ..update import note_version
             place_starter(INSTALL_DIR, CODE_DIR.parent)
             note_version(INSTALL_DIR, self.version)
+            root.after(PRUNE_AFTER_MS, self.prune_versions)
         if self.addon_missing():                   # said at once, not only when the companion would start
             self.say(f"в {GAME_NAMES[self.selected]} нет аддона — «установить аддон» справа", "WARN")
         self.redraw()
@@ -162,6 +164,13 @@ class App:
         if args["open"]:                           # --open settings|help: straight to that window
             root.after(300, {"settings": self.open_settings, "help": self.open_help, "log": self.open_log}.get(args["open"], lambda: None))
         root.after(TICK_MS, self.tick)
+
+    def prune_versions(self) -> None:
+        """Old versions removed on a thread of their own (update.prune_unwatched): not only at a settle, whose
+        prune the launcher closing with the game cut short."""
+        if not self.closed and INSTALL_DIR is not None:
+            from ..update import prune_unwatched
+            prune_unwatched(INSTALL_DIR)
 
     # --- the companion --------------------------------------------------------------------------
 

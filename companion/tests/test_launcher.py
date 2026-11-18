@@ -590,6 +590,36 @@ class Install(unittest.TestCase):
             self.assertEqual(sorted(p.name for p in (root / "app").iterdir()),
                              ["0.3.8", "0.4.0", "0.4.1", "0.4.2", "0.4.3", "0.5.0b1", "current", "current.old"])
 
+    def test_prune_cut_short_leaves_no_half_version(self):
+        # the launcher ends (a daemon thread) or a file is in use: never a half version under a version's name
+        # (one the next update could take as its previous, or a repair as whole); the rest goes next time
+        import shutil
+        from unittest import mock
+        from bv import install
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            for v in ("0.3.8", "0.3.9", "0.4.0", "0.4.1"):
+                make_version(root, v)
+            install.point_current(root, root / "app" / "0.4.1")
+            real_rename = os.rename
+
+            def in_use(a, b):
+                if Path(a).name == "0.3.8":
+                    raise PermissionError(32, "in use")
+                real_rename(a, b)
+            with mock.patch("shutil.rmtree"), mock.patch("os.rename", side_effect=in_use):
+                self.assertEqual(install.prune(root), ["0.3.9"])                        # cut short: not removed
+            self.assertEqual(sorted(p.name for p in (root / "app").iterdir()),
+                             ["0.3.8", "0.3.9.pruned", "0.4.0", "0.4.1", "current"])
+            self.assertTrue(install.whole(root / "app" / "0.3.8"))                       # in use: whole, kept
+            self.assertEqual(install.prune(root), ["0.3.8"])                            # next time: both go
+            self.assertEqual(sorted(p.name for p in (root / "app").iterdir()), ["0.4.0", "0.4.1", "current"])
+            shutil.copytree(root / "app" / "0.4.0", root / "app" / "0.3.9.pruned")      # a leftover that stays
+            make_version(root, "0.3.9")
+            with mock.patch("shutil.rmtree"):
+                self.assertEqual(install.prune(root), [])                               # its name taken: next time
+            self.assertTrue(install.whole(root / "app" / "0.3.9"))
+
     def test_switch_refuses_a_folder_without_the_launcher(self):
         # pointed at a version gone (pruned) or half there, app\\current left nothing the starter could run
         from bv import install
@@ -834,6 +864,30 @@ class Update(unittest.TestCase):
                 go.set()                                                                 # (off the window's thread)
                 update.pruning.join(10)
             self.assertEqual(sorted(p.name for p in (root / "app").iterdir()), ["0.4.1", "0.4.2", "current"])
+
+    def test_start_prunes_unless_watched(self):
+        # a few seconds after every launcher start (the settle's own prune is cut short when the launcher closes
+        # with the game right after it), but not while a version is watched: its next start decides
+        from types import SimpleNamespace
+        from unittest import mock
+        from bv import install, update
+        from bv.launcher import app
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            for v in ("0.3.9", "0.4.0", "0.4.1"):
+                make_version(root, v)
+            install.point_current(root, root / "app" / "0.4.0")
+            update.apply(root, "0.4.1")
+            self.assertIsNone(update.prune_unwatched(root))
+            self.assertEqual(len(list((root / "app").iterdir())), 4)
+            update.state_path(root).unlink()
+            with mock.patch.object(app, "INSTALL_DIR", root):
+                with mock.patch("bv.update.prune_unwatched") as later:
+                    app.App.prune_versions(SimpleNamespace(closed=True))                  # closed meanwhile: nothing
+                later.assert_not_called()
+                app.App.prune_versions(SimpleNamespace(closed=False))
+            update.pruning.join(10)
+            self.assertEqual(sorted(p.name for p in (root / "app").iterdir()), ["0.4.0", "0.4.1", "current"])
 
     def test_version_runs(self):
         # the new version's own Python must import the launcher and the companion (a broken launcher could never

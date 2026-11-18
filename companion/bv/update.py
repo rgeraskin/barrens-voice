@@ -15,6 +15,7 @@ import base64
 import hashlib
 import json
 import os
+import threading
 import urllib.request
 from pathlib import Path
 
@@ -271,6 +272,7 @@ def apply(root: Path, version: str) -> None:
 
 
 pruning = None          # the last prune_later's thread (the tests wait for it)
+PRUNE_LOCK = threading.Lock()       # one prune at a time (a settle's and the start's may meet)
 
 
 def prune_later(root: Path, also=()):
@@ -278,22 +280,31 @@ def prune_later(root: Path, also=()):
     on the window's thread. A daemon: cut short when the launcher ends, the rest goes at the next prune (a version
     pruned is never the one to go back to - that is the one current when the next update is applied). `also`
     and a watched version's previous one (update.json) are kept."""
-    import threading
     global pruning
 
     def work():
-        try:
-            watched = json.loads(state_path(root).read_text(encoding="utf-8"))
-            kept = [watched.get("previous"), watched.get("version")] if isinstance(watched, dict) else []
-        except (OSError, ValueError):
-            kept = []
-        try:
-            install.prune(root, also=[v for v in (*also, *kept) if isinstance(v, str)])
-        except OSError:
-            pass
+        with PRUNE_LOCK:
+            try:
+                watched = json.loads(state_path(root).read_text(encoding="utf-8"))
+                kept = [watched.get("previous"), watched.get("version")] if isinstance(watched, dict) else []
+            except (OSError, ValueError):
+                kept = []
+            try:
+                install.prune(root, also=[v for v in (*also, *kept) if isinstance(v, str)])
+            except OSError:
+                pass
     pruning = threading.Thread(target=work, daemon=True, name="prune")
     pruning.start()
     return pruning
+
+
+def prune_unwatched(root: Path):
+    """At the launcher's start (a few seconds after it): the versions a settle prunes, when no version is
+    watched (update.json: its next start decides). A settle's prune is cut short when the launcher closes
+    with the game right after it; this finishes it. The prune's thread, or None while a version is watched."""
+    if state_path(root).exists():
+        return None
+    return prune_later(root)
 
 
 def record_start(root: Path, ran_for: float, failed: bool | None) -> str | None:
