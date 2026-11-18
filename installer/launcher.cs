@@ -23,7 +23,7 @@ static class BarrensVoice
         if (!Starts(current))
         {
             MessageBox.Show("Barrens Voice установлен не до конца: нет " + (File.Exists(pythonw) ? script : pythonw) +
-                            ".\n\nУстановите его заново.", "Barrens Voice", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            ".\n\nУстанови его заново.", "Barrens Voice", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return 1;
         }
         var start = new ProcessStartInfo(pythonw)
