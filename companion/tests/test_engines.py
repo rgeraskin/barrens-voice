@@ -296,16 +296,34 @@ class F5SpeakerLoad(unittest.TestCase):
         self.assertTrue(any(m.startswith("F5-TTS: ") for m in logged), logged)
 
     def test_an_empty_voice_bank_is_an_error(self):
-        # a client without the Russian voice-over: the bank is made with no voices in it
+        # a client without the Russian voice-over: the bank is made with no voices in it. Said before RUAccent
+        # and F5's graphs are loaded - a retry every RETRY_AFTER loaded them only to fail
         import tempfile
+        from unittest import mock
+
+        from bv import f5engine
+        loaded = []
+
+        class Accentor(Accent):
+            def load(self):
+                loaded.append("RUAccent")
         with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "F5_Metadata.onnx").write_bytes(b"")
             speaker, _ = self.speaker(Path(d), [])
-            loop = threading.Thread(target=speaker._synth_loop)
-            loop.start()
-            loop.join(5)
+            del speaker._load_onnx                           # the real one, with ONNX Runtime and the bank faked
+            speaker.accentor = Accentor()
+            speaker.config.update(f5_onnx_provider="CUDAExecutionProvider", f5_onnx_dir=d)
+            with mock.patch("onnxruntime.get_available_providers", lambda: ["CUDAExecutionProvider"]), \
+                    mock.patch.object(f5engine, "preload", lambda engine: None), \
+                    mock.patch.object(f5engine, "make_bank", lambda *a: []), \
+                    mock.patch("bv.f5onnx.F5Onnx", lambda *a: loaded.append("F5")):
+                loop = threading.Thread(target=speaker._synth_loop)
+                loop.start()
+                loop.join(5)
             self.assertFalse(loop.is_alive())
             self.assertTrue(speaker.ready.is_set())
             self.assertIn("русской озвучки", speaker.error)
+            self.assertEqual(loaded, [])
 
 
 class PrepareVoices(unittest.TestCase):

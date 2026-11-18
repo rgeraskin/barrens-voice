@@ -315,9 +315,7 @@ class F5Speaker:
         self._load_onnx()
         import soundfile as sf
         slots = self.assigner.slots
-        first = next((s for s in slots if s.race), None)
-        if first is None:      # a client without the Russian voice-over (or before it is downloaded)
-            raise RuntimeError("в клиенте игры нет русской озвучки: голоса рас не из чего собрать")
+        first = next(s for s in slots if s.race)     # _load_onnx refused a bank without race voices
         self.ref_text = {s.id: self.accentor.accent(s.text) for s in slots}
         self.ref_seconds = {s.id: sf.info(s.path).duration for s in slots}
         paces = sorted(self.pace(s) for s in slots if s.shift == 0 and s.speech)
@@ -338,6 +336,9 @@ class F5Speaker:
         if not (models / "F5_Metadata.onnx").exists():
             raise RuntimeError(f"нет моделей F5 в ONNX: {models} (f5_onnx_dir в config.json)")
         slots = make_bank(self.config, self.home, self.log)
+        if not any(s.race for s in slots):   # before the models: a retry (RETRY_AFTER) loads nothing for nothing
+            # a client without the Russian voice-over (or before it is downloaded)
+            raise RuntimeError("в клиенте игры нет русской озвучки: голоса рас не из чего собрать")
         self.assigner = Assigner(slots, self.home / "assignments.json", self.config["players"])
         self.log("загружаю RUAccent ...")
         self.accentor.load()
