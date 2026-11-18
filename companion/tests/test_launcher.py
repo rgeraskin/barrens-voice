@@ -1887,6 +1887,10 @@ class OldClients(unittest.TestCase):
         # so no refusal of the test-build addon a tagged release would get)
         self.updater_client("v0_4_0b14", "0.4.0b14", release=None)
 
+    def test_beta17_client_updates_through_its_updater(self):
+        # pruning by name and after current, settling while running, the refusal history: a release still installs
+        self.updater_client("v0_4_0b17", "0.4.0b17", release=None)
+
     def updater_client(self, client: str, current: str, release: str | None = "v0.4.0-beta.99"):
         import base64
         import io
