@@ -60,7 +60,8 @@ def renamed(lua: str) -> dict[str, str]:
         done = subprocess.run([luajit, str(script), str(source)], capture_output=True)
     if done.returncode != 0:
         sys.exit(f"Dictionary.lua does not load: {done.stderr.decode('utf-8', 'replace').strip()}")
-    parts = done.stdout.decode("utf-8").split("\0")[:-1]
+    # LuaJIT's stdout is in text mode on Windows: "\n" comes out as "\r\n" (the dictionary has no "\r" of its own)
+    parts = done.stdout.replace(b"\r\n", b"\n").decode("utf-8").split("\0")[:-1]
     return dict(zip(parts[::2], parts[1::2]))
 
 

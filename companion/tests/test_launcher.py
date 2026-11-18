@@ -1809,7 +1809,8 @@ class OldClients(unittest.TestCase):
                 if re.fullmatch(r"v\d+\.\d+\.\d+(-beta\.\d+)?", t)]
         if not tags:
             self.skipTest("no release tags here (a shallow clone)")
-        copies = [(c / "update.py").read_bytes() + b"\0" + (c / "install.py").read_bytes()
+        # on Windows git checks the copies out with CRLF, and git show gives the tag's LF: compared without "\r"
+        copies = [((c / "update.py").read_bytes() + b"\0" + (c / "install.py").read_bytes()).replace(b"\r\n", b"\n")
                   for c in (root / "companion" / "tests" / "compat").glob("v*") if (c / "update.py").is_file()]
         for tag in sorted(set(tags) - self.BEFORE_COMPAT):
             files = [subprocess.run(["git", "show", f"{tag}:companion/bv/{name}"], cwd=root, capture_output=True)

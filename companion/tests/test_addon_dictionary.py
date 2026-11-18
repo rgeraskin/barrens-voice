@@ -21,7 +21,8 @@ LUAJIT = shutil.which("luajit")
 def addon(case: str) -> tuple[str, str, str, list[bytes]]:
     """The addon's default, its D.Text(), the layer its saved variables keep and the "dict" frames, for a case of
     dictionary_dump.lua."""
-    out = subprocess.run([LUAJIT, str(DUMP), case], cwd=ADDON, capture_output=True, check=True).stdout
+    # LuaJIT's stdout is in text mode on Windows: "\n" comes out as "\r\n"
+    out = subprocess.run([LUAJIT, str(DUMP), case], cwd=ADDON, capture_output=True, check=True).stdout.replace(b"\r\n", b"\n")
     default, text, layer, *frames = out.split(b"\0")
     return default.decode(), text.decode(), layer.decode(), frames
 
