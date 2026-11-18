@@ -26,25 +26,24 @@ local NUMBERED = {
     { "chOther", "Остальные", "Любые другие номерные каналы, например ваши собственные." },
 }
 
--- Retail closes the group's chat to addons in dungeons and raids (by the map), in boss fights, Mythic+ and
--- PvP (SecretInChatMessagingLockdown): said under those channels there, not on Forever.
-local CLOSED = "В ритейле в подземельях, рейдах, на боссах, в эпохальных+ и PvP игра закрывает этот чат от аддонов: "
+-- Retail closes every chat the addon reads (each of its events is SecretInChatMessagingLockdown in 12.1.5: say,
+-- yell, whispers, guild, officer, channels, emotes and the group's chats alike) in dungeons and raids (by the
+-- map), in boss fights, Mythic+ and PvP: said once, on top of the channels' tab, on retail only.
+O.CLOSED = "В ритейле в подземельях, рейдах, на боссах, в эпохальных+ и PvP игра закрывает от аддонов весь чат: "
     .. "там он не озвучивается."
 
 -- Channels, in two columns: setting, label, the client's slash command for it (the SLASH_<key>1..9 globals
--- the client defines, so the label shows what this client takes; the fallback if it has none), tooltip,
--- and what the tooltip adds on retail.
+-- the client defines, so the label shows what this client takes; the fallback if it has none), tooltip.
 local CHANNELS = {
-    { "party", "Группа", "PARTY", "/p", "Сообщения группы и её лидера.", CLOSED },
+    { "party", "Группа", "PARTY", "/p", "Сообщения группы и её лидера." },
     { "say", "Сказать", "SAY", "/s", "Что говорят игроки рядом." },
-    { "raid", "Рейд", "RAID", "/ra", "Сообщения рейда и его лидера.", CLOSED },
+    { "raid", "Рейд", "RAID", "/ra", "Сообщения рейда и его лидера." },
     { "yell", "Крик", "YELL", "/y", "Что кричат игроки рядом." },
-    { "warning", "Объявления рейда", "RAID_WARNING", "/rw", "Объявления рейда.", CLOSED },
+    { "warning", "Объявления рейда", "RAID_WARNING", "/rw", "Объявления рейда." },
     { "whisper", "Шёпот", "SMART_WHISPER", "/w", "Шёпот вам от персонажей и от друзей Battle.net. Друга "
         .. "Battle.net назовёт по имени персонажа, если он в WoW, а иначе по BattleTag. Ваш собственный шёпот "
         .. "читается, только если включены «Свои сообщения»." },
-    { "instance", "Подземелье и БГ", "INSTANCE_CHAT", "/i", "Чат подземелья (поиск группы) и поля боя.",
-        "В ритейле он почти не озвучивается: в подземельях и на полях боя игра закрывает его от аддонов." },
+    { "instance", "Подземелье и БГ", "INSTANCE_CHAT", "/i", "Чат подземелья (поиск группы) и поля боя." },
     { "guild", "Гильдия", "GUILD", "/g", "Чат гильдии." },
     { "officer", "Офицеры", "OFFICER", "/o", "Офицерский чат гильдии." },
     { "emote", "Эмоции", "EMOTE", "/e", "Эмоции, написанные игроками." },
@@ -73,9 +72,9 @@ local function ChannelLabel(item)
 end
 O.ChannelLabel = ChannelLabel
 
---- A channel's tooltip, with what it adds on retail.
-local function ChannelTip(item, retail)
-    return retail and item[6] and item[5] .. " " .. item[6] or item[5]
+--- A channel's tooltip.
+local function ChannelTip(item)
+    return item[5]
 end
 O.ChannelTip, O.CHANNELS = ChannelTip, CHANNELS   -- for the tests
 
@@ -102,8 +101,8 @@ local READS = {
         .. "окно чата или любая его вкладка, даже та, что сейчас не выбрана. Чего не показывает ни одна вкладка (так "
         .. "настроены вкладки) или что скрыл фильтр другого аддона, не читается." },
     { "tab", true, true, "Только выбранная вкладка", "Читается только то, что показывает выбранная сейчас вкладка "
-        .. "окна чата, и отдельные окна чата (вынесенные из вкладок). Например, в подземелье: вынесите чат группы в "
-        .. "свою вкладку и выберите её — будет читаться только группа." },
+        .. "окна чата, и отдельные окна чата (вынесенные из вкладок). Например, вынесите чат группы в свою вкладку и "
+        .. "выберите её — будет читаться только группа." },
 }
 
 --- The "Что читать" choice the settings make.
@@ -309,8 +308,13 @@ local function BuildGeneral(tab, description)
 end
 
 -- "Каналы и чтение": how a line is read, and which chats are read.
+--- The tab's line on top: on retail with the chat it closes.
+function O.ReadingTop(description)
+    return ns.Retail() and description .. "\n\n" .. O.CLOSED or description
+end
+
 local function BuildReading(tab, description)
-    local y = Describe(tab, description)
+    local y = Describe(tab, O.ReadingTop(description))
     y = UI.Header(tab, "Чтение", y)
     local get, set = Setting("sayNames", function() Refresh() end)
     checks[#checks + 1] = UI.Check(tab, LEFT, y, "Озвучивать имена", "Перед сообщением читать имя написавшего: "
@@ -358,7 +362,7 @@ local function BuildReading(tab, description)
         local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
         local get, set = Setting(item[1])
         checks[#checks + 1] = UI.Check(tab, LEFT + col * (RIGHT_COL - LEFT), y - row * 24, ChannelLabel(item),
-            ChannelTip(item, retail), get, set)
+            ChannelTip(item), get, set)
     end
     y = y - math.ceil(#CHANNELS / 2) * 24
     -- "Общие каналы" on a row of its own, the channels it holds under it, indented: as the names above

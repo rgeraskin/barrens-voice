@@ -165,21 +165,24 @@ do  -- CatQuest and Wayfarer are Forever's addons: on retail /bv debug names nei
     GetBuildInfo, print, C_Timer.NewTicker, ns.db.debug = nil, print0, ticker0, debug0
     print("Forever's addons not on retail ok")
 end
-do  -- the channels' tooltips: Battle.net whispers are read too; retail's closed group chat is said on retail only
-    local function tooltips(retail)
-        local all = {}
-        for _, item in ipairs(ns.Options.CHANNELS) do all[#all + 1] = ns.Options.ChannelTip(item, retail) end
-        return table.concat(all, "\n")
+do  -- the channels' tooltips: Battle.net whispers are read too; retail's closed chat is one sentence on top of the
+    -- tab, on retail only, for every channel (each event the addon reads is SecretInChatMessagingLockdown there)
+    local all = {}
+    for _, item in ipairs(ns.Options.CHANNELS) do all[#all + 1] = ns.Options.ChannelTip(item) end
+    all = table.concat(all, "\n")
+    assert(all:find("от друзей Battle.net", 1, true) and not all:find("Battle.net не", 1, true),
+        "whispers: Battle.net's are read too")
+    assert(not all:find("ритейл", 1, true), "no channel speaks of retail: the whole chat is closed there")
+    assert(ns.Options.CLOSED:find("весь чат", 1, true), ns.Options.CLOSED)
+    local function topLine(interface)
+        GetBuildInfo = function() return "", "", "", interface end
+        local line = ns.Options.ReadingTop("Какие каналы читать.")
+        GetBuildInfo = nil
+        return line
     end
-    local forever, retail = tooltips(false), tooltips(true)
-    for _, all in ipairs({ forever, retail }) do
-        assert(all:find("от друзей Battle.net", 1, true) and not all:find("Battle.net не", 1, true),
-            "whispers: Battle.net's are read too")
-    end
-    assert(not forever:find("В ритейле", 1, true), "Forever: no word of retail")
-    local _, closed = retail:gsub("игра закрывает этот чат от аддонов", "")
-    assert(closed == 3, "retail: party, raid and raid warnings say where they are closed: " .. closed)
-    assert(retail:find("В ритейле он почти не озвучивается", 1, true), "retail: the instance chat")
+    local _, onRetail = topLine(120105):gsub("закрывает от аддонов весь чат", "")
+    local _, onForever = topLine(16001):gsub("закрывает от аддонов весь чат", "")
+    assert(onRetail == 1 and onForever == 0, ("said once on retail, not on Forever: %d %d"):format(onRetail, onForever))
     print("channel tooltips ok")
 end
 do  -- «Скачать дополнительные голоса …: RHVoice, Silero»: the companion is asked to open the page; the address goes to the chat too
