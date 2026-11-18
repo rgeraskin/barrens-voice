@@ -62,15 +62,55 @@ D.DEFAULT = saved
 D.Invalidate()
 
 -- a renamed default regex: whoever edited the old one does not get the new one beside it
-D.RENAMED[GOLD_KEY] = "~\\b(\\d+)\\s*(?:з|g|gold)\\b"
+local shipped = D.RENAMED
+D.RENAMED = { [GOLD_KEY] = "~\\b(\\d+)\\s*(?:з|g|gold)\\b" }
 D.DEFAULT = D.DEFAULT:gsub((GOLD:gsub("%p", "%%%0")), "~\\b(\\d+)\\s*(?:з|g|gold)\\b=\\1 [золотой|золотых|золотых]")
 D.Invalidate()
 D.Migrate(ns.db)
 assert(not has(D.Text(), "(?:з|g|gold)"), "the new gold rule not added beside the edited old one")
 assert(has(D.Text(), "голды"), "the player's own kept")
-D.RENAMED = {}
+D.RENAMED = shipped
 D.DEFAULT = saved
 D.Invalidate()
+
+-- the renames shipped (D.RENAMED): the old key is gone from the default, each new key is in it
+local defaultKeys = {}
+for line in D.DEFAULT:gmatch("[^\n]+") do
+    local key = D.KeyOf(line)
+    if key then defaultKeys[key] = true end
+end
+for old, new in pairs(D.RENAMED) do
+    assert(not defaultKeys[old], "renamed, yet still a default key: " .. old)
+    assert(#D.RenamedTo(new) > 0, "renamed to nothing: " .. old)
+    for _, key in ipairs(D.RenamedTo(new)) do assert(defaultKeys[key], "renamed to a key the default lacks: " .. key) end
+end
+assert(table.concat(D.RenamedTo("~a\n~b"), "|") == "~a|~b", "several keys in one string, as dictionary.json has them")
+
+-- the old «к» rule became three: whoever deleted it gets none of them, whoever edited it keeps theirs alone
+local OLD_K, MINE_K = [[~(\d+)\s*к\b]], [[~(\d+)\s*к\b=\g<1> тысяч]]
+local function migrated(edits)
+    local other = { db = { dictionaryEdits = edits } }
+    dofile("../../companion/tests/toc.lua")(other, { "Protocol.lua", "Dictionary.lua" })
+    other.Dictionary.Migrate(other.db)
+    other.Dictionary.Migrate(other.db)                      -- at every load: the same again
+    return other.Dictionary, edits
+end
+assert(#D.RenamedTo(D.RENAMED[OLD_K]) == 3, "the «к» rule's three")
+local Dd, deleted = migrated({ lines = {}, removed = { [OLD_K] = true } })
+assert(not deleted.removed[OLD_K], "the old key's mark goes")
+local layer = Dd.SentLayer()
+for _, key in ipairs(Dd.RenamedTo(Dd.RENAMED[OLD_K])) do
+    assert(deleted.removed[key], "deleted: " .. key)
+    assert(not has(Dd.Text(), "\n" .. key .. "="), "not back in the window: " .. key)
+    assert(has(layer, "!" .. key .. "="), "the program is told: " .. key)
+end
+local De, edited = migrated({ lines = { [OLD_K] = MINE_K }, removed = {} })
+assert(edited.lines[OLD_K] == MINE_K and has(De.Text(), MINE_K), "the edited old rule is the player's own")
+for _, key in ipairs(De.RenamedTo(De.RENAMED[OLD_K])) do
+    assert(edited.removed[key] and not has(De.Text(), "\n" .. key .. "="), "not beside the edited one: " .. key)
+end
+local Du, untouched = migrated({ lines = {}, removed = {} })
+assert(next(untouched.removed) == nil and has(Du.Text(), "\n~(\\d+)к\\b=\\g<1>000"), "untouched: the new rules")
 
 print("dictionary layers ok")
 
@@ -99,4 +139,14 @@ assert(loadfile("Dictionary.lua"))("BarrensVoice", mine)
 BarrensVoiceDictionaryOnline = nil
 mine.Dictionary.Migrate(db)
 assert(mine.Dictionary.Text():find("имба=имба", 1, true), "changed by the player: kept as theirs")
+-- a rename to several keys comes from dictionary.json as one string, the keys joined by "\n"
+local gone = { dictionaryEdits = { lines = {}, removed = { ["~old"] = true } } }
+BarrensVoiceDictionaryOnline = { revision = 5, renamed = { ["~old"] = "~a\n~b" }, text = "\n~a=x\n~b=y\nкд=кулд+аун\n" }
+local split = { db = gone }
+assert(loadfile("Protocol.lua"))("BarrensVoice", split)
+assert(loadfile("Dictionary.lua"))("BarrensVoice", split)
+BarrensVoiceDictionaryOnline = nil
+split.Dictionary.Migrate(gone)
+assert(gone.dictionaryEdits.removed["~a"] and gone.dictionaryEdits.removed["~b"] and not gone.dictionaryEdits.removed["~old"])
+assert(not split.Dictionary.Text():find("\n~a=", 1, true) and not split.Dictionary.Text():find("\n~b=", 1, true))
 print("dictionary online ok")

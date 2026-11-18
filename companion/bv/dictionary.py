@@ -202,13 +202,19 @@ def key_of(line: str) -> str | None:
     return " ".join(words) + ("*" if star else "") if words else None
 
 
+def renamed_to(new) -> list[str]:
+    """The new keys of a renamed default entry (a value of the addon's D.RENAMED): a key, a list of
+    keys, or keys joined by "\n" (as dictionary.json and `addon_renamed` carry a list)."""
+    return [key for key in (new if isinstance(new, list) else str(new).split("\n")) if key]
+
+
 def merged(default: str, user: str, renamed: dict | None = None) -> list[str]:
     """The entry lines of the player's dictionary: the default's, with the player's layer on top -
     its lines replace the default's of the same key or add new ones, and a line "!<default line>"
-    deletes that default entry. `renamed` (old key -> new key of a default entry, as the addon's
-    D.RENAMED): who edited or deleted the old entry does not get the new one beside it."""
+    deletes that default entry. `renamed` (old key -> new keys of a default entry, as the addon's
+    D.RENAMED): who edited or deleted the old entry does not get the new ones beside it."""
     touched = {key_of(line.strip()[1:] if line.strip().startswith("!") else line) for line in user.splitlines()}
-    gone = {new for old, new in (renamed or {}).items() if old in touched}
+    gone = {key for old, new in (renamed or {}).items() if old in touched for key in renamed_to(new)}
     lines: dict[str, list[str]] = {}
     for line in default.splitlines():
         key = key_of(line)

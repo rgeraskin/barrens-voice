@@ -23,14 +23,18 @@ from bv.dictionary import DEFAULT_BLOCK  # noqa: E402
 from bv.online_dictionary import FORMAT, regexes_ok  # noqa: E402
 
 # D.RENAMED as the addon builds it, whichever way the table is written (a constructor, assignments, long
-# strings): Dictionary.lua run by LuaJIT, the pairs written out separated by NUL bytes
+# strings): Dictionary.lua run by LuaJIT, the pairs written out separated by NUL bytes; an entry renamed to
+# several keys as one string, the keys joined by "\n" ("renamed" stays a map of strings, as older programs read it)
 RENAMED_LUA = """
 local ns = { db = {} }
 assert(loadfile(arg[1]))("BarrensVoice", ns)
 local renamed, keys = ns.Dictionary.RENAMED or {}, {}
 for k in pairs(renamed) do keys[#keys + 1] = k end
 table.sort(keys)
-for _, k in ipairs(keys) do io.write(k, "\\0", renamed[k], "\\0") end
+for _, k in ipairs(keys) do
+    local new = renamed[k]
+    io.write(k, "\\0", type(new) == "table" and table.concat(new, "\\n") or new, "\\0")
+end
 """
 
 

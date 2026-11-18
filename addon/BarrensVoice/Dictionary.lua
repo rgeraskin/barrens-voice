@@ -548,12 +548,30 @@ function D.Reset()
     D.Rebuild()
 end
 
--- Default entries whose key (a regex pattern) changed: old key -> new key. Whoever edited or
--- deleted the old entry keeps their choice: the new default entry does not appear beside it.
+-- Default entries whose key (a regex pattern) changed: old key -> new key, or a list of new keys when
+-- the entry became several. Whoever edited or deleted the old entry keeps their choice: no new default
+-- entry appears beside it. Written with long strings ([[...]]): the program reads this table from the
+-- file too (bv/dictionary.py addon_renamed). dictionary.json carries a list as one string, the keys
+-- joined by "\n" (tools/dictionary_json.py), so its "renamed" stays a map of strings older programs read.
 D.RENAMED = {
-    -- "N к" with a space is thousands only before an amount: a rule of its own
-    [ [[~(\d+)\s*к\b]] ] = [[~(\d+)к\b]],
+    -- "N к" was one rule: glued, spaced before gold, spaced before an amount are rules of their own
+    [ [[~(\d+)\s*к\b]] ] = {
+        [[~(\d+)\s+к\s+г\+?олд\w*]],
+        [[~(?<!плюс )\b(\d+)\s+к\b(?=\s*$|\s*[-–—,.!?;)]|\s+(?:здоровь[ея]|золот[оа]|золотых|серебр[оа]|урона?|дамага?|ман[аы]|опыта?|эксп[аы]|брон[яи]|рейтинга?|рейта?|чест[ьи]|хонора?|реп(?:[аы]|утаци[яи])?|дпс|dps|дэ пэ \+?эс|хпс|hps|гс|gs|хилл?а|до|или|и|за|в|на)\b)]],
+        [[~(\d+)к\b]],
+    },
 }
+
+--- The new keys of a renamed default entry (a value of D.RENAMED): a key, a list of keys, or keys
+--- joined by "\n" (as dictionary.json carries a list).
+function D.RenamedTo(new)
+    if type(new) == "table" then return new end
+    local keys = {}
+    for key in (tostring(new) .. "\n"):gmatch("(.-)\n") do
+        if key ~= "" then keys[#keys + 1] = key end
+    end
+    return keys
+end
 
 -- Which default this is: the time of the last commit that changed this file (tools/release.py sets it in a
 -- release; 0 here, in the repository). The program fetches a fresher default from GitHub (the dictionary
@@ -574,7 +592,9 @@ function D.Migrate(db)
     local e = db.dictionaryEdits
     e.lines, e.removed = e.lines or {}, e.removed or {}
     for old, new in pairs(D.RENAMED) do
-        if e.removed[old] or e.lines[old] then e.removed[new] = true end
+        if e.removed[old] or e.lines[old] then
+            for _, key in ipairs(D.RenamedTo(new)) do e.removed[key] = true end
+        end
         e.removed[old] = nil
     end
     merged = nil

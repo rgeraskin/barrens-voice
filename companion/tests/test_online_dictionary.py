@@ -73,6 +73,9 @@ class Build(unittest.TestCase):
                                                rev=1)["renamed"], {})
         with self.assertRaises(SystemExit):                     # a Lua error is no empty table
             dictionary_json.build(head + "D.RENAMED = {\n", rev=1)
+        # an entry that became several: one string, the keys joined by "\n" - a map of strings, as older programs read it
+        several = 'D.RENAMED = {\n    [ [[~old\\d]] ] = {\n        [[~new\\d]],\n        [[~other]],\n    },\n}\n'
+        self.assertEqual(dictionary_json.build(head + several, rev=1)["renamed"], {"~old\\d": "~new\\d\n~other"})
 
 
 class Load(unittest.TestCase):
@@ -210,6 +213,11 @@ class Newer(unittest.TestCase):
         self.assertEqual(merged(default, "", {"~old": "~new"}), ["~new=x", "а=б"])
         self.assertEqual(merged(default, "!~old=y", {"~old": "~new"}), ["а=б"])      # deleted the old: no new
         self.assertEqual(merged(default, "~old=mine", {"~old": "~new"}), ["а=б", "~old=mine"])
+        # an entry that became several (dictionary.json joins the keys by "\n"): none of them
+        default = "~a=x\n~b=y\nа=б"
+        self.assertEqual(merged(default, "!~old=y", {"~old": "~a\n~b"}), ["а=б"])
+        self.assertEqual(merged(default, "~old=mine", {"~old": ["~a", "~b"]}), ["а=б", "~old=mine"])
+        self.assertEqual(merged(default, "", {"~old": "~a\n~b"}), ["~a=x", "~b=y", "а=б"])
 
     def test_removed_from_the_default(self):
         # a newer default without an entry: gone for who did not touch it, kept for who changed it
