@@ -86,7 +86,7 @@ for old, new in pairs(D.RENAMED) do
 end
 assert(table.concat(D.RenamedTo("~a\n~b"), "|") == "~a|~b", "several keys in one string, as dictionary.json has them")
 
--- the old «к» rule became three: whoever deleted it gets none of them, whoever edited it keeps theirs alone
+-- the old «к» rule became six: whoever deleted it gets none of them, whoever edited it keeps theirs alone
 local OLD_K, MINE_K = [[~(\d+)\s*к\b]], [[~(\d+)\s*к\b=\g<1> тысяч]]
 local function migrated(edits)
     local other = { db = { dictionaryEdits = edits } }
@@ -95,7 +95,7 @@ local function migrated(edits)
     other.Dictionary.Migrate(other.db)                      -- at every load: the same again
     return other.Dictionary, edits
 end
-assert(#D.RenamedTo(D.RENAMED[OLD_K]) == 3, "the «к» rule's three")
+assert(#D.RenamedTo(D.RENAMED[OLD_K]) == 6, "the «к» rule's six")
 local Dd, deleted = migrated({ lines = {}, removed = { [OLD_K] = true } })
 assert(not deleted.removed[OLD_K], "the old key's mark goes")
 local layer = Dd.SentLayer()
