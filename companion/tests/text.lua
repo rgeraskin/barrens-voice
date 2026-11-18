@@ -57,6 +57,7 @@ eq(ns.Clean("{rt8} стоп {череп} тут"), "стоп тут", "raid targ
 eq(ns.Clean("|TInterface\\Icons\\INV_Misc_Bag_08:0|t сумка |A:raceicon-orc-male:16:16|a"), "сумка", "textures and atlases")
 eq(ns.Clean("a || b"), "a | b", "an escaped bar")
 eq(ns.Clean("танк+хил"), "танк плюс хил", "a typed «+» is the word")
+eq(ns.Clean("чант +7 к урону"), "чант плюс 7 к урону", "one space each side: the dictionary's «(?<!плюс )» relies on it")
 eq(ns.Clean("a\31b"), "a b", "the separator never reaches the payload")
 eq(ns.Clean("  много   пробелов  "), "много пробелов", "spaces squeezed and trimmed")
 eq(ns.Clean("кто , идёт ?"), "кто, идёт?", "no space before punctuation")
