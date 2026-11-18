@@ -147,8 +147,17 @@ GOVERNS = {**dict.fromkeys(("с", "со"), {"gent", "ablt"}),
            **dict.fromkeys(("за", "под", "над", "перед"), {"ablt"})}
 OBLIQUE = {"gent", "datv", "ablt", "loct"}
 # a mass measured out, not counted: its singular after a number is an amount in any case ("до 200 опыта",
-# "без 50 маны"), never an ordinal; pymorphy marks some of them Sgtm, not these
-MEASURED = {"опыт", "урон", "здоровье", "мана", "золото", "серебро", "медь", "энергия", "ярость", "репутация"}
+# "без 50 маны", "без 10 силы", "до 20 ткани"), never an ordinal; pymorphy marks some of them Sgtm, not these:
+# resources, money, a character's stats, materials
+MEASURED = {"опыт", "урон", "здоровье", "мана", "энергия", "ярость", "репутация", "исцеление", "лечение",
+            "золото", "серебро", "медь", "голда",
+            "сила", "ловкость", "выносливость", "интеллект", "дух", "защита", "броня", "бронь", "меткость",
+            "точность", "сопротивление", "уклонение", "парирование", "скорость", "рейтинг", "крит",
+            "ткань", "кожа", "руда", "трава", "шерсть", "шёлк", "железо", "торий", "олово", "бронза", "сталь"}
+# a number this large before a noun that does not number (NUMBERED) is an amount ("от 300 защиты", "до 1000
+# рейтинга"), not a place in a row - except a year ("до 2020 года")
+AMOUNT_FROM = 100
+YEAR = "год"
 # a time of day: "до 5 утра", "с 8 вечера" - the hour counted, not "до пятого утра"
 DAYTIME = {"утро", "день", "вечер", "ночь"}   # "до 2 дня" - "до двух дня" (an event's day would be "второго")
 _morph = None
@@ -246,6 +255,8 @@ def ordinal(n: int, before: str, following: str, morph) -> str | None:
     parses = [p for p in morph.parse(word) if p.tag.POS == "NOUN"]
     if any(p.normal_form in MEASURED or "Sgtm" in p.tag for p in parses):
         return None                                    # "до 200 опыта", "из 100 золота": an amount
+    if n >= AMOUNT_FROM and not any(p.normal_form in NUMBERED or p.normal_form == YEAR for p in parses):
+        return None                                    # "от 300 защиты"
     if any(p.normal_form in DAYTIME and p.tag.case == "gent" for p in parses):
         return None                                    # "до 3 ночи": an hour
     numbered = any(p.normal_form in NUMBERED for p in parses)
