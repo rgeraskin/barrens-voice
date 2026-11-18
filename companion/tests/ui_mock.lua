@@ -84,10 +84,31 @@ ns.Dictionary.Migrate(ns.db)
 ns.Dictionary.Rebuild()
 local sent = {}
 ns.Strip.Push = function(p) sent[#sent + 1] = p end
+-- every check box of the settings, where it is and its label: none may run into another or off the window
+local boxes, check0 = {}, ns.UI.Check
+ns.UI.Check = function(parent, x, y, label, ...)
+    local c = check0(parent, x, y, label, ...)
+    boxes[#boxes + 1] = { parent = parent, x = x, y = y, label = label, box = c }
+    return c
+end
 ns.Options.Initialize()
 ns.db.volume = 150
 ns.Options.Toggle(); assert(ns.db.volume == 150 and ns.db.rate == 100, "Refresh must keep the settings")
 print("options ok")
+do  -- a check box and its label: 26 px, then about 7 px a letter (GameFontHighlight); the window is 580 wide
+    local function right(b) return b.x + 26 + 7 * select(2, b.label:gsub("[^\128-\191]", "")) end
+    for i, a in ipairs(boxes) do
+        assert(right(a) <= 580 - 8, ("«%s» runs off the window: %d"):format(a.label, right(a)))
+        for j = i + 1, #boxes do
+            local b = boxes[j]
+            if a.parent == b.parent and math.abs(a.y - b.y) < 20 and a.x < right(b) and b.x < right(a) then
+                error(("«%s» and «%s» run into each other"):format(a.label, b.label))
+            end
+        end
+    end
+    assert(#boxes > 20, "the settings' check boxes seen: " .. #boxes)
+    print("check boxes apart ok")
+end
 ns.Options.Open("dictionary"); assert(ns.Options.Current() == "dictionary"); print("dictionary ok")
 ns.Options.Open("voices"); assert(ns.Options.Current() == "voices"); print("voices ok")
 ns.Options.Open("help"); assert(ns.Options.Current() == "help"); print("help tab ok")
