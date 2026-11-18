@@ -467,6 +467,51 @@ assert(said(3) == "Вася спрашивает:\4 кто идёт в ОП?" an
 assert(said(2) == "Вася\5 смеётся", said(2))                               -- an emote: a name never dropped
 print("continue ok")
 
+-- the place (sayWhere): with the verb, once per change of place or after a minute's quiet
+do
+    local clock0 = GetTime
+    local at = 1000
+    GetTime = function() return at end
+    ns.db.sayWhere = true
+    sent = {}
+    local function say(kind, text, channel, seconds)
+        at = at + (seconds or 5)
+        ns.Send(kind, "Тралл-Степи", "Orc", 2, "SHAMAN", channel or "", text)
+        return said(#sent)
+    end
+    local function eq(got, want) assert(got == want, ("got %q, want %q"):format(got, want)) end
+    eq(say("guild", "всем привет", nil, 120), "Тралл пишет в гильдии:\4 всем привет")
+    eq(say("guild", "как дела"), "Тралл пишет:\4 как дела")                      -- the same place: not again
+    eq(say("guild", "кто в ОП?"), "Тралл спрашивает:\4 кто в ОП?")
+    eq(say("channels", "продам сумки", "2. Торговля - Город"), "Тралл пишет в торговле:\4 продам сумки")
+    eq(say("guild", "кто идёт?"), "Тралл спрашивает в гильдии:\4 кто идёт?")   -- back from Trade: again
+    eq(say("say", "привет"), "Тралл говорит:\4 привет")                         -- no place of its own
+    eq(say("guild", "я тут"), "Тралл пишет в гильдии:\4 я тут")                -- after a say line: again
+    eq(say("guild", "ау", nil, 60), "Тралл пишет в гильдии:\4 ау")              -- a minute's quiet: again
+    eq(say("guild", "ау", nil, 59), "Тралл пишет:\4 ау")
+    eq(say("party", "пул"), "Тралл пишет в группе:\4 пул")
+    eq(say("instance", "пул"), "Тралл пишет:\4 пул")                            -- a group's chat all the same
+    eq(say("raid", "бафы"), "Тралл пишет в рейде:\4 бафы")
+    eq(say("warning", "все в круг"), "Тралл объявляет рейду:\4 все в круг")
+    eq(say("warning", "все из круга?"), "Тралл объявляет:\4 все из круга?")    -- an announcement asks nothing
+    eq(say("officer", "собрание"), "Тралл пишет в офицерском чате:\4 собрание")
+    eq(say("channels", "го", "1. Общий - Оргриммар"), "Тралл пишет в общем:\4 го")
+    eq(say("channels", "го", "5. мойканал"), "Тралл пишет в канале мойканал:\4 го")
+    eq(say("whisper", "привет"), "Тралл шепчет:\4 привет")
+    eq(say("emote", "смеётся"), "Тралл\5 смеётся")
+    -- without the verb: a comma
+    ns.db.sayVerb = false
+    eq(say("guild", "привет"), "Тралл, в гильдии:\4 привет")
+    eq(say("guild", "ещё"), "Тралл:\4 ещё")
+    ns.db.sayVerb = true
+    -- off: no place at all
+    ns.db.sayWhere = false
+    eq(say("party", "пул", nil, 120), "Тралл пишет:\4 пул")
+    eq(say("guild", "привет"), "Тралл пишет:\4 привет")
+    GetTime = clock0
+    print("place ok")
+end
+
 -- where the strip goes: the bottom (default), the top, or a place of one's own kept on the screen
 assert(ns.DEFAULTS.stripPlace == "bottom", "the strip is at the bottom by default")
 ns.db.cell, ns.db.rows = 2, 1

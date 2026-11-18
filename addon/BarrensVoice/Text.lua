@@ -96,6 +96,27 @@ ns.CHANNEL_KINDS = {
     { "chDefense", "борона", "defense" },
 }
 
+-- Where a line was said, for «Громмаш пишет в гильдии: …» (Core.lua says it when the place changes). A raid
+-- warning's verb is «объявляет», its place «рейду». Say, yell, whisper and emote have none: the verb says it.
+-- Instance chat is a dungeon finder's or a battleground's group: «в группе» too.
+local PLACES = { party = "в группе", raid = "в рейде", warning = "рейду", instance = "в группе",
+                 guild = "в гильдии", officer = "в офицерском чате" }
+local CHANNEL_PLACES = { chGeneral = "в общем", chTrade = "в торговле", chLfg = "в поиске спутников",
+                         chDefense = "в обороне" }
+
+--- The place of a line of `kind` ("в гильдии"), or nil. `channel`: a numbered channel's name as the chat
+--- event gives it ("2. Торговля - Оргриммар", "5. мойканал").
+function ns.Place(kind, channel)
+    if kind == "channels" then
+        local place = CHANNEL_PLACES[ns.ChannelSetting(nil, channel)]
+        if place then return place end
+        -- a channel of its own (or one not in the list): by its name, without the number and the zone
+        local name = tostring(channel or ""):gsub("^%s*%d+%.%s*", ""):gsub("%s+%-%s+.*$", ""):gsub("%s+$", "")
+        return name ~= "" and ("в канале " .. name) or "в канале"
+    end
+    return PLACES[kind]
+end
+
 --- The setting of the numbered channel a line came from (chOther for a channel not in the list).
 function ns.ChannelSetting(baseName, channelString)
     local name = tostring(baseName or "")

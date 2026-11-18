@@ -107,3 +107,21 @@ eq(CS(nil, "2. Торговля - Степи"), "chTrade", "by the full channel 
 eq(CS("", "1. General - Durotar"), "chGeneral", "an empty base name counts as none")
 eq(CS(nil, nil), "chOther", "nothing known")
 print("channels ok")
+
+-- Place: where a line was said, for «Громмаш пишет в гильдии: …»
+local P = ns.Place
+eq(P("party"), "в группе", "party")
+eq(P("raid"), "в рейде", "raid")
+eq(P("warning"), "рейду", "a raid warning: «объявляет рейду»")
+eq(P("instance"), "в группе", "instance chat is a group's (a dungeon finder's or a battleground's)")
+eq(P("guild"), "в гильдии", "guild")
+eq(P("officer"), "в офицерском чате", "officer")
+eq(P("channels", "1. Общий - Оргриммар"), "в общем", "General")
+eq(P("channels", "2. Торговля - Город"), "в торговле", "Trade")
+eq(P("channels", "4. LookingForGroup"), "в поиске спутников", "LookingForGroup")
+eq(P("channels", "3. Оборона: Оргриммар"), "в обороне", "LocalDefense")
+eq(P("channels", "5. мойканал"), "в канале мойканал", "a channel of one's own, by its name")
+eq(P("channels", "6. Услуги - Город"), "в канале Услуги", "another one: without the zone")
+eq(P("channels", ""), "в канале", "no name at all")
+for _, kind in ipairs({ "say", "yell", "whisper", "emote", "test" }) do eq(P(kind), nil, kind .. ": the verb says it") end
+print("places ok")

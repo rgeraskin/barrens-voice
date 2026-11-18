@@ -49,6 +49,7 @@ ns.DEFAULTS = {
     sayNames = true,   -- "Name: text"
     sayVerb = true,    -- "Name says: text" (says / yells / whispers / writes, by chat kind)
     sayLastNames = true,  -- the whole name ("Ивар Седой"); off: up to the first space ("Ивар")
+    sayWhere = true,   -- "Name writes in the guild: text" when the place changes (Core.lua Where)
     declension = true, -- the program declines dictionary replacements after prepositions (pymorphy3)
     voices = "f5",     -- "f5": race voices (F5-TTS, from the client's own voice-over); "sapi": Windows voices
     -- voiceOff: [Windows voice name] = true for voices switched off; nil until changed here (the
@@ -75,7 +76,8 @@ local EVENTS = {
 }
 
 local SEP = ns.SEP   -- Text.lua
-local VERBS = { say = "говорит", yell = "кричит", whisper = "шепчет", test = "говорит" }
+local VERBS = { say = "говорит", yell = "кричит", whisper = "шепчет", warning = "объявляет", test = "говорит" }
+local NOT_ASKED = { yell = true, whisper = true, warning = true }   -- the verb stays even for a question
 local PREFIX = "|cff66ccffBarrens Voice|r: "
 
 -- The name before a line is followed by a mark (\4): the program drops it when the same character
@@ -85,6 +87,22 @@ local PREFIX = "|cff66ccffBarrens Voice|r: "
 -- to the name ("Лок" stays a name).
 local NAME_MARK, KEPT_NAME_MARK = "\4", "\5"
 
+-- Where a line was said (sayWhere, Text.lua ns.Place): said when the place differs from the last line's
+-- (a line of any kind: a say line between two guild lines counts) or after PLACE_PAUSE seconds without a
+-- line - a fresh start. A run of guild lines says «в гильдии» once.
+local PLACE_PAUSE = 60
+local lastPlace, lastLineAt
+
+--- The place to say before this line, or nil; every line sent moves the state on.
+local function Where(kind, channel)
+    -- (retail's closed chat never gets here - OnEvent drops it - but a secret channel name is not looked at)
+    local place = not ns.Secret(channel) and ns.Place(kind, channel) or nil
+    local now = GetTime and GetTime() or 0
+    local say = place and (place ~= lastPlace or lastLineAt == nil or now - lastLineAt >= PLACE_PAUSE)
+    lastPlace, lastLineAt = place, now
+    return ns.db.sayWhere and say and place or nil
+end
+
 local SESSION = ("%x%02x"):format((time and time() or 0) % 0x100000, math.random(0, 255))
 local lineCount = 0
 
@@ -92,6 +110,7 @@ function ns.Send(kind, sender, race, sex, class, channel, text)
     local raw = (text or ""):gsub(SEP, " ")
     text = ns.Clean(text or "")          -- the dictionary is the program's (it reads Dictionary.lua itself)
     if text == "" then ns.Skip("пусто после очистки разметки", sender, raw) return end
+    local place = Where(kind, channel)
     if ns.db.sayNames and sender and sender ~= "" then
         local name = Ambiguate and Ambiguate(sender, "none") or sender:match("^[^-]+")
         if not ns.db.sayLastNames then name = name:match("^%S+") or name end
@@ -99,10 +118,11 @@ function ns.Send(kind, sender, race, sex, class, channel, text)
             text = name .. KEPT_NAME_MARK .. " " .. text   -- "Вася смеётся"
         elseif ns.db.sayVerb then
             local verb = VERBS[kind] or "пишет"
-            if kind ~= "yell" and kind ~= "whisper" and ns.IsQuestion(text) then verb = "спрашивает" end
-            text = name .. " " .. verb .. ":" .. NAME_MARK .. " " .. text
+            if not NOT_ASKED[kind] and ns.IsQuestion(text) then verb = "спрашивает" end
+            -- "Вася пишет в гильдии:"; the place goes with the name when the program drops it
+            text = name .. " " .. verb .. (place and " " .. place or "") .. ":" .. NAME_MARK .. " " .. text
         else
-            text = name .. ":" .. NAME_MARK .. " " .. text
+            text = name .. (place and ", " .. place or "") .. ":" .. NAME_MARK .. " " .. text   -- "Вася, в гильдии:"
         end
     end
     lineCount = lineCount + 1

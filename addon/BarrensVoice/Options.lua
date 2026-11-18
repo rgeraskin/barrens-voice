@@ -68,7 +68,7 @@ local CHROME = 40                             -- the window's height beyond a ta
 local TOP, GAP = -14, 14                      -- the first text under the title bar; between a tab's blocks
 local TEXT_W = 580 - 2 * LEFT - 8             -- the width of a tab's texts
 
-local window, toggle, verb, lastNames, programState
+local window, toggle, verb, where, lastNames, programState
 local fadeSubs = {}   -- its sub-options: grey while the chat is not hidden
 local numbered = {}   -- the check boxes of the numbered channels (grey while "Общие каналы" is off)
 local checks, radios, sliders = {}, {}, {}
@@ -95,6 +95,7 @@ local function Refresh()
     for _, c in ipairs(numbered) do UI.SetCheckEnabled(c, ns.db.channels) end
     for _, c in ipairs(fadeSubs) do UI.SetCheckEnabled(c, ns.db.fadeChat) end
     UI.SetCheckEnabled(verb, ns.db.sayNames)
+    UI.SetCheckEnabled(where, ns.db.sayNames)
     if lastNames then UI.SetCheckEnabled(lastNames, ns.db.sayNames) end
     for value, r in pairs(radios) do r:SetChecked((ns.db.voices or "f5") == value) end
     for key, sl in pairs(sliders) do
@@ -281,9 +282,16 @@ local function BuildReading(tab, description)
     end
     get, set = Setting("sayVerb")
     verb = UI.Check(tab, LEFT + SUB, y - 24 * row, "с глаголом: «Громмаш говорит: …»", "Вместо двоеточия — что сделал игрок: "
-        .. "говорит (/s), кричит (/y), шепчет (шёпот), пишет (остальные каналы), спрашивает (если в строке одни "
-        .. "вопросы).", get, set)
+        .. "говорит (/s), кричит (/y), шепчет (шёпот), объявляет (объявления рейда), пишет (остальные каналы), "
+        .. "спрашивает (если в строке одни вопросы).", get, set)
     checks[#checks + 1] = verb
+    row = row + 1
+    get, set = Setting("sayWhere")
+    where = UI.Check(tab, LEFT + SUB, y - 24 * row, "и где: «Громмаш пишет в гильдии: …»", "Где написана строка: в "
+        .. "группе, в рейде, в гильдии, в торговле, в канале… Только когда место сменилось с прошлой строки или после "
+        .. "минуты тишины: подряд идущие строки гильдии назовут гильдию один раз. У «сказать», крика, шёпота и эмоций "
+        .. "места нет: оно и так понятно.", get, set)
+    checks[#checks + 1] = where
     row = row + 1
     get, set = Setting("skipAddons")
     checks[#checks + 1] = UI.Check(tab, LEFT, y - 24 * row, "Не читать сообщения аддонов", "Аддоны других игроков пишут "
