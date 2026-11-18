@@ -370,10 +370,21 @@ do  -- a test build: its release's entry from the first build on, its own entry 
     local lines = news(login("0.9.0b2"))
     assert(#lines == 1 and lines[1]:find("обновление 0.9.0 beta 2 — вторая сборка.", 1, true), tostring(lines[1]))
     W.Show()
-    assert(titles()[2] == "Проверка 0.9.0b2", "its own entry under the release's")
+    assert(titles()[1] == "Проверка 0.9.0b2" and titles()[2] == "Проверка 0.9.0",
+        "its own entry above the release's: the new text first")
     assert(W.Heading(DATA.entries[1]) == "версия 0.9.0" and W.Heading(DATA.entries[2]) == "версия 0.9.0 beta 2 — 20.11.2026")
     W.Hide()
+    table.insert(DATA.entries, 2, entry("0.9.0b4", "small", "четвёртая сборка"))
+    lines = news(login("0.9.0b4"))
+    assert(#lines == 1 and lines[1]:find("обновление 0.9.0 beta 4 — четвёртая сборка.", 1, true), tostring(lines[1]))
+    W.Show()
+    assert(titles()[1] == "Проверка 0.9.0b4" and titles()[2] == "Проверка 0.9.0b2" and titles()[3] == "Проверка 0.9.0",
+        "the builds' entries newest first, then the release's")
+    W.Hide()
     assert(#news(login("0.9.0")) == 0 and not W.IsShown(), "the release itself: nothing new")
+    W.Show()
+    assert(titles()[1] == "Проверка 0.9.0" and titles()[2] == "Проверка 0.9.0b4", "a release: its own entry on top")
+    W.Hide()
     DATA.entries = REAL
     out("test builds ok")
 end

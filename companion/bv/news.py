@@ -125,13 +125,17 @@ def problems(entries: list[dict]) -> list[str]:
 
 def visible(entries: list[dict], version: str) -> list[dict]:
     """The entries a version shows, newest first (News.lua's N.Visible, the same rule): its release's and every older
-    one - a test build has its release's entry from its first build on - and a test build's own from that build on."""
+    one - a test build has its release's entry from its first build on - and a test build's own from that build on.
+    On a test build its release's test builds' entries (newest build first) come above the release's."""
     if not VERSION.fullmatch(version or ""):
         return []
     release = version_key(release_of(version))
     own = version_key(version)
     out = [e for e in entries if version_key(e["version"]) <= (own if "b" in e["version"] else release)]
-    return sorted(out, key=lambda e: version_key(e["version"]), reverse=True)
+
+    def build(v: str) -> bool:
+        return version != release_of(version) and v != release_of(v) and release_of(v) == release_of(version)
+    return sorted(out, key=lambda e: (build(e["version"]), version_key(e["version"])), reverse=True)
 
 
 def lua_string(text: str) -> str:

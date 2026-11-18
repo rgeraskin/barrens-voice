@@ -10,7 +10,8 @@
 --
 -- An entry belongs to a release ("0.4.0"); a test build ("0.4.0b5") shows its release's entry, once, as soon as it
 -- is written. An entry of a test build's own (version = "0.4.0b6") is shown from that build on: the way to tell the
--- testers who saw the release's entry already what a later build brought.
+-- testers who saw the release's entry already what a later build brought - so on a test build its release's test
+-- builds' entries come first, above the release's.
 local _, ns = ...
 
 local N = {}
@@ -75,7 +76,9 @@ function N.Entries()
 end
 
 --- The entries the installed version has, newest first: a release's from its first test build on, a test build's
---- own from that build on. None when the version is not known.
+--- own from that build on. On a test build its release's test builds' entries (newest build first) come above the
+--- release's: what a tester has not read yet, not the release's text seen with the first build. None when the
+--- version is not known. (bv/news.py's visible: the same rule.)
 function N.Visible(installed)
     if not Parts(installed) then return {} end
     local release = N.Release(installed)
@@ -85,7 +88,12 @@ function N.Visible(installed)
         local order = N.Compare(e.version, beta and installed or release)
         if order and order <= 0 then out[#out + 1] = e end
     end
-    table.sort(out, function(a, b) return N.Compare(a.version, b.version) > 0 end)
+    local function Build(v) return installed ~= release and v ~= release and N.Release(v) == release end
+    table.sort(out, function(a, b)
+        local ba, bb = Build(a.version), Build(b.version)
+        if ba ~= bb then return ba end
+        return N.Compare(a.version, b.version) > 0
+    end)
     return out
 end
 

@@ -75,13 +75,15 @@ def news_entries() -> list[dict]:
 def notes(version: str, entries: list[dict], tag: str = "") -> str:
     """The GitHub release's description, from news.toml: the release's entry (its title and items, in Russian), then
     a link to the full English list (CHANGELOG.md at the release's tag) and how to install. A test build's starts
-    with the release it leads to and shows that release's entry (a tagged build has one: news_problem)."""
+    with the release it leads to, then the build's own entry when it has one (what this build brought), then that
+    release's entry (a tagged build has one: news_problem)."""
     release = news.release_of(version)
-    entry = next((e for e in entries if e["version"] == release), None)
+    own = [e for e in entries if e["version"] == version] if version != release else []
+    shown = own + [e for e in entries if e["version"] == release]
     parts = []
     if version != release:
         parts.append(f"Тестовая сборка выпуска {release}.")
-    if entry is not None:
+    for entry in shown:
         parts.append(f"### {entry['title']}\n\n" + "\n".join(f"- {item}" for item in entry["items"]))
     parts.append(f"Полный список изменений, на английском: [CHANGELOG.md]({REPO_URL}/blob/{tag or 'master'}/CHANGELOG.md).")
     parts.append(INSTALL)

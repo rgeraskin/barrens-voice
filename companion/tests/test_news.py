@@ -91,10 +91,15 @@ class Source(unittest.TestCase):
         entries = [entry("0.5.0"), entry("0.4.1"), entry("0.4.1b3"), entry("0.4.0")]
         shown = lambda v: [e["version"] for e in news.visible(entries, v)]   # noqa: E731
         self.assertEqual(shown("0.4.1b1"), ["0.4.1", "0.4.0"])
-        self.assertEqual(shown("0.4.1b3"), ["0.4.1", "0.4.1b3", "0.4.0"])
-        self.assertEqual(shown("0.4.1"), ["0.4.1", "0.4.1b3", "0.4.0"])
+        # a test build: its release's test builds' entries above the release's, newest build first
+        self.assertEqual(shown("0.4.1b3"), ["0.4.1b3", "0.4.1", "0.4.0"])
+        entries.insert(2, entry("0.4.1b5"))
+        self.assertEqual(shown("0.4.1b7"), ["0.4.1b5", "0.4.1b3", "0.4.1", "0.4.0"])
+        self.assertEqual(shown("0.4.1b4"), ["0.4.1b3", "0.4.1", "0.4.0"])
+        self.assertEqual(shown("0.4.1"), ["0.4.1", "0.4.1b5", "0.4.1b3", "0.4.0"])            # a release: by version
         self.assertEqual(shown("0.4.0"), ["0.4.0"])
-        self.assertEqual(shown("0.6.0"), ["0.5.0", "0.4.1", "0.4.1b3", "0.4.0"])
+        self.assertEqual(shown("0.6.0"), ["0.5.0", "0.4.1", "0.4.1b5", "0.4.1b3", "0.4.0"])
+        self.assertEqual(shown("0.5.0b1"), ["0.5.0", "0.4.1", "0.4.1b5", "0.4.1b3", "0.4.0"])   # an older release's: by version
         self.assertEqual(shown("?"), [])
 
 
@@ -144,6 +149,15 @@ class Release(unittest.TestCase):
                          "Тестовая сборка выпуска 0.4.1.\n\n### Проверка 0.4.1\n\n- Числа читаются точнее.\n"
                          "- Новые слова в словаре.\n\n" + link.format("v0.4.1-beta.2") + "\n\n" + install)
         self.assertIn("/blob/master/CHANGELOG.md", self.release.notes("0.4.1", entries))   # a build without a tag
+        # a test build with an entry of its own: that first (what this build brought), then the release's
+        later = [entry("0.4.1", items=["Числа читаются точнее."]), entry("0.4.1b3", items=["Тише в бою."]),
+                 entry("0.4.0")]
+        self.assertEqual(self.release.notes("0.4.1b3", later, "v0.4.1-beta.3"),
+                         "Тестовая сборка выпуска 0.4.1.\n\n### Проверка 0.4.1b3\n\n- Тише в бою.\n\n"
+                         "### Проверка 0.4.1\n\n- Числа читаются точнее.\n\n" + link.format("v0.4.1-beta.3")
+                         + "\n\n" + install)
+        # a later build without one: the release's entry only, not an earlier build's
+        self.assertNotIn("Тише в бою", self.release.notes("0.4.1b4", later, "v0.4.1-beta.4"))
         # the real one: the version in work's entry, in Russian
         real = self.release.news_entries()
         body = self.release.notes(real[0]["version"], real, "v" + real[0]["version"])
@@ -282,7 +296,7 @@ items = ["Пункт."]
         self.assertTrue(self.write())
         if LUAJIT:
             self.assertEqual([e["version"] for e in read_back(self.addon / news.FILE)["entries"]],
-                             ["0.4.1", "0.4.1b2", "0.4.0"])
+                             ["0.4.1b2", "0.4.1", "0.4.0"])                    # the build's own on top
 
     @unittest.skipUnless(LUAJIT, "luajit not installed")
     def test_any_text_reads_back(self):
