@@ -137,6 +137,10 @@ SINGULAR_STRESS = {"числа": "ч+исла"}
 # a number that goes on from the one before it - a time, a decimal, a version: neither an ordinal nor agreeing
 GLUED = re.compile(r"\d[:.,]$")
 GOES_ON = re.compile(r"[:.,]\d")       # ... and a number with one after it: "до 20:00" is a time, not a count
+# two numbers of one noun: a range "2-3", a share "5/5" - both in the case of the word before the first and
+# agreeing with the word after the second ("до двух-трёх человек", "с двумя-тремя магами"); not "20-00" (a time)
+PAIR_NEXT = re.compile(r"\s*[-–/]\s*([1-9]\d*)\b")
+PAIR_BEFORE = re.compile(r"(?<![\d:.,])\d+\s*[-–/]\s*$")
 PREV_WORD = re.compile(r"(?<![\w'+-])([а-яёА-ЯЁ]+(?:-[а-яёА-ЯЁ]+)?)\s+$")   # a whole word, as morph.PREVIOUS
 # the cases a preposition asks of the word after it (only those a count never takes in the singular);
 # "нет" is no preposition but asks the genitive the same way ("нет 5 места", "нет 5 игроков")
@@ -427,7 +431,8 @@ def numbers_to_words(text: str) -> str:
             return m.group(), m.end()
         n = int(m.group())
         spoken = num2words(n, lang="ru")
-        before = PREV_WORD.search(m.string, 0, m.start())
+        pair = PAIR_BEFORE.search(m.string, 0, m.start()) if not m.group().startswith("0") else None
+        before = PREV_WORD.search(m.string, 0, pair.start() if pair else m.start())   # "до 2-3": "до" for both
         before = before.group(1) if before else ""
         glued = ENDING.match(m.string, m.end())
         if glued and morph is not None:
@@ -477,6 +482,12 @@ def numbers_to_words(text: str) -> str:
                         return as_ordinal + m.string[m.end():following.start(1)] + stressed, following.end(1)
                     return as_ordinal, m.end()
                 spoken = agree(n, spoken, head, morph, before)
+            except Exception:  # noqa: BLE001 - a number read in the nominative is still a number
+                pass
+        elif morph is not None and (second := PAIR_NEXT.match(m.string, m.end())) and \
+                (noun := NEXT_WORD.match(m.string, second.end())):
+            try:                                       # the first of two: "до 2-3 человек" - "до двух-"
+                spoken = agree(n, spoken, noun.group(1).rsplit("-", 1)[-1], morph, before)
             except Exception:  # noqa: BLE001 - a number read in the nominative is still a number
                 pass
         elif (morph is not None and GOVERNS.get(before.lower()) == {"gent"}
