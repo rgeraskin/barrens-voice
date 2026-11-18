@@ -749,6 +749,12 @@ class Pipeline(unittest.TestCase):
                     "с лвлом": "с уровнем", "без лвлов": "без уровней", "на каком ты лвле": "на каком ты уровне",
                     "апнул лвл": "апнул уровень", "ниче страшного": "ничё страшного"})
 
+    def test_temp_is_hard(self):
+        said = self.say("держи темп, сбавь темпа, температура")
+        self.assertIn("тэмп", said)
+        self.assertNotIn("тэмпература", said.replace("+", ""))
+        self.assertIn("тэмпа", said.replace("+", ""))
+
     def test_spek_is_no_spyok(self):
         # the «ё» dictionary made the talents' «спек» into the verb «спёк»; a stressed entry keeps it
         self.check({"какой у тебя спек": "какой у тебя сп+ек", "сменил спек": "сменил сп+ек", "в спеке": "в спеке"})
