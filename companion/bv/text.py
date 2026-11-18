@@ -556,9 +556,9 @@ def numbers_to_words(text: str) -> str:
                 spoken = agree(n, spoken, noun.group(1).rsplit("-", 1)[-1], morph, before)
             except Exception:  # noqa: BLE001 - a number read in the nominative is still a number
                 pass
-        elif (morph is not None and asked_by(before, n, "", morph) == {"gent"}
-              and not GOES_ON.match(m.string, m.end())):
-            spoken = " ".join(to_case(spoken.split(), "gent", morph))   # "ждём до 10." - "до десяти"
+        elif morph is not None and not GOES_ON.match(m.string, m.end()) and \
+                (case := "gent" if asked_by(before, n, "", morph) == {"gent"} else "datv" if before.lower() in ("к", "ко") else None):
+            spoken = " ".join(to_case(spoken.split(), case, morph))     # "ждём до 10." - "до десяти", "2 к 1" - "к одному"
         return spoken, m.end()
 
     out, pos = [], 0

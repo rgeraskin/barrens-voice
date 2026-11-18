@@ -400,6 +400,17 @@ class Pipeline(unittest.TestCase):
             "из-за ОП вайп": "из-за Огненной пр+опасти в+айп", "из-под БГ": "из-под поля боя",
         })
 
+    def test_a_spaced_unit(self):
+        # «к» with a space is thousands only before an amount or at the end; else a preposition. «5 с кд»
+        # is seconds though «кд» has been declined after «с»
+        self.check({
+            "2 к голды": "две тысячи г+олды", "продам за 2 к": "продам за две тысячи", "3 к за ран": "три тысячи за ран",
+            "5 к урона": "пять тысяч урона", "продам за 3 к, срочно": "продам за три тысячи, срочно",
+            "плюс 5 к силе": "плюс пять к силе",
+            "обмен 2 к 1": "обмен два к одному", "5 к ОП": "пять к Огненной пр+опасти",
+            "5 с кд": "пять секунд кулд+аун", "2 с кд": "две секунды кулд+аун", "через 5 с кд": "через пять секунд кулд+аун",
+        })
+
     def test_health_is_counted(self):
         # «хп» after a number is an amount, never an ordinal («сотое здоровье»)
         self.check({
