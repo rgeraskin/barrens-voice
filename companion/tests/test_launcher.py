@@ -836,8 +836,8 @@ class Update(unittest.TestCase):
                 install.point_current(root, root / "app" / "0.4.0")
                 update.apply(root, "0.4.1")
                 with mock.patch("bv.install.prune") as prune:
-                    for _ in range(3):
-                        self.assertIsNone(update.record_start(root, 5, failed=app.App.start_failed(win, code)))
+                    for ran_for in (5, 5, 3600):                                       # however long it ran
+                        self.assertIsNone(update.record_start(root, ran_for, failed=app.App.start_failed(win, code)))
                 prune.assert_not_called()
                 self.assertTrue(update.state_path(root).is_file())                   # still watched
                 self.assertEqual(install.current_version(root), "0.4.1")

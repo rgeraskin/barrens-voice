@@ -310,9 +310,10 @@ def prune_unwatched(root: Path):
 def record_start(root: Path, ran_for: float, failed: bool | None) -> str | None:
     """After the companion of a freshly applied version ends: a failure at its very start (`failed` True)
     counts; at two, app\\current goes back to the previous version, whose number is returned. A good run
-    (False, or any end after EARLY) settles it: update.json goes, the versions before the previous one are
-    pruned. None is no verdict - the companion stopped for a reason that is not the version's (started again
-    online, another companion, config.json, an error it explained): nothing changes, the next start decides."""
+    (False, or a failure after EARLY) settles it: update.json goes, the versions before the previous one are
+    pruned. None is no verdict however long the run was - the companion stopped for a reason that is not the
+    version's (started again online, another companion, config.json, an error it explained): nothing changes,
+    the next start decides."""
     path = state_path(root)
     try:
         state = json.loads(path.read_text(encoding="utf-8"))
@@ -322,7 +323,7 @@ def record_start(root: Path, ran_for: float, failed: bool | None) -> str | None:
     if current is not None and current != state.get("version"):
         path.unlink(missing_ok=True)                # the switch it was written for did not happen
         return None
-    if failed is None and ran_for <= EARLY:
+    if failed is None:
         return None
     if not failed or ran_for > EARLY:
         path.unlink(missing_ok=True)
