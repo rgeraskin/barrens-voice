@@ -12,6 +12,7 @@ LINKS = {
     "github": "https://github.com/rgeraskin/barrens-voice/issues",
     "rhvoice": "https://rhvoice.su/voices/",
     "silero": "https://github.com/snakers4/silero-models/releases?q=SAPI",
+    "changelog": "https://github.com/rgeraskin/barrens-voice/blob/master/CHANGELOG.md",
 }
 
 

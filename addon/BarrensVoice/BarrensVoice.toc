@@ -22,6 +22,7 @@ News.lua
 UI.lua
 DictionaryWindow.lua
 StripWindow.lua
+NewsWindow.lua
 Options.lua
 VoicesWindow.lua
 Minimap.lua

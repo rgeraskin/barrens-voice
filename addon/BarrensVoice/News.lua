@@ -145,9 +145,15 @@ function N.Unseen(installed)
     return out
 end
 
---- The chat line for an update: the addon's icon, «Barrens Voice:», the version and the newest entry's summary.
+--- Where the whole of it is, at the end of the chat line.
+function N.More()
+    return "Что нового — /bv news."
+end
+
+--- The chat line for an update: the addon's icon, «Barrens Voice:», the version and the newest entry's summary,
+--- then where to read the rest (the «Что нового» window).
 function N.ChatLine(entry, installed)
-    return ns.ICON .. " " .. ns.PREFIX .. ("обновление %s — %s."):format(N.Shown(installed), entry.summary)
+    return ns.ICON .. " " .. ns.PREFIX .. ("обновление %s — %s. %s"):format(N.Shown(installed), entry.summary, N.More())
 end
 
 --- What the player has not seen, shown now and marked seen: the window for a big entry, else the chat line.

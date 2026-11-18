@@ -294,6 +294,8 @@ ns.LINKS = {
     github = { "GitHub", "https://github.com/rgeraskin/barrens-voice/issues" },
     rhvoice = { "RHVoice", "https://rhvoice.su/voices/" },
     silero = { "Silero", "https://github.com/snakers4/silero-models/releases?q=SAPI" },
+    -- every release's changes in full (English; the «Что нового» window has the players' own words, News.lua)
+    changelog = { "Изменения", "https://github.com/rgeraskin/barrens-voice/blob/master/CHANGELOG.md" },
 }
 
 local function AskCompanion(kind, key)
@@ -861,6 +863,7 @@ local function Version()
     local meta = C_AddOns and C_AddOns.GetAddOnMetadata or GetAddOnMetadata
     return meta and meta(ADDON, "Version") or "?"
 end
+ns.AddonVersion = Version   -- the .toc's ## Version: which entries the «Что нового» window shows
 
 --- The word at login: the welcome on the first run, and every time whether the reading works (Companion.lua);
 --- what is new after an update comes a few seconds later, out of combat (News.lua).
@@ -983,6 +986,8 @@ loader:SetScript("OnEvent", OnEvent)
 ns.OnEvent = function(event, ...) OnEvent(loader, event, ...) end   -- for the tests
 
 SLASH_BARRENSVOICE1 = "/bv"
+-- /bv news; lower() leaves Cyrillic as typed, so «Что нового» is listed too
+local NEWS_WORDS = { news = true, ["что нового"] = true, ["Что нового"] = true }
 SlashCmdList.BARRENSVOICE = function(msg)
     msg = (msg or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
     if msg == "help" or msg == "?" then
@@ -995,7 +1000,10 @@ SlashCmdList.BARRENSVOICE = function(msg)
         print("  " .. G .. "/bv last 5|r — ещё раз прочитать последние 5 строк чата (через текущий словарь)")
         print("  " .. G .. "/bv debug|r — отладка: почему строка чата не прочитана — в журнал компаньона")
         print("  " .. G .. "/bv reset-voices|r — раздать голоса рас заново (спросит)")
+        print("  " .. G .. "/bv news|r — что нового в последних версиях (то же: " .. G .. "/bv что нового|r)")
         print("  " .. G .. "/bv help|r — этот список")
+    elseif NEWS_WORDS[msg] then
+        ns.NewsWindow.Show()
     elseif msg == "test" then
         ns.Test()
     elseif msg == "stop" then

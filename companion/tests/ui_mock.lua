@@ -1188,8 +1188,15 @@ assert(#welcome == 1 and welcome[1]:find("озвучка чата"), "nothing ne
 ns.db.seenVersion, ns.db.newsSeen = "0.3.0", nil                     -- an addon from before News.lua
 welcome = {}
 ns.LoginWord()
-assert(#welcome == 2 and welcome[1]:find("озвучка чата") and welcome[2]:find("обновление 0.4.0 beta 2 —", 1, true),
-    "the companion's word, then what is new: " .. tostring(welcome[2]))
+assert(#welcome == 1 and welcome[1]:find("озвучка чата") and ns.NewsWindow.IsShown(),
+    "the companion's word, then the window: 0.4.0 is big")
+ns.NewsWindow.Hide()
+SlashCmdList.BARRENSVOICE("news")
+assert(ns.NewsWindow.IsShown(), "/bv news opens it")
+ns.NewsWindow.Hide()
+SlashCmdList.BARRENSVOICE("что нового")
+assert(ns.NewsWindow.IsShown(), "/bv что нового too")
+ns.NewsWindow.Hide()
 GetAddOnMetadata = nil
 print = plainPrint
 print("welcome ok")
