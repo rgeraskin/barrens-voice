@@ -103,7 +103,7 @@ class Capturer:
                     self.log("захват окна WoW: Windows Graphics Capture (работает и под другими окнами)")
                 except Exception as e:  # noqa: BLE001 - fall back to grabbing the screen
                     self.wgc_failed = True
-                    self.log("захват окна недоступен: держите игру поверх окон")
+                    self.log("захват окна недоступен: держи игру поверх окон")
                     self.log(f"    Windows Graphics Capture: {e}")
         return found
 

@@ -287,7 +287,7 @@ def describe(state: dict, running: bool, exit_code: int | None, game: str | None
     if not running:
         fourth = (GREY, "Мост: нет связи")
     elif state.get("mismatch") == "newer":
-        fourth = (RED, "Мост: аддон новее программы — обновите Barrens Voice")
+        fourth = (RED, "Мост: аддон новее программы — обнови Barrens Voice")
     elif state.get("mismatch") == "older":
         fourth = (RED, "Мост: аддон устарел — «обновить аддон» и /reload")
     elif state.get("linked"):

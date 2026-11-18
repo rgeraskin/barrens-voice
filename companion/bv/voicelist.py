@@ -27,8 +27,8 @@ def missing_addon(config: dict) -> str | None:
     games = [str(r) for r in wow_roots(config) if (r / "Interface").is_dir() or (r / "Wow.exe").exists()]
     where = ("в папке игры " + ", ".join(games)) if games else "— папка игры тоже не найдена"
     return ("аддон Barrens Voice не установлен: нет Interface\\AddOns\\BarrensVoice\\BarrensVoice.toc " + where + ". "
-            "Скопируйте папку addon\\BarrensVoice в World of Warcraft\\" + GAMES[game_of(config)] + "\\Interface\\AddOns\\ "
-            "(или укажите wow_dir в config.json, если игра стоит в другом месте) и запустите компаньон снова.")
+            "Скопируй папку addon\\BarrensVoice в World of Warcraft\\" + GAMES[game_of(config)] + "\\Interface\\AddOns\\ "
+            "(или укажи wow_dir в config.json, если игра стоит в другом месте) и запусти компаньон снова.")
 
 
 def label(voice) -> str:

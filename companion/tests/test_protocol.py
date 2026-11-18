@@ -137,7 +137,7 @@ class RoundTrip(unittest.TestCase):
         self.assertEqual((protocol.last_failure, protocol.other_version), ("version", 2))
         which, words = protocol.mismatch(2)
         self.assertEqual(which, "newer")
-        self.assertIn("обновите Barrens Voice", words)
+        self.assertIn("обнови Barrens Voice", words)
         self.assertEqual(protocol.mismatch(0)[0], "older")
         self.assertEqual({level_of(protocol.mismatch(v)[1]) for v in (0, 2)}, {"WARN"})
         self.assertIsNotNone(decode(render(encode(5, self.PAYLOAD, 960), 1920, 2, 1)))   # ours still read

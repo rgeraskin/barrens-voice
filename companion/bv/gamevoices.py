@@ -278,7 +278,7 @@ def build(config: dict, out: Path, log, checker, clock=time.monotonic) -> list[S
     shifts = config.get("voice_shifts", [])
     stamp = _stamp(config, shifts)
     if stamp is None:
-        raise RuntimeError("не найдена папка игры (укажите wow_dir в config.json)")
+        raise RuntimeError("не найдена папка игры (укажи wow_dir в config.json)")
     slots = load(out, stamp)
     if slots is not None:
         return slots

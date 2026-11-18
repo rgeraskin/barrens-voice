@@ -168,7 +168,7 @@ def launch(config: dict, log, game_running=None) -> bool:
         return False
     exe = find_battlenet(config)
     if exe is None:
-        log("Battle.net не найден: укажите его в «Настройках»")
+        log("Battle.net не найден: укажи его в «Настройках»")
         return False
     from .dictionary import game_of
     product = (config.get("launch_product_retail", "WoW") if game_of(config) == "retail"
@@ -236,5 +236,5 @@ def follow_cold_start(send, log, game_running=None, ready=None, sleep=time.sleep
             log("Battle.net только что запустился и пропустил команду — прошу запустить игру ещё раз")
         sleep(1)
     if not game_running():
-        log("Battle.net не запустил игру — нажмите «Играть» в нём")
+        log("Battle.net не запустил игру — нажми «Играть» в нём")
     return game_running()

@@ -38,19 +38,19 @@ TOP, GAP, ROW1 = 100, 14, 140                   # State and Start: one height
 MAIN_COLORS = {"WARN": "#e0b33a", "ERROR": "#ff6a5a"}
 # hints on the main window's checks and links (what the window does not show by itself)
 TIPS = {
-    "launch_wow": "Открыли Barrens Voice ярлыком — он сразу запускает игру через Battle.net и уходит в трей. "
+    "launch_wow": "Открываешь Barrens Voice ярлыком — он сразу запускает игру через Battle.net и уходит в трей. "
                   "При входе в Windows игра сама не запускается.",
     "exit_with_wow": "Игра закрылась — озвучка выключается и освобождает память (если Barrens Voice запущен при входе "
                      "в Windows, он остаётся ждать игру в трее). Выключено — озвучка остаётся включённой до следующей "
                      "игры, голоса рас занимают видеопамять.",
     "autostart": "Barrens Voice запускается при входе в Windows и ждёт в трее (значок у часов). Озвучка включается "
-                 "сама, когда вы запустите игру; до этого ничего не загружается и видеопамять свободна.",
+                 "сама, когда ты запустишь игру; до этого ничего не загружается и видеопамять свободна.",
     "install": "Скопировать аддон Barrens Voice в папку игры (Interface\\AddOns\\BarrensVoice). "
                "Если игра запущена — потом /reload.",
-    "update_now": "Версия готова и сама установится, когда вы закроете игру. Установить сейчас — Barrens Voice "
+    "update_now": "Версия готова и сама установится, когда ты закроешь игру. Установить сейчас — Barrens Voice "
                   "перезапустится с ней, озвучка прервётся примерно на полминуты (пока загружаются голоса). "
                   "Если менялся аддон — в игре потом нужен /reload.",
-    "update": "Заменить аддон в игре версией, которая пришла с Barrens Voice. Ваши настройки аддона сохранятся. "
+    "update": "Заменить аддон в игре версией, которая пришла с Barrens Voice. Твои настройки аддона сохранятся. "
               "Если игра запущена — потом /reload.",
 }
 SHOW_FILE = DATA_DIR / "tmp" / "launcher.show"   # a second launcher asks the first to show itself
@@ -153,7 +153,7 @@ class App:
         problem = model.config_problem()
         if problem:
             self.config_told.add("broken")
-            self.say(f"{problem} — исправьте его («Открыть config.json» в «Настройках»), до тех пор лаунчер "
+            self.say(f"{problem} — исправь его («Открыть config.json» в «Настройках»), до тех пор лаунчер "
                      "в него не пишет", "WARN")
         if INSTALL_DIR is not None:                # an update by an older version did not bring the starter yet,
             from ..install import place_starter, repair_current    # nor set the version Windows «Apps» shows
@@ -176,7 +176,7 @@ class App:
                 self.running_game = launch.running_game()[0]
             self.start_on_open()
             if self.config.get("launch_wow") and self.companion.running and not self.running_game:
-                self.hide(told="Barrens Voice запускает игру и ждёт её в трее — щёлкните значок, чтобы открыть окно.")
+                self.hide(told="Barrens Voice запускает игру и ждёт её в трее — щёлкни значок, чтобы открыть окно.")
         if args["open"]:                           # --open settings|help: straight to that window
             root.after(300, {"settings": self.open_settings, "help": self.open_help, "log": self.open_log}.get(args["open"], lambda: None))
         root.after(TICK_MS, self.tick)
@@ -256,7 +256,7 @@ class App:
         if self.companion.running or self.busy:
             return False
         if self.selected is None:
-            self.say("игра не найдена: укажите её папку в «Настройках»", "WARN")
+            self.say("игра не найдена: укажи её папку в «Настройках»", "WARN")
             return False
         if self.addon_missing():
             self.say(f"в {GAME_NAMES[self.selected]} нет аддона — «установить аддон» справа", "WARN")
@@ -381,7 +381,7 @@ class App:
             return
         g = self.game(self.selected)
         if g is None:
-            self.say("игра не найдена: укажите её папку в «Настройках»", "WARN")
+            self.say("игра не найдена: укажи её папку в «Настройках»", "WARN")
             return
         if g.addon is None and not self.install_addon(g, ask=True):
             return
@@ -417,7 +417,7 @@ class App:
     def install_addon(self, g, ask=False) -> bool:
         source = model.addon_source()
         if source is None:
-            self.say("аддона нет рядом с Barrens Voice — переустановите его", "WARN")
+            self.say("аддона нет рядом с Barrens Voice — переустанови его", "WARN")
             return False
         if ask and not messagebox.askyesno("Barrens Voice", f"В {g.name} нет аддона Barrens Voice. Установить его?",
                                            parent=self.root):
@@ -482,7 +482,7 @@ class App:
             return
         self.root.withdraw()
         if told or not self.config.get("launcher_tray_told"):
-            self.tray.notify(told or "Barrens Voice работает в трее: щёлкните значок, чтобы открыть окно. "
+            self.tray.notify(told or "Barrens Voice работает в трее: щёлкни значок, чтобы открыть окно. "
                                      "Выйти — правой кнопкой по значку.")
             if not self.config.get("launcher_tray_told"):
                 self.set_config(launcher_tray_told=True)
@@ -568,7 +568,7 @@ class App:
             threading.Thread(target=self._check_update, daemon=True, name="update-check").start()
         if self.companion.running and not self.reload_told and self.companion.state().get("reload_hint"):
             self.reload_told = True          # started after the player entered the world: say it outside the game too
-            self.tray.notify("Озвучка включена. Если окно чата не прячется — сделайте в игре /reload: аддон узнаёт "
+            self.tray.notify("Озвучка включена. Если окно чата не прячется — сделай в игре /reload: аддон узнаёт "
                              "о Barrens Voice при входе в игру и /reload.")
         # the game started from Battle.net while the companion is not running (waiting in the tray, or
         # after the last game was closed): start it for that game - unless it ended with an error
@@ -694,7 +694,7 @@ class App:
         p.panel(RX0, y2, RX1, y2 + row2, "Игра")
         if not self.games:
             c.create_text(RX0 + 14, y2 + 40, anchor="nw", width=RX1 - RX0 - 28, fill=PARCHMENT, font=p.body,
-                          text="WoW Forever и WoW Retail не найдены. Укажите папку игры в «Настройках».")
+                          text="WoW Forever и WoW Retail не найдены. Укажи папку игры в «Настройках».")
         for i, g in enumerate(self.games):
             y0 = y2 + 36 + i * 56
             on = g.key == self.selected
@@ -719,7 +719,7 @@ class App:
             c.create_text(RX0 + 26, y0 + 34, text=p.fit(str(g.root), p.small, RX1 - RX0 - 52), anchor="w", fill=DIM,
                           font=p.small, tags=tag)
         c.create_text(RX0 + 14, y2 + 36 + n * 56, anchor="nw", width=RX1 - RX0 - 28, fill=DIM, font=p.small,
-                      text="Запустили игру сами из Battle.net — компаньон подхватит её сам.")
+                      text="Запускаешь игру прямо из Battle.net — компаньон подхватит её сам.")
 
         # row 3: the buttons under the log | Play under Game
         bw = (LX1 - LX0 - 2 * 10) / 3
@@ -825,7 +825,7 @@ class App:
                           "Выключено — внизу окна появится «Вышла версия…» с кнопкой «Обновить».")
         draw_check("beta", y + 178, "Получать тестовые версии")
         p.tips["beta"] = ("Тестовые версии выходят раньше и могут быть с ошибками — для тех, кто готов проверять "
-                          "сборки и писать о найденном. Выключите — останетесь на тестовой, пока не выйдет "
+                          "сборки и писать о найденном. Выключишь — останешься на тестовой, пока не выйдет "
                           "стабильная новее.")
         lead = "Остальное — в config.json:"
         c.create_text(30, y + 216, anchor="w", fill=DIM, font=p.small, text=lead)
@@ -876,9 +876,9 @@ class App:
             try:
                 self.write_config(**changes)
             except model.BrokenConfig as e:
-                fix = ("Снимите с него «Только чтение» или закройте программу, которая его держит"
-                       if isinstance(e, model.ConfigNotWritten) else "Исправьте его («Открыть config.json»)")
-                messagebox.showerror("Barrens Voice", f"{e}\n\n{fix} и сохраните настройки снова.", parent=win)
+                fix = ("Сними с него «Только чтение» или закрой программу, которая его держит"
+                       if isinstance(e, model.ConfigNotWritten) else "Исправь его («Открыть config.json»)")
+                messagebox.showerror("Barrens Voice", f"{e}\n\n{fix} и сохрани настройки снова.", parent=win)
                 return
             self.games = model.find_games(self.config)
             win.destroy()
@@ -939,8 +939,8 @@ class App:
 
         # three blocks a gap apart: what this is for, the links, what to send
         c.create_text(30, 78, anchor="nw", fill=PARCHMENT, font=p.body,
-                      text="Ошибки, улучшения, предложения, или что-то прочитано неправильно — пишите в Discord или Telegram.")
-        github = "Или сразу заведите issue на GitHub"
+                      text="Ошибки, улучшения, предложения, или что-то прочитано неправильно — пиши в Discord или Telegram.")
+        github = "Или сразу заведи issue на GitHub"
         c.create_text(30, 116, anchor="nw", fill=PARCHMENT, font=p.body, text=github)
         smile = picture("smile", 16)
         if smile:

@@ -288,7 +288,7 @@ class LaunchFromTheWindow(unittest.TestCase):
         said = []
         win = SimpleNamespace(say=lambda message, level="INFO": said.append((level, message)))
         for line in ("запускаю игру через Battle.net ...", "    Battle.net: --exec=launch WoWF",
-                     "Battle.net не найден: укажите его в «Настройках»"):
+                     "Battle.net не найден: укажи его в «Настройках»"):
             app.App.say_as_companion(win, line)
         self.assertEqual([level for level, _ in said], ["INFO", "DEBUG", "WARN"])
 
@@ -515,7 +515,7 @@ class Mismatch(unittest.TestCase):
     def test_bridge_line(self):
         from bv.launcher.model import RED, describe
         self.assertEqual(describe({"mismatch": "newer", "linked": True}, True, None, "WoW Forever", False)[3],
-                         (RED, "Мост: аддон новее программы — обновите Barrens Voice"))
+                         (RED, "Мост: аддон новее программы — обнови Barrens Voice"))
         self.assertIn("/reload", describe({"mismatch": "older"}, True, None, "WoW Forever", False)[3][1])
 
 
@@ -926,7 +926,7 @@ class Update(unittest.TestCase):
                     app.App.companion_ended(win, 1)
             stuck = [m for level, m in said if level == "ERROR" and "вернуться не на что" in m]
             self.assertEqual(stuck, ["версия 0.4.1 не запускается, а вернуться не на что: версии 0.4.0 нет целиком "
-                                     "— установите Barrens Voice заново"])
+                                     "— установи Barrens Voice заново"])
             self.assertEqual(json.loads(update.state_path(root).read_text(encoding="utf-8"))["fails"], 4)
             self.assertEqual(install.current_version(root), "0.4.1")
             update.state_path(root).write_text(json.dumps({"version": "0.4.1", "previous": None, "fails": 1}))
@@ -934,7 +934,7 @@ class Update(unittest.TestCase):
             self.assertIsNone(update.record_start(root, 5, failed=True, say=told.append))
             self.assertIsNone(update.record_start(root, 5, failed=True, say=told.append))
             self.assertEqual(told, ["версия 0.4.1 не запускается, а вернуться не на что: прежней версии нет "
-                                    "— установите Barrens Voice заново"])
+                                    "— установи Barrens Voice заново"])
 
     def test_switch_watched_from_before_it(self):
         # update.json is written before app\\current moves: a switch is never left unwatched, a failed one leaves

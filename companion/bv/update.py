@@ -361,7 +361,7 @@ def record_start(root: Path, ran_for: float, failed: bool | None, say=None) -> s
                 name = install.display_version(state.get("version"))
                 say(f"версия {name} не запускается, а вернуться не на что: " + (
                     f"версии {install.display_version(previous)} нет целиком" if previous else "прежней версии нет")
-                    + " — установите Barrens Voice заново")
+                    + " — установи Barrens Voice заново")
         write_json(path, state)
         return None
     # refused before the switch: a rollback cut short between its renames (install.point_current) is remembered,
@@ -423,7 +423,7 @@ class Updater:
         self.found = found
         if bad:
             if not told:
-                self.say(f"версия {name} не запустилась у вас — сама не ставлю, «Обновить» попробует снова", "WARN")
+                self.say(f"версия {name} не запустилась у тебя — сама не ставлю, «Обновить» попробует снова", "WARN")
         elif settings.get("auto_update", True):
             self.prepare()
         return found
@@ -449,7 +449,7 @@ class Updater:
             self.say(f"готовлю версию {name} ...")
             self.ready = prepare(self.root, archive, log=self.detail, manifest=found)
             self.status = "ready"
-            self.say(f"версия {name} готова — установится, когда закроете игру")
+            self.say(f"версия {name} готова — установится, когда закроешь игру")
             return self.ready
         except Exception as e:  # noqa: BLE001 - the current version goes on
             if isinstance(e, WontStart):

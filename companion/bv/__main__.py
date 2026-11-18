@@ -592,7 +592,7 @@ def main() -> int:
         config, config_stamp = load_config_stamped()
     except (ConfigError, OSError) as e:                 # before anything else: nothing works without it
         log(f"ОШИБКА: {e}")
-        log("    исправьте файл или удалите его — компаньон создаст новый с настройками по умолчанию")
+        log("    исправь файл или удали его — компаньон создаст новый с настройками по умолчанию")
         from . import state
         state.init(STATE_FILE, phase="error", error=str(e))
         return CONFIG_ERROR

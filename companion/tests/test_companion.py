@@ -41,7 +41,7 @@ class LoadConfig(unittest.TestCase):
 
     def test_a_file_that_cannot_be_replaced_is_no_reason_not_to_start(self):
         # read-only or held for a moment: the write of new settings / this version's _help raised OSError, main()
-        # stopped with CONFIG_ERROR («исправьте файл») for a file that read fine, and config.json.tmp stayed
+        # stopped with CONFIG_ERROR («исправь файл») for a file that read fine, and config.json.tmp stayed
         from unittest import mock
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "config.json"

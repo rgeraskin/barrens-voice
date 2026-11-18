@@ -90,7 +90,7 @@ def decode(img: Image) -> Frame | None:
 def mismatch(other: int) -> tuple[str, str]:
     """For a strip of protocol `other`: ("newer" | "older", what the player should do)."""
     if other > VERSION:
-        return "newer", "аддон новее Barrens Voice — обновите Barrens Voice («Обновить» в лаунчере)"
+        return "newer", "аддон новее Barrens Voice — обнови Barrens Voice («Обновить» в лаунчере)"
     return "older", "аддон старше Barrens Voice — «обновить аддон» в лаунчере, потом в игре /reload"
 
 
