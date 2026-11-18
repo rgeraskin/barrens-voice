@@ -130,6 +130,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   It comes 5 s after login, after «озвучка чата работает», so other addons' lines at login no longer bury it; its first line has the addon's icon, as the «Что нового» line and the community's lines do, and it names the community in Battle.net among the places to write.
 
+- Whispers and guild lines show the hidden chat by default
+
+  «Показывать при шёпоте» and «Показывать при строке гильдии» under «Прятать окно чата» are on by default now, as «Показывать при строке группы/рейда» is: a whisper is easy to miss by ear.
+
 ### Removed
 
 - BREAKING: `WowChatVoice-Retail.cmd`

@@ -1054,7 +1054,9 @@ GetMouseFocus = nil
 ChatFrame1.IsMouseOver = function() return false end
 now = now + 20
 settle(2)
--- whispers and guild lines show the window if asked, though they are read aloud
+-- whispers and guild lines show the window if asked, though they are read aloud; on by default, like the group's
+assert(ns.DEFAULTS.fadeWhisper == true and ns.DEFAULTS.fadeGuild == true, "whispers and guild lines show it by default")
+ns.db.fadeWhisper, ns.db.fadeGuild = false, false
 ns.db.whisper, ns.db.guild = true, true
 now = now + 20
 settle(2)
