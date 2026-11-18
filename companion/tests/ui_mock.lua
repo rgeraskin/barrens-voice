@@ -88,12 +88,18 @@ ns.Dictionary.Migrate(ns.db)
 ns.Dictionary.Rebuild()
 local sent = {}
 ns.Strip.Push = function(p) sent[#sent + 1] = p end
--- every check box of the settings, where it is and its label: none may run into another or off the window
+-- every check box and radio button of the settings, where it is and its label: none may run into another or off the window
 local boxes, check0 = {}, ns.UI.Check
 ns.UI.Check = function(parent, x, y, label, ...)
     local c = check0(parent, x, y, label, ...)
     boxes[#boxes + 1] = { parent = parent, x = x, y = y, label = label, box = c }
     return c
+end
+local radio0 = ns.UI.Radio
+ns.UI.Radio = function(parent, x, y, label, ...)
+    local r = radio0(parent, x, y, label, ...)
+    boxes[#boxes + 1] = { parent = parent, x = x - 4, y = y, label = label, box = r }   -- 18 px and 4: as a check box's 26 less 4
+    return r
 end
 ns.Options.Initialize()
 ns.db.volume = 150
@@ -207,6 +213,40 @@ assert(not fire("CHAT_MSG_SAY", "это спам") and fire("CHAT_MSG_SAY", "п�
 ChatFrame_GetMessageEventFilters = nil
 assert(fire("CHAT_MSG_SAY", "это спам"), "no filter API at all: shown")
 ChatFrameUtil = util
+-- only the selected tab (onlyActiveTab): window 2 (guild) docked as a second tab, window 3 (yells) a
+-- separate window; window 1 selected
+do
+    NUM_CHAT_WINDOWS = 3
+    ChatFrame3 = { messageTypeList = { "YELL" }, channelList = {}, zoneChannelList = {} }
+    local info = GetChatWindowInfo
+    GetChatWindowInfo = function(i)
+        if i == 1 then return "Общий", 14, 1, 1, 1, 1, true, false, 1 end
+        if i == 2 then return "Гильдия", 14, 1, 1, 1, 1, true, false, 2 end
+        return "Крики", 14, 1, 1, 1, 1, true, false, nil
+    end
+    GENERAL_CHAT_DOCK = {}
+    local selected = ChatFrame1
+    FCFDock_GetSelectedWindow = function(dock) assert(dock == GENERAL_CHAT_DOCK) return selected end
+    assert(fire("CHAT_MSG_GUILD", "гильдия"), "off: any tab counts, a hidden one too")
+    ns.db.onlyActiveTab = true
+    assert(fire("CHAT_MSG_SAY", "привет"), "the selected tab's line")
+    assert(not fire("CHAT_MSG_GUILD", "гильдия"), "another tab's line: not read")
+    ns.db.debug = true
+    fire("CHAT_MSG_GUILD", "гильдия")
+    assert(sent[1]:find("^diag\31") and sent[1]:find("не в выбранной вкладке чата", 1, true), sent[1])
+    ns.db.debug = false
+    assert(fire("CHAT_MSG_YELL", "кричу"), "a separate window counts whatever tab is selected")
+    selected = ChatFrame2
+    assert(fire("CHAT_MSG_GUILD", "гильдия") and not fire("CHAT_MSG_SAY", "привет"), "the guild tab selected")
+    FCFDock_GetSelectedWindow = nil
+    assert(fire("CHAT_MSG_SAY", "привет"), "no dock on this client: every tab counts")
+    ns.db.onlyVisible = false
+    selected = ChatFrame2
+    FCFDock_GetSelectedWindow = function() return selected end
+    assert(fire("CHAT_MSG_SAY", "привет"), "only visible off: the tab does not matter either")
+    ns.db.onlyVisible, ns.db.onlyActiveTab = true, false
+    NUM_CHAT_WINDOWS, ChatFrame3, GetChatWindowInfo, GENERAL_CHAT_DOCK, FCFDock_GetSelectedWindow = 2, nil, info, nil, nil
+end
 ns.db.onlyVisible = false
 assert(fire("CHAT_MSG_YELL", "кричу"), "everything when the option is off")
 ChatFrameUtil.RemoveMessageEventFilter("CHAT_MSG_SAY", spamFilter)
@@ -591,6 +631,29 @@ print = quietRadio
 topRadio._scripts.OnClick(topRadio)
 assert(ns.StripWindow.Pending().place == "top" and topRadio._checked and not radios("Внизу (обычно)")[1]._checked, "the top picked")
 print("radio buttons ok")
+-- «Что читать»: one choice over onlyVisible and onlyActiveTab
+do
+    local all, windows, tab = radios("Все включённые каналы, даже не показанные в чате")[1], radios("Что показывают окна чата (обычно)")[1],
+        radios("Только выбранная вкладка")[1]
+    assert(all and windows and tab and #radios("Все включённые каналы, даже не показанные в чате") == 1, "three radio buttons, made once")
+    assert(ns.DEFAULTS.onlyVisible == true and ns.DEFAULTS.onlyActiveTab == false, "what the windows show, by default")
+    local function picked() return (all._checked and "all" or "") .. (windows._checked and "windows" or "")
+        .. (tab._checked and "tab" or "") end
+    tab._scripts.OnClick(tab)
+    assert(ns.db.onlyVisible == true and ns.db.onlyActiveTab == true and picked() == "tab", picked())
+    all._scripts.OnClick(all)
+    assert(ns.db.onlyVisible == false and ns.db.onlyActiveTab == false and picked() == "all", picked())
+    windows._scripts.OnClick(windows)
+    assert(ns.db.onlyVisible == true and ns.db.onlyActiveTab == false and picked() == "windows", picked())
+    ns.db.onlyActiveTab = true                       -- saved so: the window shows it as such
+    ns.Options.Refresh()
+    assert(picked() == "tab" and ns.Options.ReadsNow() == "tab", picked())
+    ns.db.onlyVisible = false                        -- off wins: the tab does not matter then
+    ns.Options.Refresh()
+    assert(picked() == "all", picked())
+    ns.db.onlyVisible, ns.db.onlyActiveTab = false, false
+    print("what to read ok")
+end
 
 -- the chat windows out of sight: transparent without the mouse; a line not read aloud shows its window
 local filters = {}

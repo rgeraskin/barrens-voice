@@ -72,6 +72,30 @@ local window, toggle, verb, where, lastNames, programState
 local fadeSubs = {}   -- its sub-options: grey while the chat is not hidden
 local numbered = {}   -- the check boxes of the numbered channels (grey while "Общие каналы" is off)
 local checks, radios, sliders = {}, {}, {}
+local reads = {}      -- "Что читать": its radio buttons by choice
+
+-- "Что читать", one choice over two saved settings (kept as they were): every channel switched on, even
+-- one no chat window shows (onlyVisible off), what some chat window or tab shows, or only the selected tab and separate windows
+-- (onlyActiveTab). The second and the third are not two options: the third narrows the second.
+local READS = {
+    { "all", false, false, "Все включённые каналы, даже не показанные в чате", "Читаются все каналы, включённые "
+        .. "выше, даже те, что не показывает ни одно окно чата. Например, торговлю можно убрать из всех вкладок, "
+        .. "чтобы не мешала на экране, и слушать её. Или если вы пользуетесь аддоном, который заменяет чат, и окна "
+        .. "игры показывают не то, что вы видите. Строки, скрытые фильтром другого аддона (от спама), тоже читаются." },
+    { "windows", true, false, "Что показывают окна чата (обычно)", "Строка читается, если её показывает хоть одно "
+        .. "окно чата или любая его вкладка, даже та, что сейчас не выбрана. Чего не показывает ни одна вкладка (так "
+        .. "настроены вкладки) или что скрыл фильтр другого аддона, не читается." },
+    { "tab", true, true, "Только выбранная вкладка", "Читается только то, что показывает выбранная сейчас вкладка "
+        .. "окна чата, и отдельные окна чата (вынесенные из вкладок). Например, в подземелье: вынесите чат группы в "
+        .. "свою вкладку и выберите её — будет читаться только группа." },
+}
+
+--- The "Что читать" choice the settings make.
+local function ReadsNow()
+    if not ns.db.onlyVisible then return "all" end
+    return ns.db.onlyActiveTab and "tab" or "windows"
+end
+O.ReadsNow = ReadsNow
 local tabs, tabButtons, tabOrder, tabHeight = {}, {}, {}, {}
 local current = "general"
 local bridgeHeight, bridgeOpen = 0, false
@@ -96,6 +120,7 @@ local function Refresh()
     for _, c in ipairs(fadeSubs) do UI.SetCheckEnabled(c, ns.db.fadeChat) end
     UI.SetCheckEnabled(verb, ns.db.sayNames)
     UI.SetCheckEnabled(where, ns.db.sayNames)
+    for value, r in pairs(reads) do r:SetChecked(ReadsNow() == value) end
     if lastNames then UI.SetCheckEnabled(lastNames, ns.db.sayNames) end
     for value, r in pairs(radios) do r:SetChecked((ns.db.voices or "f5") == value) end
     for key, sl in pairs(sliders) do
@@ -328,7 +353,20 @@ local function BuildReading(tab, description)
         checks[#checks + 1] = c
         numbered[#numbered + 1] = c
     end
-    y = y - 24 - math.ceil(#NUMBERED / 2) * 24 - 4
+    y = y - 24 - math.ceil(#NUMBERED / 2) * 24
+    y = y - 6
+
+    -- which chat windows count: one choice, a radio button a row
+    y = UI.Header(tab, "Что читать", y)
+    for _, item in ipairs(READS) do
+        local value = item[1]
+        reads[value] = UI.Radio(tab, LEFT + 3, y - 2, item[4], function()
+            ns.db.onlyVisible, ns.db.onlyActiveTab = item[2], item[3]
+            for v, other in pairs(reads) do other:SetChecked(v == value) end
+        end, item[5])
+        y = y - 22
+    end
+    y = y - 4
     return -y
 end
 

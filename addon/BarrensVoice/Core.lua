@@ -30,6 +30,7 @@ ns.DEFAULTS = {
     debug = false,     -- /bv debug: why a chat line was not sent, and CatQuest's speech, to the program's log
     self = true,       -- your own lines
     onlyVisible = true, -- only lines a chat window of yours shows (its message types and channels, chat filters)
+    onlyActiveTab = false, -- ... and of the docked windows only the selected tab (separate windows still count)
     waitForCatQuest = true, -- hold chat lines while CatQuest or Wayfarer reads a quest; send them when it is done
     cell = 2,          -- strip cell size, physical pixels
     rows = 1,          -- strip rows of cells
@@ -437,21 +438,40 @@ local function Filtered(frame, event, ...)
     return hidden
 end
 
+--- The tab selected in the main chat window (the dock of docked windows), when the player wants only it
+--- read (onlyActiveTab); nil otherwise or on a client without the dock (then every tab counts).
+local function SelectedTab()
+    if not ns.db.onlyActiveTab then return nil end
+    local get, dock = rawget(_G, "FCFDock_GetSelectedWindow"), rawget(_G, "GENERAL_CHAT_DOCK")
+    if type(get) ~= "function" or not dock then return nil end
+    local ok, selected = pcall(get, dock)
+    return ok and selected or nil
+end
+
 --- Whether the player sees this line: some chat window that is open (shown or docked as a tab)
---- takes it, and no chat filter - spam blockers and the like - hides it there.
+--- takes it, and no chat filter - spam blockers and the like - hides it there. With onlyActiveTab a
+--- docked window counts only while it is the selected tab; a separate (undocked) window always does.
+--- Frames are only compared here: retail's secret lines never get this far (OnEvent drops them).
 local function Visible(event, ...)
     if not ns.db.onlyVisible or not GetChatWindowInfo then return true end
     local zoneChannel, baseName = select(7, ...), select(9, ...)
-    local seen
+    local selected = SelectedTab()
+    local seen, otherTab
     for i = 1, NUM_CHAT_WINDOWS or 10 do
         local frame = _G["ChatFrame" .. i]
         local shown, _, docked = select(7, GetChatWindowInfo(i))
         if frame and (shown or docked) and Takes(frame, event, zoneChannel, baseName) then
-            seen = frame
-            break
+            if selected and docked and frame ~= selected then
+                otherTab = true
+            else
+                seen = frame
+                break
+            end
         end
     end
-    if not seen then return false, "нет открытого окна чата с этим типом или каналом" end
+    if not seen then
+        return false, otherTab and "не в выбранной вкладке чата" or "нет открытого окна чата с этим типом или каналом"
+    end
     if Filtered(seen, event, ...) then return false, "скрыто фильтром чата другого аддона" end
     return true
 end
