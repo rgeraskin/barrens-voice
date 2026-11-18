@@ -210,6 +210,9 @@ class Hook(unittest.TestCase):
         lines = f"refs/tags/v0.4.1 {self.git('rev-parse', 'HEAD')} refs/tags/v0.4.1 {'0' * 40}\n"
         crlf = self.repo / "pre-push-crlf"
         crlf.write_bytes(HOOK.read_bytes().replace(b"\n", b"\r\n"))
+        # not a proof that sh rejects "\r" (this tag is not ready, so a hook that parses refuses it too): only that a
+        # CRLF copy never lets a tag through; the guarantee is the next two checks - the hook's bytes and the
+        # checkout's filters
         self.assertNotEqual(self.run_hook(crlf, lines).returncode, 0)
         self.assertNotIn(b"\r", HOOK.read_bytes())
         if subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--is-inside-work-tree"],

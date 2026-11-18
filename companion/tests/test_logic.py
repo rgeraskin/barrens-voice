@@ -159,6 +159,19 @@ class Assign(unittest.TestCase):
         self.assertNotIn("bn:друг", a.known)
 
 
+    def test_battle_net_whole_tag_adopts_the_names_voice(self):
+        # only the name's entry is known (a replay was the friend's first line since a reset): the whole tag takes
+        # that very voice, not the next free one - a shifted copy no other speaker would pick first
+        import json
+        import time
+        now = time.time()
+        shifted = next(s.id for s in slots() if s.id.startswith("orc-male") and "^" in s.id)
+        self.path.write_text(json.dumps({"bn:друг": {"slot": shifted, "seen": now - 1}}), encoding="utf-8")
+        a = Assigner(slots(), self.path)
+        self.assertEqual(a.slot_for("BN:Друг#1234", "Orc", "2", now=now).id, shifted)
+        self.assertEqual(list(a.known), ["bn:друг#1234"])
+
+
 class Regexes(unittest.TestCase):
     SAVED = r'WTS=продам\n~(\\d+)\\s*кк\\b=\\g<1>000000\n~(\\d+)\\s*к\\b=\\g<1>000\n~[=битая\n~(?=x)y=z'
 
