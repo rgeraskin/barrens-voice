@@ -143,9 +143,12 @@ class App:
             self.say(f"{problem} — исправьте его («Открыть config.json» в «Настройках»), до тех пор лаунчер "
                      "в него не пишет", "WARN")
         if INSTALL_DIR is not None:                # an update by an older version did not bring the starter yet,
-            from ..install import place_starter    # nor set the version Windows «Apps» shows
+            from ..install import place_starter, repair_current    # nor set the version Windows «Apps» shows
             from ..paths import CODE_DIR
             from ..update import note_version
+            if repair_current(INSTALL_DIR, CODE_DIR.parent):
+                self.say(f"переход на другую версию в прошлый раз прервался — снова указал текущей "
+                         f"{display_version(self.version)}")
             place_starter(INSTALL_DIR, CODE_DIR.parent)
             note_version(INSTALL_DIR, self.version)
             root.after(PRUNE_AFTER_MS, self.prune_versions)

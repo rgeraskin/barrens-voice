@@ -836,6 +836,38 @@ class Update(unittest.TestCase):
             self.assertEqual(install.current_version(root), "0.4.0")
             self.assertEqual(sorted(p.name for p in (root / "app").iterdir()), ["0.4.0", "0.4.1", "current"])
 
+    def test_launcher_start_repairs_a_cut_switch(self):
+        # cut between the renames: only current.new and current.old, the starter runs current.new. The launcher's
+        # start makes app\\current again (the next update recorded no version to go back to), and the watch holds
+        from bv import install, update
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            for v in ("0.3.9", "0.4.0", "0.4.1"):
+                make_version(root, v)
+            install.point_current(root, root / "app" / "0.4.0")
+            self.assertFalse(install.repair_current(root, root / "app" / "0.4.0"))      # current there: nothing
+            update.state_path(root).parent.mkdir(parents=True)
+            update.write_json(update.state_path(root), {"version": "0.4.1", "previous": "0.4.0", "fails": 0})
+            os.rename(root / "app" / "current", root / "app" / "current.old")
+            install.make_link(root / "app" / "current.new", root / "app" / "0.4.1")
+            self.assertFalse(install.repair_current(root, root / "app" / "0.3.9"))      # not what the links name
+            self.assertIsNone(install.current_version(root))
+            self.assertTrue(install.repair_current(root, root / "app" / "current.new" / "companion" / ".."))
+            self.assertEqual(install.current_version(root), "0.4.1")
+            self.assertEqual(sorted(p.name for p in (root / "app").iterdir()), ["0.3.9", "0.4.0", "0.4.1", "current"])
+            self.assertIsNone(update.record_start(root, 5, failed=True))                 # still watched:
+            self.assertEqual(update.record_start(root, 5, failed=True), "0.4.0")        # its failures go back
+            # the starter ran current.old (current.new not whole): current is the old version, and the watch of
+            # the switch that did not happen is dropped at the next end
+            update.write_json(update.state_path(root), {"version": "0.4.1", "previous": "0.4.0", "fails": 0})
+            os.rename(root / "app" / "current", root / "app" / "current.old")
+            install.make_link(root / "app" / "current.new", root / "app" / "0.4.1")
+            self.assertTrue(install.repair_current(root, root / "app" / "0.4.0"))
+            self.assertEqual(install.current_version(root), "0.4.0")
+            self.assertIsNone(update.record_start(root, 5, failed=True))
+            self.assertFalse(update.state_path(root).exists())
+            self.assertEqual(install.current_version(root), "0.4.0")
+
     def test_watch_of_a_switch_that_did_not_happen(self):
         # update.json names another version than current (the launcher killed after writing it, before the
         # switch): the current version's failures are not the other's - forgotten, nothing refused
