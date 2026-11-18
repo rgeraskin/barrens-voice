@@ -67,6 +67,8 @@ D.DEFAULT = [[
 ~\bпал(\d{1,2})\b=паладин, уровень \1
 ~\bдру(?:ль|ид)?(\d{1,2})\b=друид, уровень \1
 ~(\d+)\s*кк\b=\g<1>000000
+# «кк» без числа — «окей» (регуляркой, после миллионов: словом оно съедало «за 2 кк» = «за два окей»)
+~\bкк\b=окей
 # «к» с пробелом после числа — тысячи, только если дальше количество, «до», «или», тире или ничего: «2 к голды», «5 к дпс», «от 5 к до 10 к», «продам за 3 к».
 # Иначе это предлог: «обмен 2 к 1», а после «плюс» — всегда («+5 к урону» — бонус). «голды» к этому времени склонилось после «к» («г+олдам»)
 ~(\d+)\s+к\s+г\+?олд\w*=\g<1>000 г+олды
@@ -107,7 +109,6 @@ plz=пожалуйста
 оч=очень
 прив=привет
 пок=пока
-кк=окей
 ок=окей
 ok=окей
 gg=гуд гейм
@@ -557,6 +558,8 @@ end
 -- file too (bv/dictionary.py addon_renamed). dictionary.json carries a list as one string, the keys
 -- joined by "\n" (tools/dictionary_json.py), so its "renamed" stays a map of strings older programs read.
 D.RENAMED = {
+    -- "кк" was a word: a word goes before the regexes and took "2 кк" (millions) for "окей"
+    [ [[кк]] ] = [[~\bкк\b]],
     -- "N к" was one rule: glued, spaced before gold, spaced before an amount are rules of their own
     [ [[~(\d+)\s*к\b]] ] = {
         [[~(\d+)\s+к\s+г\+?олд\w*]],
