@@ -486,6 +486,9 @@ class Pipeline(unittest.TestCase):
             # of the range: a count, as before
             "рейд с 20 по 23 по мск": "рейд с двадцати по двадцать три по эм-эс-к+а",
             "с 1 по 5 и дальше": "с одного по пять и дальше", "с 1 по 5 плюс": "с одного по пять плюс",
+            # a name, a place, an abbreviation (pymorphy's best reading): no noun of the range either
+            "с 1 по 3 Ивана": "с одного по три Ивана", "с 1 по 3 Москву": "с одного по три Москву",
+            "с 1 по 5 вов": "с одного по пять вов",
             # the noun as typed: "босс" is no accusative of the animate, so the ordinal is not one either
             "с 2 по 4 босс": "со второго по четвёртый босс",
             # M made a two-word ordinal by the dictionary: the noun's ordinal is its last word
