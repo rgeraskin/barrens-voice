@@ -214,27 +214,28 @@ do  -- «Открыть» for the community: its invite as a link in the chat, f
     BATTLENET_FONT_COLOR = { WrapTextInColorCode = function(_, text) return "|cff82c5ff" .. text .. "|r" end }
     GetBindingKeyForAction = function(action) assert(action == "TOGGLEGUILDTAB") return "J" end
     CommunitiesHyperlink = { OnClickLink = function() error("the addon must not open it itself (taint)") end }
-    local ICON = "|TInterface\\AddOns\\BarrensVoice\\Icon:14:14:0:0:64:64:4:60:4:60|t "
+    local PREFIX = "|cff66ccffBarrens Voice|r: "
+    local ICON = "|TInterface\\AddOns\\BarrensVoice\\Icon:14:14:0:0:64:64:4:60:4:60|t " .. PREFIX
     ns.Options.Open("help")
     assert(ns.Options.IsShown(), "the settings are up before the click")
     ns.OpenLink("community")
     assert(#pushed == 0, "the companion is not asked")
     assert(not ns.Options.IsShown(), "the settings close: the link in the chat is in sight")
     assert(#told == 2, "two lines: " .. #told)
-    assert(told[1] == ICON .. "Сообщество Barrens Voice — новости, вопросы, ошибки: |cff82c5ff|HclubTicket:N9KR2WNHDgW|h"
+    assert(told[1] == ICON .. "сообщество в Battle.net — новости, вопросы, ошибки: |cff82c5ff|HclubTicket:N9KR2WNHDgW|h"
         .. "[Вступить в «Barrens Voice»]|h|r  |cff999999или в браузере: https://launch.battle.net/invite/N9KR2WNHDgW|r",
         told[1])
-    assert(told[2] == "Щёлкните по ссылке: откроется окно сообществ с кнопкой «Вступить». Не открылось — рядом ссылка "
+    assert(told[2] == PREFIX .. "щёлкните по ссылке: откроется окно сообществ с кнопкой «Вступить». Не открылось — рядом ссылка "
         .. "для браузера.", told[2])
     for _, line in ipairs(told) do
-        assert(not line:find("Barrens Voice|r:", 1, true) and not line:find("→", 1, true) and not line:find("–", 1, true),
-            "no prefix, no arrow or en dash: " .. line)
+        assert(line:find("Barrens Voice|r: ", 1, true) and not line:find("→", 1, true) and not line:find("–", 1, true),
+            "signed «Barrens Voice:», no arrow or en dash: " .. line)
     end
     -- joined within 5 minutes of «Открыть» (CLUB_ADDED): greeted once, with the key the player has for the window
     infos[42] = { name = "Barrens Voice", clubType = 0 }
     clock = clock + 299
     ns.OnEvent("CLUB_ADDED", 42)
-    assert(#told == 3 and told[3] == ICON .. "Вы в сообществе Barrens Voice! Окно сообществ — клавиша J.", told[3])
+    assert(#told == 3 and told[3] == ICON .. "вы в сообществе! Окно сообществ — клавиша J.", told[3])
     ns.OnClubAdded(42)
     assert(#told == 3, "greeted once")
     -- later than 5 minutes: not greeted
@@ -250,7 +251,7 @@ do  -- «Открыть» for the community: its invite as a link in the chat, f
     -- no key bound: the greeting without one
     GetBindingKeyForAction = function() return nil end
     ns.OnClubAdded(44)
-    assert(#told == 8 and told[8] == ICON .. "Вы в сообществе Barrens Voice!", told[8])
+    assert(#told == 8 and told[8] == ICON .. "вы в сообществе!", told[8])
     -- never asked: no word for a community the player joined some other way
     local fresh = #told
     ns.OnClubAdded(42)
@@ -259,13 +260,13 @@ do  -- «Открыть» for the community: its invite as a link in the chat, f
     GetBindingKeyForAction = function() return "J" end
     clubs = { { name = "Гильдия котов" }, { name = "Barrens Voice — озвучка чата" } }
     ns.OpenLink("community")
-    assert(#told == fresh + 1 and told[#told] == ICON .. "Вы уже в сообществе «Barrens Voice — озвучка чата» — окно "
+    assert(#told == fresh + 1 and told[#told] == ICON .. "вы уже в сообществе «Barrens Voice — озвучка чата» — окно "
         .. "сообществ открывается клавишей J.", told[#told])
     ns.OnClubAdded(42)
     assert(#told == fresh + 1, "already in: no greeting")
     GetBindingKeyForAction = nil
     ns.OpenLink("community")
-    assert(told[#told] == ICON .. "Вы уже в сообществе «Barrens Voice — озвучка чата».", told[#told])
+    assert(told[#told] == ICON .. "вы уже в сообществе «Barrens Voice — озвучка чата».", told[#told])
     -- retail: the names secret (chat lockdown) - not looked at, the link given
     local SECRET = setmetatable({}, { __index = function() error("a secret value cannot be read") end,
         __eq = function() error("a secret value cannot be compared") end })
@@ -278,11 +279,11 @@ do  -- «Открыть» for the community: its invite as a link in the chat, f
     end
     infos[45] = { name = SECRET }
     ns.OnClubAdded(45)
-    assert(told[#told] == ICON .. "Вы в сообществе Barrens Voice!", "a secret name: greeted - " .. told[#told])
+    assert(told[#told] == ICON .. "вы в сообществе!", "a secret name: greeted - " .. told[#told])
     infos[46] = SECRET
     ns.OpenLink("community")
     ns.OnClubAdded(46)
-    assert(told[#told] == ICON .. "Вы в сообществе Barrens Voice!", "a secret info: greeted")
+    assert(told[#told] == ICON .. "вы в сообществе!", "a secret info: greeted")
     issecretvalue, clubs = nil, {}
     C_Club.GetSubscribedClubs = function() error("clubs not initialized") end
     local n = #told

@@ -373,7 +373,7 @@ function ns.OnClubAdded(clubId)
     end
     askedAt = nil
     local key = CommunitiesKey()
-    print(ICON .. " Вы в сообществе " .. CLUB_NAME .. "!" .. (key and (" Окно сообществ — клавиша %s."):format(key) or ""))
+    print(ICON .. " " .. PREFIX .. "вы в сообществе!" .. (key and (" Окно сообществ — клавиша %s."):format(key) or ""))
 end
 
 --- A community's invite as a link in the chat, for the player to click: the click is the game's own
@@ -393,14 +393,14 @@ local function LinkInChat(link)
     if joined then
         local key = CommunitiesKey()
         -- "|" starts the chat's markup: "||" shows one
-        print(ICON .. (" Вы уже в сообществе «%s»"):format((joined:gsub("|", "||")))
+        print(ICON .. " " .. PREFIX .. ("вы уже в сообществе «%s»"):format((joined:gsub("|", "||")))
             .. (key and (" — окно сообществ открывается клавишей %s."):format(key) or "."))
     else
         local chatLink = ClubLink(ticket)
         if not chatLink then return false end
-        print(ICON .. " Сообщество " .. CLUB_NAME .. " — новости, вопросы, ошибки: " .. chatLink .. "  " .. GREY
+        print(ICON .. " " .. PREFIX .. "сообщество в Battle.net — новости, вопросы, ошибки: " .. chatLink .. "  " .. GREY
             .. "или в браузере: " .. link[2] .. "|r")
-        print("Щёлкните по ссылке: откроется окно сообществ с кнопкой «Вступить». Не открылось — рядом ссылка для "
+        print(PREFIX .. "щёлкните по ссылке: откроется окно сообществ с кнопкой «Вступить». Не открылось — рядом ссылка для "
             .. "браузера.")
         askedAt = GetTime and GetTime() or 0
     end
