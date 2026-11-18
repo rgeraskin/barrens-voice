@@ -408,10 +408,19 @@ class Pipeline(unittest.TestCase):
             "в 2007г начал": "в две тысячи седьмом году начал", "после 2010г": "после две тысячи десятого года",
             "продам за 2000г": "продам за две тысячи золотых", "куплю до 2000г": "куплю до двух тысяч золотых",
             # «кк» after a number is millions, alone «окей» (it was a word, which went before the regexes)
+            # a range of years: «по»/«до» right after a year (a price range stays gold)
+            "играю с 2005г по 2010г": "играю с две тысячи пятого года по две тысячи десятый год",
+            "с 2005 по 2010г": "с две тысячи пятого по две тысячи десятый год",
+            "с 2005г до 2010г": "с две тысячи пятого года до две тысячи десятого года",
+            "с 1000 по 2000г": "с одной тысячи по две тысячи золотых", "дам по 2000г": "дам по две тысячи золотых",
             "продам за 2 кк": "продам за два миллиона", "за 2кк": "за два миллиона", "кк, иду": "окей, иду",
             "через 30 сек пул": "через тридцать секунд п+ул",
             "скидка 50%": "скидка пятьдесят процентов",
         })
+
+    def test_a_range_of_years_without_declension(self):
+        # no declension marks around «года»: the rule's look back holds without them too
+        self.assertIn("десятый год", self.say("играю с 2005г по 2010г", declension=False))
 
     def test_a_unit_glued_to_a_number_is_no_preposition(self):
         self.check({

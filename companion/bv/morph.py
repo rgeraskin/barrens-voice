@@ -35,7 +35,7 @@ PROPER = ("Geox", "Name", "Surn", "Patr", "Orgn", "Trad")
 CONJUNCTIONS = {"и", "или", "либо", "да"}   # "с танком и чернокнижником": the case carries over
 # "с 1 по ..." - a range: a number or an ordinal between "с" and "по" ("с первого по"; "с тобой по кд"
 # is no range: "по кулдауну")
-RANGE = re.compile(r"(?<![\w'+-])(?:с|со)\s+(\d+(?:-?[а-яё]{1,3})?|[а-яё]+)\s+по\W*$", re.IGNORECASE)
+RANGE = re.compile(r"(?<![\w'+-])(?:с|со)\s+(\d+(?:-?[а-яё]{1,3})?|[а-яё]+)(?:\s+года)?\s+по\W*$", re.IGNORECASE)
 
 
 def strip_marks(text: str) -> str:
