@@ -84,7 +84,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Dictionary
 
-  «95%» is read «95 процентов» (1 процент, 2 процента), «кача» as «к+ача», «ЛИ» (in capitals only: «ли» is a particle) as «Лабиринты Иглошкурых», «пздц» as «пиздец», «импрувед» as «импр+увед», «лк» as «эл к+а», «бк» as «бэ к+а», «дс» as «диск+орд» (it was «дисконнект»: in chat it is mostly Discord), «х3» and «х2» as «икс три», «икс два», «+-» as «плюс-минус» (also before a number: «+-5 минут» — «плюс-минус пять минут»), «2х2», «5x5», «3v3» as «два на два» (and «2х2 арена» — «два на два арена»; «40 х2» — «сорок икс два»), «2г50с» as «два золотых пятьдесят серебра», «играю с 2005г», «в 2007г» as a year (after с/в/после; «продам за 2000г» stays gold); Discord's emoji codes («:lol:», «:+1:») are dropped before the dictionary.
+  «95%» is read «95 процентов» (1 процент, 2 процента), «кача» as «к+ача», «ЛИ» (in capitals only: «ли» is a particle) as «Лабиринты Иглошкурых», «пздц» as «пиздец», «импрувед» as «импр+увед», «лк» as «эл к+а», «бк» as «бэ к+а», «дс» as «диск+орд» (it was «дисконнект»: in chat it is mostly Discord), «х3» and «х2» as «икс три», «икс два», «+-» as «плюс-минус» (also before a number: «+-5 минут» — «плюс-минус пять минут»), «2х2», «5x5», «3v3» as «два на два» (and «2х2 арена» — «два на два арена»; «40 х2» — «сорок икс два»), «2г50с» as «два золотых пятьдесят серебра», «играю с 2005г», «в 2007г» as a year (after с/в/после, and a range of years: «с 2005г по 2010г» — «… по две тысячи десятый год»; «продам за 2000г» stays gold); Discord's emoji codes («:lol:», «:+1:») are dropped before the dictionary.
 
 - Library notices left out of the model download
 
@@ -160,7 +160,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Thousands, gold and seconds after a number
 
-  «к» with a space was always thousands: «+5 к силе» was «плюс пять тысяч силе», «обмен 2 к 1» «две тысячи один». Now «к» after a space is thousands only before an amount (голды, хп, урона…) or at the line's end: «плюс пять к силе», «два к одному», «10к хп» — «десять тысяч здоровья». After «плюс» (the addon's «+») «к» is always the preposition: «+5 к урону» — «плюс пять к урону», «+100 к здоровью»; a dative after «к» is the preposition too. «N к» is thousands before what players count in thousands (дпс, хпс, гс, чести, репы, рейта, хила) and before до/или/и/a dash: «от 5 к до 10 к» — «от пяти тысяч до десяти тысяч». «100г» was «стог»: «г» glued to a number is gold, «сто золотых». «5 с кд» is «пять секунд кулд+аун», not «с кулд+ауном».
+  «к» with a space was always thousands: «+5 к силе» was «плюс пять тысяч силе», «обмен 2 к 1» «две тысячи один». Now «к» after a space is thousands only before an amount (голды, хп, урона…) or at the line's end: «плюс пять к силе», «два к одному», «10к хп» — «десять тысяч здоровья». After «плюс» (the addon's «+») «к» is always the preposition: «+5 к урону» — «плюс пять к урону», «+100 к здоровью»; a dative after «к» is the preposition too. «N к» is thousands before what players count in thousands (дпс, хпс, гс, чести, репы, рейта, хила) and before до/или/и/a dash: «от 5 к до 10 к» — «от пяти тысяч до десяти тысяч». «100г» was «стог»: «г» glued to a number is gold, «сто золотых». «за 2 кк» was «за два окей»: the word «кк» went before the rule for millions, now it is «за два миллиона» (and «кк» alone is still «окей»). «5 с кд» is «пять секунд кулд+аун», not «с кулд+ауном».
 
 - Numbers after «у», «до», «без» and other prepositions of the genitive
 
