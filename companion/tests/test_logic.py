@@ -768,6 +768,13 @@ class Pipeline(unittest.TestCase):
         self.assertNotIn("тэмпература", said.replace("+", ""))
         self.assertIn("тэмпа", said.replace("+", ""))
 
+    def test_a_heart_is_a_smiley(self):
+        # «<3» was «<три»: a pause, like the other smileys; a number after «<» stays a number
+        for line in ("люблю тебя <3", "спасибо <3 <3", "<333 супер", "</3 жаль"):
+            self.assertNotIn("три", self.say(line), line)
+        self.assertIn("тридцать", self.say("х<30 урон"))
+        self.assertIn("тридцать третьем", self.say("о 33 лвл"))        # the dictionary's own «<33>» is no heart
+
     def test_spek_is_no_spyok(self):
         # the «ё» dictionary made the talents' «спек» into the verb «спёк»; a stressed entry keeps it
         self.check({"какой у тебя спек": "какой у тебя сп+ек", "сменил спек": "сменил сп+ек", "в спеке": "в спеке"})
