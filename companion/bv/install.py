@@ -238,9 +238,11 @@ def release_tag(version: str) -> str:
 VERSION_NAME = re.compile(r"\d+(?:\.\d+)*(?:b\d+)?")
 
 
-def prune(root: Path, keep: int = KEEP, also=()) -> list[str]:
+def prune(root: Path, keep: int = KEEP, also=(), watched=None) -> list[str]:
     """Versions older than the current one removed but the newest keep-1 of them (to go back to) and those named
-    in `also` (update.json's previous). A version newer than the current one is never removed: it may be prepared
+    in `also` or by `watched()` - update.json's version and previous, asked only after the current version is
+    read: a switch writes its watch before it moves app\\current (bv/update.py apply), so a switch this prune
+    sees done is always seen with its watch (read before, an update applied meanwhile lost its previous). A version newer than the current one is never removed: it may be prepared
     and waiting for its switch, or refused here (it goes once a newer one is current) - by number alone a refused
     test build left on disk kept itself and pruned the prepared version, and the switch pointed at nothing.
     Nor what current.new or current.old points at (a switch cut short), nor anything while there is no current
@@ -255,7 +257,7 @@ def prune(root: Path, keep: int = KEEP, also=()) -> list[str]:
     current = current_version(root)
     if current is None:
         return []
-    keep_names = {current, *(v for v in also if v)}
+    keep_names = {current, *(v for v in (*also, *(watched() if watched else ())) if isinstance(v, str) and v)}
     for link in (app / "current.new", app / "current.old"):
         if os.path.lexists(link):
             keep_names.add(Path(os.path.realpath(link)).name)

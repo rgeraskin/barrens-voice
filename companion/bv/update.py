@@ -275,22 +275,27 @@ pruning = None          # the last prune_later's thread (the tests wait for it)
 PRUNE_LOCK = threading.Lock()       # one prune at a time (a settle's and the start's may meet)
 
 
+def watched_versions(root: Path) -> list:
+    """update.json's version and the one to go back to from it (nothing when no version is watched)."""
+    try:
+        watched = json.loads(state_path(root).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    return [watched.get("previous"), watched.get("version")] if isinstance(watched, dict) else []
+
+
 def prune_later(root: Path, also=()):
     """install.prune on a thread of its own: removing a version (its .venv: thousands of files) took seconds
     on the window's thread. A daemon: cut short when the launcher ends, the rest goes at the next prune (a version
-    pruned is never the one to go back to - that is the one current when the next update is applied). `also`
-    and a watched version's previous one (update.json) are kept."""
+    pruned is never the one to go back to - that is the one current when the next update is applied, and an
+    update applied while this runs is seen with its watch: install.prune reads update.json after app\\current).
+    `also` and a watched version's previous one (update.json) are kept."""
     global pruning
 
     def work():
         with PRUNE_LOCK:
             try:
-                watched = json.loads(state_path(root).read_text(encoding="utf-8"))
-                kept = [watched.get("previous"), watched.get("version")] if isinstance(watched, dict) else []
-            except (OSError, ValueError):
-                kept = []
-            try:
-                install.prune(root, also=[v for v in (*also, *kept) if isinstance(v, str)])
+                install.prune(root, also=also, watched=lambda: watched_versions(root))
             except OSError:
                 pass
     pruning = threading.Thread(target=work, daemon=True, name="prune")

@@ -974,6 +974,38 @@ class Update(unittest.TestCase):
             update.pruning.join(10)
             self.assertEqual(sorted(p.name for p in (root / "app").iterdir()), ["0.4.0", "0.4.1", "current"])
 
+    def test_prune_reads_the_watch_after_current(self):
+        # the prune read update.json, then (after clearing *.pruned leftovers: seconds) app\\current. An update
+        # applied in between (its watch written before the switch) was seen as current with no watch: the version
+        # to go back to went when a newer one (refused here, say) stood between. And while watched, its previous
+        # and itself are kept whatever their number
+        from unittest import mock
+        from bv import install, update
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            for v in ("0.4.0", "0.4.1", "0.4.2", "0.4.3"):    # 0.4.1 current, 0.4.2 refused, 0.4.3 its fix, ready
+                make_version(root, v)
+            (root / "app" / "0.3.9.pruned").mkdir()
+            install.point_current(root, root / "app" / "0.4.1")
+            real, applied = install.current_version, []
+
+            def switched_now(r):                              # the window's thread applies 0.4.3 right here
+                if not applied:
+                    applied.append(1)
+                    update.apply(root, "0.4.3")
+                return real(r)
+            with mock.patch("bv.install.current_version", side_effect=switched_now):
+                update.prune_unwatched(root).join(10)
+            self.assertEqual(install.current_version(root), "0.4.3")
+            self.assertEqual(sorted(p.name for p in (root / "app").iterdir()), ["0.4.1", "0.4.2", "0.4.3", "current"])
+            self.assertEqual(update.record_start(root, 5, failed=True), None)
+            self.assertEqual(update.record_start(root, 5, failed=True), "0.4.1")       # and back it goes
+            install.point_current(root, root / "app" / "0.4.3")
+            make_version(root, "0.4.0")
+            update.write_json(update.state_path(root), {"version": "0.4.0", "previous": "0.4.1", "fails": 0})
+            update.prune_later(root).join(10)                                          # an odd watch: kept all the same
+            self.assertEqual(sorted(p.name for p in (root / "app").iterdir()), ["0.4.0", "0.4.1", "0.4.2", "0.4.3", "current"])
+
     def test_version_runs(self):
         # the new version's own Python must import the launcher and the companion (a broken launcher could never
         # update itself again); here the test's Python and this repository stand in for the version's
