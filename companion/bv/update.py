@@ -220,6 +220,13 @@ def state_path(root: Path) -> Path:
     return root / "data" / "tmp" / "update.json"
 
 
+def write_json(path: Path, data: dict) -> None:
+    """Through a temporary file: a launcher killed meanwhile leaves the old file or the new one, never half."""
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(data), encoding="utf-8")
+    os.replace(tmp, path)
+
+
 def refused_path(root: Path) -> Path:
     return root / "data" / "update-refused.json"
 
@@ -247,13 +254,20 @@ def refuse(root: Path, version: str | None) -> None:
 
 
 def apply(root: Path, version: str) -> None:
-    """app\\current -> `version`, remembering the one before, to go back to if this one fails to start."""
+    """app\\current -> `version`, remembering the one before, to go back to if this one fails to start. The
+    watch (update.json) is written before the switch: a switch without it could never go back (and an error
+    after the switch made a retry record the version as its own previous one); a failed switch removes it."""
     previous = install.current_version(root)
-    install.point_current(root, root / "app" / version)
-    note_version(root, version)
     path = state_path(root)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"version": version, "previous": previous, "fails": 0}), encoding="utf-8")
+    if previous != version:                         # already current (a retry after the switch): watched as it is
+        path.parent.mkdir(parents=True, exist_ok=True)
+        write_json(path, {"version": version, "previous": previous, "fails": 0})
+        try:
+            install.point_current(root, root / "app" / version)
+        except BaseException:
+            path.unlink(missing_ok=True)
+            raise
+    note_version(root, version)
 
 
 def record_start(root: Path, ran_for: float, failed: bool | None) -> str | None:
@@ -266,6 +280,10 @@ def record_start(root: Path, ran_for: float, failed: bool | None) -> str | None:
     try:
         state = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
+        return None
+    current = install.current_version(root)
+    if current is not None and current != state.get("version"):
+        path.unlink(missing_ok=True)                # the switch it was written for did not happen
         return None
     if failed is None and ran_for <= EARLY:
         return None

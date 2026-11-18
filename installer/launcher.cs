@@ -13,10 +13,14 @@ static class BarrensVoice
     static int Main(string[] args)
     {
         string root = AppDomain.CurrentDomain.BaseDirectory;
-        string current = Path.Combine(root, "app", "current");
+        // app\current - or, when a switch was cut short between its two renames (bv/install.py point_current:
+        // current -> current.old, current.new -> current), the new version's link, then the old one's
+        string current = new[] { "current", "current.new", "current.old" }
+            .Select(name => Path.Combine(root, "app", name))
+            .FirstOrDefault(Starts) ?? Path.Combine(root, "app", "current");
         string pythonw = Path.Combine(current, ".venv", "Scripts", "pythonw.exe");
         string script = Path.Combine(current, "companion", "BarrensVoice.pyw");
-        if (!File.Exists(pythonw) || !File.Exists(script))
+        if (!Starts(current))
         {
             MessageBox.Show("Barrens Voice установлен не до конца: нет " + (File.Exists(pythonw) ? script : pythonw) +
                             ".\n\nУстановите его заново.", "Barrens Voice", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -30,5 +34,12 @@ static class BarrensVoice
         };
         Process.Start(start);
         return 0;
+    }
+
+    // a version's folder the launcher can start from: its Python and the launcher's script are there
+    static bool Starts(string version)
+    {
+        return File.Exists(Path.Combine(version, ".venv", "Scripts", "pythonw.exe")) &&
+               File.Exists(Path.Combine(version, "companion", "BarrensVoice.pyw"));
     }
 }

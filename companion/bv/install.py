@@ -108,7 +108,12 @@ def point_current(root: Path, version_dir: Path) -> None:
             os.rename(old, current)                     # back as it was
         remove_link(fresh)
         raise
-    remove_link(old)
+    # switched: what follows cannot undo it. The old link goes now or as a leftover at the next switch; a crash
+    # between the two renames leaves current.new and current.old, which the starter (installer/launcher.cs) uses
+    try:
+        remove_link(old)
+    except OSError:
+        pass
     place_starter(root, version_dir)
 
 

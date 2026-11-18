@@ -663,6 +663,79 @@ class Update(unittest.TestCase):
             self.assertIsNone(update.record_start(root, 300, failed=True))               # ran a while: not a start failure
             self.assertFalse(update.state_path(root).exists())
 
+    def test_switch_watched_from_before_it(self):
+        # update.json is written before app\\current moves: a switch is never left unwatched, a failed one leaves
+        # no watch, an error after it (the old link in use) does not undo it, a retry keeps the version before
+        from unittest import mock
+        from bv import install, update
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            for v in ("0.4.0", "0.4.1"):
+                (root / "app" / v).mkdir(parents=True)
+            install.point_current(root, root / "app" / "0.4.0")
+            with mock.patch("bv.update.write_json", side_effect=PermissionError("denied")), self.assertRaises(OSError):
+                update.apply(root, "0.4.1")
+            self.assertEqual(install.current_version(root), "0.4.0")                     # no watch: no switch
+            seen = []
+
+            def switch(root_, version_dir):
+                seen.append(json.loads(update.state_path(root).read_text(encoding="utf-8")))
+                raise OSError("mklink failed")
+            with mock.patch("bv.install.point_current", side_effect=switch), self.assertRaises(OSError):
+                update.apply(root, "0.4.1")
+            self.assertEqual(seen, [{"version": "0.4.1", "previous": "0.4.0", "fails": 0}])   # there during it
+            self.assertFalse(update.state_path(root).exists())                              # gone with the failure
+            self.assertEqual(install.current_version(root), "0.4.0")
+            real, calls = install.remove_link, []
+
+            def old_in_use(path):                       # the second removal of current.old: the one after the switch
+                calls.append(Path(path).name)
+                if calls.count("current.old") == 2:
+                    raise PermissionError("in use")
+                real(path)
+            with mock.patch("bv.install.remove_link", side_effect=old_in_use):
+                update.apply(root, "0.4.1")                                               # no error: switched
+            self.assertEqual(install.current_version(root), "0.4.1")
+            self.assertTrue(os.path.lexists(root / "app" / "current.old"))                 # left for next time
+            update.apply(root, "0.4.1")                                                   # a retry: watch kept
+            self.assertEqual(json.loads(update.state_path(root).read_text(encoding="utf-8"))["previous"], "0.4.0")
+            install.point_current(root, root / "app" / "0.4.1")                           # the leftover goes next time
+            self.assertEqual(sorted(p.name for p in (root / "app").iterdir()), ["0.4.0", "0.4.1", "current"])
+
+    def test_cut_between_the_renames(self):
+        # killed between current -> current.old and current.new -> current: the starter runs current.new (the new
+        # version, watched); its failed starts still go back, and the leftovers are cleaned
+        from bv import install, update
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            for v in ("0.4.0", "0.4.1"):
+                (root / "app" / v).mkdir(parents=True)
+            install.point_current(root, root / "app" / "0.4.0")
+            update.state_path(root).parent.mkdir(parents=True)
+            update.write_json(update.state_path(root), {"version": "0.4.1", "previous": "0.4.0", "fails": 0})
+            os.rename(root / "app" / "current", root / "app" / "current.old")
+            install.make_link(root / "app" / "current.new", root / "app" / "0.4.1")
+            self.assertIsNone(update.record_start(root, 5, failed=True))
+            self.assertEqual(update.record_start(root, 5, failed=True), "0.4.0")
+            self.assertEqual(install.current_version(root), "0.4.0")
+            self.assertEqual(sorted(p.name for p in (root / "app").iterdir()), ["0.4.0", "0.4.1", "current"])
+
+    def test_watch_of_a_switch_that_did_not_happen(self):
+        # update.json names another version than current (the launcher killed after writing it, before the
+        # switch): the current version's failures are not the other's - forgotten, nothing refused
+        from bv import install, update
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            for v in ("0.4.0", "0.4.1"):
+                (root / "app" / v).mkdir(parents=True)
+            install.point_current(root, root / "app" / "0.4.0")
+            update.state_path(root).parent.mkdir(parents=True)
+            update.write_json(update.state_path(root), {"version": "0.4.1", "previous": "0.4.0", "fails": 1})
+            self.assertIsNone(update.record_start(root, 5, failed=True))
+            self.assertFalse(update.state_path(root).exists())
+            self.assertIsNone(update.refused(root))
+            self.assertEqual(install.current_version(root), "0.4.0")
+
     def test_config_error_does_not_go_back(self):
         # exit 3 (start again online), 4 (another companion), 5 (config.json cannot be read), an error the run
         # explained: no verdict - no rollback, but nothing settled either (update.json kept, nothing pruned), so
