@@ -232,24 +232,40 @@ def refused_path(root: Path) -> Path:
     return root / "data" / "update-refused.json"
 
 
+def _refused_record(root: Path) -> dict:
+    """update-refused.json: {"version": the version refused now, "before": the ones refused earlier}."""
+    try:
+        record = json.loads(refused_path(root).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return record if isinstance(record, dict) else {}
+
+
 def refused(root: Path) -> str | None:
     """The version that failed here (went back from, or would not start): not prepared by itself again."""
-    try:
-        version = json.loads(refused_path(root).read_text(encoding="utf-8")).get("version")
-    except (OSError, ValueError, AttributeError):
-        return None
+    version = _refused_record(root).get("version")
     return version if isinstance(version, str) and version else None
 
 
+def refused_versions(root: Path) -> set[str]:
+    """Every version that failed here, the one refused now and those forgotten since (a newer one came out):
+    none is a version to go back to, which a prune keeps (install.prune)."""
+    record = _refused_record(root)
+    before = record.get("before") if isinstance(record.get("before"), list) else []
+    return {v for v in (record.get("version"), *before) if isinstance(v, str) and v}
+
+
 def refuse(root: Path, version: str | None) -> None:
-    """Remember the version that failed here (None: forget it)."""
+    """Remember the version that failed here (None: forget it - it may be prepared again; it stays listed
+    under "before", for the prune). Older launchers read only "version"."""
     path = refused_path(root)
+    record = _refused_record(root)
+    before = [v for v in sorted(refused_versions(root), key=install.version_key) if v != version][-20:]
+    if version is None and not record:
+        return
     try:
-        if version is None:
-            path.unlink(missing_ok=True)
-            return
         path.parent.mkdir(parents=True, exist_ok=True)
-        write_json(path, {"version": version})
+        write_json(path, {"version": version, "before": before} if version else {"before": before})
     except OSError:
         pass
 
@@ -295,7 +311,7 @@ def prune_later(root: Path, also=()):
     def work():
         with PRUNE_LOCK:
             try:
-                install.prune(root, also=also, watched=lambda: watched_versions(root))
+                install.prune(root, also=also, watched=lambda: watched_versions(root), refused=refused_versions(root))
             except OSError:
                 pass
     pruning = threading.Thread(target=work, daemon=True, name="prune")

@@ -238,8 +238,9 @@ def release_tag(version: str) -> str:
 VERSION_NAME = re.compile(r"\d+(?:\.\d+)*(?:b\d+)?")
 
 
-def prune(root: Path, keep: int = KEEP, also=(), watched=None) -> list[str]:
-    """Versions older than the current one removed but the newest keep-1 of them (to go back to) and those named
+def prune(root: Path, keep: int = KEEP, also=(), watched=None, refused=()) -> list[str]:
+    """Versions older than the current one removed but the newest keep-1 of them (to go back to; not one `refused`
+    here - a version that failed is none to go back to, the one that worked before it is) and those named
     in `also` or by `watched()` - update.json's version and previous, asked only after the current version is
     read: a switch writes its watch before it moves app\\current (bv/update.py apply), so a switch this prune
     sees done is always seen with its watch (read before, an update applied meanwhile lost its previous). A version newer than the current one is never removed: it may be prepared
@@ -264,7 +265,7 @@ def prune(root: Path, keep: int = KEEP, also=(), watched=None) -> list[str]:
     older = sorted((p for p in app.iterdir() if VERSION_NAME.fullmatch(p.name) and p.is_dir()
                     and not p.is_symlink() and not p.is_junction() and version_key(p.name) < version_key(current)),
                    key=lambda p: version_key(p.name), reverse=True)
-    keep_names.update(v.name for v in older[: max(0, keep - 1)])
+    keep_names.update(v.name for v in [v for v in older if v.name not in refused][: max(0, keep - 1)])
     removed = []
     for v in older:
         if v.name in keep_names:

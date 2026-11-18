@@ -1006,6 +1006,34 @@ class Update(unittest.TestCase):
             update.prune_later(root).join(10)                                          # an odd watch: kept all the same
             self.assertEqual(sorted(p.name for p in (root / "app").iterdir()), ["0.4.0", "0.4.1", "0.4.2", "0.4.3", "current"])
 
+    def test_a_refused_version_is_none_to_go_back_to(self):
+        # back from R to P, then N: R (forgotten for updating once N came out) stayed as the newest older version
+        # and the prune took P, the one that worked
+        from bv import install, update
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            for v in ("0.4.0", "0.4.1", "0.4.2", "0.4.3"):
+                make_version(root, v)
+            install.point_current(root, root / "app" / "0.4.1")
+            update.apply(root, "0.4.2")
+            update.record_start(root, 5, failed=True)
+            self.assertEqual(update.record_start(root, 5, failed=True), "0.4.1")
+            update.refuse(root, None)                                  # 0.4.3 came out (Updater.check)
+            self.assertIsNone(update.refused(root))
+            self.assertEqual(update.refused_versions(root), {"0.4.2"})
+            update.apply(root, "0.4.3")
+            update.record_start(root, 3600, failed=False)
+            update.pruning.join(10)
+            update.prune_unwatched(root).join(10)                       # the next start's
+            self.assertEqual(sorted(p.name for p in (root / "app").iterdir()), ["0.4.1", "0.4.3", "current"])
+            update.refuse(root, "0.4.4")
+            update.refuse(root, "0.4.5")
+            self.assertEqual((update.refused(root), update.refused_versions(root)), ("0.4.5", {"0.4.2", "0.4.4", "0.4.5"}))
+            self.assertEqual(json.loads(update.refused_path(root).read_text(encoding="utf-8"))["version"], "0.4.5")
+            update.refused_path(root).unlink()
+            update.refuse(root, None)                                  # nothing to forget: nothing written
+            self.assertFalse(update.refused_path(root).exists())
+
     def test_version_runs(self):
         # the new version's own Python must import the launcher and the companion (a broken launcher could never
         # update itself again); here the test's Python and this repository stand in for the version's
