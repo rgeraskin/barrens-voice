@@ -68,6 +68,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   A choice under the channels: «Все включённые каналы, даже не показанные в чате» (every channel on, also one taken out of every chat tab or hidden by a spam filter), «Что показывают окна чата» (as before, the default: any chat window or tab, the tabs not selected too) or the new «Только выбранная вкладка» — of the chat window's tabs only the one on screen, separate chat windows still. In a dungeon: move the group's chat to a tab of its own, select it, and only the group is read.
 
+- Battle.net whispers are read
+
+  A Battle.net friend's whisper is read under «Шёпот», as a whisper: «Громмаш шепчет: …». A friend in WoW is named by their character, without the realm, and speaks in their race's voice; a friend in the Battle.net app (or not on a character) by their BattleTag without «#1234», in the race voices' default, a human man's. The account's real name is never said or written to the log. One's own Battle.net whispers are not read, like one's own whispers to characters. «при шёпоте» under «Прятать окно чата» shows the window for them too, and «Что читать» counts the chat windows that show Battle.net whispers. On retail they are closed to addons in dungeons, raids, boss fights, Mythic+ and PvP, like the rest of the chat.
+
 ### Changed
 
 - A raid warning is «объявляет»
@@ -108,7 +112,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - The channels' tooltips say what is not read
 
-  «Шёпот» says that Battle.net whispers are not read, only characters' whispers. On retail, «Группа», «Рейд», «Объявления рейда» and «Подземелье и БГ» say where the game closes them to addons (dungeons, raids, boss fights, Mythic+, PvP): the dungeon and battleground chat is hardly ever read there.
+  On retail, «Группа», «Рейд», «Объявления рейда» and «Подземелье и БГ» say where the game closes them to addons (dungeons, raids, boss fights, Mythic+, PvP): the dungeon and battleground chat is hardly ever read there.
 
 ### Removed
 
