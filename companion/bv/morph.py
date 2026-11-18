@@ -32,8 +32,10 @@ DECLINABLE = {"ADJF", "PRTF", "NOUN"}
 # names pymorphy knows: a word it knows only as one, written in small letters, is slang it took for a name
 # («кача», as the town Кача: «для кача» became «для качи») - left as typed
 PROPER = ("Geox", "Name", "Surn", "Patr", "Orgn", "Trad")
-CONJUNCTIONS = {"и", "или", "либо", "да"}
-RANGE = re.compile(r"(?<![\w'+-])(?:с|со)\s+\S+\s+по\W*$", re.IGNORECASE)   # "с 1 по ..." - a range   # "с танком и чернокнижником": the case carries over
+CONJUNCTIONS = {"и", "или", "либо", "да"}   # "с танком и чернокнижником": the case carries over
+# "с 1 по ..." - a range: a number or an ordinal between "с" and "по" ("с первого по"; "с тобой по кд"
+# is no range: "по кулдауну")
+RANGE = re.compile(r"(?<![\w'+-])(?:с|со)\s+(\d+(?:-?[а-яё]{1,3})?|[а-яё]+)\s+по\W*$", re.IGNORECASE)
 
 
 def strip_marks(text: str) -> str:
@@ -70,7 +72,7 @@ class Inflector:
                 out.append(before)
                 prev = PREVIOUS.search(strip_marks("".join(out)))
                 word = prev.group(1).lower() if prev else ""
-                if word == "по" and RANGE.search(strip_marks("".join(out))):
+                if word == "по" and self._range(strip_marks("".join(out))):
                     case = "accs"           # "с 1 по <5> уровень": up to, not the dative of "по 5 золотых"
                 elif word in CASES:
                     case = CASES[word]
@@ -83,6 +85,11 @@ class Inflector:
                 last = m.end()
             out.append(text[last:])
             return strip_marks("".join(out))
+
+    def _range(self, text: str) -> bool:
+        """Whether `text` ends in "с N по" (N a number or an ordinal word)."""
+        m = RANGE.search(text)
+        return bool(m) and (m.group(1)[0].isdigit() or any("Anum" in p.tag for p in self.morph.parse(m.group(1).lower())))
 
     def decline(self, phrase: str, case: str) -> str:
         """The start of `phrase` (adjectives up to and including the first noun) put in `case`."""

@@ -437,6 +437,15 @@ class Pipeline(unittest.TestCase):
             "дам по 5 золотых": "дам по пять золотых", "по 1 золотому": "по одному золотому",
         })
 
+    def test_a_range_needs_a_number(self):
+        # "с" and "по" around a word are no range: the dictionary's word after "по" is in the dative
+        self.check({
+            "с тобой по кд": "с тобой по кулд+ауну", "бегаю с другом по ОП": "бегаю с другом по Огненной пр+опасти",
+            "идем с пати по БГ": "идём с п+ати по полю боя",
+            # an ordinal typed as a word makes a range too
+            "с первого по 5 лвл": "с первого по пятый уровень",
+        })
+
     def test_a_time_after_a_preposition_is_not_a_count(self):
         self.assertTrue(self.say("до 20:00").startswith("до двадцать"))     # an hour, not "до двадцати"
 
