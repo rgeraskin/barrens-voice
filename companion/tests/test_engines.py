@@ -49,6 +49,30 @@ class FakeSapi:
 
 from bv.engines import Engines  # noqa: E402
 
+
+def _ort_stand_in():
+    """onnxruntime where it is installed; else (Windows without a video card's extra, as in CI: the module comes
+    only with onnxruntime-gpu or -directml) a stand-in with what the tests below touch, left in sys.modules for
+    the run - a per-test patch of sys.modules would drop numpy and the rest a test loaded, and the next import
+    of them fails."""
+    try:
+        import onnxruntime  # noqa: F401
+    except ImportError:
+        ort = types.ModuleType("onnxruntime")
+        ort.get_available_providers = lambda: ["CPUExecutionProvider"]
+
+        class SessionOptions:
+            enable_mem_pattern = True
+            graph_optimization_level = None
+            execution_mode = None
+        ort.SessionOptions = SessionOptions
+        ort.GraphOptimizationLevel = types.SimpleNamespace(ORT_ENABLE_ALL=99)
+        ort.ExecutionMode = types.SimpleNamespace(ORT_SEQUENTIAL=0)
+        sys.modules["onnxruntime"] = ort
+
+
+_ort_stand_in()
+
 FAKE_F5 = types.SimpleNamespace(F5Speaker=FakeF5)
 
 
