@@ -195,14 +195,15 @@ EMPTY_LUA = ("-- Written by the Barrens Voice program: the default dictionary fr
 
 def clear_addon(addon: Path | None, log) -> bool:
     """DictionaryOnline.lua back as shipped (the dictionary online is off: a download kept from before would
-    still be the addon's default, over the Dictionary.lua being edited); whether it was written."""
+    still be the addon's default, over the Dictionary.lua being edited); whether it was written. Through a
+    temporary file, as every file the game reads: never half a file at the next /reload."""
     if addon is None or not addon.is_dir():
         return False
     path = addon / "DictionaryOnline.lua"
+    from .paths import write_if_changed
     try:
-        if not path.exists() or path.read_text(encoding="utf-8", errors="replace") == EMPTY_LUA:
+        if not path.exists() or not write_if_changed(path, EMPTY_LUA):
             return False
-        path.write_text(EMPTY_LUA, encoding="utf-8")
     except OSError as e:
         log(f"словарь онлайн: не убран из аддона ({e})")
         return False

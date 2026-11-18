@@ -229,6 +229,17 @@ class Newer(unittest.TestCase):
             self.assertTrue(od.clear_addon(Path(t), print))
             self.assertEqual((Path(t) / "DictionaryOnline.lua").read_text(encoding="utf-8"), shipped)
             self.assertFalse(od.clear_addon(Path(t), print))                          # as shipped: not written
+            # written in place, a game reading it at that moment could get half a file; a failed swap keeps
+            # the old one whole
+            from unittest import mock
+            od.write_addon(Path(t), entry(), print)
+            before = (Path(t) / "DictionaryOnline.lua").read_text(encoding="utf-8")
+            logged = []
+            with mock.patch("bv.paths.os.replace", side_effect=PermissionError("in use")):
+                self.assertFalse(od.clear_addon(Path(t), logged.append))
+            self.assertEqual((Path(t) / "DictionaryOnline.lua").read_text(encoding="utf-8"), before)
+            self.assertEqual(logged, ["словарь онлайн: не убран из аддона (in use)"])
+            self.assertEqual([p.name for p in Path(t).iterdir()], ["DictionaryOnline.lua"])
 
     def test_written_into_the_addon(self):
         with tempfile.TemporaryDirectory() as t:
