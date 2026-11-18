@@ -431,10 +431,31 @@ class Pipeline(unittest.TestCase):
             "с 1 по 5 уровень": "с первого по пятый уровень", "с 10 по 20 уровень": "с десятого по двадцатый уровень",
             "с 5 по 10 лвл": "с пятого по десятый уровень", "с 1 по 3 босса": "с первого по третьего босса",
             "с 2 по 4 фазу": "со второй по четвёртую фазу", "с 1 по 3 место": "с первого по третье место",
-            # no noun after it, or a date (not read as one): a count, the first in the genitive
-            "с 1 по 5": "с одного по пять", "с 1 по 5 января": "с одного по пять января",
+            # no noun after it: a count, the first in the genitive
+            "с 1 по 5": "с одного по пять",
             # "по" alone gives each its share, in the dative
             "дам по 5 золотых": "дам по пять золотых", "по 1 золотому": "по одному золотому",
+            # a function word, a sign («+» comes from the addon as the word) or a name after M is no noun
+            # of the range: a count, as before
+            "рейд с 20 по 23 по мск": "рейд с двадцати по двадцать три по эм-эс-к+а",
+            "с 1 по 5 и дальше": "с одного по пять и дальше", "с 1 по 5 плюс": "с одного по пять плюс",
+            # the noun as typed: "босс" is no accusative of the animate, so the ordinal is not one either
+            "с 2 по 4 босс": "со второго по четвёртый босс",
+            # M made a two-word ordinal by the dictionary: the noun's ordinal is its last word
+            "с 20 по 25 лвл": "с двадцатого по двадцать пятый уровень",
+            "с 1 по 25 уровень": "с первого по двадцать пятый уровень",
+            "паровоз с 22 по 28 лвл": "паровоз с двадцать второго по двадцать восьмой уровень",
+            "с 1 по 5 раз": "с первого по пятый раз",    # pymorphy's best reading of "раз" is plural
+        })
+
+    def test_dates(self):
+        # the day of a month is a neuter ordinal: in the genitive, or in the case its preposition asks;
+        # a range's end in the accusative of "по"
+        self.check({
+            "с 10 по 15 мая": "с десятого по пятнадцатое мая", "с 1 по 5 января": "с первого по пятое января",
+            "с 2 по 4 мая": "со второго по четвёртое мая", "до 5 мая": "до пятого мая", "рейд 5 мая": "рейд пятого мая",
+            "к 1 июня": "к первому июня", "на 8 марта": "на восьмое марта", "по 5 мая": "по пятое мая",
+            "до 32 мая": "до тридцати двух мая",       # no day: a count
         })
 
     def test_a_range_needs_a_number(self):

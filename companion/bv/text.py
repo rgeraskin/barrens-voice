@@ -329,30 +329,65 @@ def long_preposition(before: str, spoken: str) -> str:
 
 # a range "с N по M": both are ordinals of the noun after M ("с 1 по 5 уровень" - "с первого по пятый",
 # "с 1 по 3 босса" - "с первого по третьего босса"); the dictionary may have made M's ordinal already
-RANGE_START = re.compile(r"\s+по\s+(?:\d+\s+)?([а-яёА-ЯЁ+]+(?:-[а-яёА-ЯЁ+]+)*)")
-RANGE_END = re.compile(r"(?<![\w'+-])(?:с|со)\s+\d+\s+по\s+$", re.IGNORECASE)
+# ("по двадцать пятый уровень": the noun's ordinal is its last word)
+RANGE_START = re.compile(r"\s+по\s+(?:\d+(?:-?[а-яё]{1,3})?\s+)?((?:[а-яёА-ЯЁ+]+(?:-[а-яёА-ЯЁ+]+)*\s+){0,3}[а-яёА-ЯЁ+]+(?:-[а-яёА-ЯЁ+]+)*)")
+RANGE_END = re.compile(r"(?<![\w'+-])(?:с|со)\s+\d+(?:-?[а-яё]{1,3})?\s+по\s+$", re.IGNORECASE)
+# a date: the day is a neuter ordinal ("пятое мая"), in the genitive without a preposition ("рейд пятого
+# мая") or after one that asks it ("до пятого мая"), else in the preposition's case ("к пятому мая", "по пятое")
+MONTHS = {"января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября",
+          "ноября", "декабря"}
+DATE_CASES = {**dict.fromkeys(("к", "ко"), "datv"), **dict.fromkeys(("по", "на", "в", "во", "за", "про", "через"), "accs"),
+              **dict.fromkeys(("о", "об", "при"), "loct"), **dict.fromkeys(("перед", "под", "над", "между"), "ablt")}
+# what is never the noun a range numbers: a function word, a name
+NOT_NUMBERED = ("PREP", "CONJ", "PRCL", "INTJ", "Name", "Surn", "Patr", "Geox", "Orgn", "Abbr")
 
 
-def range_tag(word: str, morph):
-    """The singular noun closing a range, in the case "по" gives it there - the accusative (or the
-    nominative it shares), never the dative of "по 5 золотых" - or the gender of an ordinal standing
-    for it ("по пятый уровень"); None when there is no such word ("с 1 по 5 января" is a date)."""
+def closing_word(words: str, morph) -> str:
+    """The word that stands for the noun closing a range, from the words after "по M": the first one
+    that is not a cardinal ("двадцать пятый уровень" - "пятый")."""
+    split = words.split()
+    for word in split:
+        if not any(p.tag.POS == "NUMR" for p in morph.parse(word.replace("+", "").lower())):
+            return word
+    return split[-1]
+
+
+def range_tag(word: str, morph) -> tuple[str, str | None] | None:
+    """The gender and animacy for the ordinals of a range closed by `word`: a singular noun in the
+    case "по" gives it there - the accusative (or the nominative it shares), never the dative of "по 5
+    золотых" - or an ordinal standing for it ("по пятый уровень"), or a month ("с 1 по 5 января" - the
+    days, neuter). The animacy only when the noun is typed in the accusative: "по 3 босса" - "третьего",
+    "по 4 босс" - "четвёртый", as typed. None for anything else - pymorphy's best reading a function word
+    or a name ("с 1 по 5 и дальше", "по Москве"), no such form: a count."""
     word = word.replace("+", "").lower()
-    if not morph.word_is_known(word):
+    if word in MONTHS:
+        return "neut", None
+    if word in SIGNS or not morph.word_is_known(word):
         return None
     parses = morph.parse(word)
-    anum = [p for p in parses if p.tag.POS == "ADJF" and "Anum" in p.tag and p.tag.number == "sing"]
-    nouns = [p for p in parses if p.tag.POS == "NOUN" and p.tag.number == "sing" and p.tag.case in ("accs", "nomn")]
-    found = sorted(nouns or anum, key=lambda p: p.tag.case != "accs")
-    return found[0].tag if found else None
+    top = parses[0]
+    if any(g in top.tag for g in NOT_NUMBERED):
+        return None
+    if top.tag.POS == "ADJF" and "Anum" in top.tag:
+        forms = [p for p in parses if p.tag.POS == "ADJF" and "Anum" in p.tag and p.tag.number == "sing"
+                 and p.tag.case in ("accs", "nomn")]
+        return (forms[0].tag.gender or "masc", None) if forms else None
+    if top.tag.POS != "NOUN":
+        return None
+    forms = sorted((p for p in parses if p.tag.POS == "NOUN" and p.normal_form == top.normal_form
+                    and p.tag.number == "sing" and p.tag.case in ("accs", "nomn")), key=lambda p: p.tag.case != "accs")
+    if not forms:
+        return None
+    tag = forms[0].tag
+    return tag.gender or "masc", tag.animacy if tag.case == "accs" else None
 
 
-def ordinal_as(n: int, tag, case: str, morph) -> str | None:
-    """`n` as an ordinal in `case`, of the gender (and animacy, in the accusative) of `tag`."""
+def ordinal_as(n: int, gender: str, animacy: str | None, case: str, morph) -> str | None:
+    """`n` as an ordinal in `case` and `gender` (and `animacy`, in the accusative of the masculine)."""
     from num2words import num2words
-    grammemes = {case, tag.gender or "masc", "sing"}
-    if case == "accs" and tag.animacy and (tag.gender or "masc") == "masc":
-        grammemes.add(tag.animacy)                     # "по третьего босса", "по пятый уровень"
+    grammemes = {case, gender, "sing"}
+    if case == "accs" and animacy and gender == "masc":
+        grammemes.add(animacy)                         # "по третьего босса", "по пятый уровень"
     parts = num2words(n, lang="ru", to="ordinal").split()
     form = morph.parse(parts[-1])[0].inflect(grammemes)
     if not form:
@@ -396,15 +431,19 @@ def numbers_to_words(text: str) -> str:
             following = None                           # "20:00 сбор", "1.12 патч": no "нулевой сбор"
         if morph is not None and following and before.lower() in ("с", "со") and following.group(1).lower() == "по":
             closing = RANGE_START.match(m.string, m.end())
-            tag = range_tag(closing.group(1), morph) if closing else None
-            as_ordinal = ordinal_as(n, tag, "gent", morph) if tag else None
+            tag = range_tag(closing_word(closing.group(1), morph), morph) if closing else None
+            as_ordinal = ordinal_as(n, *tag, "gent", morph) if tag else None
             if as_ordinal:
                 return as_ordinal, m.end()             # "с первого по пятый уровень"
         if morph is not None and following and before.lower() == "по" and RANGE_END.search(m.string, 0, m.start()):
             tag = range_tag(following.group(1), morph)
-            as_ordinal = ordinal_as(n, tag, "accs", morph) if tag and tag.POS == "NOUN" else None
+            as_ordinal = ordinal_as(n, *tag, "accs", morph) if tag else None
             if as_ordinal:
-                return as_ordinal, m.end()             # "по третьего босса"
+                return as_ordinal, m.end()             # "по третьего босса", "по пятое января"
+        if morph is not None and following and following.group(1).lower() in MONTHS and 1 <= n <= 31:
+            date = ordinal_as(n, "neut", None, DATE_CASES.get(before.lower(), "gent"), morph)
+            if date:
+                return date, m.end()                   # "до пятого мая"
         if morph is not None and following and following.group(1).lower() in SIGNS:
             # "от 50+" - "от пятидесяти плюс"; "на 3+ человек" stays "на три плюс" (the accusative)
             case = "gent" if "gent" in GOVERNS.get(before.lower(), set()) else None
