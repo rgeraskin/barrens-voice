@@ -255,11 +255,12 @@ class Newer(unittest.TestCase):
         shipped = (ROOT / "addon" / "BarrensVoice" / "DictionaryOnline.lua").read_text(encoding="utf-8")
         self.assertEqual(od.EMPTY_LUA, shipped)
         with tempfile.TemporaryDirectory() as t:
-            self.assertFalse(od.clear_addon(Path(t), print))                          # none there: nothing to do
-            od.write_addon(Path(t), entry(), print)
-            self.assertTrue(od.clear_addon(Path(t), print))
+            said = []                       # (not print: a Windows console out of UTF-8 cannot print Cyrillic)
+            self.assertFalse(od.clear_addon(Path(t), said.append))                    # none there: nothing to do
+            od.write_addon(Path(t), entry(), said.append)
+            self.assertTrue(od.clear_addon(Path(t), said.append))
             self.assertEqual((Path(t) / "DictionaryOnline.lua").read_text(encoding="utf-8"), shipped)
-            self.assertFalse(od.clear_addon(Path(t), print))                          # as shipped: not written
+            self.assertFalse(od.clear_addon(Path(t), said.append))                    # as shipped: not written
             # written in place, a game reading it at that moment could get half a file; a failed swap keeps
             # the old one whole
             from unittest import mock
