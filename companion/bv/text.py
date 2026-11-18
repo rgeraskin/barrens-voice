@@ -137,9 +137,10 @@ NUMBERED = {"уровень", "этаж", "число", "ранг", "фаза", 
 SINGULAR_STRESS = {"числа": "ч+исла", "места": "м+еста"}
 # a number that goes on from the one before it - a time, a decimal, a version: neither an ordinal nor agreeing
 GLUED = re.compile(r"\d[:.,]$")
-# "2 на 2" (an arena: the dictionary's "2х2"), "10 на 10": a size, both numbers cardinals - not "на втором"
-SIZE_AFTER = re.compile(r"\s+на\s+\d")
-SIZE_BEFORE = re.compile(r"(?<![\d:.,])\d+\s+на\s+$")
+# "2 на 2" (an arena: the dictionary's "2х2"), "10 на 10": a size, both numbers cardinals - not "на втором";
+# only two equal numbers: "нас 3 на 2 боссе" is "на втором боссе", "с 2 на 3 место" - "со второго на третье"
+SIZE_AFTER = re.compile(r"\s+на\s+(\d+)")
+SIZE_BEFORE = re.compile(r"(?<![\d:.,])(\d+)\s+на\s+$")
 # ... and a number with one after it: "до 20:00" is a time, not a count; so is "до 20-00", "20-05" (a dash and a
 # zero: no range)
 GOES_ON = re.compile(r"[:.,]\d|-0\d")
@@ -239,8 +240,8 @@ def agree(n: int, spoken: str, following: str, morph, before: str = "") -> str:
     asked = asked_by(before, n, word, morph)
     parts = spoken.split()
     one = n % 10 == 1 and not 10 < n % 100 < 20
-    if "gent" in asked and word in ("до", "по"):
-        return " ".join(to_case(parts, "gent", morph))  # a range: "с 5 до 10" - "с пяти до десяти"
+    if "gent" in asked and word in ("до", "по", "на"):
+        return " ".join(to_case(parts, "gent", morph))  # a range: "с 5 до 10" - "с пяти до десяти", "с 59 на 60"
     if asked == {"gent"} and not one:
         # a count after a preposition that asks only the genitive is in the genitive whatever word
         # follows ("ordinal" has had its say): "из-за 2 боссов", "до 200 опыта", slang "для 3 хилов"
@@ -453,9 +454,11 @@ def long_preposition(before: str, spoken: str) -> str:
 
 # a range "с N по M": both are ordinals of the noun after M ("с 1 по 5 уровень" - "с первого по пятый",
 # "с 1 по 3 босса" - "с первого по третьего босса"); the dictionary may have made M's ordinal already
-# ("по двадцать пятый уровень": the noun's ordinal is its last word)
-RANGE_START = re.compile(r"\s+по\s+(?:\d+(?:-?[а-яё]{1,3})?\s+)?((?:[а-яёА-ЯЁ+]+(?:-[а-яёА-ЯЁ+]+)*\s+){0,3}[а-яёА-ЯЁ+]+(?:-[а-яёА-ЯЁ+]+)*)")
-RANGE_END = re.compile(r"(?<![\w'+-])(?:с|со)\s+\d+(?:-?[а-яё]{1,3})?\s+по\s+$", re.IGNORECASE)
+# ("по двадцать пятый уровень": the noun's ordinal is its last word). So is a move "с N на M": "с 2 на 3 место"
+# - "со второго на третье место", "с 10 на 5 место" - when M is typed (a number or an ordinal) and the noun is in
+# a form no count of M takes: "с 2 на 3 босса" (animate: the genitive of a count) stays two and three
+RANGE_START = re.compile(r"\s+(по|на)\s+(\d+(?:-?[а-яё]{1,3})?\s+)?((?:[а-яёА-ЯЁ+]+(?:-[а-яёА-ЯЁ+]+)*\s+){0,3}[а-яёА-ЯЁ+]+(?:-[а-яёА-ЯЁ+]+)*)")
+RANGE_END = re.compile(r"(?<![\w'+-])(?:с|со)\s+\d+(?:-?[а-яё]{1,3})?\s+(по|на)\s+$", re.IGNORECASE)
 # a date: the day is a neuter ordinal ("пятое мая"), in the genitive without a preposition ("рейд пятого
 # мая") or after one that asks it ("до пятого мая"), else in the preposition's case ("к пятому мая", "по пятое")
 MONTHS = {"января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября",
@@ -506,6 +509,20 @@ def range_tag(word: str, morph) -> tuple[str, str | None] | None:
     return tag.gender or "masc", tag.animacy if tag.case == "accs" else None
 
 
+def closing_tag(word: str, to: str, typed: bool, morph) -> tuple[str, str | None] | None:
+    """`range_tag` of the word closing "с N по M" or "с N на M" (`to`: "по", "на"); a move ("на") only to a
+    typed M (`typed`: a number, else `word` must be an ordinal) and a noun not in the accusative of an
+    animate one, which is the genitive a count takes ("на 3 босса")."""
+    tag = range_tag(word, morph)
+    if tag is None or to.lower() != "на":
+        return tag
+    if tag[1] == "anim":
+        return None
+    if not typed and not any(p.tag.POS == "ADJF" and "Anum" in p.tag for p in morph.parse(word.replace("+", "").lower())):
+        return None
+    return tag
+
+
 def ordinal_as(n: int, gender: str, animacy: str | None, case: str, morph) -> str | None:
     """`n` as an ordinal in `case` and `gender` (and `animacy`, in the accusative of the masculine)."""
     from num2words import num2words
@@ -553,7 +570,8 @@ def numbers_to_words(text: str) -> str:
                                          noun.group(1).rsplit("-", 1)[-1] if noun else "")
                 if as_ordinal:
                     return as_ordinal, glued.end()
-        if SIZE_AFTER.match(m.string, m.end()) or SIZE_BEFORE.search(m.string, 0, m.start()):
+        size = SIZE_AFTER.match(m.string, m.end()) or SIZE_BEFORE.search(m.string, 0, m.start())
+        if size and int(size.group(1)) == n:
             return spoken, m.end()                     # "2 на 2 арена" - "два на два"
         own = (NOUN_ENDING.match(m.string, m.end()) or CARDINAL_ENDING.match(m.string, m.end())) if morph else None
         if own and (word := glued_word(n, spoken, own.group(), morph)):
@@ -565,17 +583,19 @@ def numbers_to_words(text: str) -> str:
         following = NEXT_WORD.match(m.string, m.end())
         if GLUED.search(m.string, 0, m.start()):
             following = None                           # "20:00 сбор", "1.12 патч": no "нулевой сбор"
-        if morph is not None and following and before.lower() in ("с", "со") and following.group(1).lower() == "по":
+        if morph is not None and following and before.lower() in ("с", "со") and following.group(1).lower() in ("по", "на"):
             closing = RANGE_START.match(m.string, m.end())
-            tag = range_tag(closing_word(closing.group(1), morph), morph) if closing else None
+            tag = closing_tag(closing_word(closing.group(3), morph), closing.group(1), bool(closing.group(2)),
+                              morph) if closing else None
             as_ordinal = ordinal_as(n, *tag, "gent", morph) if tag else None
             if as_ordinal:
-                return as_ordinal, m.end()             # "с первого по пятый уровень"
-        if morph is not None and following and before.lower() == "по" and RANGE_END.search(m.string, 0, m.start()):
-            tag = range_tag(following.group(1), morph)
+                return as_ordinal, m.end()             # "с первого по пятый уровень", "со второго на третье место"
+        if morph is not None and following and before.lower() in ("по", "на") and \
+                (start := RANGE_END.search(m.string, 0, m.start())):
+            tag = closing_tag(following.group(1), start.group(1), True, morph)
             as_ordinal = ordinal_as(n, *tag, "accs", morph) if tag else None
             if as_ordinal:
-                return as_ordinal, m.end()             # "по третьего босса", "по пятое января"
+                return as_ordinal, m.end()             # "по третьего босса", "по пятое января", "на третье место"
         if morph is not None and following and following.group(1).lower() in MONTHS and 1 <= n <= 31:
             date = ordinal_as(n, "neut", None, DATE_CASES.get(before.lower(), "gent"), morph)
             if date:
