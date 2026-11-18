@@ -303,7 +303,8 @@ do  -- in combat: nothing until PLAYER_REGEN_ENABLED, then a moment later; a new
     assert(waiter, "waits for the combat's end")
     waiter._scripts.OnEvent(waiter, "PLAYER_REGEN_ENABLED")
     assert(not waiter._events.PLAYER_REGEN_ENABLED, "once")
-    assert(#timers == 1 and timers[1].seconds == N.AFTER_COMBAT, "a moment after it")
+    assert(#timers == 1 and timers[1].seconds == N.AFTER_COMBAT and N.AFTER_COMBAT == 5,
+        "5 s after it: time to loot and catch the breath")
     runTimers()                                              -- the next pull came first
     assert(not W.IsShown() and waiter._events.PLAYER_REGEN_ENABLED, "in combat again: waits again")
     combat = false

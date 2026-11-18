@@ -18,7 +18,7 @@ local N = {}
 ns.News = N
 
 N.DELAY = 5            -- seconds after login: after the companion's word (Companion.lua), the chat settled
-N.AFTER_COMBAT = 2     -- seconds after the combat ends: a pull right after another waits again
+N.AFTER_COMBAT = 5     -- seconds after the combat ends: a pull right after another waits again
 
 --- A version's parts: "0.4.0" -> { 0, 4, 0, huge }, "0.4.0b5" -> { 0, 4, 0, 5 } (a test build is older than its
 --- release); nil for anything else (nil: the companion has written nothing yet).
