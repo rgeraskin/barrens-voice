@@ -282,6 +282,15 @@ def agree(n: int, spoken: str, following: str, morph, before: str = "") -> str:
 ACCUSATIVE = {"в", "во", "на", "за", "через", "про"}
 
 
+def counted_form(last: int, word: str, asked: set[str], morph) -> bool:
+    """Whether `word` after the second number `last` of a pair may be the form a count of 2-4 asks, the genitive
+    singular, where the preposition does not ask the genitive itself: then its other cases are only spelt the
+    same ("на 1-2 ночи": "две ночи", not the prepositional "на ночи"), and the pair counts."""
+    few = 2 <= last % 10 <= 4 and not 12 <= last % 100 <= 14
+    return few and "gent" not in asked and morph.word_is_known(word) and \
+        any(p.tag.POS == "NOUN" and p.tag.case == "gent" and p.tag.number == "sing" for p in morph.parse(word))
+
+
 def first_of_pair(n: int, last: int, spoken: str, following: str, morph, before: str = "") -> str:
     """`spoken` (num2words' nominative for `n`), the first of two numbers of one noun, `last` the second:
     in the case the second takes ("до двух-трёх человек", "с двумя-тремя магами"). One ending in 1 does
@@ -294,7 +303,11 @@ def first_of_pair(n: int, last: int, spoken: str, following: str, morph, before:
     word = following.replace("+", "").lower()
     nouns = [p for p in morph.parse(word) if p.tag.POS == "NOUN"] if morph.word_is_known(word) else []
     asked = asked_by(before, last, word, morph)
+    if counted_form(last, word, asked, morph):
+        nouns = [p for p in nouns if p.tag.number == "plur"]   # "на 1-2 ночи": "ночи" as after "две", not "на ночи"
     case = next((c for c in CASES if c in asked and any(p.tag.case == c for p in nouns)), None)
+    if case is None and "gent" in asked and word in ("до", "по"):
+        case = "gent"                                  # a range: "с 1-2 до 5" - "с одного-двух до пяти"
     if case is None and asked in ({"gent"}, {"datv"}):
         case = next(iter(asked))                       # "до 1-2 человек", "по одному-два человека"
     if case is None:
@@ -609,7 +622,9 @@ def numbers_to_words(text: str) -> str:
         if morph is not None and following:
             head = following.group(1).rsplit("-", 1)[-1]
             try:
-                as_ordinal = ordinal(n, before, head, morph)
+                # the second of a pair before the form its count asks counts: "на 1-2 части" - "на одну-две части"
+                counts = pair and counted_form(n, head.replace("+", "").lower(), asked_by(before, n, head, morph), morph)
+                as_ordinal = None if counts else ordinal(n, before, head, morph)
                 if as_ordinal:
                     word = following.group(1)
                     stressed = SINGULAR_STRESS.get(word.lower())

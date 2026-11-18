@@ -589,6 +589,13 @@ class Pipeline(unittest.TestCase):
             "в 1-2 сумках": "в одной-двух сумках", "к 1-2 боссам": "к одному-двум боссам",
             "от 1-2 минут": "от одной-двух минут", "по 1-2 человека": "по одному-два человека",
             "нет 1-2 мест": "нет одного-двух мест", "нет 1-2 места": "нет одно-два места",
+            # ... not where a singular after «два» is only spelt as in it («две ночи», not «на ночи»): a count, both
+            "на 1-2 ночи": "на одну-две ночи", "на 1-2 части": "на одну-две части", "в 1-2 сети": "в одну-две сети",
+            "на 1-2 этаже": "на одном-втором этаже",
+            # where the preposition asks the genitive, a genitive singular is its own (the second numbers it)
+            "с 1-2 уровня": "с одного-второго уровня",
+            # a range from a pair: the genitive of «с» («с» may ask two)
+            "с 1-2 до 5": "с одного-двух до пяти",
         })
 
     def test_a_singular_in_an_oblique_case_is_an_ordinal(self):
