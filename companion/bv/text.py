@@ -131,9 +131,9 @@ NEXT_WORD = re.compile(r"\s+([а-яёА-ЯЁ+]+(?:-[а-яёА-ЯЁ+]+)*)")
 GENDERS = {"masc", "femn", "neut"}
 # words that number rather than count: "15 уровня" is the fifteenth (a count is "15 уровней")
 NUMBERED = {"уровень", "этаж", "число", "ранг", "фаза", "сезон", "глава", "акт", "волна", "слот", "босс"}
-# a numbered noun whose singular the stress model takes for the plural ("числ+а" - "two numbers"):
-# after an ordinal it is the singular, stressed here
-SINGULAR_STRESS = {"числа": "ч+исла"}
+# a noun whose singular the stress model may take for the plural ("числ+а", "мест+а" - "two of them"):
+# after an ordinal it is the singular, stressed here ("до пятнадцатого м+еста")
+SINGULAR_STRESS = {"числа": "ч+исла", "места": "м+еста"}
 # a number that goes on from the one before it - a time, a decimal, a version: neither an ordinal nor agreeing
 GLUED = re.compile(r"\d[:.,]$")
 GOES_ON = re.compile(r"[:.,]\d")       # ... and a number with one after it: "до 20:00" is a time, not a count
