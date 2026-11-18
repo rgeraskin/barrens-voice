@@ -26,6 +26,9 @@ local friends = {
         characterName = "Громмаш", realmName = "Пиратская Бухта", playerGuid = "Player-1-77" } },
     [8] = { accountName = REAL, battleTag = "Тиранда#2345", gameAccountInfo = { clientProgram = "App" } },
     [9] = { accountName = REAL, battleTag = "Брэнн#3456", gameAccountInfo = { clientProgram = "WoW" } },   -- in the menus
+    -- in another game that has characters too: not a WoW character, the BattleTag
+    [13] = { accountName = REAL, battleTag = "Кейн#5678", gameAccountInfo = { clientProgram = "WTCG",
+        characterName = "Чужой", realmName = "Где-то", playerGuid = "Player-1-77" } },
 }
 C_BattleNet = { GetAccountInfoByID = function(id) return friends[id] end }
 BNET_CLIENT_WOW = "WoW"
@@ -82,6 +85,8 @@ assert(ns.history[#ns.history - 1][2] == "BN:Тиранда" and ns.history[#ns.
     tostring(ns.history[#ns.history - 1][2]))
 assert(fields(sent[2])[2] == "BN:Тиранда", "replayed so: " .. fields(sent[2])[2])
 print("replay ok")
+f = fields(whisper("го в арену", 13)[1])
+assert(f[2] == "BN:Кейн#5678" and f[3] == "" and f[8] == "Кейн шепчет:\4 го в арену", "another game: " .. f[2] .. " " .. f[8])
 
 -- not told: no answer, an error, no such API - not read, and /bv debug names no one
 ns.db.debug = true
@@ -180,8 +185,12 @@ ChatTypeGroupInverted = { CHAT_MSG_BN_WHISPER = "BN_WHISPER", CHAT_MSG_BN_WHISPE
 NUM_CHAT_WINDOWS = 1
 ChatFrame1 = { messageTypeList = { "SAY", "WHISPER" } }
 GetChatWindowInfo = function() return "Общий", 14, 1, 1, 1, 1, true, false, 1 end
-ns.db.onlyVisible = true
-assert(#whisper("привет", 7) == 0, "no window shows Battle.net whispers: not read")
+ns.db.onlyVisible, ns.db.debug = true, true
+assert(#whisper("привет", 7) == 1 and fields(sent[1])[1] == "diag", "no window shows Battle.net whispers: not read")
+-- /bv debug names the friend by no token: «друг Battle.net»
+assert(sent[1]:find("нет открытого окна чата", 1, true) and sent[1]:find(": друг Battle.net: привет", 1, true), sent[1])
+private(sent[1])
+ns.db.debug = false
 ChatFrame1.messageTypeList[3] = "BN_WHISPER"
 assert(#whisper("привет", 7) == 1, "a window shows them: read")
 ChatFrame1.messageTypeList = { "SAY", "BN_WHISPER" }

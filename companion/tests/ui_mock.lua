@@ -349,6 +349,8 @@ do
     assert(fire("CHAT_MSG_YELL", "кричу"), "a separate window counts whatever tab is selected")
     selected = ChatFrame2
     assert(fire("CHAT_MSG_GUILD", "гильдия") and not fire("CHAT_MSG_SAY", "привет"), "the guild tab selected")
+    FCFDock_GetSelectedWindow = function() error("the dock is not ready") end
+    assert(fire("CHAT_MSG_SAY", "привет") and fire("CHAT_MSG_GUILD", "гильдия"), "the dock errs: every tab counts")
     FCFDock_GetSelectedWindow = nil
     assert(fire("CHAT_MSG_SAY", "привет"), "no dock on this client: every tab counts")
     ns.db.onlyVisible = false
@@ -1001,8 +1003,13 @@ for event, setting in pairs(ns.ChatFade.ALWAYS_SHOW) do
     assert(ns.EVENTS[event], "an event the addon reads: " .. event)
     assert(ns.DEFAULTS[setting] ~= nil, "a setting of its own: " .. setting)
 end
-ns.db.raid, ns.db.warning = true, true
-for _, event in ipairs({ "CHAT_MSG_PARTY", "CHAT_MSG_RAID_WARNING" }) do
+local GROUP = { "CHAT_MSG_PARTY", "CHAT_MSG_PARTY_LEADER", "CHAT_MSG_RAID", "CHAT_MSG_RAID_LEADER",
+    "CHAT_MSG_RAID_WARNING", "CHAT_MSG_INSTANCE_CHAT", "CHAT_MSG_INSTANCE_CHAT_LEADER" }
+for _, event in ipairs(GROUP) do
+    assert(ns.ChatFade.ALWAYS_SHOW[event] == "fadeGroup", "the group's line shows the window: " .. event)
+end
+ns.db.raid, ns.db.warning, ns.db.instance = true, true, true
+for _, event in ipairs(GROUP) do
     ns.db.fadeGroup = true
     now = now + 20
     settle(2)
