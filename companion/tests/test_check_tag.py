@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 import release  # noqa: E402
 
 SH = shutil.which("sh")
+HOOK = ROOT / ".githooks" / "pre-push"
 
 
 def news_toml(version: str = "0.4.1", date: str | None = "25.11.2026") -> str:
@@ -127,6 +128,8 @@ class Hook(unittest.TestCase):
         self.env = {**os.environ, "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
                     "GIT_AUTHOR_NAME": "Test", "GIT_AUTHOR_EMAIL": "test@example.com",
                     "GIT_COMMITTER_NAME": "Test", "GIT_COMMITTER_EMAIL": "test@example.com",
+                    # as on Windows, where Python writes a pipe in the ANSI code page: check_tag.py writes UTF-8 anyway
+                    "PYTHONIOENCODING": "cp1252",
                     # the checker run by this Python (the hook runs it through mise): as a shell command line
                     "BV_CHECK_TAG": f"{Path(sys.executable).as_posix()} {(ROOT / 'tools' / 'check_tag.py').as_posix()}"}
         if " " in self.env["BV_CHECK_TAG"].split(" ", 1)[0]:
@@ -135,17 +138,19 @@ class Hook(unittest.TestCase):
         self.write(pyproject='[project]\nname = "x"\nversion = "0.4.1"\n', news=news_toml(),
                    log=changelog(date="Unreleased", link="compare/v0.4.0...HEAD"))
         (self.repo / "addon" / "BarrensVoice").mkdir(parents=True)
-        (self.repo / release.TOC).write_text("## Version: 0.4.1\n", encoding="utf-8")
+        (self.repo / release.TOC).write_text("## Version: 0.4.1\n", encoding="utf-8", newline="\n")
         self.commit()
 
     def git(self, *args: str) -> str:
         return subprocess.run(["git", *args], cwd=self.repo, env=self.env, capture_output=True, text=True,
                               check=True).stdout.strip()
 
-    def write(self, pyproject=None, news=None, log=None):
+    def write(self, pyproject=None, news=None, log=None, newline="\n"):
+        # "\n" on every system (write_text's default is os.linesep), and the test's git has no autocrlf: the blobs
+        # are as written
         for name, text in (("pyproject.toml", pyproject), ("news.toml", news), ("CHANGELOG.md", log)):
             if text is not None:
-                (self.repo / name).write_text(text, encoding="utf-8")
+                (self.repo / name).write_text(text, encoding="utf-8", newline=newline)
 
     def commit(self):
         self.git("add", "-A")
@@ -154,9 +159,11 @@ class Hook(unittest.TestCase):
     def push(self, *refs: str) -> subprocess.CompletedProcess:
         """The hook as git runs it for a push of `refs` (a tag: refs/tags/..., a branch: refs/heads/...)."""
         lines = "".join(f"{ref} {self.git('rev-parse', ref)} {ref} {'0' * 40}\n" for ref in refs)
-        return subprocess.run([SH, str(ROOT / ".githooks" / "pre-push"), "origin", "https://example.invalid/x.git"],
-                              cwd=self.repo, env=self.env, input=lines, capture_output=True, text=True,
-                              encoding="utf-8")
+        return self.run_hook(HOOK, lines)
+
+    def run_hook(self, hook: Path, lines: str) -> subprocess.CompletedProcess:
+        return subprocess.run([SH, str(hook), "origin", "https://example.invalid/x.git"], cwd=self.repo, env=self.env,
+                              input=lines, capture_output=True, text=True, encoding="utf-8")
 
     def test_a_tag_is_checked_at_its_commit(self):
         self.git("tag", "-a", "v0.4.1", "-m", "0.4.1")
@@ -181,11 +188,38 @@ class Hook(unittest.TestCase):
         self.assertEqual(wrong.returncode, 1)
         self.assertIn("the tag v0.4.2-beta.1 and pyproject.toml's version 0.4.1 differ", wrong.stderr)
         # a branch alone, however unready the files: not checked; a deleted tag neither
-        branch = subprocess.run([SH, str(ROOT / ".githooks" / "pre-push"), "origin", "x"], cwd=self.repo, env=self.env,
+        branch = subprocess.run([SH, str(HOOK), "origin", "x"], cwd=self.repo, env=self.env,
                                 input=f"refs/heads/master {self.git('rev-parse', 'HEAD')} refs/heads/master {'0' * 40}\n"
                                       f"(delete) {'0' * 40} refs/tags/v0.4.2 {self.git('rev-parse', 'HEAD')}\n",
                                 capture_output=True, text=True)
         self.assertEqual((branch.returncode, branch.stdout, branch.stderr), (0, "", ""))
+
+    def test_files_committed_with_crlf(self):
+        # git show gives a blob's bytes: CRLF ones (Windows without autocrlf) read as CI's build reads the checkout
+        self.write(log=changelog(), newline="\r\n")
+        self.commit()
+        self.assertIn(b"\r\n", subprocess.run(["git", "show", "HEAD:CHANGELOG.md"], cwd=self.repo, env=self.env,
+                                              capture_output=True, check=True).stdout)
+        self.git("tag", "v0.4.1")
+        ready = self.push("refs/tags/v0.4.1")
+        self.assertEqual(ready.returncode, 0, ready.stderr)
+
+    def test_the_hook_keeps_lf(self):
+        # sh reads "\r" as part of the line: a hook checked out with CRLF (Git for Windows' core.autocrlf=true, as
+        # on CI) does not even parse - .gitattributes keeps .githooks/* LF
+        lines = f"refs/tags/v0.4.1 {self.git('rev-parse', 'HEAD')} refs/tags/v0.4.1 {'0' * 40}\n"
+        crlf = self.repo / "pre-push-crlf"
+        crlf.write_bytes(HOOK.read_bytes().replace(b"\n", b"\r\n"))
+        self.assertNotEqual(self.run_hook(crlf, lines).returncode, 0)
+        self.assertNotIn(b"\r", HOOK.read_bytes())
+        if subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--is-inside-work-tree"],
+                          capture_output=True).returncode != 0:
+            self.skipTest("not a git checkout")
+        # what a checkout with core.autocrlf=true writes: the hook with LF, BarrensVoice.cmd with its CRLF
+        for name, crlf_lines in ((".githooks/pre-push", False), ("companion/BarrensVoice.cmd", True)):
+            out = subprocess.run(["git", "-C", str(ROOT), "-c", "core.autocrlf=true", "cat-file", "--filters",
+                                  f":{name}"], env=self.env, capture_output=True, check=True).stdout
+            self.assertEqual(out.count(b"\r\n"), out.count(b"\n") if crlf_lines else 0, name)
 
 
 if __name__ == "__main__":

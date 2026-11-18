@@ -1,0 +1,5 @@
+# Line ends that must not follow the checkout's core.autocrlf (Git for Windows defaults it to true):
+# the hooks run in sh, which reads "\r" as part of the line - LF on every system
+.githooks/* text eol=lf
+# cmd.exe wants CRLF in a batch file: kept as committed (CRLF), never converted
+*.cmd -text

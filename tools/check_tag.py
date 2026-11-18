@@ -22,14 +22,19 @@ def git(*args: str) -> subprocess.CompletedProcess:
 
 
 def reader(commit: str):
-    """read(name): the file's text at `commit`, None when it has no such file."""
+    """read(name): the file's text at `commit`, None when it has no such file. Line ends as "\n", as CI's build reads
+    the checked-out files (universal newlines): a blob committed with CRLF (Windows, no autocrlf) is no other text."""
     def read(name: str) -> str | None:
         shown = git("show", f"{commit}:{name}")
-        return shown.stdout.decode("utf-8") if shown.returncode == 0 else None
+        return shown.stdout.decode("utf-8").replace("\r\n", "\n") if shown.returncode == 0 else None
     return read
 
 
 def main(argv: list[str]) -> int:
+    # UTF-8 whatever the pipe: on Windows Python writes a pipe (git's, the hook's) in the ANSI code page (cp1252),
+    # which turns «» into bytes git's terminal does not read as UTF-8 and has no Cyrillic for «Что нового» at all
+    for stream in (sys.stdout, sys.stderr):
+        stream.reconfigure(encoding="utf-8")
     if len(argv) not in (1, 2):
         print("usage: check_tag.py <tag> [<commit or tag object>]", file=sys.stderr)
         return 2
