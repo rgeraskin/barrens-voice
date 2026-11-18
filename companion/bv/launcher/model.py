@@ -192,6 +192,10 @@ class BrokenConfig(ValueError):
     permissions)."""
 
 
+class ConfigNotWritten(BrokenConfig):
+    """config.json read but not written: marked read-only, or another program holds it right now."""
+
+
 def read_config(path: Path = CONFIG_PATH, strict: bool = False) -> dict:
     """The companion's settings as it reads them: its defaults with config.json over them. A file that does
     not parse or cannot be read gives the defaults, or BrokenConfig when `strict` - only a file that is not
@@ -229,12 +233,20 @@ def config_problem(path: Path = CONFIG_PATH) -> str | None:
 
 def update_config(path: Path = CONFIG_PATH, **changes) -> dict:
     """Change some settings in config.json, keeping the rest as the file has them. A file that does not parse
-    is never written over (BrokenConfig): the player's names and voices are in it, to be fixed by hand."""
+    is never written over (BrokenConfig): the player's names and voices are in it, to be fixed by hand. A write
+    that fails (ConfigNotWritten) leaves the file as it was and no config.tmp beside it."""
     config = read_config(path, strict=True)
     config.update(changes)
     tmp = Path(path).with_suffix(".tmp")
-    tmp.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
-    os.replace(tmp, path)
+    try:
+        tmp.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
+        os.replace(tmp, path)
+    except OSError as e:
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise ConfigNotWritten(f"config.json не записывается: {e.strerror or e}") from e
     return config
 
 

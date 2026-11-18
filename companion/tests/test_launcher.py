@@ -199,6 +199,40 @@ class Config(unittest.TestCase):
             self.assertEqual(path.read_text(encoding="utf-8"), mine)               # nothing written
             self.assertEqual(update_config(path, game="retail")["rate"], 3)          # readable again: written
 
+    def test_failed_write_said_once_and_cleaned(self):
+        # read-only, or os.replace meeting a reader: the error escaped set_config every 2 s (the game's folder
+        # remembered at each tick) with a traceback, and config.tmp stayed beside the file
+        from types import SimpleNamespace
+        from unittest import mock
+        from bv.launcher import app, model
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "config.json"
+            mine = json.dumps({"rate": 3})
+            path.write_text(mine, encoding="utf-8")
+            said = []
+            win = SimpleNamespace(config=model.read_config(path), config_told=False,
+                                  say=lambda m, level="INFO": said.append((level, m)))
+            real = model.update_config
+            with mock.patch.object(model, "update_config", lambda **kw: real(path, **kw)):
+                with mock.patch("os.replace", side_effect=PermissionError(13, "Access is denied")):
+                    with self.assertRaises(model.ConfigNotWritten):
+                        real(path, game="retail")
+                    app.App.set_config(win, game_dirs={"forever": "W"})
+                    app.App.set_config(win, game="retail")
+                self.assertEqual(sorted(p.name for p in Path(d).iterdir()), ["config.json"])   # no config.tmp
+                self.assertEqual(path.read_text(encoding="utf-8"), mine)
+                self.assertEqual((win.config["game_dirs"], win.config["game"]), ({"forever": "W"}, "retail"))
+                self.assertEqual(len(said), 1)
+                self.assertEqual(said[0][0], "WARN")
+                self.assertIn("config.json не записывается: Access is denied", said[0][1])
+                app.App.set_config(win, rate=4)                                         # written again: said anew
+                self.assertEqual(json.loads(path.read_text(encoding="utf-8"))["rate"], 4)
+                self.assertFalse(win.config_told)
+                with mock.patch("pathlib.Path.write_text", side_effect=OSError(28, "No space left on device")):
+                    app.App.set_config(win, rate=5)
+            self.assertEqual(len(said), 2)
+            self.assertEqual(sorted(p.name for p in Path(d).iterdir()), ["config.json"])
+
     def test_window_keeps_the_change_and_says_once(self):
         from types import SimpleNamespace
         from unittest import mock

@@ -189,14 +189,20 @@ class App:
 
     def set_config(self, **changes) -> dict:
         """Settings changed in config.json; when the file does not parse it is not written over (the player's
-        settings are in it) - the change holds in this window only, and that is said once."""
+        settings are in it), and when it cannot be written (read-only, held by another program) it stays as it
+        was - the change holds in this window only, and that is said once (again only after a write that worked)."""
         try:
             self.config = model.update_config(**changes)
         except model.BrokenConfig as e:
             self.config = {**self.config, **changes}
             if not self.config_told:
                 self.config_told = True
-                self.say(f"{e} — изменения не сохраняются, пока файл не исправлен", "WARN")
+                if isinstance(e, model.ConfigNotWritten):
+                    self.say(f"{e} — изменения пока действуют только в этом окне", "WARN")
+                else:
+                    self.say(f"{e} — изменения не сохраняются, пока файл не исправлен", "WARN")
+            return self.config
+        self.config_told = False
         return self.config
 
     def say(self, message: str, level: str = "INFO") -> None:
@@ -806,8 +812,9 @@ class App:
             try:
                 self.config = model.update_config(**changes)
             except model.BrokenConfig as e:
-                messagebox.showerror("Barrens Voice", f"{e}\n\nИсправьте его («Открыть config.json») и сохраните "
-                                     "настройки снова.", parent=win)
+                fix = ("Снимите с него «Только чтение» или закройте программу, которая его держит"
+                       if isinstance(e, model.ConfigNotWritten) else "Исправьте его («Открыть config.json»)")
+                messagebox.showerror("Barrens Voice", f"{e}\n\n{fix} и сохраните настройки снова.", parent=win)
                 return
             self.games = model.find_games(self.config)
             win.destroy()
