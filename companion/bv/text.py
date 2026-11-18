@@ -255,15 +255,17 @@ def agree(n: int, spoken: str, following: str, morph, before: str = "") -> str:
         if not sing or any(p.tag.case == "nomn" and p.tag.gender in ("masc", None) for p in sing):
             return spoken
         # the case the preposition asks first: "у 101 игрока" - "ста одного" (not the accusative)
-        tag = next((p.tag for p in sing if p.tag.case in asked), sing[0].tag)
-        tags = {tag.case} | ({tag.gender} if tag.gender in GENDERS else set())
-        if tag.case == "accs" and tag.gender == "masc" and tag.animacy:
+        # ("в 1 ряду": the second prepositional, "loc2", is the prepositional of "один")
+        tag = next((p.tag for p in sing if SAME_CASE.get(p.tag.case, p.tag.case) in asked), sing[0].tag)
+        case = SAME_CASE.get(tag.case, tag.case)
+        tags = {case} | ({tag.gender} if tag.gender in GENDERS else set())
+        if case == "accs" and tag.gender == "masc" and tag.animacy:
             tags.add(tag.animacy)                      # "на 1 мага" - "одного"
         one = morph.parse("один")[0].inflect(tags)
         if one:
             parts[-1] = one.word
-        if tag.case in OBLIQUE:                        # "с 21 магом" - "двадцатью одним"
-            parts[:-1] = to_case(parts[:-1], tag.case, morph)
+        if case in OBLIQUE:                            # "с 21 магом" - "двадцатью одним"
+            parts[:-1] = to_case(parts[:-1], case, morph)
         return " ".join(parts)
     if "gent" in asked and any(p.tag.case == "gent" for p in parses):
         return " ".join(to_case(parts, "gent", morph))  # "с 5 часов" - "пяти" ("с 5 магами" - "пятью" below)
@@ -329,9 +331,11 @@ def ordinal(n: int, before: str, following: str, morph) -> str | None:
         return None                                    # "до 225 навыка", "10000 репа"
     if before.lower() in AT_HOUR and any(p.normal_form in DAYTIME and p.tag.case == "gent" for p in parses):
         return None                                    # "до 3 ночи": an hour
-    numbered = any(p.normal_form in NUMBERED for p in parses)
+    # a year in the singular numbers too ("в 2021 году" - "двадцать первом"); "1 год", "21 год", "1000 лет" count
+    numbered = any(p.normal_form in NUMBERED or (p.normal_form == YEAR and p.tag.number == "sing" and n >= 1000)
+                   for p in parses)
     asked = asked_by(before, n, word, morph)
-    governed = [p for p in parses if p.tag.case in asked]
+    governed = [p for p in parses if SAME_CASE.get(p.tag.case, p.tag.case) in asked]   # "в 2026 году": loc2
     if numbered:
         parses = [p for p in parses if p.tag.number == "sing"]   # "с 3 фазы", not "3 фазы" (plural)
     elif governed:                                     # "до 15 места": not the plural "места" (nominative)
@@ -347,14 +351,14 @@ def ordinal(n: int, before: str, following: str, morph) -> str | None:
     few = 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14
     if any(p.tag.case == "nomn" for p in parses):
         tag = next(p.tag for p in parses if p.tag.case == "nomn")
-    elif any(p.tag.case in asked for p in parses):     # the case the preposition asks for
-        tag = next(p.tag for p in parses if p.tag.case in asked)
+    elif governed:                                     # the case the preposition asks for
+        tag = governed[0].tag
     elif numbered and not few:                         # "на 2 уровня выше" is still two of them
         tag = parses[0].tag
     else:
         return None
     parts = num2words(n, lang="ru", to="ordinal").split()
-    form = morph.parse(parts[-1])[0].inflect({tag.case, tag.gender or "masc", "sing"})
+    form = morph.parse(parts[-1])[0].inflect({SAME_CASE.get(tag.case, tag.case), tag.gender or "masc", "sing"})
     if not form:
         return None
     parts[-1] = form.word
