@@ -80,8 +80,10 @@ local EVENTS = {
 }
 
 -- One's own whispers: the event's name, GUID (and a Battle.net whisper's bnSenderID) are the recipient's,
--- never used - the line is the player's (ns.PlayerSender, UnitGUID("player")), read only with «Свои сообщения».
+-- never used - the line is the player's (ns.PlayerSender, UnitGUID("player")), read only with «Свои сообщения»
+-- and once the player's own sender is known from a line of theirs.
 local OWN = { CHAT_MSG_WHISPER_INFORM = true, CHAT_MSG_BN_WHISPER_INFORM = true }
+local SELF_WHO = "вы"   -- the debug log's "who" for one's own whisper before the player's sender is known
 
 local SEP = ns.SEP   -- Text.lua
 local VERBS = { say = "говорит", yell = "кричит", whisper = "шепчет", warning = "объявляет", test = "говорит" }
@@ -607,28 +609,36 @@ function ns.Reads(event, guid, text, baseName, channelString, bnSenderID)
     if not (db and db.enabled and key and db[key]) then return false end
     if event == "CHAT_MSG_CHANNEL" and db[ns.ChannelSetting(baseName, channelString)] == false then return false end
     if db.skipAddons ~= false and ns.AddonLine(text) then return false end
-    if OWN[event] then return db.self == true end   -- the GUID is the recipient's
+    if OWN[event] then return db.self == true and ns.PlayerSender() ~= nil end   -- the GUID is the recipient's
     if event == "CHAT_MSG_BN_WHISPER" and not ns.BNetFriend(bnSenderID) then return false end   -- OnChat drops it
     return db.self or not (guid and guid ~= "" and guid == UnitGUID("player"))
 end
 
---- The player as the sender of their own whisper: the sender the game gave the player's own last chat line
---- (ownSender, kept by OnChat: the same voice as their other lines), else "Name-Realm" as the chat writes a
---- name (UnitFullName, its realm without spaces), else the name alone; "" when there is no name to have.
-local ownSender
+--- The player's GUID, nil when there is none to read (or it is secret).
+local function PlayerGUID()
+    local ok, guid = pcall(UnitGUID or error, "player")
+    return ok and not ns.Secret(guid) and type(guid) == "string" and guid ~= "" and guid or nil
+end
+
+--- The player as the sender of their own whisper: the sender the game gave a chat line of the player's own
+--- (say, guild, party...: the same voice as those lines), kept per character by GUID in the saved variables
+--- (`ownSender`), so it outlives a /reload; nil until the character has written a line the addon heard.
+--- Never built from UnitFullName: on Forever its second result may be the surname, not the realm (the
+--- client's own FrameXMLUtil/Camelot/NameUtil.lua reads UnitName's so), and a "Name-Realm" made of it could
+--- differ from what the chat gives - another voice for the same character.
 function ns.PlayerSender()
-    if ownSender then return ownSender end
-    local ok, name, realm = pcall(UnitFullName or error, "player")
-    if not ok or ns.Secret(name, realm) or type(name) ~= "string" then
-        ok, name = pcall(UnitName or error, "player")
-        if not ok or ns.Secret(name) or type(name) ~= "string" then return "" end
-        realm = nil
-    end
-    if (type(realm) ~= "string" or realm == "") and GetNormalizedRealmName then
-        local fine, normalized = pcall(GetNormalizedRealmName)
-        realm = fine and not ns.Secret(normalized) and normalized or nil
-    end
-    return type(realm) == "string" and realm ~= "" and name .. "-" .. realm or name
+    local guid, kept = PlayerGUID(), ns.db and ns.db.ownSender
+    local sender = guid and type(kept) == "table" and kept[guid]
+    return type(sender) == "string" and sender ~= "" and sender or nil
+end
+
+--- Keep the sender of the player's own line (any chat event the addon gets, before a setting drops it).
+local function LearnOwnSender(event, sender, guid)
+    if OWN[event] or ns.Secret(sender, guid) or type(sender) ~= "string" or sender == "" then return end
+    local me = PlayerGUID()
+    if not me or guid ~= me then return end
+    if type(ns.db.ownSender) ~= "table" then ns.db.ownSender = {} end
+    ns.db.ownSender[me] = sender
 end
 
 -- Retail (12.x) keeps chat from addons in a dungeon or raid, in a boss fight, a Mythic+ or a PvP
@@ -704,16 +714,15 @@ local function OnChat(event, text, sender, _, channelString, _, _, _, _, baseNam
     local key = EVENTS[event]
     if not (db.enabled and key) then return end
     local spoken          -- the name to say when it is not the sender's (a Battle.net friend's)
+    local unknownSelf     -- one's own whisper before the player's sender is known
     if BNET[event] then
         local friend = ns.BNetFriend(bnSenderID)
         if not friend then ns.Skip("не удалось узнать, кто пишет в Battle.net", BNET_WHO, text) return end
         sender, spoken, guid = friend.sender, friend.name, friend.guid or ""
     elseif OWN[event] then
         -- the event's name and GUID are the recipient's: the line is said by the player, the recipient unnamed
-        guid = UnitGUID("player")
-        sender, guid = ns.PlayerSender(), not ns.Secret(guid) and guid or ""
-    elseif guid and guid ~= "" and guid == UnitGUID("player") and type(sender) == "string" and sender ~= "" then
-        ownSender = sender   -- the player's own line: their own whispers get the same sender, the same voice
+        sender, guid = ns.PlayerSender(), PlayerGUID() or ""
+        unknownSelf, sender = not sender, sender or SELF_WHO
     end
     if not db[key] then ns.Skip("тип чата выключен в настройках: " .. key, sender, text) return end
     if event == "CHAT_MSG_CHANNEL" then
@@ -725,6 +734,11 @@ local function OnChat(event, text, sender, _, channelString, _, _, _, _, baseNam
     end
     if (OWN[event] or guid and guid ~= "" and guid == UnitGUID("player")) and not db.self then
         ns.Skip("свои сообщения выключены", sender, text)
+        return
+    end
+    if unknownSelf then
+        -- (the game's sender for the player is not guessed: their whisper waits for a line of theirs)
+        ns.Skip("ваше имя в чате ещё не известно: свой шёпот читается после вашей первой строки в чате", sender, text)
         return
     end
     local addon = db.skipAddons ~= false and ns.AddonLine(text)
@@ -889,11 +903,12 @@ local function OnEvent(self, event, name, ...)
         ns.SecretLine()                -- retail: a dungeon, raid, boss fight or PvP keeps chat from addons
         return
     end
+    if EVENTS[event] then LearnOwnSender(event, (...), (select(11, ...))) end
     if EVENTS[event] and ns.db.enabled then
         ns.secretTold = false
         local visible, why = Visible(event, name, ...)
         if not visible then
-            ns.Skip(why, BNET[event] and BNET_WHO or OWN[event] and ns.PlayerSender() or (...), name)
+            ns.Skip(why, BNET[event] and BNET_WHO or OWN[event] and (ns.PlayerSender() or SELF_WHO) or (...), name)
             return
         end
     end

@@ -113,7 +113,29 @@ end
 local lookups = 0
 local lookup = C_BattleNet.GetAccountInfoByID
 C_BattleNet.GetAccountInfoByID = function(id) lookups = lookups + 1 return lookup(id) end
-ns.db.self, ns.db.debug = false, true
+-- before the player has written a line the game's sender for them is not known (on Forever UnitFullName's second
+-- result may be the surname, not the realm): one's own whisper is not read, /bv debug says why and names no one
+local fullName = UnitFullName
+UnitFullName = function() error("one's own sender is never built from UnitFullName") end
+ns.db.self, ns.db.debug = true, true
+for _, event in ipairs({ "CHAT_MSG_WHISPER_INFORM", "CHAT_MSG_BN_WHISPER_INFORM" }) do
+    own(event, "рано", 7)
+    assert(#sent == 1 and fields(sent[1])[1] == "diag" and sent[1]:find("ваше имя в чате ещё не известно", 1, true)
+        and sent[1]:find(": вы: рано", 1, true), "not known yet: not read - " .. tostring(sent[1]))
+    private(sent[1])
+    assert(not sent[1]:find("Тиранда", 1, true) and not sent[1]:find("Громмаш", 1, true), "the recipient unnamed")
+end
+assert(ns.ChatFade.Verdict("Для [Тиранда]: рано", "CHAT_MSG_WHISPER_INFORM", { "рано", "Тиранда-ПиратскаяБухта", "", "",
+    "Тиранда-ПиратскаяБухта", "", 0, 0, "", 0, 1, "Player-1-5", 0, false, n = 14 }) == "skipped",
+    "not read: the hidden chat shows it")
+-- a line of the player's own tells it - one in a channel switched off too
+ns.db.say = false
+ns.OnEvent("CHAT_MSG_SAY", "привет", "Джайна-ПиратскаяБухта", "", "", "Джайна-ПиратскаяБухта", "", 0, 0, "", 0, 1,
+    "Player-1-1", 0, false)
+ns.db.say = true
+assert(ns.PlayerSender() == "Джайна-ПиратскаяБухта" and ns.db.ownSender["Player-1-1"] == "Джайна-ПиратскаяБухта",
+    "kept by the character's GUID in the saved variables")
+ns.db.self = false
 for _, event in ipairs({ "CHAT_MSG_WHISPER_INFORM", "CHAT_MSG_BN_WHISPER_INFORM" }) do
     own(event, "я отправил", 7)
     assert(#sent == 1 and fields(sent[1])[1] == "diag" and sent[1]:find("свои сообщения выключены", 1, true)
@@ -133,9 +155,14 @@ assert(not sent[1]:find("Громмаш", 1, true) and not sent[1]:find("Вас�
 private(sent[1])
 assert(lookups == 0, "the recipient's bnSenderID is never looked up")
 C_BattleNet.GetAccountInfoByID = lookup
--- the sender the game gives the player's own lines wins: the same voice as their other lines
+-- the game's latest sender for the player wins: the same voice as their other lines
 ns.OnEvent("CHAT_MSG_SAY", "привет", "Джайна", "", "", "Джайна", "", 0, 0, "", 0, 1, "Player-1-1", 0, false)
 assert(fields(own("CHAT_MSG_WHISPER_INFORM", "иду")[1])[2] == "Джайна", "as the say line's sender")
+-- another character (the saved variables are the account's): theirs is not known yet
+UnitGUID = function() return "Player-1-9" end
+assert(#own("CHAT_MSG_WHISPER_INFORM", "иду") == 0, "another character's whisper waits for their own line")
+UnitGUID = function() return "Player-1-1" end
+UnitFullName = fullName
 -- «Шёпот» off: one's own not read either
 ns.db.whisper = false
 assert(#own("CHAT_MSG_WHISPER_INFORM", "иду") == 0 and #own("CHAT_MSG_BN_WHISPER_INFORM", "иду", 7) == 0)
