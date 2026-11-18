@@ -375,13 +375,8 @@ class Mismatch(unittest.TestCase):
 
 
 class MainLog(unittest.TestCase):
-    def test_a_busy_chat_keeps_the_main_window_filled(self):
-        # each chat line brings a CHAT and two DEBUG lines: they must not push the INFO lines out
-        import ast
-        tree = ast.parse((Path(__file__).resolve().parents[1] / "bv" / "launcher" / "app.py").read_text(encoding="utf-8"))
-        snapshot = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "snapshot")
-        self.assertIn("self.main", ast.unparse(snapshot))
-        self.assertNotIn("self.lines", ast.unparse(snapshot))
+    def test_main_levels_only(self):
+        # a busy chat through the window itself: test_layout.Layout.test_a_busy_chat_keeps_the_main_window_filled
         from bv.launcher.model import main_lines
         kept = [("20:13:37", "INFO", "голоса рас готовы")]
         self.assertEqual([m for _, _, m in main_lines(kept)], ["голоса рас готовы"])

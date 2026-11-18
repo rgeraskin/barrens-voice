@@ -201,6 +201,26 @@ class Layout(unittest.TestCase):
                 a.help_win.destroy()
         self.report(found)
 
+    def test_a_busy_chat_keeps_the_main_window_filled(self):
+        # each chat line brings a CHAT and two DEBUG lines: they pushed the INFO lines out of the window of recent
+        # lines, and the main window's log went blank in a busy raid
+        import tempfile
+        import time
+        from bv.launcher import app
+        a = self.make()
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(app, "SHOW_FILE", Path(d) / "launcher.show"):
+            now = time.monotonic()
+            a.checked = {"game": now, "games": now, "update": now}      # the tick's checks wait: only the lines
+            a.incoming.put("20:13:37 INFO  голоса рас готовы")
+            for i in range(a.lines.maxlen // 3 + 10):
+                a.incoming.put(f"20:14:00 CHAT  [Громмаш] строка {i}")
+                a.incoming.put("20:14:00 DEBUG   исходно: строка")
+                a.incoming.put("20:14:00 DEBUG   к синтезу: строка")
+            a._tick()
+        self.assertNotIn("голоса рас готовы", [m for _, _, m in a.lines])   # gone from the log window's lines
+        drawn = [a.canvas.itemcget(i, "text") for i in a.canvas.find_all() if a.canvas.type(i) == "text"]
+        self.assertTrue(any("голоса рас готовы" in text for text in drawn), drawn)
+
     def report(self, found: list[tuple[str, str]]):
         """Each problem once, with how often and the first state it was seen in."""
         seen: dict[str, list[str]] = {}
