@@ -496,25 +496,97 @@ local function SelectedTab()
     return ok and selected or nil
 end
 
+-- Whispers have windows of their own: with the client's «Шёпот» option (CVar whisperMode) "popout" or
+-- "popout_and_inline" each conversation gets a temporary window (FloatingChatFrame.lua
+-- FloatingChatFrameManager_OnEvent -> FCF_OpenTemporaryWindow: ChatFrame11 and on, docked as a tab,
+-- selected at once only for one's own whisper in "popout"), which takes that one target
+-- (privateMessageList). With "popout" no other window shows a whisper (FCFManager_ShouldSuppressMessage), and a
+-- window a conversation was moved out of leaves its target out (excludePrivateMessageList, except in
+-- "popout_and_inline"; ChatFrameOverrides.lua MessageEventHandler). The same in Forever and retail.
+local WHISPER_GROUPS = { WHISPER = true, BN_WHISPER = true }
+
+local function Lower(s)
+    local lower = rawget(_G, "strlower")   -- the client's own, as it keys the lists
+    return type(lower) == "function" and lower(s) or s:lower()
+end
+
+local function WhisperMode()
+    local get = rawget(_G, "GetCVar")
+    local ok, mode = pcall(get or error, "whisperMode")
+    return ok and type(mode) == "string" and mode or "inline"
+end
+
+--- Whether `frame` is the whisper window of this conversation (the client's dedicated frame).
+local function OwnWhisperWindow(frame, group, target)
+    return type(frame.chatType) == "string" and type(frame.chatTarget) == "string"
+        and Lower(frame.chatType) == Lower(group) and Lower(frame.chatTarget) == target
+end
+
+--- Whether `frame`, which takes whispers, shows this one (to or from `target`, lowered) - the chat's own rules.
+local function ShowsWhisper(frame, group, target, mode)
+    if OwnWhisperWindow(frame, group, target) then return true end
+    if mode == "popout" then return false end
+    if type(frame.privateMessageList) == "table" and not frame.privateMessageList[target] then return false end
+    if type(frame.excludePrivateMessageList) == "table" and frame.excludePrivateMessageList[target]
+            and mode ~= "popout_and_inline" then
+        return false
+    end
+    return true
+end
+
+--- The chat windows to look at: the ten permanent ones (shown or docked, by GetChatWindowInfo) and the
+--- temporary whisper windows in use; each with whether it is docked.
+local function ChatWindows()
+    local list, named = {}, {}
+    for i = 1, NUM_CHAT_WINDOWS or 10 do
+        local frame = _G["ChatFrame" .. i]
+        local shown, _, docked = select(7, GetChatWindowInfo(i))
+        named["ChatFrame" .. i] = true
+        if frame and (shown or docked) then list[#list + 1] = { frame, docked } end
+    end
+    for _, name in ipairs(type(CHAT_FRAMES) == "table" and CHAT_FRAMES or {}) do
+        local frame = not named[name] and _G[name]
+        if type(frame) == "table" and frame.isTemporary and frame.inUse then
+            list[#list + 1] = { frame, frame.isDocked and true or false }
+        end
+    end
+    return list
+end
+
 --- Whether the player sees this line: some chat window that is open (shown or docked as a tab)
 --- takes it, and no chat filter - spam blockers and the like - hides it there. With onlyActiveTab a
 --- docked window counts only while it is the selected tab; a separate (undocked) window always does.
+--- A whisper counts in the windows that show that conversation, its own whisper window too - also one the
+--- client is opening for it right now (when this addon hears the event first).
 --- Frames are only compared here: retail's secret lines never get this far (OnEvent drops them).
 local function Visible(event, ...)
     if not ns.db.onlyVisible or not GetChatWindowInfo then return true end
     local zoneChannel, baseName = select(7, ...), select(9, ...)
     local selected = SelectedTab()
-    local seen, otherTab
-    for i = 1, NUM_CHAT_WINDOWS or 10 do
-        local frame = _G["ChatFrame" .. i]
-        local shown, _, docked = select(7, GetChatWindowInfo(i))
-        if frame and (shown or docked) and Takes(frame, event, zoneChannel, baseName) then
+    local group = ChatTypeGroupInverted and ChatTypeGroupInverted[event] or event:sub(10)
+    local whisper = WHISPER_GROUPS[group] and type((select(2, ...))) == "string"
+    local target, mode = whisper and Lower((select(2, ...))), whisper and WhisperMode()
+    local seen, otherTab, ownWindow
+    for _, item in ipairs(ChatWindows()) do
+        local frame, docked = item[1], item[2]
+        if whisper and OwnWhisperWindow(frame, group, target) then ownWindow = true end
+        if Takes(frame, event, zoneChannel, baseName) and (not whisper or ShowsWhisper(frame, group, target, mode)) then
             if selected and docked and frame ~= selected then
                 otherTab = true
             else
                 seen = frame
                 break
             end
+        end
+    end
+    -- a conversation with no window yet in "popout" modes: the client opens one now, docked as a tab and
+    -- not selected - but for one's own whisper in "popout" (FloatingChatFrameManager_OnEvent; not for a GM's)
+    if not seen and whisper and not ownWindow and (mode == "popout" or mode == "popout_and_inline")
+            and select(6, ...) ~= "GM" then
+        if not selected or (mode == "popout" and event:find("_INFORM$")) then
+            seen = rawget(_G, "DEFAULT_CHAT_FRAME") or ChatFrame1 or {}
+        else
+            otherTab = true
         end
     end
     if not seen then

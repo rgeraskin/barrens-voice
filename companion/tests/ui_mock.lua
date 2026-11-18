@@ -355,6 +355,87 @@ do
     ns.db.onlyVisible, ns.db.onlyActiveTab = true, false
     NUM_CHAT_WINDOWS, ChatFrame3, GetChatWindowInfo, GENERAL_CHAT_DOCK, FCFDock_GetSelectedWindow = 2, nil, info, nil, nil
 end
+-- whispers in a tab of their own (the client's «Шёпот»: whisperMode "popout"): a temporary window ChatFrame11,
+-- docked, that takes one conversation (FCF_OpenTemporaryWindow, FCF_SetTemporaryWindowType); with "popout" no
+-- other window shows a whisper; a window a conversation was moved out of leaves its target out
+do
+    local mode = "popout"
+    GetCVar = function(name) assert(name == "whisperMode") return mode end
+    ChatTypeGroupInverted = { CHAT_MSG_WHISPER = "WHISPER", CHAT_MSG_WHISPER_INFORM = "WHISPER", CHAT_MSG_PARTY = "PARTY" }
+    local info = GetChatWindowInfo
+    NUM_CHAT_WINDOWS = 2
+    ChatFrame1 = { messageTypeList = { "SAY", "PARTY", "WHISPER" }, channelList = {}, zoneChannelList = {} }
+    GetChatWindowInfo = function(i)
+        if i == 1 then return "Общий", 14, 1, 1, 1, 1, true, false, 1 end
+        return "Гильдия", 14, 1, 1, 1, 1, false, false, nil
+    end
+    local whisperTab = { messageTypeList = { "WHISPER" }, channelList = {}, zoneChannelList = {}, isTemporary = true,
+                         inUse = true, isDocked = true, chatType = "WHISPER", chatTarget = "VASYA-STEPI",
+                         privateMessageList = { ["vasya-stepi"] = true } }
+    ChatFrame11 = whisperTab
+    CHAT_FRAMES = { "ChatFrame1", "ChatFrame2", "ChatFrame11" }
+    GENERAL_CHAT_DOCK = {}
+    local selected = whisperTab
+    FCFDock_GetSelectedWindow = function() return selected end
+    ns.db.whisper, ns.db.party, ns.db.onlyVisible, ns.db.onlyActiveTab = true, true, true, true
+    local function said(event, sender, flag)
+        sent = {}
+        loader._scripts.OnEvent(loader, event, "ты тут?", sender or "Vasya-Stepi", "", "", "", flag or "", 0, 0, "",
+            nil, 1, "")
+        for _, p in ipairs(sent) do if not p:find("^diag\31") then return true end end
+        return false
+    end
+    local function why()
+        for _, p in ipairs(sent) do if p:find("^diag\31") then return p:match("не отправлено %((.-)%)") end end
+    end
+    assert(said("CHAT_MSG_WHISPER"), "the whisper's own tab selected: its whisper read")
+    assert(not said("CHAT_MSG_PARTY"), "... and the general tab's party line not")
+    assert(said("CHAT_MSG_WHISPER", "VASYA-stepi"), "the conversation by its name in any case")
+    assert(not said("CHAT_MSG_WHISPER", "Petya-Stepi"), "another one's whisper: not in this window, a new tab")
+    selected = ChatFrame1
+    ns.db.debug = true
+    assert(not said("CHAT_MSG_WHISPER") and why() == "не в выбранной вкладке чата",
+        "the general tab selected: the whisper is in the other tab only - " .. tostring(why()))
+    ns.db.debug = false
+    assert(said("CHAT_MSG_PARTY"), "the general tab's party line read")
+    whisperTab.isDocked = false
+    assert(said("CHAT_MSG_WHISPER"), "the whisper window pulled out of the tabs: a separate window, always read")
+    whisperTab.isDocked = true
+    ns.db.onlyActiveTab = false
+    assert(said("CHAT_MSG_WHISPER"), "«Что показывают окна чата»: read in its tab")
+    ns.db.onlyActiveTab = true
+    -- no window for it yet (the client opens it as this addon hears the event): a new tab, not selected - but
+    -- for one's own whisper in "popout", which the client selects at once; none for a GM's
+    whisperTab.inUse = false
+    assert(not said("CHAT_MSG_WHISPER"), "a new conversation: its tab opens behind the selected one")
+    ns.db.onlyActiveTab = false
+    assert(said("CHAT_MSG_WHISPER"), "«Что показывают окна чата»: its new tab shows it")
+    assert(not said("CHAT_MSG_WHISPER", nil, "GM"), "a GM's whisper: no tab for it, the general one does not show it")
+    ns.db.onlyActiveTab = true
+    -- (one's own whisper, CHAT_MSG_WHISPER_INFORM: the recipient is the conversation - the case is in bnet_whisper.lua)
+    -- "inline": whispers in the windows that take them; one moved out to a window of its own stays out of the source
+    mode = "inline"
+    assert(said("CHAT_MSG_WHISPER"), "inline: the general tab shows whispers")
+    whisperTab.inUse = true
+    ChatFrame1.excludePrivateMessageList = { ["vasya-stepi"] = true }
+    assert(not said("CHAT_MSG_WHISPER"), "moved out of the general window: there no more")
+    assert(said("CHAT_MSG_WHISPER", "Petya-Stepi"), "another conversation stays in the general window")
+    selected = whisperTab
+    assert(said("CHAT_MSG_WHISPER"), "its own window selected: read")
+    -- "popout_and_inline": both
+    mode, selected = "popout_and_inline", ChatFrame1
+    assert(said("CHAT_MSG_WHISPER"), "both: the general window shows it too, though excluded")
+    ChatFrame1.excludePrivateMessageList = nil
+    whisperTab.inUse = false
+    assert(said("CHAT_MSG_WHISPER"), "both, no window of its own yet: the general one shows it")
+    GetCVar = nil
+    assert(said("CHAT_MSG_WHISPER"), "no CVar to read: inline")
+    ns.db.onlyActiveTab = false
+    NUM_CHAT_WINDOWS, ChatFrame11, CHAT_FRAMES, GetChatWindowInfo, GENERAL_CHAT_DOCK, FCFDock_GetSelectedWindow,
+        ChatTypeGroupInverted = 2, nil, nil, info, nil, nil, nil
+    ChatFrame1 = { messageTypeList = { "SAY", "PARTY" }, channelList = { "Общий" }, zoneChannelList = { 1 } }
+    print("whisper tabs ok")
+end
 ns.db.onlyVisible = false
 assert(fire("CHAT_MSG_YELL", "кричу"), "everything when the option is off")
 ChatFrameUtil.RemoveMessageEventFilter("CHAT_MSG_SAY", spamFilter)
