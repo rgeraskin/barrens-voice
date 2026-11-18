@@ -346,7 +346,10 @@ def write_live(config: dict, path: Path | None = None) -> None:
         tmp.write_text(json.dumps({k: config[k] for k in LiveConfig.KEYS if k in config}), encoding="utf-8")
         os.replace(tmp, path)
     except OSError:
-        tmp.unlink(missing_ok=True)
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass                                 # what is left is overwritten by the next write
 
 
 MODELS_READY = DATA_DIR / ".models_ready"
