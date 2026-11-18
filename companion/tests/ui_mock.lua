@@ -750,6 +750,7 @@ editBox._focus = false
 editBox.HasFocus = function(self) return self._focus end
 editBox.IsVisible = function() return true end
 editBox.IsMouseOver = function() return false end
+editBox.isGM = false                                    -- (the stub's other fields are functions)
 ChatFrame1.editBox = editBox
 CHAT_FRAMES = { "ChatFrame1" }
 local now = 1000
@@ -764,8 +765,22 @@ editBox._focus = true
 settle(0.3)
 assert(editBox:GetAlpha() == 1 and ChatFrame1:GetAlpha() == 1, "typing: the window and its edit box show")
 editBox._focus = false
+editBox:SetAlpha(0.35)                                  -- the game, the message sent (Deactivate, "im" style)
 settle(2)
 assert(editBox:GetAlpha() == 0, "done typing: out of sight again")
+ChatFrame1.IsMouseOver = function() return true end
+settle(0.5)
+assert(ChatFrame1:GetAlpha() == 1 and editBox:GetAlpha() == 0.35,
+    "the mouse over the chat: the edit box nobody types in as the game shows it (\"im\" style), not brighter")
+ChatFrame1.IsMouseOver = nil
+settle(2)
+editBox:SetAlpha(1)                                     -- the game: the newcomer's hint in the box
+ChatFrame1.IsMouseOver = function() return true end
+settle(0.5)
+assert(editBox:GetAlpha() == 1, "shown again: as the game last set it, whatever it was (the newcomer's hint)")
+ChatFrame1.IsMouseOver = nil
+editBox:SetAlpha(0.35)                                  -- the game: the hint gone, the box dimmed again
+settle(2)
 -- a chat event's line as the chat window adds it: AddMessage(msg, r, g, b, id, accessID, typeID, event,
 -- eventArgs, MessageFormatter), eventArgs SafePack'ed (n); an event the window does not show never gets here
 local function args(text, guid, channel, base)
@@ -914,7 +929,7 @@ ChatFrame1.isDocked = false
 ns.db.fadeChat = false
 ns.ChatFade.Apply()
 assert(ChatFrame1:GetAlpha() == 1, "the setting off: the chat as it was")
-assert(editBox:GetAlpha() == 1, "and its edit box")
+assert(editBox:GetAlpha() == 0.35, "and its edit box, as the game leaves it between messages")
 ChatFrameUtil.AddMessageEventFilter, ChatFrame_AddMessageEventFilter = addFilter, nil
 print("chat fade ok")
 

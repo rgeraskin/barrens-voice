@@ -1,6 +1,6 @@
 -- The chat windows out of sight (a setting, off by default): the chat is read aloud, so its lines
 -- need not catch the eye. The windows - text, background, tabs, the edit box (faded on its own: in
--- the classic chat style it is always up and not inside the window) - stay transparent until
+-- the "im" chat style it stays up between messages, under the window) - stay transparent until
 -- the mouse is over them or the player types. A line the program does not read shows its window
 -- for REVEAL seconds: a system message, loot, a channel switched off, one's own line, an addon's
 -- print - what is not heard must still be seen. Only while the companion was running at login (or
@@ -9,7 +9,9 @@
 --
 -- Transparency is SetAlpha on the chat frames and on the dock (GENERAL_CHAT_DOCK): the game sets
 -- the alpha of their textures, tabs and buttons, never of the frames themselves, so nothing fights
--- over it. Which lines are read: the chat window hands a chat event's line to its AddMessage with
+-- over it. The edit box is the exception: the game sets its alpha itself (1 while the player types,
+-- 0.35 after a message in the "im" style, hidden in "classic", 1 with the newcomer's hint;
+-- ChatFrameEditBox.lua) - shown, it comes back to what the game last set (HookEditBox), not to 1. Which lines are read: the chat window hands a chat event's line to its AddMessage with
 -- the event and the event's arguments (ChatFrameOverrides.lua, MessageEventHandler: AddMessage(msg,
 -- r, g, b, id, accessID, typeID, event, eventArgs, MessageFormatter), Forever and retail alike) -
 -- only for a line it shows, after its filters and its channel and whisper checks - and the hook asks
@@ -30,6 +32,7 @@ ns.ChatFade = F
 local FADE_IN = 0.15   -- seconds to appear
 local FADE_OUT = 0.5   -- seconds to disappear
 local HIDE_DELAY = 1   -- seconds after the mouse leaves before the window fades
+local EDIT_IDLE = 0.35 -- the game's alpha of an edit box nobody types in (ChatFrameEditBox.lua, Deactivate)
 F.REVEAL = 10          -- seconds a line not read aloud keeps its window up
 
 local hiddenFor, revealUntil, hooked = {}, {}, {}
@@ -84,11 +87,35 @@ local function DockWanted(dock, mouseFree)
 end
 
 
-local function Step(frame, wanted, elapsed)
+-- The edit box's alpha as the game last set it (ChatFrameEditBox.lua: 0.35 when a message is sent, 1 while
+-- typing, 1 with the newcomer's hint - whatever the client does), so that shown again it is as the game left
+-- it; a hook on its SetAlpha records the game's calls, ours are made with `ours` up and not recorded.
+local gameAlpha, ours = {}, false
+
+local function HookEditBox(eb)
+    if eb and not hooked[eb] and eb.SetAlpha and eb.GetAlpha then
+        gameAlpha[eb] = eb:GetAlpha()
+        hooksecurefunc(eb, "SetAlpha", function(self, alpha)
+            if not ours and type(alpha) == "number" then gameAlpha[self] = alpha end
+        end)
+        hooked[eb] = true
+    end
+end
+
+--- The edit box's alpha when shown: 1 while the player types, else as the game last set it (EDIT_IDLE when
+--- that is not known).
+local function EditBoxAlpha(eb)
+    if (eb.HasFocus and eb:HasFocus()) or eb.isGM then return 1 end
+    return gameAlpha[eb] or EDIT_IDLE
+end
+
+--- Fade a frame towards `top` (1 unless given) when wanted, to nothing when not.
+local function Step(frame, wanted, elapsed, top)
     local a = frame:GetAlpha()
+    top = top or 1
     if wanted then
         hiddenFor[frame] = 0
-        if a < 1 then frame:SetAlpha(math.min(1, a + elapsed / FADE_IN)) end
+        if a < top then frame:SetAlpha(math.min(top, a + elapsed / FADE_IN)) elseif a > top then frame:SetAlpha(top) end
     else
         local t = (hiddenFor[frame] or 0) + elapsed
         hiddenFor[frame] = t
@@ -164,6 +191,7 @@ local function Hook(cf)
         hooksecurefunc(cf, "AddMessage", OnAddMessage)
         hooked[cf] = true
     end
+    if cf then HookEditBox(cf.editBox) end
 end
 
 function F.Update(_, elapsed)
@@ -187,9 +215,13 @@ function F.Update(_, elapsed)
             local wanted = moving or (cf.isDocked and dockWanted) or (revealUntil[cf] or 0) > now
                 or (cf:IsShown() and FrameWanted(cf, mouseFree))
             Step(cf, wanted, elapsed)
-            -- the edit box too: in the classic chat style it is always up and not inside the window
+            -- the edit box too: in the "im" chat style it stays up between messages, under the window
             local eb = cf.editBox
-            if eb and eb.SetAlpha then Step(eb, wanted or (eb.HasFocus and eb:HasFocus()) or false, elapsed) end
+            if eb and eb.SetAlpha then
+                ours = true
+                Step(eb, wanted or (eb.HasFocus and eb:HasFocus()) or false, elapsed, EditBoxAlpha(eb))
+                ours = false
+            end
         end
     end
     if dock then Step(dock, dockWanted, elapsed) end
@@ -200,7 +232,11 @@ local function ShowAll()
         local cf = _G[name]
         if cf then
             cf:SetAlpha(1)
-            if cf.editBox and cf.editBox.SetAlpha then cf.editBox:SetAlpha(1) end
+            if cf.editBox and cf.editBox.SetAlpha then
+                ours = true
+                cf.editBox:SetAlpha(EditBoxAlpha(cf.editBox))
+                ours = false
+            end
         end
     end
     if GENERAL_CHAT_DOCK then GENERAL_CHAT_DOCK:SetAlpha(1) end

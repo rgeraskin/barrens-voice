@@ -248,6 +248,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   A channel line read aloud marked every chat window as read, also one that does not show that channel: an addon's message or a system line there within half a second did not show the window. On retail, `/bv debug` called a line of the closed chat «строка не из события чата». The addon now judges the line the window actually adds, by the event the window passes with it: nothing is left marked, and a closed line is «закрытый чат».
 
+- The hidden chat's edit box comes back as the game shows it
+
+  In the «im» chat style the edit box stays under the chat between messages, dimmed by the game. With «Прятать окно чата» it came back fully bright when the window showed or the setting was turned off; now it comes back as the game last set it — dimmed between messages, bright while the player types or with the newcomer's hint.
+
 ## [0.3.0] - 2026-11-15
 
 ### Added
