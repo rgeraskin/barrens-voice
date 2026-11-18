@@ -20,11 +20,12 @@ description = "Python tests; the protocol test runs the addon's encoder with lua
 run = "uv run --locked python -m unittest discover -s companion/tests"
 
 [tasks.test-lua]
-description = "Addon tests on WoW API stubs: windows, payloads, visible-chat filter, Battle.net whispers, dictionary layers; the text functions without stubs"
+description = "Addon tests on WoW API stubs: windows, payloads, visible-chat filter, Battle.net whispers, «Что нового», dictionary layers; the text functions without stubs"
 dir = "addon/BarrensVoice"
 run = [
   "luajit ../../companion/tests/ui_mock.lua",
   "luajit ../../companion/tests/bnet_whisper.lua",
+  "luajit ../../companion/tests/news.lua",
   "luajit ../../companion/tests/dictionary_layers.lua",
   "luajit ../../companion/tests/text.lua",
 ]
