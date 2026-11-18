@@ -76,6 +76,11 @@ sent = {}
 ns.Replay(3)
 assert(#sent == 3 and fields(sent[1])[8] == "Громмаш шепчет:\4 привет, идёшь в ОП?" and fields(sent[2])[8]:find("^Тиранда"),
     sent[1] or "nothing replayed")
+-- the history (saved variables, on disk) keeps a BattleTag without its digits; a character's sender whole
+for _, h in ipairs(ns.history) do assert(not tostring(h[2]):find("#", 1, true), "digits at rest: " .. tostring(h[2])) end
+assert(ns.history[#ns.history - 1][2] == "BN:Тиранда" and ns.history[#ns.history - 2][2] == "Громмаш-ПиратскаяБухта",
+    tostring(ns.history[#ns.history - 1][2]))
+assert(fields(sent[2])[2] == "BN:Тиранда", "replayed so: " .. fields(sent[2])[2])
 print("replay ok")
 
 -- not told: no answer, an error, no such API - not read, and /bv debug names no one

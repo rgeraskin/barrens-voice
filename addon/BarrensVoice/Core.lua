@@ -411,7 +411,9 @@ end
 
 -- The last chat lines read, as they came (before the dictionary), for /bv last N. Kept in the saved
 -- variables (written at /reload and logout), so they outlive a /reload and a game restart - not a
--- crash. The saved variables are the account's: another character replays the same lines.
+-- crash. The saved variables are the account's: another character replays the same lines. A Battle.net
+-- friend's BattleTag is kept without its "#1234" (no friend's whole tag at rest on disk): a replayed line's
+-- sender is "BN:Вася", which the companion ties to the voice of the "BN:Вася#1234" it knows (assign.py).
 local HISTORY = 50
 ns.history = {}
 
@@ -422,8 +424,9 @@ function ns.RestoreHistory()
     while #ns.history > HISTORY do table.remove(ns.history, 1) end
 end
 
-local function Remember(...)
-    table.insert(ns.history, { n = select("#", ...), ... })   -- n: a nil (no race known) stays in place
+local function Remember(kind, sender, ...)
+    if type(sender) == "string" and sender:find("^BN:") then sender = sender:gsub("#%d+$", "") end
+    table.insert(ns.history, { n = select("#", ...) + 2, kind, sender, ... })   -- n: a nil (no race known) stays in place
     if #ns.history > HISTORY then table.remove(ns.history, 1) end
 end
 
