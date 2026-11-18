@@ -34,6 +34,7 @@ jobs:
       # (not the highest version): another release still carrying one may be taken instead of this one. Only a
       # warning; the latest stable release keeps its manifest (the stable channel reads releases/latest).
       - name: Releases that still offer a manifest
+        continue-on-error: true      # only a warning: a failing gh api must not turn a published release red
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
