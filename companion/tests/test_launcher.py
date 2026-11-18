@@ -1877,7 +1877,13 @@ class OldClients(unittest.TestCase):
     def test_beta11_client_updates_through_its_updater(self):
         self.updater_client("v0_4_0b11", "0.4.0b11")
 
-    def updater_client(self, client: str, current: str):
+    def test_beta14_client_updates_through_its_updater(self):
+        # the first client with the selfcheck, the exact-version refusal and the watch before the switch
+        # it keeps test builds out of the stable channel, so it gets a release: 0.4.0 as pyproject.toml has it (no tag,
+        # so no refusal of the test-build addon a tagged release would get)
+        self.updater_client("v0_4_0b14", "0.4.0b14", release=None)
+
+    def updater_client(self, client: str, current: str, release: str | None = "v0.4.0-beta.99"):
         import base64
         import io
         import json
@@ -1895,7 +1901,7 @@ class OldClients(unittest.TestCase):
             z.writestr("uv.exe", b"new uv")
         uv_zip = uv_zip.getvalue()
         uv = {"version": "0.99.0", "url": "https://x/uv-0.99.0.zip", "sha256": hashlib.sha256(uv_zip).hexdigest()}
-        archive, manifest = ReleaseBuild.build(self, "v0.4.0-beta.99", exe=b"starter", uv=uv)
+        archive, manifest = ReleaseBuild.build(self, release, exe=b"starter", uv=uv)
         base = old_update.STABLE
         raw = json.dumps(manifest).encode()
         key = Ed25519PrivateKey.generate()
@@ -1919,9 +1925,17 @@ class OldClients(unittest.TestCase):
                                          lambda m, level="INFO": said.append(m), fetch=files.__getitem__,
                                          fetch_stream=lambda req, timeout=0: Stream(files[req.full_url]), public=public)
             # the old release_uv reads the manifest's "uv" (its own get(), the installed uv's version asked)
-            with mock.patch.object(old_install, "build") as build, \
+            import contextlib
+
+            def whole(build_root, folder, *a, **k):       # what the starter runs (beta 14 on points only at a whole version)
+                (Path(folder) / "companion").mkdir(parents=True, exist_ok=True)
+                (Path(folder) / "companion" / "BarrensVoice.pyw").write_text("", encoding="utf-8")
+                built(build_root, folder)
+            with mock.patch.object(old_install, "build", side_effect=whole) as build, \
                     mock.patch.object(old_update, "get", side_effect=lambda url, timeout=0: files[url]), \
-                    mock.patch.object(old_update, "uv_version", return_value="0.13.7"):
+                    mock.patch.object(old_update, "uv_version", return_value="0.13.7"), \
+                    (mock.patch.object(old_update, "version_runs", return_value=None)      # beta 14 on: the selfcheck
+                     if hasattr(old_update, "version_runs") else contextlib.nullcontext()):   # of a built version's Python
                 self.assertIsNotNone(updater.check())
                 build.assert_called_once()
                 self.assertEqual(build.call_args[0][3].name, "uv.new.exe")          # built with the release's uv
@@ -1930,7 +1944,7 @@ class OldClients(unittest.TestCase):
             self.assertFalse(updater.due(game_running=True, companion_running=False, busy=False))
             self.assertTrue(updater.due(game_running=False, companion_running=False, busy=False))
             updater.apply()
-            self.assertEqual(install.current_version(root), "0.4.0b99")                 # the old client switched
+            self.assertEqual(install.current_version(root), manifest["version"])        # the old client switched
 
 
 class UpdateInWindow(unittest.TestCase):
