@@ -200,6 +200,35 @@ class LiveSettings(unittest.TestCase):
         live.refresh()
         self.assertFalse(config["exit_with_wow"])
 
+    def test_the_launchers_window_reaches_it_through_live_json(self):
+        # config.json read-only: the launcher's window writes tmp/live.json; the last of the two files changed wins
+        import os
+        with tempfile.TemporaryDirectory() as d:
+            path, live_path = Path(d) / "config.json", Path(d) / "live.json"
+            path.write_text(json.dumps({"exit_with_wow": True}), encoding="utf-8")
+            config = {"exit_with_wow": True}
+            live = companion.LiveConfig(config, path, None, live_path)
+            live.refresh()
+            self.assertIs(config["exit_with_wow"], True)                  # no live.json yet: the file's
+            companion.write_live({"exit_with_wow": False, "rate": 3}, live_path)
+            self.assertEqual(json.loads(live_path.read_text(encoding="utf-8")), {"exit_with_wow": False})
+            live.refresh()
+            self.assertIs(config["exit_with_wow"], False)
+            live.refresh()
+            self.assertIs(config["exit_with_wow"], False)                 # unchanged files: nothing read again
+            path.write_text(json.dumps({"exit_with_wow": True}), encoding="utf-8")   # edited by hand later
+            os.utime(path, ns=(10**18, 10**18))
+            live.refresh()
+            self.assertIs(config["exit_with_wow"], True)
+            live_path.write_text("{half", encoding="utf-8")                # broken: kept as it was
+            os.utime(live_path, ns=(2 * 10**18, 2 * 10**18))
+            live.refresh()
+            self.assertIs(config["exit_with_wow"], True)
+            # a companion not started by the launcher has no live file to read
+            config2 = {"exit_with_wow": True}
+            companion.write_live({"exit_with_wow": False}, live_path)
+            companion.LiveConfig(config2, path, None, None).refresh()
+            self.assertIs(config2["exit_with_wow"], True)
 
 class ServiceFrames(unittest.TestCase):
     """Frames that are not chat: state counts even in the frame that was up at the start, a command

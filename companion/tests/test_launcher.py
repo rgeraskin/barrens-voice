@@ -3,6 +3,7 @@ import os
 import json
 import tempfile
 import unittest
+from types import SimpleNamespace
 from pathlib import Path
 
 
@@ -277,6 +278,30 @@ class Config(unittest.TestCase):
         with mock.patch.object(model, "update_config", side_effect=model.BrokenConfig("config.json не читается")):
             app.App.set_config(win, game="forever")
         self.assertEqual(said, ["WARN", "WARN", "WARN"])
+
+
+class LiveFromTheWindow(unittest.TestCase):
+    def test_a_change_config_json_did_not_take_reaches_the_running_companion(self):
+        # «Закрываться вместе с игрой» unchecked with config.json read-only: the companion still ended with the game
+        import json
+        import tempfile
+        from unittest import mock
+        import bv.__main__ as companion
+        from bv.launcher import app, model
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(companion, "LIVE_FILE", Path(d) / "live.json"):
+            live = Path(d) / "live.json"
+            win = config_window({"exit_with_wow": True}, lambda *a, **k: None)
+            win.companion = SimpleNamespace(running=True)
+            with mock.patch.object(model, "update_config", side_effect=model.ConfigNotWritten("config.json не записывается")):
+                app.App.set_config(win, exit_with_wow=False)
+            self.assertEqual(json.loads(live.read_text(encoding="utf-8")), {"exit_with_wow": False})
+            live.unlink()
+            with mock.patch.object(model, "update_config", side_effect=lambda **kw: kw):
+                app.App.set_config(win, rate=4)                       # not a live setting: nothing to share
+                self.assertFalse(live.exists())
+                win.companion.running = False
+                app.App.set_config(win, exit_with_wow=True)           # no companion: start_companion writes it
+                self.assertFalse(live.exists())
 
 
 class StateLines(unittest.TestCase):
@@ -1985,12 +2010,22 @@ class UpdateInWindow(unittest.TestCase):
         # a change config.json did not take held in the window only: «компаньон запущен (WoW Retail)» while the
         # companion read Forever from the file, and with «Запускать игру…» the window went to the tray for a game
         # the companion did not launch. The game and the launch choice go on its command line
+        import json
+        import tempfile
+        from unittest import mock
+        import bv.__main__ as companion
+
         def started(selected, launch_wow, args=None, extra=()):
             got = []
             win = self.ns(companion=self.ns(running=False, start=got.append), busy="", selected=selected,
-                          addon_missing=lambda: False, config={"game": selected, "launch_wow": launch_wow},
+                          addon_missing=lambda: False,
+                          config={"game": selected, "launch_wow": launch_wow, "exit_with_wow": not launch_wow},
                           extra=list(extra), say=lambda *a: None, settle_due=False)
-            self.assertTrue(self.app.App.start_companion(win, args))
+            with tempfile.TemporaryDirectory() as d, mock.patch.object(companion, "LIVE_FILE", Path(d) / "live.json"):
+                self.assertTrue(self.app.App.start_companion(win, args))
+                # «Закрываться вместе с игрой» as the window has it, for the companion's LiveConfig
+                self.assertEqual(json.loads((Path(d) / "live.json").read_text(encoding="utf-8")),
+                                 {"exit_with_wow": not launch_wow})
             self.assertTrue(win.settle_due)                                            # a run that may settle
             return got[0]
         self.assertEqual(started("retail", True), ["--retail", "--launch"])

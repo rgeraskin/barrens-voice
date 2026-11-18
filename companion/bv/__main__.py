@@ -303,26 +303,57 @@ class LiveConfig:
     built, the game launched) is taken at the first look; None reads the file then."""
     KEYS = ("exit_with_wow",)
 
-    def __init__(self, config: dict, path: Path = CONFIG_PATH, stamp=None):
+    def __init__(self, config: dict, path: Path = CONFIG_PATH, stamp=None, live: Path | None = None):
         self.config, self.path, self.stamp = config, path, stamp
+        # the launcher's window (LIVE_FILE, write_live): a change config.json did not take (read-only) still
+        # reaches a companion the launcher started; whichever of the two files changed last wins
+        self.live, self.live_stamp = live, None
 
     def refresh(self) -> None:
-        if _stamp(self.path) == self.stamp:
-            return
-        try:
-            stamp, saved = read_config(self.path)
-        except (OSError, ConfigError):   # being written, held by an antivirus, broken: the next look tries again
-            return
-        self.stamp = stamp                # only a read that worked counts as seen
-        for key in self.KEYS:            # of the default's type: "false" typed as text is no False
+        if _stamp(self.path) != self.stamp:
+            try:
+                stamp, saved = read_config(self.path)
+            except (OSError, ConfigError):   # being written, held by an antivirus, broken: the next look tries again
+                pass
+            else:
+                self.stamp = stamp            # only a read that worked counts as seen
+                self._take(saved)
+        if self.live is not None:
+            stamp = _stamp(self.live)
+            if stamp is not None and stamp != self.live_stamp:
+                try:
+                    saved = json.loads(self.live.read_text(encoding="utf-8"))
+                except (OSError, ValueError):
+                    return
+                if isinstance(saved, dict):
+                    self.live_stamp = stamp
+                    self._take(saved)
+
+    def _take(self, saved: dict) -> None:
+        for key in self.KEYS:                # of the default's type: "false" typed as text is no False
             if isinstance(saved.get(key), type(DEFAULT_CONFIG[key])):
                 self.config[key] = saved[key]
+
+
+def write_live(config: dict, path: Path | None = None) -> None:
+    """The launcher's side of LiveConfig: its keys as the launcher's window has them, in tmp/live.json (the data
+    folder's tmp, writable when config.json is not). Written before each start of the companion and at each
+    change of one of them while it runs; a failed write leaves the companion with config.json's value."""
+    path = path or LIVE_FILE
+    tmp = path.with_name(path.name + ".tmp")
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp.write_text(json.dumps({k: config[k] for k in LiveConfig.KEYS if k in config}), encoding="utf-8")
+        os.replace(tmp, path)
+    except OSError:
+        tmp.unlink(missing_ok=True)
 
 
 MODELS_READY = DATA_DIR / ".models_ready"
 # the launcher (bv.launcher): what the companion does, and its word to stop
 STATE_FILE = DATA_DIR / "tmp" / "state.json"
 STOP_FILE = DATA_DIR / "tmp" / "stop"
+LIVE_FILE = DATA_DIR / "tmp" / "live.json"   # LiveConfig's keys as the launcher's window has them (write_live)
 RESTART = 3               # exit code: start me again (online) - the launcher does it
 ALREADY = 4               # exit code: another companion runs
 CONFIG_ERROR = 5          # exit code: config.json cannot be read - the player's file, not the version (no rollback)
@@ -624,7 +655,7 @@ def main() -> int:
     seen_lines = SeenLines(DATA_DIR / "tmp" / "seen_lines.txt")
     # --launch / --no-launch: the launcher's Play and its start for a game already running
     want_launch = "--launch" in sys.argv or (config["launch_wow"] and "--no-launch" not in sys.argv)
-    live = LiveConfig(config, CONFIG_PATH, config_stamp)   # from the file as read: a change from now on is seen
+    live = LiveConfig(config, CONFIG_PATH, config_stamp, LIVE_FILE if os.environ.get(LAUNCHED) else None)   # from the file as read: a change from now on is seen
     if want_launch and launch.launch_allowed(log):
         # the race voices come from the client's files: (re)made before the game, after an update
         from .f5engine import prepare_voices

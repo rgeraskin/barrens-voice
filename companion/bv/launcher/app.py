@@ -80,6 +80,16 @@ def launcher_log(message: str) -> None:
         pass
 
 
+def share_live(window, changes: dict) -> None:
+    """A change of a live setting (LiveConfig.KEYS: «Закрываться вместе с игрой») to the running companion through
+    tmp/live.json - also when config.json did not take it (read-only): the companion would end with the game
+    while the window said it stays."""
+    from ..__main__ import LiveConfig, write_live
+    companion = getattr(window, "companion", None)
+    if companion is not None and companion.running and set(changes) & set(LiveConfig.KEYS):
+        write_live(window.config)
+
+
 class App:
     def __init__(self, root: tk.Tk, args: dict, scale: float = 1.0):
         self.root, self.args, self.scale = root, args, scale
@@ -200,7 +210,9 @@ class App:
         the next change the file takes (`pending`), not lost to it. Each of the two is said once (again only after a
         write that worked): a file that broke after one that could not be written is said too."""
         try:
-            return self.write_config(**changes)
+            config = self.write_config(**changes)
+            share_live(self, changes)
+            return config
         except model.BrokenConfig as e:
             self.pending = changes = {**self.pending, **changes}
             self.config = {**self.config, **changes}
@@ -211,6 +223,7 @@ class App:
                     self.say(f"{e} — изменения действуют, а в файл запишутся, когда его снова можно будет изменить", "WARN")
                 else:
                     self.say(f"{e} — изменения действуют, а в файл запишутся, когда он будет исправлен", "WARN")
+            share_live(self, changes)
             return self.config
 
     def write_config(self, **changes) -> dict:
@@ -256,6 +269,8 @@ class App:
         # companion reads, may not have taken them (set_config)
         if not launch_flags & set(extra + flags):
             flags.append("--launch" if self.config.get("launch_wow") else "--no-launch")
+        from ..__main__ import write_live
+        write_live(self.config)                # «Закрываться вместе с игрой» as the window has it, read live
         self.companion.start([f"--{self.selected}", *extra, *flags])
         self.say(f"компаньон запущен ({GAME_NAMES[self.selected]})")
         return True
