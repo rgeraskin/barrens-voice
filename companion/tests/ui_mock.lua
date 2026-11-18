@@ -1190,6 +1190,8 @@ assert(#welcome == 5 and welcome[1]:find("озвучка чата") and welcome[
     and welcome[3]:find("приложение%-компаньон") and welcome[5]:find("«Помощь»", 1, true)
     and welcome[5]:find("сообщество в Battle.net", 1, true), "whether the reading works, then the welcome")
 assert(welcome[2]:find("Barrens Voice 0.4.0b1", 1, true), "the welcome names the addon's version")
+assert(welcome[2]:sub(1, #ns.ICON + 1) == ns.ICON .. " " and welcome[2]:find(ns.PREFIX, 1, true)
+    and not welcome[3]:find(ns.ICON, 1, true), "the icon before the welcome's first line only")
 assert(ns.db.seenVersion == "0.4.0b15", "the program's version is kept")
 assert(ns.db.newsSeen["0.4.0"] and ns.db.newsSeen["0.1.0"], "the first run: every entry seen")
 ns.firstRun = false

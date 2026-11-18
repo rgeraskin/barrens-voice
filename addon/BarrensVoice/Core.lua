@@ -312,7 +312,7 @@ end
 local CLUB_LINK_COLOR = "|cff82c5ff"   -- BATTLENET_FONT_COLOR, when the client's own is not there
 local GREY = "|cff999999"
 local ICON = "|TInterface\\AddOns\\BarrensVoice\\Icon:14:14:0:0:64:64:4:60:4:60|t"
-ns.ICON = ICON       -- before the prefix of a line worth noticing (the community, News.lua)
+ns.ICON = ICON       -- before the prefix of a line worth noticing (the welcome, the community, News.lua)
 local CLUB_NAME = "Barrens Voice"      -- how the community is told among the player's own
 local JOIN_WAIT = 300                  -- seconds after «Открыть» a community joined is greeted
 local askedAt                          -- when «Открыть» last gave the link
@@ -888,7 +888,7 @@ end
 --- the settings are.
 function ns.Welcome()
     local version = Version()
-    print(PREFIX .. ("|cffffd100добро пожаловать!|r Barrens Voice %s — озвучка чата: у каждого игрока свой голос "
+    print(ICON .. " " .. PREFIX .. ("|cffffd100добро пожаловать!|r Barrens Voice %s — озвучка чата: у каждого игрока свой голос "
         .. "его расы и пола."):format(version))
     print(PREFIX .. "читает вслух приложение-компаньон Barrens Voice (Windows): без него аддон молчит. Удобнее всего "
         .. "запускать игру через него — оно само запустит игру.")

@@ -126,6 +126,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   On retail, the «Каналы и чтение» tab says on top that the game closes the whole chat to addons in dungeons, raids, boss fights, Mythic+ and PvP: there nothing is read.
 
+- The first run's welcome is easier to see
+
+  It comes 5 s after login, after «озвучка чата работает», so other addons' lines at login no longer bury it; its first line has the addon's icon, as the «Что нового» line and the community's lines do, and it names the community in Battle.net among the places to write.
+
 ### Removed
 
 - BREAKING: `WowChatVoice-Retail.cmd`
