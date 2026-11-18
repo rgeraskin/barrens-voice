@@ -87,13 +87,19 @@ class Assigner:
             return None
         ids = {s.id for s in pool}
         entry = self.known.get(key)
-        if entry is None and key.startswith("bn:") and battle_tag_name(key) == key:
+        if key.startswith("bn:") and battle_tag_name(key) == key:
             # "BN:Вася" without the digits: a line replayed from the addon's history (/bv last), which keeps no
-            # friend's whole tag - the voice of the "BN:Вася#1234" heard last
+            # friend's whole tag - the voice of the "BN:Вася#1234" heard last, before one kept under the name alone
             same = [(e.get("seen", 0), k) for k, e in self.known.items() if battle_tag_name(k) == key and k != key]
             if same:
                 key = max(same)[1]
                 entry = self.known[key]
+        elif key.startswith("bn:"):
+            # the whole tag: a voice given to the name alone (a replayed line before the friend's first live one
+            # since the voices were reset or forgotten) is theirs - one entry, one voice
+            bare = self.known.pop(battle_tag_name(key), None)
+            if entry is None and bare is not None:
+                entry = self.known[key] = bare
         if entry and entry.get("slot") in ids:
             entry["seen"] = now
             self._changed()

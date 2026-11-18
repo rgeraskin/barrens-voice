@@ -126,6 +126,38 @@ class Assign(unittest.TestCase):
         self.assertIsNotNone(a.slot_for("BN:Брэнн", "", "", now=7))
         self.assertIn("bn:брэнн", a.known)
 
+    def test_battle_net_replay_before_the_whole_tag(self):
+        # the friend in the history but not in assignments.json (voices reset or forgotten): the replay comes first
+        a = Assigner(slots(), self.path)
+        replayed = a.slot_for("BN:Друг", "Orc", "2", now=1).id
+        for i in range(3):
+            a.slot_for(f"Орк{i}", "Orc", "2", now=2 + i)
+        live = a.slot_for("BN:Друг#1234", "Orc", "2", now=10).id
+        self.assertEqual(live, replayed)                                           # the name's voice is theirs
+        self.assertEqual([k for k in a.known if k.startswith("bn:")], ["bn:друг#1234"])
+        self.assertEqual(a.slot_for("BN:Друг", "Orc", "2", now=11).id, live)
+        self.assertEqual(a.slot_for("BN:Друг#1234", "Orc", "2", now=12).id, live)
+        # and the other order: the whole tag first, then the replay
+        b = Assigner(slots(), Path(self.dir.name) / "b.json")
+        live = b.slot_for("BN:Друг#1234", "Orc", "2", now=1).id
+        for i in range(3):
+            b.slot_for(f"Орк{i}", "Orc", "2", now=2 + i)
+        self.assertEqual(b.slot_for("BN:Друг", "Orc", "2", now=10).id, live)
+        self.assertEqual(b.slot_for("BN:Друг#1234", "Orc", "2", now=11).id, live)
+        self.assertNotIn("bn:друг", b.known)
+
+    def test_battle_net_name_alone_kept_by_an_older_version(self):
+        # a file with both entries (written before): the whole tag's voice wins, and the name's entry goes
+        import json
+        import time
+        now = time.time()
+        self.path.write_text(json.dumps({"bn:друг": {"slot": "orc-male", "seen": now - 2},
+                                         "bn:друг#1234": {"slot": "orc-male#60", "seen": now - 1}}), encoding="utf-8")
+        a = Assigner(slots(), self.path)
+        self.assertEqual(a.slot_for("BN:Друг", "Orc", "2", now=now).id, "orc-male#60")
+        self.assertEqual(a.slot_for("BN:Друг#1234", "Orc", "2", now=now + 1).id, "orc-male#60")
+        self.assertNotIn("bn:друг", a.known)
+
 
 class Regexes(unittest.TestCase):
     SAVED = r'WTS=продам\n~(\\d+)\\s*кк\\b=\\g<1>000000\n~(\\d+)\\s*к\\b=\\g<1>000\n~[=битая\n~(?=x)y=z'
