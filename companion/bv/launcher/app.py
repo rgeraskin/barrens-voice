@@ -568,8 +568,7 @@ class App:
             threading.Thread(target=self._check_update, daemon=True, name="update-check").start()
         if self.companion.running and not self.reload_told and self.companion.state().get("reload_hint"):
             self.reload_told = True          # started after the player entered the world: say it outside the game too
-            self.tray.notify("Озвучка включена. Если окно чата не прячется — сделай в игре /reload: аддон узнаёт "
-                             "о Barrens Voice при входе в игру и /reload.")
+            self.tray.notify("Озвучка включена. Если окно чата не прячется — сделай в игре /reload.")
         # the game started from Battle.net while the companion is not running (waiting in the tray, or
         # after the last game was closed): start it for that game - unless it ended with an error
         if (self.running_game and not self.companion.running and not self.busy and self.exit_seen
