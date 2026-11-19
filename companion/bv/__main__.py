@@ -246,20 +246,9 @@ def _write_config(path: Path, config: dict, log=log) -> bool:
         return False
 
 
-def _stamp(path: Path):
-    """What tells one state of config.json from another (None: no file, or it cannot be looked at)."""
-    try:
-        info = path.stat()
-    except OSError:
-        return None
-    return info.st_mtime_ns, info.st_size
-
-
-def read_config(path: Path) -> tuple[object, dict]:
-    """(stamp, settings) of config.json. The stamp is taken before the read: a change made while it is read
-    gets a newer stamp and is read again. Raises ConfigError when the file is not JSON of settings, OSError
-    when it cannot be read."""
-    stamp = _stamp(path)
+def read_config(path: Path) -> dict:
+    """The settings in config.json. Raises ConfigError when the file is not JSON of settings, OSError when it
+    cannot be read."""
     try:
         saved = json.loads(path.read_text(encoding="utf-8-sig"))   # -sig: Notepad's BOM is no error
     except json.JSONDecodeError as e:
@@ -268,95 +257,53 @@ def read_config(path: Path) -> tuple[object, dict]:
         raise ConfigError(f"config.json не читается: {e}") from e
     if not isinstance(saved, dict):
         raise ConfigError("config.json не читается: в нём должны быть настройки в фигурных скобках { }")
-    return stamp, saved
+    return saved
 
 
-def load_config_stamped(path: Path | None = None, log=log) -> tuple[dict, object]:
-    """`load_config` and the stamp of the file it read (`LiveConfig` starts from it); None when the companion
-    wrote the file itself, so that the first look reads it again. A write that fails is logged, not raised."""
+def load_config(path: Path | None = None, log=log) -> dict:
+    """DEFAULT_CONFIG with config.json over it; settings new to the file written into it (a write that fails
+    is logged, not raised). Raises ConfigError when the file is not JSON of settings (the launcher shows why)."""
     path = path or CONFIG_PATH
     config = dict(DEFAULT_CONFIG)
     if not path.exists():
         _write_config(path, config, log)
-        return config, None
-    stamp, saved = read_config(path)
+        return config
+    saved = read_config(path)
     config.update(saved)
     config["_help"] = DEFAULT_CONFIG["_help"]           # this version's text, not the one the file was made with
     settle_numbers(config, log)
     if any(key not in saved for key in DEFAULT_CONFIG) or saved["_help"] != config["_help"]:
-        # new settings or a new _help: write them in
-        if _write_config(path, config, log):
-            stamp = None
-    return config, stamp
+        _write_config(path, config, log)                # new settings or a new _help: written in
+    return config
 
 
-def load_config(path: Path | None = None, log=log) -> dict:
-    """DEFAULT_CONFIG with config.json over it; settings new to the file written into it. Raises
-    ConfigError when the file is not JSON of settings (the launcher shows why)."""
-    return load_config_stamped(path, log)[0]
+class GameWatch:
+    """The voice-over ends with the game it saw: the race voices leave video memory, whatever the launcher
+    does after (closes, or waits for the next game in the tray). Looked at every 2 s; gone for 10 s (a client
+    restarting itself, an update) counts as closed. A game never seen (started before Battle.net opened it,
+    «Играть» still launching) keeps it waiting."""
 
+    def __init__(self, running=None):
+        if running is None:
+            from .launch import wow_running as running
+        self.running, self.seen, self.gone_since, self.checked = running, False, None, None
 
-class LiveConfig:
-    """Settings the launcher changes while the companion runs, taken from config.json again when it changes:
-    «Закрываться вместе с игрой» unchecked during the game must keep the companion when the game closes.
-    `stamp` is the file's as `load_config_stamped` read it, so a change made since (while the voice bank is
-    built, the game launched) is taken at the first look; None reads the file then."""
-    KEYS = ("exit_with_wow",)
-
-    def __init__(self, config: dict, path: Path = CONFIG_PATH, stamp=None, live: Path | None = None):
-        self.config, self.path, self.stamp = config, path, stamp
-        # the launcher's window (LIVE_FILE, write_live): a change config.json did not take (read-only) still
-        # reaches a companion the launcher started; whichever of the two files changed last wins
-        self.live, self.live_stamp = live, None
-
-    def refresh(self) -> None:
-        if _stamp(self.path) != self.stamp:
-            try:
-                stamp, saved = read_config(self.path)
-            except (OSError, ConfigError):   # being written, held by an antivirus, broken: the next look tries again
-                pass
-            else:
-                self.stamp = stamp            # only a read that worked counts as seen
-                self._take(saved)
-        if self.live is not None:
-            stamp = _stamp(self.live)
-            if stamp is not None and stamp != self.live_stamp:
-                try:
-                    saved = json.loads(self.live.read_text(encoding="utf-8"))
-                except (OSError, ValueError):
-                    return
-                if isinstance(saved, dict):
-                    self.live_stamp = stamp
-                    self._take(saved)
-
-    def _take(self, saved: dict) -> None:
-        for key in self.KEYS:                # of the default's type: "false" typed as text is no False
-            if isinstance(saved.get(key), type(DEFAULT_CONFIG[key])):
-                self.config[key] = saved[key]
-
-
-def write_live(config: dict, path: Path | None = None) -> None:
-    """The launcher's side of LiveConfig: its keys as the launcher's window has them, in tmp/live.json (the data
-    folder's tmp, writable when config.json is not). Written before each start of the companion and at each
-    change of one of them while it runs; a failed write leaves the companion with config.json's value."""
-    path = path or LIVE_FILE
-    tmp = path.with_name(path.name + ".tmp")
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp.write_text(json.dumps({k: config[k] for k in LiveConfig.KEYS if k in config}), encoding="utf-8")
-        os.replace(tmp, path)
-    except OSError:
-        try:
-            tmp.unlink(missing_ok=True)
-        except OSError:
-            pass                                 # what is left is overwritten by the next write
+    def closed(self, now: float) -> bool:
+        if self.checked is not None and now - self.checked <= 2:
+            return False
+        self.checked = now
+        if self.running():
+            self.seen, self.gone_since = True, None
+        elif self.seen:
+            self.gone_since = self.gone_since if self.gone_since is not None else now
+            return now - self.gone_since > 10
+        return False
 
 
 MODELS_READY = DATA_DIR / ".models_ready"
 # the launcher (bv.launcher): what the companion does, and its word to stop
 STATE_FILE = DATA_DIR / "tmp" / "state.json"
 STOP_FILE = DATA_DIR / "tmp" / "stop"
-LIVE_FILE = DATA_DIR / "tmp" / "live.json"   # LiveConfig's keys as the launcher's window has them (write_live)
 RESTART = 3               # exit code: start me again (online) - the launcher does it
 ALREADY = 4               # exit code: another companion runs
 CONFIG_ERROR = 5          # exit code: config.json cannot be read - the player's file, not the version (no rollback)
@@ -608,7 +555,7 @@ def main() -> int:
     make_dpi_aware()
 
     try:
-        config, config_stamp = load_config_stamped()
+        config = load_config()
     except (ConfigError, OSError) as e:                 # before anything else: nothing works without it
         log(f"ОШИБКА: {e}")
         log("    исправь файл или удали его — лаунчер создаст новый с настройками по умолчанию")
@@ -680,7 +627,6 @@ def main() -> int:
     seen_lines = SeenLines(DATA_DIR / "tmp" / "seen_lines.txt")
     # --launch / --no-launch: the launcher's Play and its start for a game already running
     want_launch = "--launch" in sys.argv or (config["launch_wow"] and "--no-launch" not in sys.argv)
-    live = LiveConfig(config, CONFIG_PATH, config_stamp, LIVE_FILE if os.environ.get(LAUNCHED) else None)   # from the file as read: a change from now on is seen
     if want_launch and launch.launch_allowed(log):
         # the race voices come from the client's files: (re)made before the game, after an update
         from .f5engine import prepare_voices
@@ -740,7 +686,7 @@ def main() -> int:
     if "--f5" in sys.argv or (saved_voices(config) or config["engine"]) == "f5":
         engines.want("f5")
 
-    wow_seen, wow_gone_since, wow_checked = False, None, 0.0
+    game = GameWatch()
     capturer = Capturer(config, log)
     from . import locate
     known = locate.known_place(config)
@@ -760,7 +706,6 @@ def main() -> int:
         now = time.monotonic()
         if now - dictionary_checked > 2:
             dictionary.refresh()               # a changed Dictionary.lua works within seconds
-            live.refresh()                     # the launcher's checks, changed while running
             dictionary_checked = now
             fresh = online.take() if online else None
             if fresh and fresh["revision"] > dictionary.revision:      # applied here, between chat lines
@@ -772,16 +717,10 @@ def main() -> int:
                 log("остановлен лаунчером")
                 state.report(phase="stopped")
                 return 0
-        if config["exit_with_wow"] and now - wow_checked > 2:
-            wow_checked = now
-            if launch.wow_running():
-                wow_seen, wow_gone_since = True, None
-            elif wow_seen:
-                wow_gone_since = wow_gone_since or now
-                if now - wow_gone_since > 10:
-                    log("игра закрыта — выхожу")
-                    state.report(phase="game_closed")
-                    return 0
+        if game.closed(now):
+            log("игра закрыта — выхожу")
+            state.report(phase="game_closed")
+            return 0
         step = strip.poll(now)
         if step.frame is not None:
             lines.handle(protocol.parse(step.frame.payload), step.first)

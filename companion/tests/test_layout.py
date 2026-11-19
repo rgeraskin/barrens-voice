@@ -194,12 +194,32 @@ class Layout(unittest.TestCase):
                     a.update, a.busy = u, busy
                     a.updater = SimpleNamespace(status=status, ready="x" if status == "ready" else None) if u else None
                     a.config = {"launch_wow": True, "exit_with_wow": True}
+                    a.autostart = busy == "stopping"          # «Закрываться вместе с игрой» grey in half the states
                     a.drawn = None
                     a.redraw()
                     self.assertTrue(a.tray.said.startswith("Barrens Voice Launcher — "), a.tray.said)   # the program's name
                     self.check(a.canvas, f"главное окно ×{scale}, игры «{gname}», {st.get('phase')}/{st.get('voices')}, "
                                          f"игра {running_game}, обновление {u and u['version']} {status} {busy}", found)
         self.report(found)
+
+    def test_the_close_check_grey_with_the_start_with_windows(self):
+        # the start with Windows always stays in the tray after the game: «Закрываться вместе с игрой» is grey then,
+        # its value kept, no click, and its hint says why
+        from bv.launcher import app
+        from bv.launcher.paint import DIM, PARCHMENT
+        a = self.make(1.0)
+        a.config = {"launch_wow": False, "exit_with_wow": True}
+        for autostart, fill, tip in ((True, DIM, "exit_with_wow_off"), (False, PARCHMENT, "exit_with_wow")):
+            a.autostart, a.drawn = autostart, None
+            a.redraw()
+            c = a.canvas
+            label = [i for i in c.find_withtag("check1") if c.type(i) == "text"]
+            self.assertEqual([c.itemcget(i, "text") for i in label], ["Закрываться вместе с игрой"])
+            self.assertEqual(c.itemcget(label[0], "fill"), fill)
+            self.assertEqual(bool(c.tag_bind("check1", "<Button-1>")), not autostart)
+            self.assertEqual(a.p.tips["check1"], app.TIPS[tip])
+            self.assertTrue(any(c.type(i) == "line" for i in c.find_withtag("check1")))        # its value still shown
+            self.assertEqual(problems(c), [])
 
     def test_settings_and_help(self):
         found: list[tuple[str, str]] = []

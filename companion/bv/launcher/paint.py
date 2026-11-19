@@ -221,13 +221,20 @@ class Painter:
         self.hover(tag, lambda: self.c.itemconfig(tag, fill="#fff2a8"), lambda: self.c.itemconfig(tag, fill=GOLD))
         self.click(tag, action)
 
-    def check(self, x, y, text, on: bool, tag, action, tip=None) -> None:
+    def check(self, x, y, text, on: bool, tag, action, tip=None, enabled: bool = True) -> None:
+        """A check box with its label; not `enabled`: grey, its value kept, no click - its hint says why."""
         if tip:
             self.tips[tag] = tip
-        self.rounded(x, y - 8, x + 16, y + 8, r=3, fill="#1b120a", outline="#b8862b", tags=(tag, tag + "box"))
+        edge = "#b8862b" if enabled else "#5a4220"
+        self.rounded(x, y - 8, x + 16, y + 8, r=3, fill="#1b120a", outline=edge, tags=(tag, tag + "box"))
         if on:
-            self.c.create_line(x + 3, y, x + 7, y + 5, x + 14, y - 6, fill=GOLD, width=3, tags=tag)
-        self.c.create_text(x + 26, y, text=text, anchor="w", fill=PARCHMENT, font=self.body, tags=tag)
+            self.c.create_line(x + 3, y, x + 7, y + 5, x + 14, y - 6, fill=GOLD if enabled else DIM, width=3, tags=tag)
+        self.c.create_text(x + 26, y, text=text, anchor="w", fill=PARCHMENT if enabled else DIM, font=self.body, tags=tag)
+        if not enabled:                     # the hint only, on hover; a tag's bindings outlive a redraw: the click off
+            self.c.tag_unbind(tag, "<Button-1>")
+            self.c.tag_bind(tag, "<Enter>", lambda e: self._tip_soon(tag))
+            self.c.tag_bind(tag, "<Leave>", lambda e: self.hide_tip())
+            return
         self.hover(tag, lambda: self.c.itemconfig(tag + "box", outline=GOLD),
                    lambda: self.c.itemconfig(tag + "box", outline="#b8862b"))
         self.click(tag, action)

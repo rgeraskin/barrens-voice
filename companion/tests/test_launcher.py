@@ -365,26 +365,19 @@ class LaunchFromTheWindow(unittest.TestCase):
 
 class LiveFromTheWindow(unittest.TestCase):
     def test_a_hand_edit_made_while_the_window_was_open_is_taken_at_the_next_start(self):
-        # the window read config.json at its start; the player then opened it from Settings and set both off.
-        # The next start must go by the file (no --launch, live.json with exit_with_wow false) unless the window
-        # holds a change of its own the file did not take (pending)
-        import json
-        import tempfile
+        # the window read config.json at its start; the player then opened it from Settings and set «Запускать
+        # игру…» off. The next start must go by the file (no --launch) unless the window holds a change of its own
+        # the file did not take (pending)
         from unittest import mock
-        import bv.__main__ as companion
         from bv.launcher import app, model
         file = {"game": "forever", "launch_wow": False, "exit_with_wow": False}
-        for pending, launch, exit_with_wow in (({}, "--no-launch", False),
-                                               ({"exit_with_wow": True}, "--no-launch", True)):
+        for pending, launch in (({}, "--no-launch"), ({"launch_wow": True}, "--launch")):
             got = []
             win = SimpleNamespace(companion=SimpleNamespace(running=False, start=got.append), busy="", selected="forever",
                                   addon_missing=lambda: False, pending=dict(pending), extra=[], say=lambda *a: None,
                                   settle_due=False, config={"game": "forever", "launch_wow": True, "exit_with_wow": True})
-            with tempfile.TemporaryDirectory() as d, mock.patch.object(companion, "LIVE_FILE", Path(d) / "live.json"), \
-                    mock.patch.object(model, "read_config", lambda strict=False: dict(file)):
+            with mock.patch.object(model, "read_config", lambda strict=False: dict(file)):
                 self.assertTrue(app.App.start_companion(win))
-                self.assertEqual(json.loads((Path(d) / "live.json").read_text(encoding="utf-8")),
-                                 {"exit_with_wow": exit_with_wow})
             self.assertEqual(got[0], ["--forever", launch])
         # a file that cannot be read now: no voice-over (it would end at once on the same file, its error twice), and
         # the window is told what is wrong (check_config: the ERROR line, the state line)
@@ -394,32 +387,9 @@ class LiveFromTheWindow(unittest.TestCase):
                               addon_missing=lambda: False, pending={}, extra=[], say=lambda *a: None, settle_due=False,
                               config={"game": "forever", "launch_wow": True, "exit_with_wow": True},
                               check_config=lambda now, error: told.append(error))
-        with tempfile.TemporaryDirectory() as d, mock.patch.object(companion, "LIVE_FILE", Path(d) / "live.json"), \
-                mock.patch.object(model, "read_config", side_effect=broken):
+        with mock.patch.object(model, "read_config", side_effect=broken):
             self.assertFalse(app.App.start_companion(win))
         self.assertEqual((got, told), ([], [broken]))
-
-    def test_a_change_config_json_did_not_take_reaches_the_running_companion(self):
-        # «Закрываться вместе с игрой» unchecked with config.json read-only: the companion still ended with the game
-        import json
-        import tempfile
-        from unittest import mock
-        import bv.__main__ as companion
-        from bv.launcher import app, model
-        with tempfile.TemporaryDirectory() as d, mock.patch.object(companion, "LIVE_FILE", Path(d) / "live.json"):
-            live = Path(d) / "live.json"
-            win = config_window({"exit_with_wow": True}, lambda *a, **k: None)
-            win.companion = SimpleNamespace(running=True)
-            with mock.patch.object(model, "update_config", side_effect=model.ConfigNotWritten("config.json не записывается")):
-                app.App.set_config(win, exit_with_wow=False)
-            self.assertEqual(json.loads(live.read_text(encoding="utf-8")), {"exit_with_wow": False})
-            live.unlink()
-            with mock.patch.object(model, "update_config", side_effect=lambda **kw: kw):
-                app.App.set_config(win, rate=4)                       # not a live setting: nothing to share
-                self.assertFalse(live.exists())
-                win.companion.running = False
-                app.App.set_config(win, exit_with_wow=True)           # no companion: start_companion writes it
-                self.assertFalse(live.exists())
 
 
 class StateLines(unittest.TestCase):
@@ -2147,14 +2117,15 @@ class UpdateInWindow(unittest.TestCase):
                 self.assertEqual(companion.state(), {})
 
 
-    def ended_with_the_game(self, exit_with_wow, resident=False):
+    def ended_with_the_game(self, exit_with_wow, autostart=False):
         """The companion ended because the game closed, a version prepared: what the launcher does."""
         done = []
         win = self.ns(exit_seen=False, last_code=None, companion_started=0.0, companion_game=None, running_game=None,
                       game=lambda key: None, tray=self.ns(notify=done.append), say=lambda *a: None, busy="",
                       companion=self.ns(state=lambda: {"phase": "game_closed"}, running=False),
-                      config={"exit_with_wow": exit_with_wow}, resident=resident,
+                      config={"exit_with_wow": exit_with_wow}, autostart=autostart,
                       quit=lambda: done.append("quit"), relaunch=lambda updated=False: done.append(("relaunch", updated)))
+        win.closes_with_game = lambda: self.app.App.closes_with_game(win)
         win.updater = self.ns(due=lambda *a: True, apply=lambda: done.append("apply") or "0.4.1")
         win.closed = False
         self.app.App.companion_ended(win, 0)
@@ -2164,10 +2135,12 @@ class UpdateInWindow(unittest.TestCase):
 
     def test_update_after_the_game_closed(self):
         # closing with the game: the version is switched, no restart (it reopened the window, or started the game
-        # again with «Запускать игру вместе с лаунчером»); else the restart that does not start the game
+        # again with «Запускать игру вместе с лаунчером»); else the restart that does not start the game. With the
+        # start with Windows on the launcher always stays (the check is grey), whatever the check says
         self.assertEqual(self.ended_with_the_game(exit_with_wow=True), ["apply", "quit"])
         self.assertEqual(self.ended_with_the_game(exit_with_wow=False), ["apply", ("relaunch", True)])
-        self.assertEqual(self.ended_with_the_game(exit_with_wow=True, resident=True), ["apply", ("relaunch", True)])
+        self.assertEqual(self.ended_with_the_game(exit_with_wow=True, autostart=True), ["apply", ("relaunch", True)])
+        self.assertEqual(self.ended_with_the_game(exit_with_wow=False, autostart=True), ["apply", ("relaunch", True)])
 
     def test_switch_waits_for_the_companions_end(self):
         done = []
@@ -2184,45 +2157,55 @@ class UpdateInWindow(unittest.TestCase):
         # «готова — установится, когда закроешь игру» came with no game at all, the switch a second later
         said = []
 
-        def win(game, running, exit_with_wow=False):
+        def win(game, running):
             return self.ns(exit_seen=True, running_game=game, busy="", companion=self.ns(running=running),
                            updater=self.ns(ready="0.4.1", due=lambda g, c, b: not g and not c, apply=lambda: None),
                            relaunch=lambda updated=False: None, say=lambda text, *a: said.append(text),
-                           config={"exit_with_wow": exit_with_wow})
+                           config={"exit_with_wow": False})
         w = win("forever", True)
         self.app.App.apply_update_when_idle(w)
         self.app.App.apply_update_when_idle(w)
         self.assertEqual(said, ["версия 0.4.1 установится, когда закроешь игру"])      # once
         said.clear()
-        w.running_game = None                                  # the game closed, the voice-over goes on: said too
-        self.app.App.apply_update_when_idle(w)
-        self.app.App.apply_update_when_idle(w)
-        self.assertEqual(said, ["версия 0.4.1 установится, когда остановится озвучка"])
-        said.clear()
         self.app.App.apply_update_when_idle(win(None, False))  # nothing to wait for: switched, no word of waiting
         self.assertEqual(said, [])
-        # «Закрываться вместе с игрой» on: the voice-over ends by itself a moment after the game - no word of it
-        w = win("forever", True, exit_with_wow=True)
-        self.app.App.apply_update_when_idle(w)
+        # the voice-over ends by itself a moment after the game it saw, «Закрываться вместе с игрой» or not: no word
         w.running_game = None
         self.app.App.apply_update_when_idle(w)
-        self.assertEqual(said, ["версия 0.4.1 установится, когда закроешь игру"])
+        self.assertEqual(said, [])
         # ... but a voice-over that has seen no game yet waits for one: said
-        said.clear()
-        self.app.App.apply_update_when_idle(win(None, True, exit_with_wow=True))
+        self.app.App.apply_update_when_idle(win(None, True))
         self.assertEqual(said, ["версия 0.4.1 установится, когда остановится озвучка"])
 
-    def test_no_autostart_while_config_json_does_not_read(self):
-        # a config.json that cannot be opened was read at every tick (400 ms) for the autostart, 0.1 s of waiting
-        # in the window's thread each time: the autostart waits for check_config to see it read
-        from bv.launcher import model
+    def test_the_start_with_windows_never_launches_the_game(self):
+        # «Запускать игру вместе с лаунчером»: the game only for a start by hand, not for the one at Windows
+        # sign-in (--tray), even without a tray to wait in
+        started, said = [], []
+        for resident, launched in ((False, True), (True, False)):
+            started.clear()
+            win = self.ns(args={"updated": False}, running_game=None, resident=resident, config={"launch_wow": True},
+                          start_companion=lambda args=None: started.append(args), say=said.append)
+            self.app.App.start_on_open(win)
+            self.assertEqual(started == [None], launched, resident)
 
-        def win(error):
-            return self.ns(running_game="forever", companion=self.ns(running=False), busy="", exit_seen=True,
-                           last_code=None, config_error=error, game=lambda key: object(), addon_missing=lambda: False)
-        self.assertTrue(self.app.App.autostart_due(win(None)))
-        self.assertFalse(self.app.App.autostart_due(win(model.ConfigNotOpened("config.json не открывается: x"))))
-        self.assertFalse(self.app.App.autostart_due(win(model.BrokenConfig("config.json не читается"))))
+    def test_a_second_start_by_hand_launches_the_game(self):
+        # the launcher waits in the tray; its shortcut asks it to show itself and, with «Запускать игру вместе с
+        # лаунчером», to launch the game - a second start with Windows only shows it
+        import tempfile
+        for written, launch_wow, game, running, played in (("play", True, None, False, True),
+                                                            ("", True, None, False, False),          # --tray
+                                                            ("play", False, None, False, False),
+                                                            ("play", True, "forever", False, False),
+                                                            ("play", True, None, True, False)):
+            done = []
+            win = self.ns(config={"launch_wow": launch_wow}, running_game=game, companion=self.ns(running=running),
+                          busy="", show=lambda: done.append("show"), play=lambda: done.append("play"))
+            with tempfile.TemporaryDirectory() as d:
+                path = Path(d) / "launcher.show"
+                path.write_text(written, encoding="utf-8")
+                self.app.App.second_start(win, path)
+                self.assertFalse(path.exists())
+            self.assertEqual(done, ["show", "play"] if played else ["show"], (written, launch_wow, game, running))
 
     def test_turning_auto_updates_on_checks_at_once(self):
         # a version found with automatic updates off waited for the next hourly check after the box was ticked
@@ -2247,10 +2230,7 @@ class UpdateInWindow(unittest.TestCase):
         # a change config.json did not take held in the window only: «компаньон запускается (WoW Retail)» while the
         # companion read Forever from the file, and with «Запускать игру…» the window went to the tray for a game
         # the companion did not launch. The game and the launch choice go on its command line
-        import json
-        import tempfile
         from unittest import mock
-        import bv.__main__ as companion
 
         def started(selected, launch_wow, args=None, extra=()):
             got = []
@@ -2258,12 +2238,8 @@ class UpdateInWindow(unittest.TestCase):
                           addon_missing=lambda: False,
                           config={"game": selected, "launch_wow": launch_wow, "exit_with_wow": not launch_wow},
                           extra=list(extra), say=lambda *a: None, settle_due=False, pending={})
-            with tempfile.TemporaryDirectory() as d, mock.patch.object(companion, "LIVE_FILE", Path(d) / "live.json"), \
-                    mock.patch.object(self.app.model, "read_config", lambda strict=False: dict(win.config)):
+            with mock.patch.object(self.app.model, "read_config", lambda strict=False: dict(win.config)):
                 self.assertTrue(self.app.App.start_companion(win, args))
-                # «Закрываться вместе с игрой» as the window has it, for the companion's LiveConfig
-                self.assertEqual(json.loads((Path(d) / "live.json").read_text(encoding="utf-8")),
-                                 {"exit_with_wow": not launch_wow})
             self.assertTrue(win.settle_due)                                            # a run that may settle
             return got[0]
         self.assertEqual(started("retail", True), ["--retail", "--launch"])
@@ -2277,7 +2253,7 @@ class UpdateInWindow(unittest.TestCase):
         def opened(running_game, launch_wow, updated):
             started = []
             win = self.ns(args={"updated": updated}, running_game=running_game, config={"launch_wow": launch_wow},
-                          start_companion=lambda args=None: started.append(args), say=lambda *a: None)
+                          resident=False, start_companion=lambda args=None: started.append(args), say=lambda *a: None)
             self.app.App.start_on_open(win)
             return started
         self.assertEqual(opened(None, True, False), [None])                               # the player's start: the game

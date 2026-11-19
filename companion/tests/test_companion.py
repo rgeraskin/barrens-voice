@@ -1,5 +1,6 @@
 """The companion's own plumbing that runs without Windows: config.json, service frames and chat lines,
 the files it writes into the addon."""
+import inspect
 import json
 import sys
 import tempfile
@@ -50,10 +51,9 @@ class LoadConfig(unittest.TestCase):
             for failure in ({"target": "os.replace"}, {"target": "pathlib.Path.write_text"}):
                 logged = []
                 with self.subTest(**failure), mock.patch(failure["target"], side_effect=PermissionError(13, "Access is denied")):
-                    config, stamp = companion.load_config_stamped(path, logged.append)
+                    config = companion.load_config(path, logged.append)
                 self.assertEqual(config["rate"], 3)                                   # the settings as read
                 self.assertEqual(config["_help"], companion.DEFAULT_CONFIG["_help"])
-                self.assertEqual(stamp, companion._stamp(path))                       # the file as it is: watched
                 self.assertEqual(path.read_text(encoding="utf-8"), mine)
                 self.assertEqual(sorted(p.name for p in Path(d).iterdir()), ["config.json"])   # no .tmp left
                 self.assertEqual(len(logged), 1)
@@ -62,7 +62,7 @@ class LoadConfig(unittest.TestCase):
                 self.assertEqual(level_of(logged[0]), "WARN")
             path.unlink()
             with mock.patch("os.replace", side_effect=PermissionError(13, "Access is denied")):
-                self.assertEqual(companion.load_config_stamped(path, lambda *a: None), (companion.DEFAULT_CONFIG, None))
+                self.assertEqual(companion.load_config(path, lambda *a: None), companion.DEFAULT_CONFIG)
             self.assertEqual(list(Path(d).iterdir()), [])                             # none made, none left over
 
     def test_bom_is_read(self):
@@ -126,109 +126,28 @@ class LoadConfig(unittest.TestCase):
         json.dumps(config, allow_nan=False)             # nothing that is no finite number is left
 
 
-class LiveSettings(unittest.TestCase):
-    """`LiveConfig`: the launcher's «Закрываться вместе с игрой» taken while the companion runs, whatever
-    the file is like at the moment it is looked at."""
+class GameWatch(unittest.TestCase):
+    def test_the_voice_over_ends_with_the_game(self):
+        # «Закрываться вместе с игрой» off kept the race voices in video memory until the next game: the
+        # voice-over now always ends some 10 s after the game it saw, whatever config.json says
+        running = [False]
+        watch = companion.GameWatch(lambda: running[0])
+        self.assertFalse(watch.closed(0.0))                 # no game seen yet: it waits for one
+        self.assertFalse(watch.closed(100.0))
+        running[0] = True
+        self.assertFalse(watch.closed(103.0))
+        running[0] = False
+        self.assertFalse(watch.closed(104.0))               # looked at every 2 s only
+        self.assertFalse(watch.closed(106.0))               # gone: the 10 s start
+        self.assertFalse(watch.closed(112.0))
+        running[0] = True                                   # back (a client restarting itself): no end
+        self.assertFalse(watch.closed(115.0))
+        running[0] = False
+        self.assertFalse(watch.closed(118.0))
+        self.assertFalse(watch.closed(127.0))
+        self.assertTrue(watch.closed(130.0))
+        self.assertNotIn("exit_with_wow", inspect.getsource(companion.GameWatch))
 
-    def setUp(self):
-        self.dir = tempfile.TemporaryDirectory()
-        self.path = Path(self.dir.name) / "config.json"
-        self.tick = 0
-
-    def tearDown(self):
-        self.dir.cleanup()
-
-    def write(self, text: str, encoding: str = "utf-8"):
-        import os
-        self.path.write_text(text, encoding=encoding)
-        self.tick += 10
-        os.utime(self.path, (self.tick, self.tick))        # a new stamp, whatever the clock's grain
-
-    def loaded(self):
-        self.write(json.dumps(dict(companion.DEFAULT_CONFIG, exit_with_wow=True)))
-        config, stamp = companion.load_config_stamped(self.path, lambda *a: None)
-        self.assertIsNotNone(stamp)                         # nothing new written: the file's own stamp
-        return config, stamp
-
-    def test_a_read_that_fails_is_tried_again(self):
-        # the stamp was kept before the read: one sharing violation lost the change until the next one
-        from unittest import mock
-        config, stamp = self.loaded()
-        live = companion.LiveConfig(config, self.path, stamp)
-        self.write(json.dumps({"exit_with_wow": False}))
-        with mock.patch.object(Path, "read_text", side_effect=PermissionError("sharing violation")):
-            live.refresh()
-        self.assertTrue(config["exit_with_wow"])
-        live.refresh()
-        self.assertFalse(config["exit_with_wow"])
-
-    def test_a_file_that_is_no_settings_is_left_alone(self):
-        # null or 5 raised TypeError in the main loop: the running companion died
-        config, stamp = self.loaded()
-        live = companion.LiveConfig(config, self.path, stamp)
-        for text in ("null", "5", "true", '"exit_with_wow"', "[]", '{"exit_with_wow": fal', '{"exit_with_wow": "false"}'):
-            self.write(text)
-            live.refresh()
-            self.assertIs(config["exit_with_wow"], True, text)
-        self.write('{"exit_with_wow": false}')               # saved whole at last: taken
-        live.refresh()
-        self.assertFalse(config["exit_with_wow"])
-
-    def test_a_change_before_the_first_look(self):
-        # the stamp was first taken after the voice bank and the game's launch: a box unchecked meanwhile
-        # was never seen
-        config, stamp = self.loaded()
-        self.write(json.dumps(dict(companion.DEFAULT_CONFIG, exit_with_wow=False)))
-        live = companion.LiveConfig(config, self.path, stamp)
-        live.refresh()
-        self.assertFalse(config["exit_with_wow"])
-
-    def test_a_file_the_companion_wrote_is_read_at_the_first_look(self):
-        # new settings written in: the stamp is that of our own write, which may hide the launcher's
-        self.write('{"exit_with_wow": false}')
-        config, stamp = companion.load_config_stamped(self.path, lambda *a: None)
-        self.assertIsNone(stamp)
-        config["exit_with_wow"] = True
-        companion.LiveConfig(config, self.path, stamp).refresh()
-        self.assertFalse(config["exit_with_wow"])
-
-    def test_bom(self):
-        # Notepad's «UTF-8 with BOM»
-        config, stamp = self.loaded()
-        live = companion.LiveConfig(config, self.path, stamp)
-        self.write('{"exit_with_wow": false}', encoding="utf-8-sig")
-        live.refresh()
-        self.assertFalse(config["exit_with_wow"])
-
-    def test_the_launchers_window_reaches_it_through_live_json(self):
-        # config.json read-only: the launcher's window writes tmp/live.json; the last of the two files changed wins
-        import os
-        with tempfile.TemporaryDirectory() as d:
-            path, live_path = Path(d) / "config.json", Path(d) / "live.json"
-            path.write_text(json.dumps({"exit_with_wow": True}), encoding="utf-8")
-            config = {"exit_with_wow": True}
-            live = companion.LiveConfig(config, path, None, live_path)
-            live.refresh()
-            self.assertIs(config["exit_with_wow"], True)                  # no live.json yet: the file's
-            companion.write_live({"exit_with_wow": False, "rate": 3}, live_path)
-            self.assertEqual(json.loads(live_path.read_text(encoding="utf-8")), {"exit_with_wow": False})
-            live.refresh()
-            self.assertIs(config["exit_with_wow"], False)
-            live.refresh()
-            self.assertIs(config["exit_with_wow"], False)                 # unchanged files: nothing read again
-            path.write_text(json.dumps({"exit_with_wow": True}), encoding="utf-8")   # edited by hand later
-            os.utime(path, ns=(10**18, 10**18))
-            live.refresh()
-            self.assertIs(config["exit_with_wow"], True)
-            live_path.write_text("{half", encoding="utf-8")                # broken: kept as it was
-            os.utime(live_path, ns=(2 * 10**18, 2 * 10**18))
-            live.refresh()
-            self.assertIs(config["exit_with_wow"], True)
-            # a companion not started by the launcher has no live file to read
-            config2 = {"exit_with_wow": True}
-            companion.write_live({"exit_with_wow": False}, live_path)
-            companion.LiveConfig(config2, path, None, None).refresh()
-            self.assertIs(config2["exit_with_wow"], True)
 
 class ServiceFrames(unittest.TestCase):
     """Frames that are not chat: state counts even in the frame that was up at the start, a command

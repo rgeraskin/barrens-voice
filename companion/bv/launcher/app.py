@@ -39,12 +39,15 @@ MAIN_COLORS = {"WARN": "#e0b33a", "ERROR": "#ff6a5a"}
 # hints on the main window's checks and links (what the window does not show by itself)
 TIPS = {
     "launch_wow": "Открываешь лаунчер ярлыком — он сразу запускает игру через Battle.net и уходит в трей. "
-                  "При входе в Windows игра сама не запускается.",
-    "exit_with_wow": "Игра закрылась — озвучка выключается и освобождает память (если лаунчер запущен при входе "
-                     "в Windows, он остаётся ждать игру в трее). Выключено — озвучка остаётся включённой до следующей "
-                     "игры, голоса рас занимают видеопамять.",
+                  "Лаунчер уже ждёт в трее — ярлык тоже запускает игру. При входе в Windows игра сама не запускается.",
+    "exit_with_wow": "Игра закрылась — лаунчер закрывается целиком. Выключено — он остаётся ждать следующую игру "
+                     "(в окне или в трее, как был). Озвучка после игры выключается в любом случае и освобождает "
+                     "видеопамять.",
+    "exit_with_wow_off": "Лаунчер запускается при входе в Windows, поэтому после игры он всегда остаётся ждать "
+                         "следующую в трее. Чтобы он закрывался вместе с игрой, сними «Запускать при входе в Windows».",
     "autostart": "Лаунчер запускается при входе в Windows и ждёт в трее (значок у часов). Озвучка включается "
-                 "сама, когда ты запустишь игру. До этого ничего не загружается и видеопамять свободна.",
+                 "сама, когда ты запустишь игру, и выключается, когда закроешь. До этого ничего не загружается "
+                 "и видеопамять свободна.",
     "install": "Скопировать аддон Barrens Voice в папку игры (Interface\\AddOns\\BarrensVoice). "
                "Если игра запущена — потом /reload.",
     "update_now": "Версия готова и сама установится, когда ты закроешь игру. Установить сейчас — лаунчер "
@@ -53,7 +56,8 @@ TIPS = {
     "update": "Заменить аддон в игре версией, которая пришла с лаунчером. Твои настройки аддона сохранятся. "
               "Если игра запущена — потом /reload.",
 }
-SHOW_FILE = DATA_DIR / "tmp" / "launcher.show"   # a second launcher asks the first to show itself
+SHOW_FILE = DATA_DIR / "tmp" / "launcher.show"   # a second launcher asks the first to show itself ("play" in it: and to
+                                                 # launch the game, as a start by hand would)
 LAUNCHER_LOG = DATA_DIR / "logs" / "launcher.log"
 TICK_MS = 400
 UPDATE_EVERY = 3600          # an hour; and at every start
@@ -80,16 +84,6 @@ def launcher_log(message: str) -> None:
             f.write(f"{datetime.now():%Y-%m-%d %H:%M:%S} {message}\n")
     except OSError:
         pass
-
-
-def share_live(window, changes: dict) -> None:
-    """A change of a live setting (LiveConfig.KEYS: «Закрываться вместе с игрой») to the running companion through
-    tmp/live.json - also when config.json did not take it (read-only): the companion would end with the game
-    while the window said it stays."""
-    from ..__main__ import LiveConfig, write_live
-    companion = getattr(window, "companion", None)
-    if companion is not None and companion.running and set(changes) & set(LiveConfig.KEYS):
-        write_live(window.config)
 
 
 class App:
@@ -202,14 +196,14 @@ class App:
 
     def start_on_open(self) -> None:
         """The companion (and the race voices in video memory) only with the game: started at the window's
-        start when the game runs or the launcher starts it («Запускать игру вместе с Barrens Voice»); else when
-        it appears (tick) or on «Играть». Not the game after an update's restart (--updated): the player did not
-        ask to play, and may just have closed it."""
+        start when the game runs or the launcher starts it («Запускать игру вместе с лаунчером», opened by hand);
+        else when it appears (tick) or on «Играть». Not the game after an update's restart (--updated): the player
+        did not ask to play, and may just have closed it."""
         updated = self.args.get("updated")
         if self.running_game:
             self.start_companion(["--no-launch"] if updated else None)
-        elif self.config.get("launch_wow") and not updated:
-            self.start_companion()
+        elif self.config.get("launch_wow") and not updated and not self.resident:
+            self.start_companion()             # by hand only: the start with Windows never launches the game
         else:
             self.say("ждёт игру: «Играть» или запуск из Battle.net")
 
@@ -246,9 +240,7 @@ class App:
         the next change the file takes (`pending`), not lost to it. Each of the two is said once (again only after a
         write that worked): a file that broke after one that could not be written is said too."""
         try:
-            config = self.write_config(**changes)
-            share_live(self, changes)
-            return config
+            return self.write_config(**changes)
         except model.BrokenConfig as e:
             self.pending = changes = {**self.pending, **changes}
             self.config = {**self.config, **changes}
@@ -259,7 +251,6 @@ class App:
                     self.say(f"{e} — изменения действуют, а в файл запишутся, когда его снова можно будет изменить", "WARN")
                 else:
                     self.say(f"{e} — изменения действуют, а в файл запишутся, когда он будет исправлен", "WARN")
-            share_live(self, changes)
             return self.config
 
     def write_config(self, **changes) -> dict:
@@ -299,8 +290,7 @@ class App:
             return False
         try:
             # config.json as it is now - edited by hand while the window was open (it may sit in the tray for days) -
-            # with what it did not take over it: the launch choice and tmp/live.json go by this, not by the window's
-            # copy from its start
+            # with what it did not take over it: the launch choice goes by this, not by the window's copy from its start
             self.config = {**model.read_config(strict=True), **self.pending}
         except model.BrokenConfig as e:
             # unreadable: no voice-over (it would end at once on the same file, with the same error a second time)
@@ -312,19 +302,17 @@ class App:
             self.set_config(game=self.selected)
         self.companion_game = self.selected
         self.companion_started = time.monotonic()
-        self.game_seen = False          # a game while this voice-over runs: with «Закрываться вместе с игрой» it ends after it
+        self.game_seen = False          # a game while this voice-over runs: it ends some 10 s after that game
         self.settle_due = True
         self.exit_seen = False
         self.reload_told = False
         flags = list(args or [])
         launch_flags = {"--launch", "--no-launch"}
         extra = [a for a in self.extra if not (launch_flags & set(flags) and a in launch_flags)]
-        # the game and «Запускать игру вместе с Barrens Voice» as the window has them: config.json, which the
+        # the game and «Запускать игру вместе с лаунчером» as the window has them: config.json, which the
         # companion reads, may not have taken them (set_config)
         if not launch_flags & set(extra + flags):
             flags.append("--launch" if self.config.get("launch_wow") else "--no-launch")
-        from ..__main__ import write_live
-        write_live(self.config)                # «Закрываться вместе с игрой» as the window has it, read live
         self.companion.start([f"--{self.selected}", *extra, *flags])
         self.say(f"озвучка запускается ({GAME_NAMES[self.selected]})")
         return True
@@ -348,8 +336,7 @@ class App:
 
     def settle_running(self, now: float) -> None:
         """A freshly applied version is settled while its companion runs, once the run is past update.EARLY: a
-        companion only ever stopped by the launcher («Закрываться вместе с игрой» off, the window or voice-over
-        closed first) never ended by itself, so its version stayed watched for good - nothing pruned, and two
+        companion only ever stopped by the launcher (the window or voice-over closed first, «Выход») never ended by itself, so its version stayed watched for good - nothing pruned, and two
         failed starts months later still went back. Once per run; the run's own end then finds nothing watched
         and counts as nothing."""
         if self.settle_due and INSTALL_DIR is not None and self.companion.running:
@@ -383,8 +370,8 @@ class App:
             self.say("озвучке нужна сеть для моделей — запускаю снова")
             self.start_companion()
             return
-        if state.get("phase") == "game_closed":
-            if self.config.get("exit_with_wow") and not self.resident:
+        if state.get("phase") == "game_closed":       # the voice-over ends with the game; the launcher by its check
+            if self.closes_with_game():
                 self.say("игра закрыта — закрываюсь")
                 if self.updater is not None and self.updater.due(False, self.companion.running, bool(self.busy)):
                     self.updater.apply()             # no restart: the next start opens the new version
@@ -392,6 +379,11 @@ class App:
             return
         if code not in (0, None):
             self.say(f"озвучка остановилась (код {code}) — подробности в «Журнале»", "ERROR")
+
+    def closes_with_game(self) -> bool:
+        """«Закрываться вместе с игрой»: the launcher ends after the game - unless it starts with Windows, then it
+        always stays to wait for the next game in the tray (the check is grey)."""
+        return bool(self.config.get("exit_with_wow")) and not self.autostart
 
     def start_failed(self, code: int | None) -> bool | None:
         """How the companion's end counts for a freshly applied version (update.record_start): True - an error,
@@ -485,7 +477,7 @@ class App:
                 self.say(f"не удалось изменить автозапуск: {e}", "WARN")
         else:
             self.set_config(**{key: not self.config.get(key)})
-            if self.companion.running and key != "exit_with_wow":     # that one the companion reads at once
+            if self.companion.running and key != "exit_with_wow":     # that one is the launcher's own
                 self.say("изменение подействует при следующем запуске озвучки")
         self.redraw()
 
@@ -528,6 +520,20 @@ class App:
                                      "Выйти — правой кнопкой по значку.")
             if not self.config.get("launcher_tray_told"):
                 self.set_config(launcher_tray_told=True)
+
+    def second_start(self, path: Path) -> None:
+        """The launcher started again while this one runs: the window shown; started by hand (a shortcut, not the
+        start with Windows: "play" in the file) with «Запускать игру вместе с лаунчером» on, the game launched too,
+        as a first start by hand would - unless a game or the voice-over is already on its way."""
+        try:
+            asked = path.read_text(encoding="utf-8").strip()
+        except OSError:
+            asked = ""
+        path.unlink(missing_ok=True)
+        self.show()
+        if (asked == "play" and self.config.get("launch_wow") and not self.running_game
+                and not self.companion.running and not self.busy):
+            self.play()
 
     def show(self) -> None:
         self.root.deiconify()
@@ -583,8 +589,7 @@ class App:
                 self.quit()
                 return
         if SHOW_FILE.exists():
-            SHOW_FILE.unlink(missing_ok=True)
-            self.show()
+            self.second_start(SHOW_FILE)
         if now - self.checked["game"] > 2:
             self.checked["game"] = now
             from .. import launch
@@ -670,13 +675,11 @@ class App:
             return
         ready = getattr(self.updater, "ready", None)
         # what it waits for, once per version and cause, and only when it does wait (no game, no voice-over: switched
-        # at once); the game closed with the voice-over going on is a new cause. With «Закрываться вместе с игрой» on
-        # the voice-over ends by itself some 10 s after a game it saw (bv/__main__.py), just before the switch: no
-        # word then - but one that has seen no game yet waits for one, and the switch with it
+        # at once). The voice-over ends by itself some 10 s after a game it saw (bv/__main__.py GameWatch), just
+        # before the switch: no word then - but one that has seen no game yet waits for one, and the switch with it
         if self.running_game:
             self.game_seen = True
-        closes = (getattr(self, "config", {}) or {}).get("exit_with_wow", True)
-        voice_waits = self.companion.running and not (closes and getattr(self, "game_seen", False))
+        voice_waits = self.companion.running and not getattr(self, "game_seen", False)
         cause = "game" if self.running_game else "voice" if voice_waits else None
         if ready and cause and (ready, cause) != getattr(self, "wait_told", None):
             self.wait_told = (ready, cause)
@@ -822,7 +825,9 @@ class App:
         for i, (key, text, on) in enumerate((("launch_wow", "Запускать игру вместе с лаунчером", launch_wow),
                                              ("exit_with_wow", "Закрываться вместе с игрой", exit_with_wow),
                                              ("autostart", "Запускать при входе в Windows", autostart))):
-            p.check(RX0 + 14, TOP + 48 + i * 24, text, bool(on), f"check{i}", lambda k=key: self.toggle(k), tip=TIPS[key])
+            grey = key == "exit_with_wow" and bool(autostart)      # the start with Windows always stays in the tray
+            p.check(RX0 + 14, TOP + 48 + i * 24, text, bool(on), f"check{i}", lambda k=key: self.toggle(k),
+                    tip=TIPS["exit_with_wow_off" if grey else key], enabled=not grey)
 
         # row 2: the log | Game
         p.panel(LX0, y2, LX1, y2 + row2, "Журнал")
@@ -1151,8 +1156,9 @@ def register_app_id() -> None:
         pass
 
 
-def single_instance() -> bool:
-    """True for the first launcher; a second one asks the first to show itself and ends."""
+def single_instance(tray: bool = False) -> bool:
+    """True for the first launcher; a second one asks the first to show itself (and, started by hand, to launch
+    the game: second_start) and ends."""
     if sys.platform != "win32":
         return True
     import ctypes
@@ -1162,7 +1168,7 @@ def single_instance() -> bool:
     if ctypes.get_last_error() == 183:                    # ERROR_ALREADY_EXISTS
         try:
             SHOW_FILE.parent.mkdir(parents=True, exist_ok=True)
-            SHOW_FILE.touch()
+            SHOW_FILE.write_text("" if tray else "play", encoding="utf-8")
         except OSError:
             pass
         return False
@@ -1199,7 +1205,7 @@ def main() -> int:
     if args["console"]:
         run_in_console(args)
         return 0
-    if not single_instance():
+    if not single_instance(args["tray"]):
         return 0
     if sys.platform == "win32":
         import ctypes
