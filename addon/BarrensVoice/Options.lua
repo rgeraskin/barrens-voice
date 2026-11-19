@@ -84,6 +84,9 @@ local TOP, GAP = -14, 14                      -- the first text under the title 
 local TEXT_W = 580 - 2 * LEFT - 8             -- the width of a tab's texts
 
 local window, toggle, verb, where, lastNames, programState
+-- the companion's status line may wrap (a longer text, another font): what is under it moves down (StatusFits)
+local statusRest, statusTop, statusBase, statusExtra = nil, 0, 0, 0
+local StatusFits
 local fadeSubs = {}   -- its sub-options: grey while the chat is not hidden
 local numbered = {}   -- the check boxes of the numbered channels (grey while "Общие каналы" is off)
 local checks, radios, sliders = {}, {}, {}
@@ -128,6 +131,7 @@ local function Refresh()
     toggle:SetText(ns.db.enabled and "|cff40ff40Озвучка чата включена|r" or "|cffff5050Озвучка чата выключена|r")
     if programState then
         programState:SetText(ns.Companion.Describe())
+        StatusFits()
     end
     for _, c in ipairs(checks) do c.refresh() end
     for _, c in ipairs(numbered) do UI.SetCheckEnabled(c, ns.db.channels) end
@@ -161,6 +165,19 @@ local function Resize()
     local h = tabHeight[current] + CHROME
     if current == "general" and bridgeOpen then h = h + bridgeHeight end
     window:SetHeight(h)
+end
+
+--- The companion's status line as tall as its text: a second line moves the rest of «Общее» down and makes the
+--- tab taller, so nothing runs into «Скорость и громкость» (GetNumLines, GetStringHeight: forever and live).
+StatusFits = function()
+    if not statusRest then return end
+    local lines = programState:GetNumLines() or 1
+    local extra = lines > 1 and math.ceil((programState:GetStringHeight() or 0) * (lines - 1) / lines) or 0
+    if extra == statusExtra then return end
+    statusExtra = extra
+    statusRest:SetPoint("TOPLEFT", 0, statusTop - extra)
+    tabHeight.general = statusBase + extra
+    Resize()
 end
 
 --- Show the tab `name`: its frame, its tab marked, the window fitted to it.
@@ -220,6 +237,12 @@ local function BuildGeneral(tab, description)
         .. "тоже его читает.\n\nЭто важно только для «Прятать окно чата»: окна прячутся, если компаньон работал "
         .. "при входе. Запустил его позже — сделай /reload, и прозрачный чат включится.")
     y = y - 24
+    -- the rest of the tab hangs from here, so a status line that wraps pushes it down (StatusFits)
+    local rest = CreateFrame("Frame", nil, tab)
+    rest:SetPoint("TOPLEFT", 0, y)
+    rest:SetPoint("RIGHT", 0, 0)
+    statusRest, statusTop = rest, y
+    tab, y = rest, 0
 
     y = UI.Header(tab, "Скорость и громкость", y)
     -- A labelled slider for a percent setting `key`, `lo`..`hi` in steps of `step`.
@@ -309,7 +332,9 @@ local function BuildGeneral(tab, description)
     O.Bridge = Fold
     fold:SetText("Мост к компаньону…")
     y = y - 34
-    return -y
+    rest:SetHeight(-y)
+    statusBase = -(statusTop + y)
+    return statusBase
 end
 
 -- "Каналы и чтение": how a line is read, and which chats are read.
@@ -523,6 +548,9 @@ end
 
 --- Open the window on the tab `name` ("general", "reading", "voices", "dictionary", "help"; another
 --- name: the first).
+--- For the tests: the status line and how far it moved the rest of «Общее».
+function O.Status() return programState, statusExtra, tabHeight.general end
+
 function O.Open(name)
     if not window then Build() end
     Select(name)

@@ -1546,3 +1546,22 @@ do
     print = plain
     print("icons ok")
 end
+
+-- «Общее»: the companion's status line wraps (a longer text, another font) - what is under it moves down, the tab
+-- grows; back on one line, back in place
+do
+    ns.Options.Open("general")
+    local status, extra, height = ns.Options.Status()
+    assert(status and extra == 0, "one line: nothing moved")
+    status.GetNumLines = function() return 2 end
+    status.GetStringHeight = function() return 26 end
+    ns.Options.Open("general")                               -- the window shown again: Refresh
+    local _, moved, taller = ns.Options.Status()
+    assert(moved == 13 and taller == height + 13, ("two lines: the rest down by one, the tab taller - %s, %s"):format(moved, taller))
+    status.GetNumLines = function() return 1 end
+    status.GetStringHeight = function() return 13 end
+    ns.Options.Open("general")
+    local _, back, again = ns.Options.Status()
+    assert(back == 0 and again == height, "one line again: back in place")
+    print("status line fits ok")
+end
