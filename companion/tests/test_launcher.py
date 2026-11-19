@@ -2186,6 +2186,10 @@ class UpdateInWindow(unittest.TestCase):
         self.app.App.apply_update_when_idle(win(None, True))
         self.assertEqual(said, ["версия 0.4.1 установится, когда остановится озвучка"])
 
+    def test_the_launch_hint_says_nothing_of_the_windows_start(self):
+        # «При входе в Windows игра сама не запускается» under «Запускать игру вместе с лаунчером» confused the player
+        self.assertNotIn("При входе в Windows", self.app.TIPS["launch_wow"])
+
     def test_the_start_with_windows_never_launches_the_game(self):
         # «Запускать игру вместе с лаунчером»: the game only for a start by hand, not for the one at Windows
         # sign-in (--tray), even without a tray to wait in

@@ -245,6 +245,49 @@ class Layout(unittest.TestCase):
         a.log_scroll_to(0)
         self.assertTrue(shown()[-1].endswith("новая"))
 
+    def test_tooltips_in_paragraphs_and_they_fit(self):
+        # the launcher's hints: one thought a paragraph, a blank line between (as the addon's), the Label showing the
+        # blank line (taller than the same text in one paragraph) and staying within its wrap width at every scale
+        from bv.launcher import app, logwindow
+        painters = []
+        real = app.Painter
+
+        def keep(*args, **kw):
+            made = real(*args, **kw)
+            painters.append(made)
+            return made
+        with mock.patch.object(app, "Painter", keep):
+            a = self.make(1.0)
+            a.open_settings()
+        settings_tips = {k: v for k, v in painters[-1].tips.items() if k in ("auto", "beta")}
+        a.settings_win.destroy()
+        tips = {**app.TIPS, **{f"настройки: {k}": v for k, v in settings_tips.items()},
+                **{f"журнал: {k}": v for k, v in logwindow.TIPS.items()}}
+        self.assertEqual(len(settings_tips), 2)
+        one_thought = {"журнал: Копировать", "журнал: Открыть файл за сегодня", "журнал: Папка журналов", "журнал: В конец ↓"}
+        for name, text in tips.items():
+            self.assertNotIn(";", text, name)
+            self.assertEqual("\n\n" in text, name not in one_thought, name)
+            self.assertNotIn("\n\n\n", text, name)
+        for scale in (1.0, 1.25, 1.5):
+            a = self.make(scale)
+            for name, text in tips.items():
+                if "\n\n" not in text:
+                    continue
+
+                def shown(t):
+                    a.p._show_tip(t)
+                    label = a.p._tip.winfo_children()[0]
+                    a.p._tip.update_idletasks()
+                    size = label.winfo_reqwidth(), label.winfo_reqheight(), int(label.cget("wraplength"))
+                    a.p.hide_tip()
+                    return size
+                width, height, wrap = shown(text)
+                _, flat, _ = shown(text.replace("\n\n", " "))
+                self.assertGreater(height, flat, f"{name} ×{scale}: the blank line shown")
+                self.assertLessEqual(width, wrap + round(2 * 8 * scale) + 4, f"{name} ×{scale}: within the wrap width")
+                self.assertLess(height, 400 * scale, f"{name} ×{scale}: a hint, not a page")
+
     def test_settings_and_help(self):
         found: list[tuple[str, str]] = []
         for scale in (1.0, 1.25, 1.5):
