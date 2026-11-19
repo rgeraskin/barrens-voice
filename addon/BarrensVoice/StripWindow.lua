@@ -15,6 +15,7 @@ local window, screen, from
 local radios, fields = {}, {}
 local pending = {}
 
+local RADIO_GAP = 28        -- between a place's label and the next place's button
 local PLACES = {
     { "bottom", "Внизу (обычно)" },
     { "top", "Вверху" },
@@ -64,10 +65,14 @@ function W.Create(pane, close)
     UI.TextTooltip(window, note, ns.BRIDGE_TIP)
     y = y - 36
 
-    local xs = { 22, 190, 270 }
-    for i, item in ipairs(PLACES) do
+    -- one gap after each label, whatever its length (fixed places left «Внизу (обычно)» far from «Вверху»
+    -- and «Вверху» close to «Своё место:»): the button 18 px, 4 to its label, then RADIO_GAP
+    local x = 22
+    for _, item in ipairs(PLACES) do
         local value = item[1]
-        radios[value] = UI.Radio(window, xs[i], y, item[2], function() W.Pick(value) end)
+        local r = UI.Radio(window, x, y, item[2], function() W.Pick(value) end)
+        radios[value] = r
+        x = x + 22 + r.label:GetStringWidth() + RADIO_GAP
     end
     y = y - 28
 

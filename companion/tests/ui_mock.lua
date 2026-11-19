@@ -893,6 +893,15 @@ local function radios(label)
 end
 assert(#radios("Windows") == 1 and #radios("Расы") == 1 and #radios("Вверху") == 1, "each radio button made once")
 local sapiRadio, f5Radio, topRadio = radios("Windows")[1], radios("Расы")[1], radios("Вверху")[1]
+do  -- the bridge's places one gap apart, after each label's own width (the mock's labels are 100 px)
+    local xs = {}
+    for _, b in ipairs(boxes) do
+        for i, label in ipairs({ "Внизу (обычно)", "Вверху", "Своё место:" }) do
+            if b.label == label then xs[i] = b.x end
+        end
+    end
+    assert(#xs == 3 and xs[2] - xs[1] == xs[3] - xs[2], "the bridge's radio buttons evenly apart: " .. table.concat(xs, ", "))
+end
 assert(sapiRadio._scripts.OnEnter and not topRadio._scripts.OnEnter, "a tooltip only where one is given")
 local quietRadio = print
 print = function() end
