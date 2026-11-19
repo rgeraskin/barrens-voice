@@ -192,6 +192,7 @@ class Release(unittest.TestCase):
                 mock.patch.object(release, "DIST", Path(d)), \
                 mock.patch.object(release, "uv_entry", return_value={"version": "x", "url": "u", "sha256": "0" * 64}), \
                 mock.patch.object(release, "build_subjects", return_value=["Chat: icon → clear", "Fix «скачки»"]), \
+                mock.patch.object(release, "released_tags", return_value=None), \
                 mock.patch.dict(os.environ, {"RELEASE_TAG": "v0.4.0-beta.7"}):
             archive = release.build()
             shipped = news.parse(zipfile.ZipFile(archive).read(news.SOURCE).decode("utf-8"))
@@ -201,6 +202,47 @@ class Release(unittest.TestCase):
         self.assertEqual(news.problems(shipped), [])
         self.assertIn("### Тестовая сборка 7\n\n- Chat: icon -> clear\n- Fix «скачки»", body)
         self.assertFalse((ROOT / news.SOURCE).read_text(encoding="utf-8").count("0.4.0b7"))   # news.toml as it was
+
+    def test_build_subjects_from_the_last_released_tag(self):
+        # the commits since the last tag with a release (a tag whose build failed reached no tester), oldest first, no
+        # merges, none that touch docs/ only; the nearest tag when GitHub is not asked or does not answer
+        with tempfile.TemporaryDirectory() as d:
+            repo = Path(d)
+
+            def git(*args):
+                subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True)
+
+            def commit(subject, path):
+                (repo / path).parent.mkdir(parents=True, exist_ok=True)
+                (repo / path).write_text(subject, encoding="utf-8")
+                git("add", "-A")
+                git("commit", "-q", "-m", subject)
+            git("init", "-q", "-b", "master")
+            git("config", "user.email", "t@t")
+            git("config", "user.name", "t")
+            commit("Start", "a.txt")
+            git("tag", "v0.1.0")
+            commit("Code one", "b.txt")
+            git("tag", "v0.1.1-beta.1")                                    # its build failed: no release
+            commit("Checked (verified.md)", "docs/verified.md")
+            commit("Code two", "c.txt")
+            git("tag", "v0.1.1-beta.2")
+            subjects = self.release.build_subjects
+            self.assertEqual(subjects("v0.1.1-beta.2", {"v0.1.0"}, repo), ["Code one", "Code two"])
+            self.assertEqual(subjects("v0.1.1-beta.2", {"v0.1.0", "v0.1.1-beta.1"}, repo), ["Code two"])
+            self.assertEqual(subjects("v0.1.1-beta.2", None, repo), ["Code two"])        # GitHub not asked: the nearest
+            self.assertEqual(subjects("v0.1.1-beta.2", set(), repo), ["Code two"])       # none released: the nearest
+            commit("Code three", "d.txt")
+            self.assertEqual(subjects("v0.1.1-beta.3", {"v0.1.0"}, repo), ["Code one", "Code two", "Code three"])
+
+    def test_no_build_entry_for_a_release_and_none_with_control_characters(self):
+        release = self.release
+        entries = [entry("0.4.1"), entry("0.4.0")]
+        self.assertIs(release.with_build_entry("0.4.1", entries, ["a commit"]), entries)    # a release: as it is,
+        self.assertIs(release.with_build_entry("0.4.2", entries, ["a commit"]), entries)    # with or without its entry
+        made = release.build_entry("0.4.1b2", ["Tab\there", "DEL\x7f gone"])
+        self.assertEqual(made["items"], ["Tabhere", "DEL gone"])           # TOML's strings may not hold them
+        self.assertEqual(news.parse(news.dumps([made])), [made])
 
     def test_the_archive_carries_the_news(self):
         # the companion writes the addon's «Что нового» from the release's own news.toml

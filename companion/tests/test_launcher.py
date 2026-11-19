@@ -1744,6 +1744,7 @@ class ReleaseBuild(unittest.TestCase):
             (dist / "Barrens Voice.exe").write_bytes(exe)
         uv = uv or {"version": "0.13.7", "url": "https://x/uv.zip", "sha256": "0" * 64}
         with mock.patch.object(release, "DIST", dist), mock.patch.object(release, "uv_entry", return_value=uv), \
+             mock.patch.object(release, "released_tags", return_value=None), \
              mock.patch.dict("os.environ", {"RELEASE_TAG": tag} if tag else {}, clear=False):
             if not tag:
                 os.environ.pop("RELEASE_TAG", None)

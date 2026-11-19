@@ -72,17 +72,44 @@ def news_entries() -> list[dict]:
     return news.load(ROOT / news.SOURCE)
 
 
-def build_subjects(tag: str) -> list[str]:
-    """The subjects of the commits a test build brings, oldest first: since the tag before it - any, a test build's
-    or a release's, built or not - up to the tag (HEAD when the tag is not there yet: a local build). No merges."""
+def released_tags() -> set[str] | None:
+    """The tags that have a GitHub release (a tag whose build failed has none), or None when GitHub does not answer.
+    The repository is public: no token needed, one is used when the environment has it (CI's rate limit)."""
+    import urllib.request
+    from bv.update import AGENT, RELEASES
+    headers = {"User-Agent": AGENT}
+    token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    try:
+        with urllib.request.urlopen(urllib.request.Request(RELEASES, headers=headers), timeout=15) as response:  # noqa: S310
+            data = json.loads(response.read())
+    except Exception:  # noqa: BLE001 - offline, rate-limited: the nearest tag will do
+        return None
+    return {r["tag_name"] for r in data if isinstance(r, dict) and isinstance(r.get("tag_name"), str)}
+
+
+NOT_LISTED = ":(exclude)docs"   # commits that touch docs/ only (verified.md, to-test, bugs.md): nothing a tester runs
+
+
+def build_subjects(tag: str, released: set[str] | None = None, root: Path = ROOT) -> list[str]:
+    """The subjects of the commits a test build brings, oldest first, up to the tag (HEAD when the tag is not there
+    yet: a local build): since the last tag that has a release (`released`, released_tags) - a tag whose build failed
+    reached no tester, so its commits are listed with the next - or the nearest tag when that is not known. No
+    merges, none that touch docs/ only."""
     import subprocess
 
     def git(*args: str) -> str:
-        return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True, encoding="utf-8").stdout.strip()
+        return subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, encoding="utf-8").stdout.strip()
     ref = tag if git("rev-parse", "-q", "--verify", f"refs/tags/{tag}") else "HEAD"
-    previous = git("describe", "--tags", "--abbrev=0", "--match", "v*", f"{ref}^")
+    nearest = git("describe", "--tags", "--abbrev=0", "--match", "v*", f"{ref}^")
+    previous, seen = nearest, nearest
+    while released is not None and seen and seen not in released:      # back past the tags without a release
+        seen = git("describe", "--tags", "--abbrev=0", "--match", "v*", f"{seen}^")
+        previous = seen or nearest                                     # none released before it: the nearest
     span = f"{previous}..{ref}" if previous else ref
-    return [s for s in git("log", "--no-merges", "--reverse", "--format=%s", span).splitlines() if s.strip()]
+    out = git("log", "--no-merges", "--reverse", "--format=%s", span, "--", ".", NOT_LISTED)
+    return [s for s in out.splitlines() if s.strip()]
 
 
 # what the game's font has not, in a commit's subject (news.FORBIDDEN): what it has instead; «|» is its markup
@@ -95,6 +122,8 @@ def build_entry(version: str, subjects: list[str]) -> dict:
     never reach a release: news_problem). `kind` "big": the window opens for testers."""
     number = re.search(r"b(\d+)$", version).group(1)
     items = [re.sub("|".join(map(re.escape, PLAIN)), lambda m: PLAIN[m.group()], s) for s in subjects]
+    # control characters (a DEL, say) TOML's strings may not hold: news.toml would not read, no news at all
+    items = [re.sub(r"[\x00-\x1f\x7f]", "", item) for item in items]
     return {"version": version, "kind": "big", "title": f"Тестовая сборка {number}",
             "summary": f"тестовая сборка {number}: что в неё вошло",
             "items": items or ["Новых коммитов нет: та же сборка заново."]}
@@ -293,12 +322,20 @@ def build() -> Path:
         if problems:
             sys.exit("\n".join(problems))
         info["version"] = version_of(tag, base)
-        entries = with_build_entry(info["version"], entries, build_subjects(tag))
+        if info["version"] != news.release_of(info["version"]):          # a test build: its own entry (GitHub asked)
+            entries = with_build_entry(info["version"], entries, build_subjects(tag, released_tags()))
         problems = news.problems(entries)
         if problems:
             sys.exit("the test build's «Что нового»: " + "; ".join(problems))
     own_news = news.dumps(entries) if any(e["version"] == info["version"] != news.release_of(info["version"])
                                          for e in entries) else None
+    if own_news is not None:                                               # what the companion will read: the same
+        try:
+            same = news.parse(own_news) == entries
+        except (ValueError, TypeError) as e:
+            same = e
+        if same is not True:
+            sys.exit(f"news.toml of the test build does not read back as written: {same}")
     DIST.mkdir(exist_ok=True)
     archive = DIST / f"barrens-voice-{info['version']}.zip"
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as z:
