@@ -116,7 +116,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - The strip is at the bottom edge by default
 
-  «Внизу (обычно)» in «Мост к компаньону…» (it was the top). An addon with saved settings keeps its place.
+  «Внизу» in «Мост к лаунчеру…» (it was the top). An addon with saved settings keeps its place.
 
 - The transparent chat fades only with the companion running
 

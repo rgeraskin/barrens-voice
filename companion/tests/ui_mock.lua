@@ -956,7 +956,7 @@ local sapiRadio, f5Radio, topRadio = radios("Windows")[1], radios("Расы")[1]
 do  -- the bridge's places one gap apart, after each label's own width (the mock's labels are 100 px)
     local xs = {}
     for _, b in ipairs(boxes) do
-        for i, label in ipairs({ "Внизу (обычно)", "Вверху", "Своё место:" }) do
+        for i, label in ipairs({ "Внизу", "Вверху", "Своё место:" }) do
             if b.label == label then xs[i] = b.x end
         end
     end
@@ -972,11 +972,11 @@ f5Radio._scripts.OnClick(f5Radio)
 assert(ns.db.voices == "f5" and f5Radio._checked and not sapiRadio._checked, "race voices picked")
 print = quietRadio
 topRadio._scripts.OnClick(topRadio)
-assert(ns.StripWindow.Pending().place == "top" and topRadio._checked and not radios("Внизу (обычно)")[1]._checked, "the top picked")
+assert(ns.StripWindow.Pending().place == "top" and topRadio._checked and not radios("Внизу")[1]._checked, "the top picked")
 print("radio buttons ok")
 -- «Что читать»: one choice over onlyVisible and onlyActiveTab
 do
-    local all, windows, tab = radios("Все включённые каналы, даже не показанные в чате")[1], radios("Что показывают окна чата (обычно)")[1],
+    local all, windows, tab = radios("Все включённые каналы, даже не показанные в чате")[1], radios("Что показывают окна чата")[1],
         radios("Только выбранная вкладка")[1]
     assert(all and windows and tab and #radios("Все включённые каналы, даже не показанные в чате") == 1, "three radio buttons, made once")
     assert(ns.DEFAULTS.onlyVisible == true and ns.DEFAULTS.onlyActiveTab == false, "what the windows show, by default")

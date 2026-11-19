@@ -17,7 +17,7 @@ local pending = {}
 
 local RADIO_GAP = 28        -- between a place's label and the next place's button
 local PLACES = {
-    { "bottom", "Внизу (обычно)" },
+    { "bottom", "Внизу" },
     { "top", "Вверху" },
     { "custom", "Своё место:" },
 }
@@ -65,7 +65,7 @@ function W.Create(pane, close)
     UI.TextTooltip(window, note, ns.BRIDGE_TIP)
     y = y - 36
 
-    -- one gap after each label, whatever its length (fixed places left «Внизу (обычно)» far from «Вверху»
+    -- one gap after each label, whatever its length (fixed places left «Внизу (обычно)», as it was called, far from «Вверху»
     -- and «Вверху» close to «Своё место:»): the button 18 px, 4 to its label, then RADIO_GAP
     local x = 22
     for _, item in ipairs(PLACES) do
