@@ -569,6 +569,27 @@ class LogLines(unittest.TestCase):
         # the bar and the warning after it are one line of stderr: as in a console, the warning overwrote the bar
         self.assertEqual([m for _, lv, m in lines if lv == "DEBUG"], ["[stderr] W: onnxruntime"], got)
 
+    def test_the_log_scrolls(self):
+        # the main window's log showed only the newest lines that fit: scrolled back with the wheel or the bar
+        from bv.launcher.model import log_back_at, log_thumb, log_view
+        self.assertEqual(log_view(10, 14, 5), (0, 0))              # all fit: nothing to scroll
+        self.assertEqual(log_view(40, 14, 0), (26, 0))             # the newest at the bottom
+        self.assertEqual(log_view(40, 14, 6), (20, 6))
+        self.assertEqual(log_view(40, 14, 99), (0, 26))            # not past the oldest
+        self.assertEqual(log_view(40, 14, -3), (26, 0))            # nor past the newest
+        self.assertIsNone(log_thumb(14, 14, 0, 0, 100))            # no bar when all fit
+        self.assertEqual(log_thumb(40, 10, 30, 0, 100), (75.0, 100.0))   # a quarter shown, at the bottom
+        self.assertEqual(log_thumb(40, 10, 0, 0, 100), (0.0, 25.0))
+        self.assertEqual(log_thumb(1000, 10, 0, 0, 100), (0.0, 24.0))    # never thinner than a finger's grip
+        for back in (0, 7, 30):                                     # dragging: the thumb's place back to rows
+            first, _ = log_view(40, 10, back)
+            self.assertEqual(log_back_at(40, 10, log_thumb(40, 10, first, 0, 100)[0], 0, 100), back)
+        self.assertEqual(log_back_at(40, 10, -50, 0, 100), 30)
+        self.assertEqual(log_back_at(40, 10, 500, 0, 100), 0)
+        # the log's text stops short of the bar's track: the bar never covers a letter
+        from bv.launcher import app
+        self.assertLess(app.LX0 + 14 + (app.LX1 - app.LX0 - 28 - app.LOG_GUTTER), app.LX1 - 14 - 4)
+
     def test_progress_kept_in_one_line(self):
         from bv.launcher.model import main_lines
         items = [("04:45:32", "INFO", "озвучка запускается"), ("04:45:32", "DEBUG", "детали"),

@@ -552,6 +552,32 @@ def main_lines(items, keep: int = 14) -> tuple:
     return tuple(reversed(shown))
 
 
+def log_view(total: int, fits: int, back: int) -> tuple[int, int]:
+    """The main window's log scrolled: `back` rows up from the newest, kept within the rows there are.
+    (the first row shown, `back` as kept) - the newest `fits` rows with back 0."""
+    back = max(0, min(back, total - fits))
+    return max(0, total - fits - back), back
+
+
+def log_thumb(total: int, fits: int, first: int, y0: float, y1: float, least: float = 24) -> tuple[float, float] | None:
+    """The scroll bar's thumb between `y0` and `y1` for rows first..first+fits of `total`; None when all fit."""
+    if total <= fits:
+        return None
+    size = max(least, (y1 - y0) * fits / total)
+    top = y0 + (y1 - y0 - size) * first / (total - fits)
+    return top, top + size
+
+
+def log_back_at(total: int, fits: int, top: float, y0: float, y1: float, least: float = 24) -> int:
+    """The `back` that puts the thumb's top at `top` (dragging it): log_thumb the other way round."""
+    if total <= fits:
+        return 0
+    size = max(least, (y1 - y0) * fits / total)
+    room = y1 - y0 - size
+    first = round((top - y0) / room * (total - fits)) if room > 0 else 0
+    return log_view(total, fits, total - fits - first)[1]
+
+
 def addons_to_update(games, version: str, running: str | None) -> list:
     """The games whose installed addon is older than `version` and not running now."""
     return [g for g in games if g.addon is not None and g.key != running and newer(version, g.addon)]

@@ -58,6 +58,7 @@ LAUNCHER_LOG = DATA_DIR / "logs" / "launcher.log"
 TICK_MS = 400
 UPDATE_EVERY = 3600          # an hour; and at every start
 CONFIG_EVERY = 2.0           # seconds between looks at whether config.json reads (check_config)
+LOG_GUTTER = 12              # the log's text stops this short of the right edge: room for its scroll bar
 PRUNE_AFTER_MS = 5000        # old versions removed this long after the start (update.prune_unwatched)
 
 
@@ -102,6 +103,12 @@ class App:
         self.canvas = ScaledCanvas(root, scale, width=W, height=560, highlightthickness=0, bg="#0b0705")
         self.canvas.pack()
         self.p = Painter(self.canvas, self.title_font)
+        for event, handler in (("<Motion>", self.log_pointer), ("<Leave>", self.log_pointer),
+                               ("<MouseWheel>", self.log_wheel), ("<Button-4>", self.log_wheel),
+                               ("<Button-5>", self.log_wheel), ("<B1-Motion>", self.log_dragged),
+                               ("<ButtonRelease-1>", self.log_released)):
+            self.canvas.bind(event, handler, add="+")
+        self.canvas.tag_bind("logbar", "<Button-1>", self.log_pressed)
 
         self.config = model.read_config()
         self.config_told: set[str] = set()   # what was said of config.json: "broken" (does not parse, cannot be
@@ -130,6 +137,11 @@ class App:
         # the main window's own: a busy chat (a line, «исходно», «к синтезу» each) pushed the last INFO lines
         # out of any window of recent lines, and the main window went blank
         self.main: collections.deque[tuple[str, str, str]] = collections.deque(maxlen=200)
+        self.log_back = 0                # the main window's log scrolled this many rows up from the newest
+        self.log_rows = 0                # its rows at the last drawing: new ones keep a scrolled view where it is
+        self.log_box = None              # its rows' place and its bar's track (redraw), for the mouse
+        self.log_hover = False           # the pointer over the log: its scroll bar shown
+        self.log_drag = None             # the thumb held: (pointer y, thumb top) where it was taken
         self.incoming: queue.Queue[str] = queue.Queue()
         self.log_window = None
         self.events: queue.Queue[str] = queue.Queue()
@@ -698,11 +710,87 @@ class App:
                         else "config.json не читается — открой «Настройки»")
         show_update = bool(self.update) and self.config.get("launcher_dismissed") != self.update["version"]
         games = tuple((g.key, g.addon, str(g.root)) for g in self.games)
-        progress = model.main_lines(list(self.main))
+        progress = model.main_lines(list(self.main), keep=self.main.maxlen)
         return (tuple(lines), progress, games, self.selected, self.running_game, show_update,
                 self.updater.status if self.updater else "",
                 self.companion.running,
-                self.config.get("launch_wow"), self.config.get("exit_with_wow"), self.autostart)
+                self.config.get("launch_wow"), self.config.get("exit_with_wow"), self.autostart, self.log_back)
+
+    def draw_log_bar(self) -> None:
+        """The log's scroll bar: a thin track, its thumb the rows shown - drawn only when the rows do not all fit,
+        and seen only while the pointer is over the log (or the thumb is held)."""
+        c = self.canvas
+        c.delete("logbar")
+        if self.log_box is None:
+            return
+        _, _, _, _, (x0, y0, x1, y1), total, fits, first = self.log_box
+        thumb = model.log_thumb(total, fits, first, y0, y1)
+        if thumb is None:
+            return
+        state = "normal" if self.log_hover or self.log_drag else "hidden"
+        self.p.rounded(x0, y0, x1, y1, r=3, fill="#2a1d10", outline="", tags=("logbar",), state=state)
+        self.p.rounded(x0, thumb[0], x1, thumb[1], r=3, fill="#8a6420" if not self.log_drag else "#c9a24a",
+                       outline="", tags=("logbar", "logthumb"), state=state)
+
+    def in_log(self, event) -> bool:
+        if self.log_box is None:
+            return False
+        x, y = event.x / self.scale, event.y / self.scale
+        x0, y0, x1, y1 = self.log_box[:4]
+        return x0 <= x <= x1 and y0 <= y <= y1
+
+    def log_pointer(self, event) -> None:
+        """The pointer over the log shows its scroll bar, off it hides it; a press on the bar takes the thumb
+        (or pages to where it was pressed)."""
+        hover = str(event.type) != "Leave" and self.in_log(event)
+        if hover != self.log_hover:
+            self.log_hover = hover
+            self.canvas.itemconfigure("logbar", state="normal" if hover or self.log_drag else "hidden")
+
+    def log_scroll_to(self, back: int) -> None:
+        if self.log_box is not None:
+            total, fits = self.log_box[5], self.log_box[6]
+            back = model.log_view(total, fits, back)[1]
+        if back != self.log_back:
+            self.log_back = back
+            self.redraw()
+
+    def log_wheel(self, event) -> None:
+        if not self.in_log(event):
+            return
+        if getattr(event, "num", None) in (4, 5):             # X11
+            notches = 1 if event.num == 4 else -1
+        else:                                                 # Windows: 120 a notch; macOS: a few, either way
+            notches = event.delta / 120 if abs(event.delta) >= 120 else (1 if event.delta > 0 else -1)
+        self.log_scroll_to(self.log_back + round(notches * 3))
+
+    def log_pressed(self, event) -> None:
+        """A press on the bar: on the thumb it is taken, beside it the log moves a page that way."""
+        if self.log_box is None:
+            return
+        _, _, _, _, (x0, y0, x1, y1), total, fits, first = self.log_box
+        thumb = model.log_thumb(total, fits, first, y0, y1)
+        if thumb is None:
+            return
+        y = event.y / self.scale
+        if thumb[0] <= y <= thumb[1]:
+            self.log_drag = (y, thumb[0])
+            self.draw_log_bar()
+        else:
+            self.log_scroll_to(self.log_back + (fits - 1 if y < thumb[0] else 1 - fits))
+
+    def log_dragged(self, event) -> None:
+        if self.log_drag is None or self.log_box is None:
+            return
+        _, _, _, _, (_, y0, _, y1), total, fits, _ = self.log_box
+        taken, top = self.log_drag
+        self.log_scroll_to(model.log_back_at(total, fits, top + event.y / self.scale - taken, y0, y1))
+
+    def log_released(self, event) -> None:
+        if self.log_drag is not None:
+            self.log_drag = None
+            self.log_hover = self.in_log(event)
+            self.draw_log_bar()
 
     def redraw(self) -> None:
         if self.closed:
@@ -711,7 +799,7 @@ class App:
         if snap == self.drawn:
             return
         self.drawn = snap
-        lines, log, _, _, _, show_update, _, _, launch_wow, exit_with_wow, autostart = snap
+        lines, log, _, _, _, show_update, _, _, launch_wow, exit_with_wow, autostart, _ = snap
         c, p = self.canvas, self.p
         c.delete("all")
         n = max(1, len(self.games))
@@ -739,16 +827,24 @@ class App:
         # row 2: the log | Game
         p.panel(LX0, y2, LX1, y2 + row2, "Журнал")
         fits = (row2 - 44 - 6) // 18 + 1
-        # the newest lines that fit; messages are written to fit one line (~58 characters after the time), and
-        # one that does not is wrapped under its time rather than cut
+        # every line wrapped, messages are written to fit one line (~58 characters after the time), and one that
+        # does not is wrapped under its time rather than cut. The text stops LOG_GUTTER short of the scroll bar's
+        # track: the bar, shown over the log while the pointer is on it, never covers a letter
         rows: list[tuple[str, str]] = []
-        for time, level, message in reversed(log):  # the level itself is not shown here
-            rows[:0] = [(level, part) for part in p.wrap(f"{time} {message}", p.mono, LX1 - LX0 - 28, " " * (len(time) + 1))]
-            if len(rows) >= fits:
-                break
-        for i, (level, text) in enumerate(rows[-fits:]):
+        for time, level, message in log:            # the level itself is not shown here
+            rows += [(level, part) for part in p.wrap(f"{time} {message}", p.mono, LX1 - LX0 - 28 - LOG_GUTTER,
+                                                      " " * (len(time) + 1))]
+        if self.log_back:                         # scrolled up: new rows below do not move the view
+            self.log_back += max(0, len(rows) - self.log_rows)
+        self.log_rows = len(rows)
+        first, self.log_back = model.log_view(len(rows), fits, self.log_back)
+        self.drawn = snap[:-1] + (self.log_back,)
+        for i, (level, text) in enumerate(rows[first:first + fits]):
             c.create_text(LX0 + 14, y2 + 44 + i * 18, text=text, anchor="w", fill=MAIN_COLORS.get(level, "#c9b896"),
                           font=p.mono)
+        track = (LX1 - 14, y2 + 36, LX1 - 8, y2 + row2 - 12)     # inside the frame, clear of its round corners
+        self.log_box = (LX0, y2 + 30, LX1, y2 + row2, track, len(rows), fits, first)
+        self.draw_log_bar()
         p.panel(RX0, y2, RX1, y2 + row2, "Игра")
         if not self.games:
             c.create_text(RX0 + 14, y2 + 40, anchor="nw", width=RX1 - RX0 - 28, fill=PARCHMENT, font=p.body,
