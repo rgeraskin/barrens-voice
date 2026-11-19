@@ -104,7 +104,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - BREAKING: the voice-over always ends with the game, and `exit_with_wow` is the launcher's
 
-  In 0.3.0 `exit_with_wow` false kept the companion running after the game, the race voices in video memory until the next one. Now the voice-over always ends some 10 s after the game it saw and frees the memory, and `exit_with_wow` («Закрываться вместе с игрой») says whether the launcher closes too: on, it closes, off, it waits for the next game in the window or the tray. The key keeps its name and default (true). With the start at Windows sign-in on, the check is grey and the launcher always stays. `tmp/live.json` is no longer written.
+  In 0.3.0 `exit_with_wow` false kept the companion running after the game, the race voices in video memory until the next one. Now the voice-over always ends some 10 s after the game it saw and frees the memory, and `exit_with_wow` («Закрываться вместе с игрой») says whether the launcher closes too: on, it closes, off, it waits for the next game in the window or the tray. The key keeps its name and default (true). With the start at Windows sign-in on, the check is grey and unchecked and the launcher always stays; turning the start on takes the check off, so turning it off again does not make the launcher close with the game unasked. `tmp/live.json` is no longer written.
 
 - BREAKING: the mod is called Barrens Voice
 

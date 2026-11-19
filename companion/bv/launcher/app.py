@@ -44,7 +44,7 @@ TIPS = {
                      "Выключено — он остаётся ждать следующую игру (в окне или в трее, как был).\n\n"
                      "Озвучка после игры выключается в любом случае и освобождает видеопамять.",
     "exit_with_wow_off": "Лаунчер запускается при входе в Windows, поэтому после игры он всегда остаётся ждать "
-                         "следующую в трее.\n\nЧтобы он закрывался вместе с игрой, сними «Запускать при входе в Windows».",
+                         "следующую в трее.\n\nЧтобы он закрывался вместе с игрой, сними «Запускать при входе в Windows» и поставь эту галочку.",
     "autostart": "Лаунчер запускается при входе в Windows и ждёт в трее (значок у часов).\n\n"
                  "Озвучка включается сама, когда ты запустишь игру, и выключается, когда закроешь. До этого ничего "
                  "не загружается и видеопамять свободна.",
@@ -476,6 +476,8 @@ class App:
                 self.autostart = model.autostart()
             except OSError as e:
                 self.say(f"не удалось изменить автозапуск: {e}", "WARN")
+            if self.autostart and self.config.get("exit_with_wow"):    # it stays in the tray: the check comes off
+                self.set_config(exit_with_wow=False)
         else:
             self.set_config(**{key: not self.config.get(key)})
             if self.companion.running and key != "exit_with_wow":     # that one is the launcher's own
@@ -827,7 +829,7 @@ class App:
                                              ("exit_with_wow", "Закрываться вместе с игрой", exit_with_wow),
                                              ("autostart", "Запускать при входе в Windows", autostart))):
             grey = key == "exit_with_wow" and bool(autostart)      # the start with Windows always stays in the tray
-            p.check(RX0 + 14, TOP + 48 + i * 24, text, bool(on), f"check{i}", lambda k=key: self.toggle(k),
+            p.check(RX0 + 14, TOP + 48 + i * 24, text, bool(on) and not grey, f"check{i}", lambda k=key: self.toggle(k),
                     tip=TIPS["exit_with_wow_off" if grey else key], enabled=not grey)
 
         # row 2: the log | Game

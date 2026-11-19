@@ -204,7 +204,7 @@ class Layout(unittest.TestCase):
 
     def test_the_close_check_grey_with_the_start_with_windows(self):
         # the start with Windows always stays in the tray after the game: «Закрываться вместе с игрой» is grey then,
-        # its value kept, no click, and its hint says why
+        # unchecked (it does not act; a config.json from before still has it on), no click, and its hint says why
         from bv.launcher import app
         from bv.launcher.paint import DIM, PARCHMENT
         a = self.make(1.0)
@@ -218,8 +218,23 @@ class Layout(unittest.TestCase):
             self.assertEqual(c.itemcget(label[0], "fill"), fill)
             self.assertEqual(bool(c.tag_bind("check1", "<Button-1>")), not autostart)
             self.assertEqual(a.p.tips["check1"], app.TIPS[tip])
-            self.assertTrue(any(c.type(i) == "line" for i in c.find_withtag("check1")))        # its value still shown
+            self.assertEqual(any(c.type(i) == "line" for i in c.find_withtag("check1")), not autostart)   # the tick
             self.assertEqual(problems(c), [])
+
+    def test_the_start_with_windows_takes_the_close_check_off(self):
+        # turning the start with Windows on unchecks «Закрываться вместе с игрой» in config.json: off again, the
+        # launcher does not start closing with the game behind the player's back; off, the check is left alone
+        from bv.launcher import model
+        for was in (False, True):
+            with self.subTest(autostart=was):
+                a = self.make(1.0, config={"exit_with_wow": True})
+                on = [was]
+                with mock.patch.object(model, "set_autostart", lambda v: on.__setitem__(0, v)), \
+                        mock.patch.object(model, "autostart", lambda: on[0]):
+                    a.autostart = was
+                    a.toggle("autostart")
+                self.assertEqual(a.autostart, not was)
+                self.assertEqual(a.config.get("exit_with_wow"), was)        # on: taken off; off: left as it was
 
     def test_the_log_scrolls_without_wrapping_again_and_stays_put(self):
         # a scroll's redraw wrapped every line again (the thumb dragged: at each move of the mouse); with 200 lines
