@@ -85,8 +85,7 @@ function V.Create(pane, width)
     local _, h = UI.Text(window, "GameFontHighlight", 22, 0, width,
         "Голоса Windows звучат механически, заметно хуже голосов рас, а для разнообразия их нужно ставить "
         .. "отдельно (в Windows по умолчанию только Ирина). Они оставлены на всякий случай — если голоса рас отвечают "
-        .. "с большой задержкой или не работают на твоём компьютере.\n\nВыбранные голоса раздаются игрокам по имени и полу.\n\n"
-        .. "«>» — послушать.")
+        .. "с большой задержкой или не работают на твоём компьютере.\n\nВыбранные голоса раздаются игрокам по имени и полу.")
     local y = -h - GAP
 
     -- where to get more voices: the address to copy, and «Копировать» / «Открыть» (UI.LinkRow)
@@ -119,6 +118,11 @@ function V.Create(pane, width)
     allOn:SetPoint("LEFT", filter, "RIGHT", 10, 0)
     local allOff = UI.Button(window, "Выкл. все", 82, function() SetAllShown(false) end)
     allOff:SetPoint("LEFT", allOn, "RIGHT", 4, 0)
+    -- what «>» in a row does: on the filter row, at the right, over the rows' «>» (their right edge: the list's
+    -- frame 14 in from the pane's, the scroll bar's 28, the row's 6 - 48 from the pane's edge)
+    local listen = window:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    listen:SetPoint("RIGHT", window, "TOPRIGHT", -48, y - 10)
+    listen:SetText("«>» — послушать.")
 
     local box = UI.Box(window)
     box:SetPoint("TOPLEFT", 14, y - 28)

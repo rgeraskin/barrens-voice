@@ -31,6 +31,11 @@ local function widget()
         if k == "SetTexture" then return function(self, v) self._texture = v end end
         if k == "SetTexCoord" then return function(self, ...) self._coords = { ... } end end
         if k == "SetSize" then return function(self, w, h) self._w, self._h = w, h end end
+        if k == "SetPoint" then return function(self, ...)
+            local points = rawget(self, "_points") or {}
+            points[#points + 1] = { ... }
+            self._points = points
+        end end
         if k:match("^Create") then return function() local made = widget(); created[#created + 1] = made; return made end end
         return function() end
     end })
@@ -184,6 +189,27 @@ do  -- the channels' tooltips: Battle.net whispers are read too; retail's closed
     local _, onForever = topLine(16001):gsub("закрывает от аддонов весь чат", "")
     assert(onRetail == 1 and onForever == 0, ("said once on retail, not on Forever: %d %d"):format(onRetail, onForever))
     print("channel tooltips ok")
+end
+do  -- «Голоса»: «>» — послушать on the filter row, at the right over the rows' «>», not in the text above
+    local listen, top, filterRow
+    for _, w in ipairs(created) do
+        local text = rawget(w, "_text")
+        if text == "«>» — послушать." then listen = w end
+        if type(text) == "string" and text:find("^Голоса Windows звучат") then top = w end
+        if text == "фильтр: silero, edge, жен…" then filterRow = w end
+    end
+    assert(listen and top, "the voices tab's texts")
+    assert(top._text:find("Выбранные голоса раздаются игрокам по имени и полу.$") and not top._text:find("послушать"),
+        "the text above ends with the voices given out: " .. top._text)
+    local point = listen._points and listen._points[1]
+    assert(point and point[1] == "RIGHT" and point[3] == "TOPRIGHT" and point[4] == -48, "at the right, over the rows' «>»")
+    -- on the filter row: its middle, 10 under the filter's top
+    local filterBox
+    for _, f in ipairs(frames) do
+        if rawget(f, "_points") and f._points[1][1] == "TOPLEFT" and f._points[1][2] == 24 then filterBox = f end
+    end
+    assert(filterBox and point[5] == filterBox._points[1][3] - 10, "on the filter's row")
+    print("voices tab ok")
 end
 do  -- «Скачать дополнительные голоса …: RHVoice, Silero»: the companion is asked to open the page; the address goes to the chat too
     local pushedLink, saidLink, push0, print0 = {}, {}, ns.Strip.Push, print
