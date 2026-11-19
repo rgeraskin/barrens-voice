@@ -205,16 +205,18 @@ class Release(unittest.TestCase):
 
     def test_build_subjects_from_the_last_released_tag(self):
         # the commits since the last tag with a release (a tag whose build failed reached no tester), oldest first, no
-        # merges, none that touch docs/ only; the nearest tag when GitHub is not asked or does not answer
+        # merges, none that touch only what no tester runs (docs, tests, CI, tools, notes); the nearest tag when GitHub
+        # is not asked or does not answer
         with tempfile.TemporaryDirectory() as d:
             repo = Path(d)
 
             def git(*args):
                 subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True)
 
-            def commit(subject, path):
-                (repo / path).parent.mkdir(parents=True, exist_ok=True)
-                (repo / path).write_text(subject, encoding="utf-8")
+            def commit(subject, *paths):
+                for path in paths:
+                    (repo / path).parent.mkdir(parents=True, exist_ok=True)
+                    (repo / path).write_text(subject, encoding="utf-8")
                 git("add", "-A")
                 git("commit", "-q", "-m", subject)
             git("init", "-q", "-b", "master")
@@ -225,7 +227,11 @@ class Release(unittest.TestCase):
             commit("Code one", "b.txt")
             git("tag", "v0.1.1-beta.1")                                    # its build failed: no release
             commit("Checked (verified.md)", "docs/verified.md")
-            commit("Code two", "c.txt")
+            commit("Tests: one more", "companion/tests/test_x.py")
+            commit("CI: Windows", ".github/workflows/ci.yml")
+            commit("Release tools", "tools/release.py", "DEVELOPMENT.md")
+            commit("Notes", "CLAUDE.md", "README.md", "CHANGELOG.md")
+            commit("Code two", "c.txt", "companion/tests/test_c.py", "CHANGELOG.md")     # code with its test: listed
             git("tag", "v0.1.1-beta.2")
             subjects = self.release.build_subjects
             self.assertEqual(subjects("v0.1.1-beta.2", {"v0.1.0"}, repo), ["Code one", "Code two"])

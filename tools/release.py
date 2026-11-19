@@ -89,7 +89,11 @@ def released_tags() -> set[str] | None:
     return {r["tag_name"] for r in data if isinstance(r, dict) and isinstance(r.get("tag_name"), str)}
 
 
-NOT_LISTED = ":(exclude)docs"   # commits that touch docs/ only (verified.md, to-test, bugs.md): nothing a tester runs
+# a commit that touches only these is not listed: nothing a tester runs or sees - the docs (verified.md, to-test,
+# bugs.md, README, CHANGELOG), the tests, CI and the hooks, the release tools, notes for the developers
+NOT_LISTED = tuple(f":(exclude){path}" for path in (
+    "docs", "companion/tests", ".github", ".githooks", "tools", ".claude",
+    "README.md", "CHANGELOG.md", "CLAUDE.md", "DEVELOPMENT.md", ".mise.toml", ".gitignore", ".gitattributes"))
 
 
 def build_subjects(tag: str, released: set[str] | None = None, root: Path = ROOT) -> list[str]:
@@ -108,7 +112,7 @@ def build_subjects(tag: str, released: set[str] | None = None, root: Path = ROOT
         seen = git("describe", "--tags", "--abbrev=0", "--match", "v*", f"{seen}^")
         previous = seen or nearest                                     # none released before it: the nearest
     span = f"{previous}..{ref}" if previous else ref
-    out = git("log", "--no-merges", "--reverse", "--format=%s", span, "--", ".", NOT_LISTED)
+    out = git("log", "--no-merges", "--reverse", "--format=%s", span, "--", ".", *NOT_LISTED)
     return [s for s in out.splitlines() if s.strip()]
 
 
