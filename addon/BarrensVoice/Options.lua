@@ -215,7 +215,7 @@ local function BuildGeneral(tab, description)
         .. "ему.\n\nТо же — ПКМ по значку у миникарты или /bv on, /bv off.")
     local test = UI.Button(tab, "Проверка", W, ns.Test)
     test:SetPoint("TOPLEFT", LEFT + W + GAP, y)
-    UI.Tooltip(test, "Четыре тестовые строки разными голосами (/bv test). Все команды — /bv help.")
+    UI.Tooltip(test, "Четыре тестовые строки разными голосами (/bv test).\n\nВсе команды — /bv help.")
     y = y - 30
     local get, set = Setting("minimapIcon", function() ns.Minimap.Update() end)
     checks[#checks + 1] = UI.Check(tab, LEFT, y, "Значок у миникарты",
