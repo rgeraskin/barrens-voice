@@ -154,6 +154,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- «Мост: связь с аддоном есть» under a minimized game
+
+  With the game minimized the launcher kept the green «связь с аддоном есть»: the companion dropped the link only on missed frames, and there are none to miss without a window. The link now goes with the window, and the launcher says «Мост: окно игры свёрнуто или не найдено».
+
 - «установится, когда закроешь игру» only while a game or the voice-over runs
 
   A version prepared with no game running said it would install when the game closed, and switched the same second. The update now says only «версия … готова»; the launcher adds «установится, когда закроешь игру» (or «…когда остановится озвучка») once, when the switch really waits.

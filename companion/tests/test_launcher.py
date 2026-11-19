@@ -520,6 +520,12 @@ class Mismatch(unittest.TestCase):
         self.assertEqual(describe({"mismatch": "newer", "linked": True}, True, None, "WoW Forever", False)[3],
                          (RED, "Мост: аддон новее лаунчера — обнови Barrens Voice Launcher"))
         self.assertIn("/reload", describe({"mismatch": "older"}, True, None, "WoW Forever", False)[3][1])
+        # a minimized game: its window gone, whatever «linked» last said (it stayed true under a minimized game)
+        from bv.launcher.model import GREEN, YELLOW
+        self.assertEqual(describe({"window": False, "linked": True}, True, None, "WoW Forever", False)[3],
+                         (YELLOW, "Мост: окно игры свёрнуто или не найдено"))
+        self.assertEqual(describe({"window": True, "linked": True}, True, None, "WoW Forever", False)[3],
+                         (GREEN, "Мост: связь с аддоном есть"))
 
 
 class MainLog(unittest.TestCase):

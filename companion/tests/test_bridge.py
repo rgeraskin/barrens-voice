@@ -269,7 +269,12 @@ class Polling(Base):
         self.capturer.window = None
         self.now += 2.1
         self.assertEqual(self.poll().pause, 1.0)
-        self.assertEqual(self.take(), (["окно игры не найдено или свёрнуто — жду"], [{"window": False}]))
+        # minimized: the link goes with the window (the launcher said «связь есть» under a minimized game)
+        self.assertEqual(self.take(), (["окно игры не найдено или свёрнуто — жду"], [{"window": False}, {"linked": False}]))
+        self.capturer.window = WINDOW
+        self.now += 1
+        self.poll((frame(4), "", 0))
+        self.assertEqual(self.take()[1], [{"window": True}, {"linked": True}])     # back: linked again
 
     def test_grab(self):
         self.poll()

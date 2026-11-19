@@ -290,12 +290,12 @@ def describe(state: dict, running: bool, exit_code: int | None, game: str | None
         fourth = (RED, "Мост: аддон новее лаунчера — обнови Barrens Voice Launcher")
     elif state.get("mismatch") == "older":
         fourth = (RED, "Мост: аддон устарел — «обновить аддон» и /reload")
+    elif game and state.get("window") is False:       # before «связь есть»: no window, no link, whatever was said
+        fourth = (YELLOW, "Мост: окно игры свёрнуто или не найдено")
     elif state.get("linked"):
         fourth = (GREEN, "Мост: связь с аддоном есть")
     elif state.get("damaged"):
         fourth = (RED, "Мост: полоску что-то перекрывает — см. журнал")
-    elif game and state.get("window") is False:
-        fourth = (YELLOW, "Мост: окно игры свёрнуто или не найдено")
     elif game:
         fourth = (YELLOW, "Мост: ждём связь с аддоном")
     else:

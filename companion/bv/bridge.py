@@ -64,6 +64,9 @@ class StripReader:
                 self.report(window=bool(found))
             self.window, self.window_checked, self.first_check = found, now, False
         if self.window is None:
+            if self.linked:                        # no window, no strip: the link is gone (said as the window's)
+                self.linked = False
+                self.report(linked=False)
             return Step(self.RETRY)
         try:
             grabbed = self.capturer.grab()
