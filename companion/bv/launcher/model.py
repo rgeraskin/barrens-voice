@@ -497,8 +497,10 @@ def report_header(version: str, state: dict, config: dict, games: list, running_
         f"Голоса рас: {voices}",
         f"Игры: {played}. Запущена: {GAME_NAMES.get(running_game, 'нет') if running_game else 'нет'}",
         f"Компаньон: {phase if running else f'не запущен (в прошлый раз: {phase})'}",
-        "Настройки не по умолчанию: " + ("; ".join(changed_settings(config, DEFAULT_CONFIG)) or "нет"),
     ]
+    # one setting a line: a value may have commas of its own (game_dirs, a list)
+    changed = changed_settings(config, DEFAULT_CONFIG)
+    lines += ["Настройки не по умолчанию:"] + [f"  {c}" for c in changed] if changed else ["Настройки не по умолчанию: нет"]
     return hide_private("\n".join(lines))
 
 

@@ -644,7 +644,11 @@ class Report(unittest.TestCase):
         self.assertIn("Barrens Voice 0.4.0", head)
         self.assertIn("Голоса рас: готовы на RTX (CUDAExecutionProvider)", head)
         self.assertIn("WoW Forever (аддон 0.4.0). Запущена: WoW Forever", head)
-        self.assertIn("volume = 70", head)
+        self.assertIn("Настройки не по умолчанию:\n  volume = 70", head)          # a line each: values may have commas
+        two = model.report_header("0.4.0", state, {"volume": 70, "game_dirs": {"forever": "E:/a", "retail": "E:/b"}},
+                                  [game], "forever", gpus=["RTX"], runtime="x")
+        self.assertIn("Настройки не по умолчанию:\n  game_dirs = forever, retail\n  volume = 70", two)
+        self.assertNotIn(";", two.split("Настройки не по умолчанию:")[1])    # (Windows' own version may have one)
         stopped = model.report_header("0.4.0", dict(state, phase="stopped"), {"_help": "x"}, [], None,
                                       running=False, gpus=[], runtime="x")
         self.assertIn("Видеокарты: RTX", stopped)                       # from the state when Windows lists none
