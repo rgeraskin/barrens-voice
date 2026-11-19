@@ -164,6 +164,44 @@ class Release(unittest.TestCase):
         self.assertTrue(body.startswith("### " + real[0]["title"] + "\n\n- "), body[:80])
         self.assertEqual(body.count("\n- "), len(real[0]["items"]))
 
+    def test_a_test_builds_own_entry(self):
+        # every test build lists its commits since the tag before it, made at the build (not kept in news.toml)
+        release = self.release
+        made = release.build_entry("0.4.1b7", ["Update 17 → 18 checked", "a | b – c", "Плюс «вы» в цитате"])
+        self.assertEqual((made["version"], made["kind"], made["title"]), ("0.4.1b7", "big", "Тестовая сборка 7"))
+        self.assertEqual(made["items"], ["Update 17 -> 18 checked", "a / b — c", "Плюс «вы» в цитате"])   # the font's own
+        self.assertEqual(news.entry_problems(made), [])               # «вы» quoted from a commit: no style rule here
+        self.assertEqual(release.build_entry("0.4.1b8", [])["items"], ["Новых коммитов нет: та же сборка заново."])
+        many = release.build_entry("0.4.1b9", [f"commit {i}" for i in range(60)])
+        self.assertEqual(news.entry_problems(many), [])               # a long list is fine for a test build...
+        self.assertIn("items must be 1 to 10", " ".join(news.entry_problems(dict(many, version="0.4.1"))))   # ...not a release
+        # among news.toml's: after its release's (newest first: 0.4.1 is newer than 0.4.1b7), checked as a whole
+        entries = [{k: v for k, v in entry("0.4.1").items() if k != "date"}, entry("0.4.0")]
+        out = release.with_build_entry("0.4.1b7", entries, ["one"])
+        self.assertEqual([e["version"] for e in out], ["0.4.1", "0.4.1b7", "0.4.0"])
+        self.assertEqual(news.problems(out), [])
+        self.assertIs(release.with_build_entry("0.4.1", entries, ["one"]), entries)          # a release: none
+        hand = entries[:1] + [entry("0.4.1b7", items=["Своими словами."])] + entries[1:]
+        self.assertEqual(release.with_build_entry("0.4.1b7", hand, ["one"]), hand)       # written by hand: kept
+        self.assertEqual(news.parse(news.dumps(out)), out)                               # news.toml's text of them
+        # the build itself: in the archive's news.toml, which the companion reads, and in the release's description
+        import os
+        import zipfile
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as d, \
+                mock.patch.object(release, "DIST", Path(d)), \
+                mock.patch.object(release, "uv_entry", return_value={"version": "x", "url": "u", "sha256": "0" * 64}), \
+                mock.patch.object(release, "build_subjects", return_value=["Chat: icon → clear", "Fix «скачки»"]), \
+                mock.patch.dict(os.environ, {"RELEASE_TAG": "v0.4.0-beta.7"}):
+            archive = release.build()
+            shipped = news.parse(zipfile.ZipFile(archive).read(news.SOURCE).decode("utf-8"))
+            body = (Path(d) / "notes.md").read_text(encoding="utf-8")
+        own = [e for e in shipped if e["version"] == "0.4.0b7"]
+        self.assertEqual(own[0]["items"], ["Chat: icon -> clear", "Fix «скачки»"])
+        self.assertEqual(news.problems(shipped), [])
+        self.assertIn("### Тестовая сборка 7\n\n- Chat: icon -> clear\n- Fix «скачки»", body)
+        self.assertFalse((ROOT / news.SOURCE).read_text(encoding="utf-8").count("0.4.0b7"))   # news.toml as it was
+
     def test_the_archive_carries_the_news(self):
         # the companion writes the addon's «Что нового» from the release's own news.toml
         self.assertIn((ROOT / news.SOURCE, news.SOURCE), self.release.files())

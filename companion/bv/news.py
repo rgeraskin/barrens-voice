@@ -23,6 +23,7 @@ VERSION = re.compile(r"\d+\.\d+\.\d+(?:b\d+)?")
 DATE = re.compile(r"\d\d\.\d\d\.\d{4}")
 MAX_SUMMARY = 100             # letters: one line in the chat after «обновление 0.4.0 beta 16 — »
 MAX_ITEMS = 10
+MAX_BUILD_ITEMS = 300         # a test build's entry: the list of its commits (tools/release.py build_entry), however long
 # not in the game's font (an arrow, an en dash), or the game's markup (|c, |H, |T...)
 FORBIDDEN = ("→", "–", "|")
 YOU = ("вы", "вас", "вам", "вами", "ваш", "ваша", "ваше", "ваши", "вашего", "вашей", "вашу", "ваших", "вашим")
@@ -82,9 +83,11 @@ def entry_problems(entry: dict) -> list[str]:
         if not (isinstance(entry.get(field), str) and entry[field].strip()):
             out.append(f"{name}: {field} must be a text")
     items = entry.get("items")
-    if not (isinstance(items, list) and 0 < len(items) <= MAX_ITEMS
+    build = isinstance(entry.get("version"), str) and entry["version"] != release_of(entry["version"])
+    most = MAX_BUILD_ITEMS if build else MAX_ITEMS          # a test build's entry lists its commits
+    if not (isinstance(items, list) and 0 < len(items) <= most
             and all(isinstance(i, str) and i.strip() for i in items)):
-        out.append(f"{name}: items must be 1 to {MAX_ITEMS} texts")
+        out.append(f"{name}: items must be 1 to {most} texts")
     summary = entry.get("summary")
     if isinstance(summary, str):
         if len(summary) > MAX_SUMMARY:
@@ -98,9 +101,26 @@ def entry_problems(entry: dict) -> list[str]:
             if bad in text:
                 out.append(f"{name}: no {bad!r} (the game's font or markup): {text}")
         words = re.findall(r"[а-яё]+", text.lower())
-        if any(w in YOU for w in words):
+        if not build and any(w in YOU for w in words):      # a test build's commits are English, quoted as they are
             out.append(f"{name}: «ты», not «вы»: {text}")
     return out
+
+
+def dumps(entries: list[dict]) -> str:
+    """news.toml's text for `entries`, as `parse` reads it back: [[entry]] tables in the order given. Strings in JSON's
+    escapes, which TOML's basic strings share (backslash, quote, line break, unicode escapes)."""
+    import json
+    out = []
+    for e in entries:
+        lines = ["[[entry]]"]
+        for key in ("version", "date", "kind", "title", "summary"):
+            if key in e:
+                lines.append(f"{key} = {json.dumps(e[key], ensure_ascii=False)}")
+        lines.append("items = [")
+        lines += [f"    {json.dumps(item, ensure_ascii=False)}," for item in e["items"]]
+        lines.append("]")
+        out.append("\n".join(lines))
+    return "\n\n".join(out) + "\n"
 
 
 def problems(entries: list[dict]) -> list[str]:

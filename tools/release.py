@@ -72,6 +72,43 @@ def news_entries() -> list[dict]:
     return news.load(ROOT / news.SOURCE)
 
 
+def build_subjects(tag: str) -> list[str]:
+    """The subjects of the commits a test build brings, oldest first: since the tag before it - any, a test build's
+    or a release's, built or not - up to the tag (HEAD when the tag is not there yet: a local build). No merges."""
+    import subprocess
+
+    def git(*args: str) -> str:
+        return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True, encoding="utf-8").stdout.strip()
+    ref = tag if git("rev-parse", "-q", "--verify", f"refs/tags/{tag}") else "HEAD"
+    previous = git("describe", "--tags", "--abbrev=0", "--match", "v*", f"{ref}^")
+    span = f"{previous}..{ref}" if previous else ref
+    return [s for s in git("log", "--no-merges", "--reverse", "--format=%s", span).splitlines() if s.strip()]
+
+
+# what the game's font has not, in a commit's subject (news.FORBIDDEN): what it has instead; «|» is its markup
+PLAIN = {"→": "->", "–": "—", "|": "/"}
+
+
+def build_entry(version: str, subjects: list[str]) -> dict:
+    """A test build's own «Что нового»: the list of its commits, as they are (English), in news.toml's shape - made
+    at the build, not kept in news.toml (a release folds what players need into its own entry; test builds' entries
+    never reach a release: news_problem). `kind` "big": the window opens for testers."""
+    number = re.search(r"b(\d+)$", version).group(1)
+    items = [re.sub("|".join(map(re.escape, PLAIN)), lambda m: PLAIN[m.group()], s) for s in subjects]
+    return {"version": version, "kind": "big", "title": f"Тестовая сборка {number}",
+            "summary": f"тестовая сборка {number}: что в неё вошло",
+            "items": items or ["Новых коммитов нет: та же сборка заново."]}
+
+
+def with_build_entry(version: str, entries: list[dict], subjects: list[str]) -> list[dict]:
+    """news.toml's entries with a test build's own (build_entry) where it is (newest first: a release before its test
+    builds); as they are for a release, or a test build whose entry news.toml has (written by hand)."""
+    if version == news.release_of(version) or any(e["version"] == version for e in entries):
+        return entries
+    return sorted(entries + [build_entry(version, subjects)], key=lambda e: news.version_key(e["version"]),
+                  reverse=True)
+
+
 def notes(version: str, entries: list[dict], tag: str = "") -> str:
     """The GitHub release's description, from news.toml: the release's entry (its title and items, in Russian), then
     a link to the full English list (CHANGELOG.md at the release's tag) and how to install. A test build's starts
@@ -256,6 +293,12 @@ def build() -> Path:
         if problems:
             sys.exit("\n".join(problems))
         info["version"] = version_of(tag, base)
+        entries = with_build_entry(info["version"], entries, build_subjects(tag))
+        problems = news.problems(entries)
+        if problems:
+            sys.exit("the test build's «Что нового»: " + "; ".join(problems))
+    own_news = news.dumps(entries) if any(e["version"] == info["version"] != news.release_of(info["version"])
+                                         for e in entries) else None
     DIST.mkdir(exist_ok=True)
     archive = DIST / f"barrens-voice-{info['version']}.zip"
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as z:
@@ -266,6 +309,8 @@ def build() -> Path:
             data = source.read_bytes()
             if name == "pyproject.toml" and info["version"] != base:     # the build's own version, beta and all
                 data = re.sub(rb'(?m)^version = "[^"]*"', f'version = "{info["version"]}"'.encode(), data, count=1)
+            if name == news.SOURCE and own_news is not None:               # with the test build's own entry
+                data = own_news.encode("utf-8")
             if name == "addon/BarrensVoice/Dictionary.lua":                # which default this is (the dictionary online)
                 data = re.sub(rb"(?m)^D\.REVISION = \d+", f"D.REVISION = {dictionary_revision()}".encode(), data, count=1)
             z.writestr(info_, data)
