@@ -154,6 +154,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- «полоска аддона пропала» names the causes there are
+
+  It guessed «игра свёрнута или скрыт интерфейс», and neither fits: a minimized game has its own line («окно игры не найдено или свёрнуто»), and the strip has not hidden with the interface since 0.2.1. It says now «озвучка выключена в игре (/bv off), экран загрузки или полоску закрыл другой аддон?».
+
 - «Мост: связь с аддоном есть» under a minimized game
 
   With the game minimized the launcher kept the green «связь с аддоном есть»: the companion dropped the link only on missed frames, and there are none to miss without a window. The link now goes with the window, and the launcher says «Мост: окно игры свёрнуто или не найдено».

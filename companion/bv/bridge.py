@@ -145,7 +145,7 @@ class StripReader:
                 self.damaged_told = False
                 self.report(damaged=False)
         if self.linked and self.misses == int(self.LOST_AFTER / self.config["poll_interval"]):
-            self.log("полоска аддона пропала: игра свёрнута или скрыт интерфейс?")
+            self.log("полоска аддона пропала: озвучка выключена в игре (/bv off), экран загрузки или полоску закрыл другой аддон?")
             self.linked = False
             self.report(linked=False)
 

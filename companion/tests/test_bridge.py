@@ -98,7 +98,7 @@ class Bookkeeping(Base):
             self.at(0)
         self.assertEqual(self.take(), ([], []))
         self.at(0)
-        self.assertEqual(self.take(), (["полоска аддона пропала: игра свёрнута или скрыт интерфейс?"],
+        self.assertEqual(self.take(), (["полоска аддона пропала: озвучка выключена в игре (/bv off), экран загрузки или полоску закрыл другой аддон?"],
                                        [{"linked": False}]))
         for _ in range(200):
             self.at(0)
