@@ -378,10 +378,10 @@ local function BuildReading(tab, description)
     row = row + 1
     if not retail then
         get, set = Setting("waitForCatQuest")
-        checks[#checks + 1] = UI.Check(tab, LEFT, y - 24 * row, "Ждать озвучку квестов (CatQuest, Wayfarer)",
-            "Пока аддон CatQuest или Wayfarer читает квест, реплику NPC, рассказ о месте или путевую историю, чат "
-            .. "замолкает и после дочитывает прерванную строку с начала.\n\nСтроки, ждавшие дольше 40 секунд, пропускаются.\n\n"
-            .. "Без этих аддонов ничего не меняет.", get, set)
+        checks[#checks + 1] = UI.Check(tab, LEFT, y - 24 * row, "Ждать озвучку CatQuest/Wayfarer",
+            "Пока аддон CatQuest или Wayfarer читает квест, рассказ о месте или путевую историю или озвучивает реплику "
+            .. "NPC (крик глашатая в городе, фразу моба), чат замолкает и после дочитывает прерванную строку с начала.\n\n"
+            .. "Строки, ждавшие дольше 40 секунд, пропускаются.\n\nБез этих аддонов ничего не меняет.", get, set)
         row = row + 1
     end
     y = y - 24 * row - 6

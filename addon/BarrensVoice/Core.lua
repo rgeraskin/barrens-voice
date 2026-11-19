@@ -31,7 +31,7 @@ ns.DEFAULTS = {
     self = true,       -- your own lines
     onlyVisible = true, -- only lines a chat window of yours shows (its message types and channels, chat filters)
     onlyActiveTab = false, -- ... and of the docked windows only the selected tab (separate windows still count)
-    waitForCatQuest = true, -- hold chat lines while CatQuest or Wayfarer reads a quest; send them when it is done
+    waitForCatQuest = true, -- hold chat lines while CatQuest or Wayfarer reads a quest or voices an NPC's line
     cell = 2,          -- strip cell size, physical pixels
     rows = 1,          -- strip rows of cells
     -- the strip's cells start at the "left" edge of it or the "right"

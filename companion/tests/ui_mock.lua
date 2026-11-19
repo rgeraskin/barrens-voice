@@ -635,7 +635,7 @@ for _, p in ipairs(sent) do
     if p:find("^diag\31") then diag[#diag + 1] = p else chat[#chat + 1] = p end
 end
 assert(#chat == 1 and chat[1]:find("вторая"), "only the fresh one goes: " .. #chat)
-assert(#diag == 1 and diag[1]:find("озвучку квеста", 1, true), "the dropped one is reported to the program's log")
+assert(#diag == 1 and diag[1]:find("озвучку CatQuest/Wayfarer", 1, true), "the dropped one is reported to the program's log")
 sent = { chat[1] }
 ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "третья")
 assert(#sent == 2, "CatQuest silent: straight to the strip")
@@ -664,11 +664,11 @@ assert(#first == 2 and first[2]:find("^pause\31"), "CatQuest speaks: the program
 ns.WatchCatQuest()
 assert(#first == 2, "a pause is sent once")
 ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "в очередь")
-assert(sent[2]:find("строка ждёт озвучку квеста", 1, true), sent[2] or "nothing")
+assert(sent[2]:find("строка ждёт озвучку CatQuest/Wayfarer", 1, true), sent[2] or "nothing")
 CatQuestCore.state = { playing = false }
 ns.WatchCatQuest()
 ns.ReleaseHeld()
-assert(sent[3]:find("озвучка квестов замолчала", 1, true) and sent[4]:find("в очередь", 1, true), tostring(sent[3]))
+assert(sent[3]:find("CatQuest и Wayfarer замолчали", 1, true) and sent[4]:find("в очередь", 1, true), tostring(sent[3]))
 assert(#first == 3 and first[3]:find("^resume\31"), "CatQuest silent: the program goes on")
 ns.Skip("свои сообщения выключены", "Вася-Степи", "|cff00ff00привет|r")
 assert(sent[5]:find("не отправлено (свои сообщения выключены): Вася: привет", 1, true), sent[5])
@@ -713,6 +713,62 @@ WayfarerRU.Queue.items = {}
 ns.WatchCatQuest()
 assert(#first == 2 and first[2]:find("^resume\31"), "Wayfarer silent: the program goes on")
 ns.db.debug = false
+WayfarerRU = nil
+-- NPC lines (2026-11-19: Thrall's cry over a chat line): CatQuest's «Голоса мира» and Wayfarer's barks hold the chat too
+local hook0 = hooksecurefunc
+hooksecurefunc = function(t, name, f)
+    local orig = t[name]
+    t[name] = function(...) local r = orig(...); f(...); return r end
+end
+sent, first, clock = {}, {}, 500
+local worldLine = { ends = 503 }
+CatQuestCore = { state = { playing = false }, WorldQueue = { Current = function(now)
+    return worldLine and now < worldLine.ends and worldLine or nil end } }
+ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "под голос мира")
+assert(#sent == 0, "held while CatQuest voices an NPC")
+ns.WatchCatQuest()
+assert(#first == 1 and first[1]:find("^pause\31"), "the line being read pauses for it")
+clock = 503.5
+ns.ReleaseHeld()
+ns.WatchCatQuest()
+assert(#sent == 1 and sent[1]:find("под голос мира") and first[2]:find("^resume\31"), "its line over: the chat goes on")
+CatQuestCore = { state = { playing = false }, WorldQueue = {} }      -- an older CatQuest: no Current, silent
+ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "без Current")
+assert(#sent == 2, "a CatQuest without the queue's Current holds nothing")
+CatQuestCore = nil
+local barks = { recent = {} }
+function barks:Play(sound) return sound.ok end
+function barks:Stop() end
+WayfarerRU = { Queue = { items = {} }, Barks = barks }
+ns.ReleaseHeld()                                  -- the first look hooks Barks:Play and :Stop
+local function bark(ok, outcome, d)               -- Wayfarer's own way: Play, then its note of what came of it
+    barks:Play({ ok = ok, duration = d })
+    table.insert(barks.recent, 1, { t = clock, outcome = outcome })
+end
+clock = 600
+bark(true, "played", 4)
+ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "под крик")
+assert(#sent == 2, "held while Wayfarer voices an NPC's cry")
+clock = 601
+table.insert(barks.recent, 1, { t = clock, outcome = "busy" })   -- another cry, not played: the first one still counts
+clock = 602
+ns.ReleaseHeld()
+assert(#sent == 2, "still held")
+clock = 604.5
+ns.ReleaseHeld()
+assert(#sent == 3 and sent[3]:find("под крик"), "the cry over: the held line goes")
+clock = 610
+bark(false, "failed", 4)
+ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "после неудачного")
+assert(#sent == 4, "a cry whose file did not play holds nothing")
+bark(true, "chatty", 5)
+ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "под болтуна")
+assert(#sent == 4, "a chatty mob's line holds too")
+barks:Stop()
+ns.ReleaseHeld()
+assert(#sent == 5 and sent[5]:find("под болтуна"), "Wayfarer stopped it (a quest begins): the chat goes on")
+ns.WatchCatQuest()
+hooksecurefunc = hook0
 WayfarerRU = nil
 -- /bv off forgets the lines held for a quest voice-over: they are not read after /bv on
 ns.db.cell, ns.db.rows = 2, 1                 -- /bv on sends the settings, the strip's place with them

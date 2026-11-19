@@ -44,9 +44,55 @@ local function WayfarerSpeaking()
     return not (started and length and length > 0 and GetTime() > started + length + 3)
 end
 
---- Whether a quest voice-over speaks (or is about to): the chat waits.
+-- NPC lines in the world (a city's herald, a mob's cry): the server sends only their text, and CatQuest's «Голоса
+-- мира» and Wayfarer's barks voice them, each in a queue of its own, outside the quests' (the player, 2026-11-19:
+-- Thrall's «Чествуйте своих героев» over a chat line was a mess). They are short: the chat waits for them as for a
+-- quest, under the same setting.
+--  * CatQuest: CatQuestCore.WorldQueue.Current(now) - the line playing (its .ends), nil when none;
+--  * Wayfarer: Barks:Play knows the sound's length but keeps it to itself - a hook on it notes the start, and
+--    Barks.recent (an entry of that very time, "played" or "chatty") tells that it did play (a file that would not
+--    play is "failed"); Barks:Stop (a quest begins) ends it. Hooked once WayfarerRU.Barks is there (it loads after).
+local function CatQuestWorldSpeaking()
+    local core = rawget(_G, "CatQuestCore")
+    local wq = type(core) == "table" and type(core.WorldQueue) == "table" and core.WorldQueue
+    if not (wq and type(wq.Current) == "function") then return false end
+    local ok, cur = pcall(wq.Current, GetTime())
+    return ok and type(cur) == "table" and cur or false
+end
+
+local barkStart, barkLength, barkHooked
+local function WayfarerBarks()
+    local wf = rawget(_G, "WayfarerRU")
+    local barks = type(wf) == "table" and type(wf.Barks) == "table" and wf.Barks
+    if barks and not barkHooked and hooksecurefunc and type(barks.Play) == "function"
+            and type(barks.Stop) == "function" then
+        barkHooked = true
+        hooksecurefunc(barks, "Play", function(_, sound)
+            barkStart = GetTime()
+            barkLength = type(sound) == "table" and tonumber(sound.duration) or 2
+        end)
+        hooksecurefunc(barks, "Stop", function() barkStart = nil end)
+    end
+    return barks
+end
+
+--- The length of the Wayfarer bark playing now, or nil.
+local function WayfarerBarkSpeaking()
+    local barks = WayfarerBarks()
+    if not (barks and barkStart) then return nil end
+    if GetTime() > barkStart + barkLength then barkStart = nil return nil end
+    for _, entry in ipairs(type(barks.recent) == "table" and barks.recent or {}) do
+        if type(entry) == "table" and entry.t == barkStart then
+            return (entry.outcome == "played" or entry.outcome == "chatty") and barkLength or nil
+        end
+    end
+    return nil
+end
+
+--- Whether CatQuest or Wayfarer speaks (or is about to): a quest, a story, an NPC's line. The chat waits.
 local function QuestVoiceSpeaking()
-    return CatQuestSpeaking() or WayfarerSpeaking()
+    return CatQuestSpeaking() or WayfarerSpeaking() or CatQuestWorldSpeaking() ~= false
+        or WayfarerBarkSpeaking() ~= nil
 end
 
 --- Send the waiting chat lines once CatQuest is silent; drop those that waited too long.
@@ -57,7 +103,7 @@ function ns.ReleaseHeld()
             if now - h.at <= HOLD_MAX then kept[#kept + 1] = h end
         end
         if #kept < #held then
-            ns.Diag(("пропущено строк: %d — ждали озвучку квеста дольше %d с"):format(#held - #kept, HOLD_MAX))
+            ns.Diag(("пропущено строк: %d — ждали озвучку CatQuest/Wayfarer дольше %d с"):format(#held - #kept, HOLD_MAX))
         end
         held = kept
         return
@@ -67,7 +113,7 @@ function ns.ReleaseHeld()
         if now - h.at <= HOLD_MAX then ns.Strip.Push(h.payload) else dropped = dropped + 1 end
     end
     held = {}
-    if dropped > 0 then ns.Diag(("пропущено строк: %d — ждали озвучку квеста дольше %d с"):format(dropped, HOLD_MAX)) end
+    if dropped > 0 then ns.Diag(("пропущено строк: %d — ждали озвучку CatQuest/Wayfarer дольше %d с"):format(dropped, HOLD_MAX)) end
     if holdTicker then holdTicker:Cancel(); holdTicker = nil end
 end
 
@@ -94,10 +140,19 @@ local function QuestVoiceState()
         parts[#parts + 1] = what .. (WayfarerSpeaking() and " — чат ждёт"
             or (q.paused == true and " — на паузе, чат не ждёт") or " — считаем зависшим, чат не ждёт")
     end
+    local cur = CatQuestWorldSpeaking()
+    if cur then
+        parts[#parts + 1] = ("CatQuest: голос мира, ещё %s с — чат ждёт"):format(
+            tostring(tonumber(cur.ends) and math.max(0, math.floor(cur.ends - GetTime() + 0.5))))
+    end
+    local bark = WayfarerBarkSpeaking()
+    if bark then
+        parts[#parts + 1] = ("Wayfarer: фраза NPC, %d с — чат ждёт"):format(math.floor(bark + 0.5))
+    end
     return table.concat(parts, "; ")
 end
 
--- While a quest voice-over speaks the program pauses: the chat line being read is cut and said again
+-- While a quest voice-over (or an NPC's line) speaks the program pauses: the chat line being read is cut and said again
 -- from its start once it is silent, then the queue goes on. nil at first: the first check tells the
 -- program the state either way (a /reload during a pause must not leave it paused).
 local pausedForCatQuest
@@ -112,7 +167,7 @@ function ns.WatchCatQuest()
     if not ns.db.debug then voiceSeen = nil; return end
     local now = QuestVoiceState()
     if now ~= voiceSeen then
-        if voiceSeen ~= nil or now ~= "" then ns.Diag(now == "" and "озвучка квестов замолчала" or now) end
+        if voiceSeen ~= nil or now ~= "" then ns.Diag(now == "" and "CatQuest и Wayfarer замолчали" or now) end
         voiceSeen = now
     end
 end
@@ -132,7 +187,7 @@ function ns.Deliver(payload)
         return
     end
     held[#held + 1] = { payload = payload, at = GetTime() }
-    if ns.db.debug then ns.Diag(("строка ждёт озвучку квеста (в очереди %d)"):format(#held)) end
+    if ns.db.debug then ns.Diag(("строка ждёт озвучку CatQuest/Wayfarer (в очереди %d)"):format(#held)) end
     if not holdTicker and C_Timer and C_Timer.NewTicker then
         holdTicker = C_Timer.NewTicker(0.25, ns.ReleaseHeld)
     end
