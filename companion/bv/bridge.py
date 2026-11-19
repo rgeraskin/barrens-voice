@@ -155,9 +155,13 @@ class StripReader:
         # rows enough for a narrow strip: the addon makes it thicker so a long line fits
         hit = self.find(*whole, width_hint=self.capturer.rect[2],
                         capture_height=max(self.config["capture_height"], 64)) if whole else None
-        if hit and hit[:4] != self.capturer.rect:
+        # elsewhere: its place or width differ - not its height, which is the search's own (64 rows) and said
+        # «найдена в другом месте» of a strip where it was
+        if hit and tuple(hit[:3]) != tuple(self.capturer.rect[:3]):
             self.capturer.use(hit[:4])
             self.log(f"полоска найдена в другом месте: x {hit[0]}, y {hit[1]}, ширина {hit[2]}")
             # kept for a restart once a frame is read from there (a hit can be wrong: a strip half covered by
             # another addon), in the window's pixels, the window taken for the "screen"
             self.found = (*hit[:4], whole[1], whole[2])
+        elif hit and hit[3] > self.capturer.rect[3]:     # there, but thicker than grabbed: more rows, no word
+            self.capturer.use(hit[:4])

@@ -215,6 +215,24 @@ class Bookkeeping(Base):
         self.at(2.4, frame(2))
         self.assertEqual(self.capturer.kept, [])                   # nor later
 
+    def test_found_where_it_is_grabbed_is_not_elsewhere(self):
+        # the search's height (64 rows) differs from the grabbed rectangle's (16): not «в другом месте», nothing kept;
+        # the rows taken only to read a strip thicker than grabbed
+        self.capturer.whole = (b"picture", 1920, 1080)
+        self.capturer.rect = (510, 0, 300, 16)
+        self.hit = (510, 0, 300, 64, frame(1))
+        self.at(0)
+        self.at(2.1)
+        self.assertEqual(self.take()[0], [])
+        self.assertEqual(self.capturer.used, [(510, 0, 300, 64)])       # more rows, the same place
+        self.at(2.3, frame(1))
+        self.assertEqual(self.capturer.kept, [])                        # nothing new to keep
+        self.capturer.rect, self.capturer.used = (510, 0, 300, 80), []
+        self.at(7.5)
+        self.at(9.7)                                                    # gone 2 s, 5 s since the last search
+        self.assertEqual(len(self.found), 2)
+        self.assertEqual(self.capturer.used, [])                        # already more rows than the hit: left so
+
     def test_a_strip_thicker_than_asked_is_looked_for(self):
         self.strip.config["capture_height"] = 80
         self.capturer.whole = (b"picture", 1920, 1080)
