@@ -122,7 +122,7 @@ local TABS = {
     { "reading", "Каналы и чтение", "Какие каналы и строки читать вслух и как произносить имена." },
     { "voices", "Голоса", "Чем читать: голоса рас или голоса Windows, и какие голоса Windows раздавать игрокам." },
     { "dictionary", "Словарь", "Как читать сленг и сокращения: WTS = продам, дд = дамагер, ОП = Огненная пропасть." },
-    { "help", "Помощь", "Ошибки, улучшения, предложения, или что-то прочитано неправильно — пиши в Discord или Telegram.\n\n"
+    { "help", "Помощь", "Ошибки, улучшения, предложения, или что-то прочитано неправильно — пиши в Discord, Telegram или в сообщество.\n\n"
         .. "Или сразу заведи issue на GitHub |TInterface\\AddOns\\BarrensVoice\\Media\\smile:14:14|t" },
 }
 
@@ -212,10 +212,10 @@ local function BuildGeneral(tab, description)
     toggle = UI.Button(tab, "", W, function() ns.SetEnabled(not ns.db.enabled) end)
     toggle:SetPoint("TOPLEFT", LEFT, y)
     UI.Tooltip(toggle, "Включить или выключить всю озвучку: мост к лаунчеру (линию у края экрана) и передачу чата "
-        .. "ему.\n\nТо же — ПКМ по значку у миникарты или /bv on, /bv off.")
+        .. "ему.\n\nТо же — ПКМ по значку у миникарты.")
     local test = UI.Button(tab, "Проверка", W, ns.Test)
     test:SetPoint("TOPLEFT", LEFT + W + GAP, y)
-    UI.Tooltip(test, "Четыре тестовые строки разными голосами (/bv test).\n\nВсе команды — /bv help.")
+    UI.Tooltip(test, "Четыре тестовые строки разными голосами.")
     y = y - 30
     local get, set = Setting("minimapIcon", function() ns.Minimap.Update() end)
     checks[#checks + 1] = UI.Check(tab, LEFT, y, "Значок у миникарты",
@@ -225,7 +225,7 @@ local function BuildGeneral(tab, description)
         .. "есть что-то новое и заметное, через несколько секунд после входа в игру (не в бою) открывается окно с "
         .. "изменениями, а в чате — строка со ссылкой [Что нового], чтобы открыть его снова.\n\nВыключено — только "
         .. "строка.\n\nОткрыть окно можно в "
-        .. "любой момент: /bv news или кнопка на вкладке «Помощь».", get, set)
+        .. "любой момент кнопкой на вкладке «Помощь».", get, set)
     y = y - 30
 
     programState = tab:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -306,7 +306,7 @@ local function BuildGeneral(tab, description)
     -- "Мост к компаньону": folded, as it is needed rarely - when another addon covers the line.
     y = UI.Header(tab, "Дополнительно", y)
     -- CatQuest and Wayfarer are Forever's addons: not a word of them on retail
-    checks[#checks + 1] = UI.Check(tab, LEFT, y, "Отладка (/bv debug)", "Аддон пишет в журнал лаунчера каждую "
+    checks[#checks + 1] = UI.Check(tab, LEFT, y, "Отладка", "Аддон пишет в журнал лаунчера каждую "
         .. "строку чата, которую не отправил, с причиной (канал выключен, строку не видно ни в одном окне чата, "
         .. "её скрыл другой аддон)" .. (ns.Retail() and "" or ", и когда CatQuest или Wayfarer начинает и заканчивает "
         .. "говорить") .. ".\n\nСтроки отладки идут по мосту вместе с чатом, поэтому включай её, только когда ищешь, "
@@ -353,7 +353,7 @@ local function BuildReading(tab, description)
     local retail, row = ns.Retail(), 1
     if not retail then
         get, set = Setting("sayLastNames")
-        lastNames = UI.Check(tab, LEFT + SUB, y - 24 * row, "и фамилии: «Ивар Седой», а не «Ивар»", "Читать имя целиком. "
+        lastNames = UI.Check(tab, LEFT + SUB, y - 24 * row, "и фамилии: «Ивар Седой», а не «Ивар»", "Читать имя целиком.\n\n"
             .. "Выключено — только до первого пробела: у персонажа «Ивар Седой» прозвучит «Ивар».", get, set)
         checks[#checks + 1] = lastNames
         row = row + 1
@@ -380,7 +380,7 @@ local function BuildReading(tab, description)
         get, set = Setting("waitForCatQuest")
         checks[#checks + 1] = UI.Check(tab, LEFT, y - 24 * row, "Ждать озвучку квестов (CatQuest, Wayfarer)",
             "Пока аддон CatQuest или Wayfarer читает квест, реплику NPC, рассказ о месте или путевую историю, чат "
-            .. "замолкает и после дочитывает прерванную строку с начала. Строки, ждавшие дольше 40 секунд, пропускаются.\n\n"
+            .. "замолкает и после дочитывает прерванную строку с начала.\n\nСтроки, ждавшие дольше 40 секунд, пропускаются.\n\n"
             .. "Без этих аддонов ничего не меняет.", get, set)
         row = row + 1
     end
@@ -397,7 +397,7 @@ local function BuildReading(tab, description)
     -- "Общие каналы" on a row of its own, the channels it holds under it, indented: as the names above
     get, set = Setting("channels", function() Refresh() end)
     checks[#checks + 1] = UI.Check(tab, LEFT, y, "Общие каналы", "Номерные каналы: Общий, Торговля, Поиск спутников, "
-        .. "Оборона. Какие из них — галочки под этой.", get, set)
+        .. "Оборона.\n\nКакие из них — галочки под этой.", get, set)
     for i, item in ipairs(NUMBERED) do
         local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
         local g, st = Setting(item[1])
@@ -469,7 +469,7 @@ local function BuildHelp(tab, description)
     y = y - height - GAP
     local news = UI.Button(tab, "Что нового", 140, function() ns.NewsWindow.Show() end)
     news:SetPoint("TOP", tab, "TOP", 0, y)          -- centred under the links
-    UI.Tooltip(news, "Что изменилось в последних версиях Barrens Voice (/bv news).")
+    UI.Tooltip(news, "Что изменилось в последних версиях Barrens Voice.")
     return -(y - 22 - (GAP - 8))                    -- the tab is 8 px taller than its height (CHROME)
 end
 
@@ -570,9 +570,6 @@ local function RegisterInGameSettings()
         window:Show()
     end)
     open:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -12)
-    local hint = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    hint:SetPoint("LEFT", open, "RIGHT", 10, 0)
-    hint:SetText("или /bv в чате")
     if Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory then
         Settings.RegisterAddOnCategory(Settings.RegisterCanvasLayoutCategory(panel, panel.name))
     elseif InterfaceOptions_AddCategory then

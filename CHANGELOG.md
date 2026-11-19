@@ -56,7 +56,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   What an update brought, in the players' own words (Russian, short), instead of the one line after an update: a few seconds after login (after «озвучка чата работает»), and never in combat (5 s after it ends), a release with something new or changed opens the «Что нового» window — every release's entry, newest first, with its date and a few points, and under them a link row to the full changelog on GitHub («Копировать», «Открыть»); a release of fixes and dictionary words only is just the chat line, which comes with the window too (to open it again): one line with the addon's icon, «Barrens Voice:», a short summary and a [Что нового] link that opens the same window (a click with Shift opens it too and puts nothing into the edit box). Each entry is shown once; a test build shows its release's entry and, above it, its own: «Тестовая сборка N», the list of its commits since the tag before it, made by the build (never kept in news.toml); the first run shows the welcome instead. `/bv news` and «Что нового» on «Помощь» open the window any time, and Escape closes it. «Окно «Что нового» после обновлений» on «Общее» (on by default) leaves only the chat line. The news are the program's: every release has its entry, one with changes to the program alone too, and the companion brings them into the game at its start (`NewsData.lua` in the addon's folder, kept by addon installs), so they show at the next login or `/reload`; until the companion has run, the window says where they come from. The GitHub release's description is the same entry, with a link to this changelog.
 
-- «Отладка (/bv debug)» in the addon's settings
+- «Отладка» in the addon's settings
 
   Under «Дополнительно», with a tooltip on what it writes and why to keep it off otherwise.
 
@@ -140,7 +140,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - The settings' tooltips are in paragraphs
 
-  A long tooltip was one dense block; now what the setting does, the details and the caveat are paragraphs with an empty line between, as the game's own tooltips are, and «с глаголом» lists its verbs a line each.
+  A long tooltip was one dense block; now what the setting does, the details and the caveat are paragraphs with an empty line between, as the game's own tooltips are, and «с глаголом» lists its verbs a line each. Tooltips and labels name no chat commands (`/bv help` lists them, and the welcome says so): «Отладка», not «Отладка (/bv debug)».
 
 - Every message of the addon in the chat starts with its icon
 
