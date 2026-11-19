@@ -132,7 +132,8 @@ class App:
         # out of any window of recent lines, and the main window went blank
         self.main: collections.deque[tuple[str, str, str]] = collections.deque(maxlen=200)
         self.log_back = 0                # the main window's log scrolled this many rows up from the newest
-        self.log_rows = 0                # its rows at the last drawing: new ones keep a scrolled view where it is
+        self.log_last = None             # its newest line at the last drawing: rows after it are new (a scrolled view stays)
+        self.log_wrapped: dict = {}      # its lines as wrapped into rows: wrapped again only when new (scrolling redraws)
         self.log_box = None              # its rows' place and its bar's track (redraw), for the mouse
         self.log_hover = False           # the pointer over the log: its scroll bar shown
         self.log_drag = None             # the thumb held: (pointer y, thumb top) where it was taken
@@ -835,13 +836,20 @@ class App:
         # every line wrapped, messages are written to fit one line (~58 characters after the time), and one that
         # does not is wrapped under its time rather than cut. The text stops LOG_GUTTER short of the scroll bar's
         # track: the bar, shown over the log while the pointer is on it, never covers a letter
-        rows: list[tuple[str, str]] = []
-        for time, level, message in log:            # the level itself is not shown here
-            rows += [(level, part) for part in p.wrap(f"{time} {message}", p.mono, LX1 - LX0 - 28 - LOG_GUTTER,
-                                                      " " * (len(time) + 1))]
-        if self.log_back:                         # scrolled up: new rows below do not move the view
-            self.log_back += max(0, len(rows) - self.log_rows)
-        self.log_rows = len(rows)
+        wrapped, counts, rows = {}, [], []
+        for item in log:
+            time, level, message = item             # the level itself is not shown here
+            got = wrapped.get(item) or self.log_wrapped.get(item)
+            if got is None:
+                got = [(level, part) for part in p.wrap(f"{time} {message}", p.mono, LX1 - LX0 - 28 - LOG_GUTTER,
+                                                        " " * (len(time) + 1))]
+            wrapped[item] = got
+            counts.append(len(got))
+            rows += got
+        self.log_wrapped = wrapped
+        if self.log_back:      # scrolled up: the rows that came below do not move the view (nor the oldest gone above)
+            self.log_back += model.log_rows_after(self.log_last, log, counts)
+        self.log_last = log[-1] if log else None
         first, self.log_back = model.log_view(len(rows), fits, self.log_back)
         self.drawn = snap[:-1] + (self.log_back,)
         for i, (level, text) in enumerate(rows[first:first + fits]):

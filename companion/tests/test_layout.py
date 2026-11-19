@@ -221,6 +221,30 @@ class Layout(unittest.TestCase):
             self.assertTrue(any(c.type(i) == "line" for i in c.find_withtag("check1")))        # its value still shown
             self.assertEqual(problems(c), [])
 
+    def test_the_log_scrolls_without_wrapping_again_and_stays_put(self):
+        # a scroll's redraw wrapped every line again (the thumb dragged: at each move of the mouse); with 200 lines
+        # kept a new one pushed the oldest out, and a view scrolled up slid a row a line
+        a = self.make(1.0)
+        a.main.extend((f"12:{i // 60:02d}:{i % 60:02d}", "INFO", f"строка {i}") for i in range(a.main.maxlen))
+        a.drawn = None
+        a.redraw()
+        calls = []
+        wrap = a.p.wrap
+        a.p.wrap = lambda *args, **kw: calls.append(args) or wrap(*args, **kw)
+        a.log_scroll_to(20)
+        self.assertEqual((a.log_back, calls), (20, []))                     # scrolled: nothing wrapped again
+
+        def shown():
+            return [a.canvas.itemcget(i, "text") for i in a.canvas.find_all() if a.canvas.type(i) == "text"
+                    and a.canvas.itemcget(i, "text").startswith(("12:", "13:"))]
+        before = shown()
+        a.main.append(("13:00:00", "INFO", "новая"))                       # the oldest goes: as many rows
+        a.redraw()
+        self.assertEqual(len(calls), 1)                                     # only the new line wrapped
+        self.assertEqual(shown(), before)                                   # the view stays put
+        a.log_scroll_to(0)
+        self.assertTrue(shown()[-1].endswith("новая"))
+
     def test_settings_and_help(self):
         found: list[tuple[str, str]] = []
         for scale in (1.0, 1.25, 1.5):

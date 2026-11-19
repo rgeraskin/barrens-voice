@@ -556,6 +556,15 @@ class LogLines(unittest.TestCase):
             self.assertEqual(log_back_at(40, 10, log_thumb(40, 10, first, 0, 100)[0], 0, 100), back)
         self.assertEqual(log_back_at(40, 10, -50, 0, 100), 30)
         self.assertEqual(log_back_at(40, 10, 500, 0, 100), 0)
+        # a scrolled view stays put by the lines that came after the newest it saw, also when 200 lines are kept and
+        # the oldest goes as a new one comes (the count of rows stays)
+        from bv.launcher.model import log_rows_after
+        a, b, c, d = ("1", "INFO", "a"), ("2", "INFO", "b"), ("3", "INFO", "c"), ("4", "INFO", "d")
+        self.assertEqual(log_rows_after(b, [a, b, c, d], [1, 1, 2, 1]), 3)
+        self.assertEqual(log_rows_after(b, [b, c, d], [1, 2, 1]), 3)              # «a» gone above, as many rows
+        self.assertEqual(log_rows_after(d, [a, b, c, d], [1, 1, 2, 1]), 0)        # nothing new: a scroll's redraw
+        self.assertEqual(log_rows_after(None, [a], [1]), 0)
+        self.assertEqual(log_rows_after(("0", "INFO", "x"), [a, b], [1, 1]), 0)    # gone (a progress line moved on)
         # the log's text stops short of the bar's track: the bar never covers a letter
         from bv.launcher import app
         self.assertLess(app.LX0 + 14 + (app.LX1 - app.LX0 - 28 - app.LOG_GUTTER), app.LX1 - 14 - 4)

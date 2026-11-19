@@ -559,6 +559,18 @@ def log_view(total: int, fits: int, back: int) -> tuple[int, int]:
     return max(0, total - fits - back), back
 
 
+def log_rows_after(last, log, counts) -> int:
+    """The rows of the lines that came after `last` (the newest line at the last drawing), `counts` the rows of each
+    line of `log`. With 200 lines kept the oldest goes as a new one comes - the count of rows stays, and only this
+    tells how far a view scrolled up must move to stay put. 0 when `last` is gone (a progress line moved on)."""
+    if last is None:
+        return 0
+    for i in range(len(log) - 1, -1, -1):
+        if log[i] == last:
+            return sum(counts[i + 1:])
+    return 0
+
+
 def log_thumb(total: int, fits: int, first: int, y0: float, y1: float, least: float = 24) -> tuple[float, float] | None:
     """The scroll bar's thumb between `y0` and `y1` for rows first..first+fits of `total`; None when all fit."""
     if total <= fits:
