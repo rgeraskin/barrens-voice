@@ -465,7 +465,8 @@ local function BuildHelp(tab, description)
     y = y - GAP
     local _, height = UI.Text(tab, "GameFontHighlight", LEFT + 4, y, TEXT_W,
         "Что прислать: что прозвучало и как надо, а лучше — строку из журнала лаунчера (кнопка «Журнал» "
-        .. "в окне Barrens Voice Launcher). Неверное ударение можно сразу поправить себе на вкладке «Словарь».")
+        .. "в окне Barrens Voice Launcher).\n\nНеверное ударение можно сразу поправить себе на вкладке «Словарь».\n\n"
+        .. "Список команд чата — /bv help.")
     y = y - height - GAP
     local news = UI.Button(tab, "Что нового", 140, function() ns.NewsWindow.Show() end)
     news:SetPoint("TOP", tab, "TOP", 0, y)          -- centred under the links
@@ -570,6 +571,9 @@ local function RegisterInGameSettings()
         window:Show()
     end)
     open:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -12)
+    local hint = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    hint:SetPoint("LEFT", open, "RIGHT", 10, 0)
+    hint:SetText("или /bv в чате")
     if Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory then
         Settings.RegisterAddOnCategory(Settings.RegisterCanvasLayoutCategory(panel, panel.name))
     elseif InterfaceOptions_AddCategory then

@@ -144,7 +144,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - The settings' tooltips are in paragraphs
 
-  A long tooltip was one dense block; now what the setting does, the details and the caveat are paragraphs with an empty line between, as the game's own tooltips are, and «с глаголом» lists its verbs a line each. Tooltips and labels name no chat commands (`/bv help` lists them, and the welcome says so): «Отладка», not «Отладка (/bv debug)».
+  A long tooltip was one dense block; now what the setting does, the details and the caveat are paragraphs with an empty line between, as the game's own tooltips are, and «с глаголом» lists its verbs a line each. Tooltips and labels name no chat commands: «Отладка», not «Отладка (/bv debug)»; «Помощь» says where they are («Список команд чата — /bv help»), and the game's settings panel keeps «или /bv в чате».
 
 - Every message of the addon in the chat starts with its icon
 
