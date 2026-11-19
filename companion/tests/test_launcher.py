@@ -215,6 +215,7 @@ class Config(unittest.TestCase):
         said = []
         win = SimpleNamespace(checked={}, config_told=set(), config_error=None,
                               say=lambda text, level="INFO": said.append((level, text)))
+        win.say_config_error = lambda e: app.App.say_config_error(win, e)
         app.App.check_config(win, 1.0, error)
         self.assertEqual([lvl for lvl, _ in said], ["ERROR", "DEBUG"])
         self.assertTrue(said[0][1].startswith("config.json не читается: ошибка в строке 3, столбец 3 — исправь его "
@@ -226,6 +227,44 @@ class Config(unittest.TestCase):
         app.App.check_config(win, 5.0, None)
         self.assertEqual(said[-1], ("INFO", "config.json снова читается"))
         self.assertEqual((win.config_error, win.config_told, win.checked["config"]), (None, set(), 5.0))
+        # not opened (another program holds it, its permissions): another remedy, said the same way
+        from bv.launcher.model import ConfigNotOpened
+        app.App.check_config(win, 7.0, ConfigNotOpened("config.json не открывается: Permission denied"))
+        self.assertEqual(said[-1], ("ERROR", "config.json не открывается: Permission denied — закрой программу, которая "
+                                             "его держит, и проверь права на файл, до тех пор лаунчер в него не пишет и "
+                                             "озвучку не запускает"))
+        # «Играть» with it broken: said again (a click asked), not only the red state line
+        said.clear()
+        win.busy, win.running_game, win.selected = "", None, "forever"
+        win.companion = SimpleNamespace(running=False)
+        win.game = lambda key: SimpleNamespace(addon="0.4.0")
+        win.start_companion = lambda args=None: False
+        app.App.play(win)
+        self.assertEqual([lvl for lvl, _ in said], ["ERROR"])
+        said.clear()
+        win.running_game = "forever"                      # the game runs, the voice-over not: the same
+        app.App.play(win)
+        self.assertEqual([lvl for lvl, _ in said], ["ERROR"])
+
+    def test_a_file_held_a_moment_is_read_again(self):
+        # an antivirus or an editor's save holds config.json for a moment: read again after 0.1 s, no error for it
+        from unittest import mock
+        from bv.launcher import model
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "config.json"
+            path.write_text('{"rate": 7}', encoding="utf-8")
+            real, calls = Path.read_text, []
+
+            def held_once(self, *a, **k):
+                calls.append(1)
+                if len(calls) == 1:
+                    raise PermissionError(13, "held")
+                return real(self, *a, **k)
+            with mock.patch.object(Path, "read_text", held_once), mock.patch("time.sleep"):
+                self.assertEqual(model.read_config(path, strict=True)["rate"], 7)
+            with mock.patch.object(Path, "read_text", side_effect=PermissionError(13, "Permission denied")), \
+                    mock.patch("time.sleep"):
+                self.assertIsInstance(model.config_error(path), model.ConfigNotOpened)
 
     def test_unreadable_file_never_written_over(self):
         # in use (a sharing violation, an antivirus scan) or its permissions: the launcher wrote the defaults over it

@@ -197,6 +197,10 @@ class BrokenConfig(ValueError):
         self.detail = detail
 
 
+class ConfigNotOpened(BrokenConfig):
+    """config.json there but not opened: another program holds it, or its permissions keep it from this user."""
+
+
 class ConfigNotWritten(BrokenConfig):
     """config.json read but not written: marked read-only, or another program holds it right now."""
 
@@ -208,12 +212,20 @@ def read_config(path: Path = CONFIG_PATH, strict: bool = False) -> dict:
     from ..__main__ import DEFAULT_CONFIG
     config = dict(DEFAULT_CONFIG)
     try:
-        saved = json.loads(Path(path).read_text(encoding="utf-8-sig"))     # -sig: Notepad's BOM is no error
+        try:
+            text = Path(path).read_text(encoding="utf-8-sig")             # -sig: Notepad's BOM is no error
+        except OSError as e:
+            if isinstance(e, FileNotFoundError):
+                raise
+            import time
+            time.sleep(0.1)                     # held a moment by another program (an antivirus, an editor's save)
+            text = Path(path).read_text(encoding="utf-8-sig")
+        saved = json.loads(text)
     except FileNotFoundError:
         return config
     except OSError as e:
         if strict:
-            raise BrokenConfig(f"config.json не открывается: {e.strerror or e}") from e
+            raise ConfigNotOpened(f"config.json не открывается: {e.strerror or e}") from e
         return config
     except ValueError as e:
         if strict:

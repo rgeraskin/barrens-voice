@@ -212,13 +212,20 @@ class App:
         self.config_error = error
         if error is not None and (old is None or str(old) != str(error)):
             self.config_told.add("broken")              # set_config: no second word of it
-            self.say(f"{error} — исправь его («Открыть config.json» в «Настройках»), до тех пор лаунчер в него не "
-                     "пишет и озвучку не запускает", "ERROR")
-            if error.detail:
-                self.say(f"    {error.detail}", "DEBUG")
+            self.say_config_error(error)
         elif error is None and old is not None:
             self.config_told.discard("broken")
             self.say("config.json снова читается")
+
+    def say_config_error(self, error) -> None:
+        """The ERROR line of a config.json that does not read, what to do in it; the parser's words a DEBUG line."""
+        if isinstance(error, model.ConfigNotOpened):
+            what = "закрой программу, которая его держит, и проверь права на файл"
+        else:
+            what = "исправь его («Открыть config.json» в «Настройках»)"
+        self.say(f"{error} — {what}, до тех пор лаунчер в него не пишет и озвучку не запускает", "ERROR")
+        if error.detail:
+            self.say(f"    {error.detail}", "DEBUG")
 
     def set_config(self, **changes) -> dict:
         """Settings changed in config.json; when the file does not parse it is not written over (the player's
@@ -398,8 +405,9 @@ class App:
         if self.busy:
             return
         if self.running_game:                      # the game runs, the companion not (it stopped): voices back on
-            if not self.companion.running:
-                self.start_companion(["--no-launch"])
+            if not self.companion.running and not self.start_companion(["--no-launch"]) \
+                    and getattr(self, "config_error", None) is not None:
+                self.say_config_error(self.config_error)   # a click asked for it: said again
             return
         g = self.game(self.selected)
         if g is None:
@@ -412,8 +420,8 @@ class App:
             launch.launch(dict(self.config, game=self.selected), self.say_as_companion)
         elif self.companion.running:
             self.restart_companion(["--launch"])
-        else:
-            self.start_companion(["--launch"])
+        elif not self.start_companion(["--launch"]) and getattr(self, "config_error", None) is not None:
+            self.say_config_error(self.config_error)   # a click asked for it: said again, not only the red state line
 
     def choose_game(self, key: str) -> None:
         if key == self.selected:
@@ -678,7 +686,10 @@ class App:
         if self.busy:
             lines[0] = (model.YELLOW, "Озвучка перезапускается…" if self.busy == "restarting" else "Озвучка останавливается…")
         elif getattr(self, "config_error", None) is not None and not self.companion.running:
-            lines[0] = (model.RED, "config.json не читается — открой «Настройки»")     # the tray's hint says it too
+            # the tray's hint says it too
+            lines[0] = (model.RED, "config.json не открывается — его держит другая программа"
+                        if isinstance(self.config_error, model.ConfigNotOpened)
+                        else "config.json не читается — открой «Настройки»")
         show_update = bool(self.update) and self.config.get("launcher_dismissed") != self.update["version"]
         games = tuple((g.key, g.addon, str(g.root)) for g in self.games)
         progress = model.main_lines(list(self.main))
