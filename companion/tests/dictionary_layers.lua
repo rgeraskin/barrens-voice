@@ -144,6 +144,15 @@ end
 local Du, untouched = migrated({ lines = {}, removed = {} })
 assert(next(untouched.removed) == nil and has(Du.Text(), "\n~(\\d+)к\\b=\\g<1>000"), "untouched: the new rules")
 
+-- «НП» was a word (any case), the dungeon's case-sensitive regex now: a player's delete or edit of «нп» carries over
+do
+    local NP = [[~\b(?-i:НП)\b]]
+    local Dn, deleted = migrated({ lines = {}, removed = { ["нп"] = true } })
+    assert(deleted.removed[NP] and not deleted.removed["нп"], "deleted «нп»: the dungeon's regex deleted too")
+    assert(not Dn.Text():find(NP .. "=", 1, true), "and not in the text")
+    local _, edited = migrated({ lines = { ["нп"] = "нп=моя пучина" }, removed = {} })
+    assert(edited.removed[NP] and edited.lines["нп"] == "нп=моя пучина", "edited «нп»: theirs kept alone")
+end
 print("dictionary layers ok")
 
 -- the dictionary online (DictionaryOnline.lua, loaded before Dictionary.lua): the newer default wins
