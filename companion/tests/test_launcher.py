@@ -2092,10 +2092,11 @@ class UpdateInWindow(unittest.TestCase):
         # «готова — установится, когда закроешь игру» came with no game at all, the switch a second later
         said = []
 
-        def win(game, running):
+        def win(game, running, exit_with_wow=False):
             return self.ns(exit_seen=True, running_game=game, busy="", companion=self.ns(running=running),
                            updater=self.ns(ready="0.4.1", due=lambda g, c, b: not g and not c, apply=lambda: None),
-                           relaunch=lambda updated=False: None, say=lambda text, *a: said.append(text))
+                           relaunch=lambda updated=False: None, say=lambda text, *a: said.append(text),
+                           config={"exit_with_wow": exit_with_wow})
         w = win("forever", True)
         self.app.App.apply_update_when_idle(w)
         self.app.App.apply_update_when_idle(w)
@@ -2108,6 +2109,12 @@ class UpdateInWindow(unittest.TestCase):
         said.clear()
         self.app.App.apply_update_when_idle(win(None, False))  # nothing to wait for: switched, no word of waiting
         self.assertEqual(said, [])
+        # «Закрываться вместе с игрой» on: the voice-over ends by itself a moment after the game - no word of it
+        w = win("forever", True, exit_with_wow=True)
+        self.app.App.apply_update_when_idle(w)
+        w.running_game = None
+        self.app.App.apply_update_when_idle(w)
+        self.assertEqual(said, ["версия 0.4.1 установится, когда закроешь игру"])
 
     def test_companion_starts_as_the_window_says(self):
         # a change config.json did not take held in the window only: «компаньон запускается (WoW Retail)» while the

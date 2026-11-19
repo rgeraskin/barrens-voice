@@ -620,8 +620,10 @@ class App:
             return
         ready = getattr(self.updater, "ready", None)
         # what it waits for, once per version and cause, and only when it does wait (no game, no voice-over: switched
-        # at once); the game closed with the voice-over going on («Закрываться вместе с игрой» off) is a new cause
-        cause = "game" if self.running_game else "voice" if self.companion.running else None
+        # at once); the game closed with the voice-over going on is a new cause - with «Закрываться вместе с игрой»
+        # off only: on, the voice-over ends by itself a second or two after the game, just before the switch
+        voice_waits = self.companion.running and not (getattr(self, "config", {}) or {}).get("exit_with_wow", True)
+        cause = "game" if self.running_game else "voice" if voice_waits else None
         if ready and cause and (ready, cause) != getattr(self, "wait_told", None):
             self.wait_told = (ready, cause)
             name = display_version(ready)

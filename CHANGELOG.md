@@ -164,7 +164,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - «установится, когда закроешь игру» only while a game or the voice-over runs
 
-  A version prepared with no game running said it would install when the game closed, and switched the same second. The update now says only «версия … готова»; the launcher adds «установится, когда закроешь игру» (or «…когда остановится озвучка») once, when the switch really waits.
+  A version prepared with no game running said it would install when the game closed, and switched the same second. The update now says only «версия … готова»; the launcher adds «установится, когда закроешь игру» once, when the switch really waits, and «…когда остановится озвучка» when the voice-over outlives the game («Закрываться вместе с игрой» off).
 
 - «в первый раз скачивается ~760 МБ» only when it does
 
