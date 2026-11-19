@@ -772,7 +772,7 @@ class App:
             p.button(W - 156, y + 9, W - 58, y + 39, "Что нового", "news", lambda: webbrowser.open(u["url"]))
             p.button(W - 50, y + 9, W - 30, y + 39, "×", "dismiss", self.dismiss_update)
         c.create_text(W - 24, h - 16, text=f"версия {display_version(self.version)}", anchor="e", fill=DIM, font=p.small)
-        self.tray.tooltip("Barrens Voice — " + lines[0][1])
+        self.tray.tooltip("Barrens Voice Launcher — " + lines[0][1])
 
     # --- settings and help ----------------------------------------------------------------------
 
@@ -1007,7 +1007,7 @@ def register_app_id() -> None:
         import winreg
         from .paint import ICON_FILE
         with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"Software\Classes\AppUserModelId\{APP_ID}") as key:
-            winreg.SetValueEx(key, "DisplayName", 0, winreg.REG_SZ, "Barrens Voice")
+            winreg.SetValueEx(key, "DisplayName", 0, winreg.REG_SZ, "Barrens Voice Launcher")   # the notices' sender
             winreg.SetValueEx(key, "IconUri", 0, winreg.REG_SZ, str(ICON_FILE))
     except OSError:
         pass

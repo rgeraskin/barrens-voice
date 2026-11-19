@@ -100,8 +100,8 @@ class FakeTray:
     def notify(self, *_):
         pass
 
-    def tooltip(self, *_):
-        pass
+    def tooltip(self, text):
+        self.said = text                 # the tray icon's hint (test_main_window_in_every_state)
 
 
 def game(key, addon, root=None):
@@ -194,6 +194,7 @@ class Layout(unittest.TestCase):
                     a.config = {"launch_wow": True, "exit_with_wow": True}
                     a.drawn = None
                     a.redraw()
+                    self.assertTrue(a.tray.said.startswith("Barrens Voice Launcher — "), a.tray.said)   # the program's name
                     self.check(a.canvas, f"главное окно ×{scale}, игры «{gname}», {st.get('phase')}/{st.get('voices')}, "
                                          f"игра {running_game}, обновление {u and u['version']} {status} {busy}", found)
         self.report(found)
