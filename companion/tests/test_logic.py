@@ -767,6 +767,11 @@ class Pipeline(unittest.TestCase):
         self.check({"скачки патча долгие": "ск+ачки патча долгие", "после скачки клиента": "после ск+ачки клиента",
                     "у меня скачки фпс": "у меня скачк+и фпс", "из-за скачки пинга": "из-за скачк+и пинга"})
 
+    def test_np_by_case(self):
+        # «нп» in lower case (or «Нп» starting a phrase) is «без проблем», the dungeon only in capitals
+        self.check({"спасибо! нп": "спасибо! без проблем", "Нп, обращайся": "без проблем, обращайся",
+                    "го в НП": "го в Непроглядную пучину", "из НП": "из Непроглядной пучины", "нпс": "нпс"})
+
     def test_keep_case_mark(self):
         # «=!»: a replacement as written, never declined after a preposition - a word, a regex; without it: declined
         from bv.__main__ import speech_text
