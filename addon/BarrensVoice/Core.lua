@@ -105,7 +105,7 @@ local NAME_MARK, KEPT_NAME_MARK = "\4", "\5"
 -- Where a line was said (sayWhere, Text.lua ns.Place): said when the place differs from the last line's
 -- (a line of any kind: a say line between two guild lines counts) or after PLACE_PAUSE seconds without a
 -- line - a fresh start. A run of guild lines says «в гильдии» once.
-local PLACE_PAUSE = 60
+local PLACE_PAUSE = 30
 local lastPlace, lastLineAt
 
 --- The place to say before this line, or nil; every line sent moves the state on.

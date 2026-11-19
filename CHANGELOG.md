@@ -66,7 +66,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Where a line was said
 
-  «и где: «Громмаш пишет в гильдии: …»» under the names, on by default: the verb gets the place — «в группе», «в рейде», «объявляет рейду», «в гильдии», «в офицерском чате», «в общем», «в торговле», «в канале <имя>». Only when the place changes from the last line read or after a minute's quiet, so a run of guild lines names the guild once; say, yell, whisper and emote have no place. Without the verb: «Громмаш, в гильдии: …».
+  «и где: «Громмаш пишет в гильдии: …»» under the names, on by default: the verb gets the place — «в группе», «в рейде», «объявляет рейду», «в гильдии», «в офицерском чате», «в общем», «в торговле», «в канале <имя>». Only when the place changes from the last line read or after 30 s of quiet, so a run of guild lines names the guild once; say, yell, whisper and emote have no place. Without the verb: «Громмаш, в гильдии: …».
 
 - «Что читать»: only the selected chat tab
 

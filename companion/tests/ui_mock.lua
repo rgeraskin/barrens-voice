@@ -781,7 +781,7 @@ assert(said(3) == "Вася спрашивает:\4 кто идёт в ОП?" an
 assert(said(2) == "Вася\5 смеётся", said(2))                               -- an emote: a name never dropped
 print("continue ok")
 
--- the place (sayWhere): with the verb, once per change of place or after a minute's quiet
+-- the place (sayWhere): with the verb, once per change of place or after 30 s of quiet
 do
     local clock0 = GetTime
     local at = 1000
@@ -801,8 +801,8 @@ do
     eq(say("guild", "кто идёт?"), "Тралл спрашивает в гильдии:\4 кто идёт?")   -- back from Trade: again
     eq(say("say", "привет"), "Тралл говорит:\4 привет")                         -- no place of its own
     eq(say("guild", "я тут"), "Тралл пишет в гильдии:\4 я тут")                -- after a say line: again
-    eq(say("guild", "ау", nil, 60), "Тралл пишет в гильдии:\4 ау")              -- a minute's quiet: again
-    eq(say("guild", "ау", nil, 59), "Тралл пишет:\4 ау")
+    eq(say("guild", "ау", nil, 30), "Тралл пишет в гильдии:\4 ау")              -- 30 s of quiet: again
+    eq(say("guild", "ау", nil, 29), "Тралл пишет:\4 ау")
     eq(say("party", "пул"), "Тралл пишет в группе:\4 пул")
     eq(say("instance", "пул"), "Тралл пишет:\4 пул")                            -- a group's chat all the same
     eq(say("raid", "бафы"), "Тралл пишет в рейде:\4 бафы")
