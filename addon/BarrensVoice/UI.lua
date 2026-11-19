@@ -6,10 +6,21 @@ ns.UI = UI
 
 UI.GOLD = { 1, 0.82, 0 }
 
+--- A hint on hover. `text` (or a function giving it) may have paragraphs: each "\n" starts a line, an empty line
+--- (a "\n\n") is a gap between them, as the game's own tooltips make it (GameTooltip_AddBlankLineToTooltip:
+--- a line of " ", SharedTooltipTemplates.lua, forever and live). Every line wraps.
 function UI.Tooltip(widget, text)
     widget:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText(type(text) == "function" and text() or text, 1, 1, 1, 1, true)
+        local first = true
+        for line in ((type(text) == "function" and text() or text) .. "\n"):gmatch("(.-)\n") do
+            if first then
+                GameTooltip:SetText(line, 1, 1, 1, 1, true)
+                first = false
+            else
+                GameTooltip:AddLine(line == "" and " " or line, 1, 1, 1, true)
+            end
+        end
         GameTooltip:Show()
     end)
     widget:SetScript("OnLeave", GameTooltip_Hide)
@@ -147,7 +158,7 @@ function UI.LinkRow(parent, x, y, width, key, icon)
     local open = UI.Button(parent, "Открыть", 76, function() ns.OpenLink(key) end)
     open:SetPoint("TOPLEFT", x + width - 76, y)
     UI.Tooltip(open, link[3] and "Закроет настройки и покажет в чате ссылку на сообщество, а если ты уже в нём, скажет "
-        .. "об этом. Щёлкни по ссылке — откроется окно сообществ с кнопкой «Вступить». Если сообщества в игре "
+        .. "об этом.\n\nЩёлкни по ссылке — откроется окно сообществ с кнопкой «Вступить».\n\nЕсли сообщества в игре "
         .. "недоступны, страницу откроет в браузере компаньон, как у других ссылок."
         or "Компаньон откроет страницу в браузере.")
     local copy = UI.Button(parent, "Копировать", 96, function() ns.CopyLink(key) end)

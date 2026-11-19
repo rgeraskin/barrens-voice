@@ -1475,3 +1475,39 @@ do
     ns.Dictionary.Reset()
     print("dictionary window ok")
 end
+
+-- Tooltips with paragraphs: a line each, an empty one between them (a line of " ", as the game's own tooltips)
+do
+    local saved, got = GameTooltip, {}
+    GameTooltip = setmetatable({}, { __index = function(_, k)
+        if k == "SetText" or k == "AddLine" then
+            return function(_, text, _, _, _, a, b) got[#got + 1] = { k, text, k == "SetText" and b or a } end
+        end
+        return function() end
+    end })
+    local w = widget()
+    ns.UI.Tooltip(w, "Что делает.\n\nПодробности.\nЕщё строка.")
+    w._scripts.OnEnter(w)
+    assert(#got == 4 and got[1][1] == "SetText" and got[1][2] == "Что делает." and got[2][2] == " "
+        and got[3][2] == "Подробности." and got[4][2] == "Ещё строка.", "paragraphs: " .. #got)
+    for _, g in ipairs(got) do assert(g[3] == true, "every line wraps: " .. g[2]) end
+    got = {}
+    ns.UI.Tooltip(w, function() return "одна строка" end)
+    w._scripts.OnEnter(w)
+    assert(#got == 1 and got[1][2] == "одна строка", "one line: as before")
+    -- every tooltip of the settings: no gap of two empty lines, no empty line first or last
+    for _, f in ipairs(frames) do
+        local enter = f._scripts and f._scripts.OnEnter
+        if enter then
+            got = {}
+            pcall(enter, f)
+            for i, g in ipairs(got) do
+                if g[2] == " " then
+                    assert(i > 1 and i < #got and got[i + 1][2] ~= " ", "a stray gap in: " .. tostring(got[1][2]))
+                end
+            end
+        end
+    end
+    GameTooltip = saved
+    print("tooltips ok")
+end

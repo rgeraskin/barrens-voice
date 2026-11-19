@@ -134,6 +134,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   «Показывать при шёпоте» and «Показывать при строке гильдии» under «Прятать окно чата» are on by default now, as «Показывать при строке группы/рейда» is: a whisper is easy to miss by ear.
 
+- The settings' tooltips are in paragraphs
+
+  A long tooltip was one dense block; now what the setting does, the details and the caveat are paragraphs with an empty line between, as the game's own tooltips are, and «с глаголом» lists its verbs a line each.
+
 ### Removed
 
 - BREAKING: `WowChatVoice-Retail.cmd`
