@@ -619,11 +619,13 @@ class App:
                 self.relaunch(updated=True)
             return
         ready = getattr(self.updater, "ready", None)
-        # what it waits for, once per version, and only when it does wait (no game, no voice-over: switched at once)
-        if ready and ready != getattr(self, "wait_told", None) and (self.running_game or self.companion.running):
-            self.wait_told = ready
+        # what it waits for, once per version and cause, and only when it does wait (no game, no voice-over: switched
+        # at once); the game closed with the voice-over going on («Закрываться вместе с игрой» off) is a new cause
+        cause = "game" if self.running_game else "voice" if self.companion.running else None
+        if ready and cause and (ready, cause) != getattr(self, "wait_told", None):
+            self.wait_told = (ready, cause)
             name = display_version(ready)
-            self.say(f"версия {name} установится, когда закроешь игру" if self.running_game
+            self.say(f"версия {name} установится, когда закроешь игру" if cause == "game"
                      else f"версия {name} установится, когда остановится озвучка")
 
     def relaunch(self, updated: bool = False) -> None:

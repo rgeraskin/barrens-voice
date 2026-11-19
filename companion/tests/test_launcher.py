@@ -2101,7 +2101,8 @@ class UpdateInWindow(unittest.TestCase):
         self.app.App.apply_update_when_idle(w)
         self.assertEqual(said, ["версия 0.4.1 установится, когда закроешь игру"])      # once
         said.clear()
-        w = win(None, True)                                    # the game closed, the voice-over still ending
+        w.running_game = None                                  # the game closed, the voice-over goes on: said too
+        self.app.App.apply_update_when_idle(w)
         self.app.App.apply_update_when_idle(w)
         self.assertEqual(said, ["версия 0.4.1 установится, когда остановится озвучка"])
         said.clear()
