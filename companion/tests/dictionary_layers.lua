@@ -107,6 +107,13 @@ do
     assert(e.lines["~\\b(тестраз|тестдва)\\b"] == "# моё\n~\\b(тестраз|тестдва)\\b=окей", "the line and its key")
     assert(e.lines["~\\b(тестраз||тестдва)\\b"] == nil and e.lines["абв"] == "абв=где", "the old key gone, others kept")
     assert(e.header == "# мой | словарь")
+    -- a real «||» typed twice (saved «||||»): «||» after the one migration - migrated() runs Migrate twice
+    local _, twice = migrated({ lines = { ["~а||||б"] = "~а||||б=в" }, removed = {} })
+    assert(twice.lines["~а||б"] == "~а||б=в" and twice.lines["~а|б"] == nil, "once only, kept by its mark")
+    -- two edits that become one key: both kept, one after the other (as Blocks joins them), none lost
+    local _, both = migrated({ lines = { ["~(а|б)"] = "~(а|б)=x", ["~(а||б)"] = "~(а||б)=y" }, removed = {} })
+    local joined = both.lines["~(а|б)"]
+    assert(joined and joined:find("~(а|б)=x", 1, true) and joined:find("~(а|б)=y", 1, true), tostring(joined))
     local db = { dictionaryEdits = e, dictionaryPipes = true }
     e.lines["~а||б"] = "~а||б=в"                            -- after the migration: left alone (once only)
     Dp.Migrate(db)

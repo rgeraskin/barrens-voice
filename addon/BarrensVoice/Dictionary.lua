@@ -676,7 +676,8 @@ function D.Migrate(db)
         for key, block in pairs(e.lines) do
             block = D.Unescaped(block)
             local last = block:match("([^\n]*)$")
-            lines[key == "#" and "#" or (D.KeyOf(last) or ("?" .. last))] = block
+            local k = key == "#" and "#" or (D.KeyOf(last) or ("?" .. last))
+            lines[k] = lines[k] and (lines[k] .. "\n" .. block) or block   -- two that became one: both kept, as Blocks does
         end
         e.lines = lines
         if e.header then e.header = D.Unescaped(e.header) end
