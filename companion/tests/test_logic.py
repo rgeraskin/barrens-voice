@@ -775,6 +775,10 @@ class Pipeline(unittest.TestCase):
     def test_btw_in_russian_letters(self):
         self.check({"бтв я завтра не смогу": "кстати я завтра не смогу", "Бтв": "кстати", "бтвх": "бтвх"})
 
+    def test_skraftit_and_vendor_stress(self):
+        self.check({"скрафтить": "скр+афтить", "скрафтил": "скр+афтил", "скрафитить": "скр+афтить",
+                    "у вендора": "у в+ендора", "вендоров": "в+ендоров", "крафт": "крафт"})
+
     def test_np_by_case(self):
         # «нп» in lower case (or «Нп» starting a phrase) is «без проблем», the dungeon only in capitals
         self.check({"спасибо! нп": "спасибо! без проблем", "Нп, обращайся": "без проблем, обращайся",
