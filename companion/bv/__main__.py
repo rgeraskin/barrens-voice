@@ -718,7 +718,7 @@ def main() -> int:
                 state.report(phase="stopped")
                 return 0
         if game.closed(now):
-            log("игра закрыта — выхожу")
+            log("игра закрыта — выключаю озвучку")
             state.report(phase="game_closed")
             return 0
         step = strip.poll(now)

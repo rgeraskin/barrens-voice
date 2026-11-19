@@ -1936,7 +1936,7 @@ class LogLevels(unittest.TestCase):
     def test_levels(self):
         from bv.logs import level_of
         cases = {
-            "игра закрыта — выхожу": "INFO",
+            "игра закрыта — выключаю озвучку": "INFO",
             "окно WoW: (0, 0, 1920, 1080)": "DEBUG",
             "окно игры не найдено или свёрнуто — жду": "INFO",
             "Battle.net только что запустился и пропустил команду": "DEBUG",
