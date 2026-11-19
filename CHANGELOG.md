@@ -154,6 +154,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- The companion in a console with its output in a file
+
+  `python -m bv > out.txt` in a console whose code page has no «×» (cp1251) stopped at the first «экран 1920×1080»: the output goes in UTF-8 now, a character it cannot take replaced. Under the launcher nothing changes (it sets PYTHONUTF8).
+
 - A video card's failure is no reason to fetch the models again
 
   With the models already downloaded, any failure of the race voices — TensorRT not starting, say — was taken for a model missing from the cache: the companion restarted to go online and forgot that the models were there, so every later start went online too. It restarts now only when a model really is missing; otherwise it reads with the Windows voices, as it says.

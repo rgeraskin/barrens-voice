@@ -576,5 +576,25 @@ class ExitCodes(unittest.TestCase):
         returned = [ast.unparse(n.value) for n in ast.walk(handler) if isinstance(n, ast.Return)]
         self.assertEqual(returned, ["CONFIG_ERROR"], "a config.json the companion cannot read ends with CONFIG_ERROR")
 
+class Utf8Output(unittest.TestCase):
+    """A console redirected to a file has the code page's encoding: «×» must not raise there."""
+
+    def test_a_cp1251_stream_takes_any_character(self):
+        import io
+        from unittest import mock
+        out = io.TextIOWrapper(io.BytesIO(), encoding="cp1251")
+        err = io.TextIOWrapper(io.BytesIO(), encoding="cp1251")
+        with self.assertRaises(UnicodeEncodeError):
+            out.write("экран 1920×1080")
+        out.seek(0); out.truncate()
+        with mock.patch.object(companion.sys, "stdout", out), mock.patch.object(companion.sys, "stderr", err):
+            companion.utf8_output()
+            print("экран 1920×1080", flush=True)
+            err.write("×\n"); err.flush()
+        self.assertEqual(out.buffer.getvalue().decode("utf-8"), "экран 1920×1080\n")
+        self.assertEqual(err.buffer.getvalue().decode("utf-8"), "×\n")
+        companion.utf8_output()                              # a stream without reconfigure: left alone
+
+
 if __name__ == "__main__":
     unittest.main()

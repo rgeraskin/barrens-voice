@@ -576,10 +576,22 @@ def fetch_models(config: dict) -> int:
     return 0
 
 
+def utf8_output() -> None:
+    """The console's output in UTF-8, a character it cannot take replaced, never an error: redirected to a file
+    (`python -m bv > out.txt`), Windows gives the console's code page (cp1251), which has no «×» of «экран 1920×1080»,
+    and print() raised. The launcher sets PYTHONUTF8 itself."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError, OSError):     # not a text stream of its own (a test's, a wrapper)
+            pass
+
+
 def main() -> int:
     if sys.platform != "win32":
         print("Windows only")
         return 1
+    utf8_output()
     offline = offline_models() if "--fetch-models" not in sys.argv else False
     # two notices of RUAccent's own, harmless and not ours to fix: a regex string it writes without r"" (shown
     # once, when Python first compiles it) and an argument huggingface_hub no longer uses
