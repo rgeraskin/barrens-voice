@@ -24,7 +24,7 @@ class Engines:
         self.f5 = None
         self.ready = False
         self.on_ready = None    # called once F5 is loaded (all models are in the cache by then)
-        self.on_error = None    # called with the error when F5 fails to load
+        self.on_models_missing = None   # called with the error when F5 failed for a model missing from the cache
         self.failed_at = None   # clock() of the last failed load: not tried again for RETRY_AFTER
         self.lock = threading.Lock()
 
@@ -71,15 +71,15 @@ class Engines:
                 return                      # unloaded meanwhile
             if speaker.error is not None:
                 self.f5, self.failed_at = None, self.clock()
-                error = speaker.error
+                error, missing = speaker.error, getattr(speaker, "models_missing", False)
             else:
-                self.ready, error = True, None
+                self.ready, error, missing = True, None, False
         if error is not None:
             state.report(voices="error", voices_error=error)
             self.notice("Голоса рас недоступны, читаю голосами Windows.")
             self.log(f"  причина: {error}")
-            if self.on_error:
-                self.on_error(error)
+            if missing and self.on_models_missing:      # a video card's failure is no reason to go online
+                self.on_models_missing(error)
         else:
             state.report(voices="ready", device=getattr(speaker, "card", ""), provider=getattr(speaker, "provider", ""))
             self.notice("Голоса рас готовы.")

@@ -415,11 +415,11 @@ def restart_online(log) -> None:
     the launcher: exit with RESTART, it starts the companion again - so it keeps its process). In the
     console the companion runs itself again and waits for it, so the console waits too (os.execv on
     Windows started a separate process and did not quote a path with a space); off the main thread
-    (engines.on_error) the main loop does that, so that it stops reading the strip first."""
+    (engines.on_models_missing) the main loop does that, so that it stops reading the strip first."""
     MODELS_READY.unlink(missing_ok=True)
     log("в кэше моделей не всё — перезапускаюсь с сетью")
     if os.environ.get(LAUNCHED):
-        os._exit(RESTART)          # from any thread (engines.on_error runs on its own)
+        os._exit(RESTART)          # from any thread (engines.on_models_missing runs on its own)
     if threading.current_thread() is not threading.main_thread():
         _restart.set()
         return
@@ -721,7 +721,7 @@ def main() -> int:
     from .engines import Engines
     engines = Engines(config, log, DATA_DIR, sapi, accentor, player)
     engines.on_ready = lambda: MODELS_READY.touch()
-    engines.on_error = (lambda error: restart_online(log)) if offline else None
+    engines.on_models_missing = (lambda error: restart_online(log)) if offline else None
     # The race voices load while the game starts, not when its first chat line comes - unless the
     # addon was last set to Windows voices (then F5 is loaded only if the addon asks for it).
     from .dictionary import saved_voices

@@ -13,6 +13,7 @@ from bv.protocol import Line  # noqa: E402
 
 class FakeF5:
     fail = None
+    missing = False     # the failure was a model missing from the cache (f5engine.models_missing)
     made = 0
 
     def __init__(self, *a):
@@ -29,6 +30,7 @@ class FakeF5:
 
     def start(self):
         self.error = FakeF5.fail
+        self.models_missing = FakeF5.missing
         if FakeF5.fail is not None:          # failed at once; else ready when the test says
             self.ready.set()
 
@@ -120,6 +122,20 @@ class EnginesTest(unittest.TestCase):
         wait()
         self.assertIsNone(e.f5)
         self.assertIn("Голоса рас недоступны, читаю голосами Windows.", self.sapi.said)
+
+    def test_online_restart_only_for_a_missing_model(self):
+        # TensorRT not starting is no reason to go online and drop the models' mark; a model not in the cache is
+        for missing, want in ((False, []), (True, ["нет в кэше"])):
+            with self.subTest(missing=missing):
+                FakeF5.fail, FakeF5.missing = "нет в кэше", missing
+                e = self.make()
+                asked = []
+                e.on_models_missing = asked.append
+                e.want("f5")
+                wait()
+                self.assertIn("Голоса рас недоступны, читаю голосами Windows.", self.sapi.said)
+                self.assertEqual(asked, want)
+        FakeF5.missing = False
 
     def test_an_empty_error_is_still_a_failure(self):
         # str() of some exceptions is "" (StopIteration): never taken for "ready"
@@ -444,6 +460,27 @@ class OnCard(unittest.TestCase):
         self.assertEqual(card_session("CPUExecutionProvider")[1], ["CPUExecutionProvider"])
         # any other provider asked for gets it, the processor as the fallback (it got the processor alone)
         self.assertEqual(card_session("TensorrtExecutionProvider")[1], ["TensorrtExecutionProvider", "CPUExecutionProvider"])
+
+
+class ModelsMissing(unittest.TestCase):
+    """Which F5 failure a restart online can fix: a model missing from the cache, nothing else."""
+
+    def test_models_missing_by_the_error(self):
+        from huggingface_hub.errors import LocalEntryNotFoundError, OfflineModeIsEnabled
+
+        from bv.f5engine import models_missing as missing_of
+        self.assertTrue(missing_of(LocalEntryNotFoundError("not in the cache")))
+        self.assertTrue(missing_of(OfflineModeIsEnabled("offline mode is enabled")))
+        try:                                      # wrapped by another library: its cause counts
+            try:
+                raise LocalEntryNotFoundError("x")
+            except LocalEntryNotFoundError as inner:
+                raise OSError("RUAccent: could not load") from inner
+        except OSError as outer:
+            self.assertTrue(missing_of(outer))
+        self.assertFalse(missing_of(RuntimeError("[TensorRT EP] failed to build the engine")))
+        self.assertFalse(missing_of(FileNotFoundError("no game client")))   # a missing file, but not a model
+        self.assertFalse(missing_of(None))
 
 
 if __name__ == "__main__":

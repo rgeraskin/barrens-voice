@@ -169,6 +169,21 @@ def fetch_models(config: dict, log) -> Path:
     return Path(snapshot_download(repo, allow_patterns=["*.onnx"]))
 
 
+def models_missing(error: BaseException | None) -> bool:
+    """Was it a model missing from the Hugging Face cache while offline (`offline_models`): a file not
+    there, or the hub asked in offline mode - here or as the cause of another library's error. Only then
+    a restart online helps; a video card's failure (TensorRT not starting, no DirectX 12), a client without
+    the Russian voice-over and the like are not fixed by the network."""
+    from huggingface_hub.errors import LocalEntryNotFoundError, OfflineModeIsEnabled
+    seen = set()
+    while error is not None and id(error) not in seen:
+        if isinstance(error, (LocalEntryNotFoundError, OfflineModeIsEnabled)):
+            return True
+        seen.add(id(error))
+        error = error.__cause__ or error.__context__
+    return False
+
+
 def gpu_name() -> str:
     """The video card DirectML runs on (its device 0: the adapter the desktop is on), for people to
     read; "" if Windows does not say."""
@@ -301,6 +316,7 @@ class F5Speaker:
         self.working = False         # a line taken from the queue and not yet handed to the player
         self.ready = threading.Event()
         self.error: str | None = None
+        self.models_missing = False   # the error was a model not in the cache while offline (models_missing)
         self.accentor = accentor or Accentor(log, config.get("ruaccent", True))
         self.assigner: Assigner | None = None
         self.onnx = None             # F5Onnx, once loaded
@@ -416,6 +432,7 @@ class F5Speaker:
             self._load()
         except Exception as e:  # noqa: BLE001 - reported, the caller falls back to SAPI
             self.error = str(e) or type(e).__name__     # never "": that would read as success
+            self.models_missing = models_missing(e)
             self.ready.set()
             return
         self.ready.set()

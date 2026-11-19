@@ -150,6 +150,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- A video card's failure is no reason to fetch the models again
+
+  With the models already downloaded, any failure of the race voices — TensorRT not starting, say — was taken for a model missing from the cache: the companion restarted to go online and forgot that the models were there, so every later start went online too. It restarts now only when a model really is missing; otherwise it reads with the Windows voices, as it says.
+
 - The restart to fetch models works in the console too
 
   A companion started in the console (`python -m bv`) that found a model missing from the cache restarted itself still offline and failed at once («OfflineModeIsEnabled»): the new process inherited the offline switches. It starts online now, as under the launcher.
