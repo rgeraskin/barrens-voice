@@ -818,6 +818,9 @@ do
     ns.db.sayVerb = false
     eq(say("guild", "привет"), "Тралл, в гильдии:\4 привет")
     eq(say("guild", "ещё"), "Тралл:\4 ещё")
+    eq(say("channels", "го", "1. Общий - Оргриммар"), "Тралл, общий:\4 го")   -- «в общем» sounded like «so to say»
+    eq(say("channels", "кто в ОП?", "2. Торговля - Город"), "Тралл, торговля:\4 кто в ОП?")
+    eq(say("channels", "го", "5. мойканал"), "Тралл, канал мойканал:\4 го")
     ns.db.sayVerb = true
     -- off: no place at all
     ns.db.sayWhere = false

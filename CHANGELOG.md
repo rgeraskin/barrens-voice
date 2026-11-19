@@ -66,7 +66,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Where a line was said
 
-  «и где: «Громмаш пишет в гильдии: …»» under the names, on by default: the verb gets the place — «в группе», «в рейде», «объявляет рейду», «в гильдии», «в офицерском чате», and a numbered channel as where the line goes after «пишет» — «пишет в общий», «в торговлю», «в канал <имя>» (not «пишет в общем», which sounded like the writer's own «в общем»), as where it is after «спрашивает» — «спрашивает в общем», «в торговле». Only when the place changes from the last line read or after 30 s of quiet, so a run of guild lines names the guild once; say, yell, whisper and emote have no place. Without the verb: «Громмаш, в гильдии: …».
+  «и где: «Громмаш пишет в гильдии: …»» under the names, on by default: the verb gets the place — «в группе», «в рейде», «объявляет рейду», «в гильдии», «в офицерском чате», and a numbered channel as where the line goes after «пишет» — «пишет в общий», «в торговлю», «в канал <имя>» (not «пишет в общем», which sounded like the writer's own «в общем»), as where it is after «спрашивает» — «спрашивает в общем», «в торговле». With «Озвучивать имена» but no verb a channel goes by its name: «Тралл, общий: …», «Тралл, канал <имя>: …». Only when the place changes from the last line read or after 30 s of quiet, so a run of guild lines names the guild once; say, yell, whisper and emote have no place. Without the verb: «Громмаш, в гильдии: …».
 
 - «Что читать»: only the selected chat tab
 

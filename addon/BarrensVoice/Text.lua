@@ -115,17 +115,21 @@ local CHANNEL_PLACES = { chGeneral = "в общем", chTrade = "в торгов
 -- writer's own «в общем» (so to say). «спрашивает в общем» reads well and stays
 local CHANNEL_INTO = { chGeneral = "в общий", chTrade = "в торговлю", chLfg = "в поиск спутников",
                        chDefense = "в оборону" }
+-- without a verb («Тралл, общий: …»): the channel's own name - «Тралл, в общем:» sounded like «so to say» too
+local CHANNEL_NAMES = { chGeneral = "общий", chTrade = "торговля", chLfg = "поиск спутников", chDefense = "оборона" }
+local CHANNEL_FORMS = { into = { CHANNEL_INTO, "в канал" }, name = { CHANNEL_NAMES, "канал" } }
 
 --- The place of a line of `kind` ("в гильдии"), or nil. `channel`: a numbered channel's name as the chat
---- event gives it ("2. Торговля - Оргриммар", "5. мойканал"). `into`: a numbered channel as where the line
---- goes, for «пишет» ("в торговлю", "в канал мойканал"); other places are the same either way.
-function ns.Place(kind, channel, into)
+--- event gives it ("2. Торговля - Оргриммар", "5. мойканал"). `form`, for a numbered channel only (other places
+--- are the same either way): "into" - where the line goes, after «пишет» ("в торговлю", "в канал мойканал");
+--- "name" - the channel's name, with no verb ("торговля", "канал мойканал"); nil - where it is ("в торговле").
+function ns.Place(kind, channel, form)
     if kind == "channels" then
-        local place = (into and CHANNEL_INTO or CHANNEL_PLACES)[ns.ChannelSetting(nil, channel)]
+        local places, word = unpack(CHANNEL_FORMS[form] or { CHANNEL_PLACES, "в канале" })
+        local place = places[ns.ChannelSetting(nil, channel)]
         if place then return place end
         -- a channel of its own (or one not in the list): by its name, without the number and the zone
         local name = tostring(channel or ""):gsub("^%s*%d+%.%s*", ""):gsub("%s+%-%s+.*$", ""):gsub("%s+$", "")
-        local word = into and "в канал" or "в канале"
         return name ~= "" and (word .. " " .. name) or word
     end
     return PLACES[kind]
