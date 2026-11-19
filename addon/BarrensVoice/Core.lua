@@ -92,8 +92,8 @@ local NOT_ASKED = { yell = true, whisper = true, warning = true }   -- the verb 
 local PREFIX = "|cff66ccffBarrens Voice|r: "
 ns.PREFIX = PREFIX   -- every line of the addon in the chat starts with it (News.lua too)
 local ICON = "|TInterface\\AddOns\\BarrensVoice\\Media\\chat:14:14|t"   -- the bubble on a clear background (make_icon.py)
-ns.ICON = ICON       -- before the prefix of every message's first line; a message's next lines go without it
-local SAY = ICON .. " " .. PREFIX   -- a message's first line
+ns.ICON = ICON       -- before «Barrens Voice:» on every line that has it; lines without the prefix (a list) go without it
+local SAY = ICON .. " " .. PREFIX   -- every line of the addon that names itself
 
 -- The name before a line is followed by a mark (\4): the program drops it when the same character
 -- goes on while their previous line is still being said or was just said (it knows when a line
@@ -308,8 +308,7 @@ end
 
 -- The community's word in the chat. The link is the client's own kind (LinkUtil.FormatLink with
 -- LinkTypes.ClubTicket, as GetClubTicketLink makes it, in BATTLENET_FONT_COLOR - Forever and retail alike) with
--- a text of the addon's; each line starts with the addon's icon (Icon.tga without its bevelled frame: 4 of its
--- 64 pixels on each side). Every call here is open to addons in both clients' API docs (C_Club.IsEnabled,
+-- a text of the addon's; each line starts with the addon's icon (Media/chat.tga). Every call here is open to addons in both clients' API docs (C_Club.IsEnabled,
 -- GetSubscribedClubs, GetClubInfo and the event CLUB_ADDED: no HasRestrictions; the clubs' names can be secret
 -- on retail, so they are looked at only when not).
 local CLUB_LINK_COLOR = "|cff82c5ff"   -- BATTLENET_FONT_COLOR, when the client's own is not there
@@ -406,7 +405,7 @@ local function LinkInChat(link)
         if not chatLink then return false end
         print(SAY .. "сообщество в Battle.net — новости, вопросы, ошибки: " .. chatLink .. "  " .. GREY
             .. "или в браузере: " .. link[2] .. "|r")
-        print(PREFIX .. "щёлкни по ссылке: откроется окно сообществ с кнопкой «Вступить». Не открылось — рядом ссылка для "
+        print(SAY .. "щёлкни по ссылке: откроется окно сообществ с кнопкой «Вступить». Не открылось — рядом ссылка для "
             .. "браузера.")
         askedAt = GetTime and GetTime() or 0
     end
@@ -891,10 +890,10 @@ function ns.Welcome()
     local version = Version()
     print(SAY .. ("|cffffd100добро пожаловать!|r Barrens Voice %s — озвучка чата: у каждого игрока свой голос "
         .. "его расы и пола."):format(version))
-    print(PREFIX .. "читает вслух Barrens Voice Launcher — программа для Windows: без него аддон молчит. Удобнее всего "
+    print(SAY .. "читает вслух Barrens Voice Launcher — программа для Windows: без него аддон молчит. Удобнее всего "
         .. "запускать игру через него — он сам её запустит.")
-    print(PREFIX .. "настройки — значок у миникарты или /bv. Команды — /bv help.")
-    print(PREFIX .. HELP_HINT)
+    print(SAY .. "настройки — значок у миникарты или /bv. Команды — /bv help.")
+    print(SAY .. HELP_HINT)
 end
 
 function ns.SetEnabled(enabled)

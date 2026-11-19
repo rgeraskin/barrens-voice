@@ -225,7 +225,7 @@ do  -- «Открыть» for the community: its invite as a link in the chat, f
     assert(told[1] == ICON .. "сообщество в Battle.net — новости, вопросы, ошибки: |cff82c5ff|HclubTicket:N9KR2WNHDgW|h"
         .. "[Вступить в «Barrens Voice»]|h|r  |cff999999или в браузере: https://launch.battle.net/invite/N9KR2WNHDgW|r",
         told[1])
-    assert(told[2] == PREFIX .. "щёлкни по ссылке: откроется окно сообществ с кнопкой «Вступить». Не открылось — рядом ссылка "
+    assert(told[2] == ICON .. "щёлкни по ссылке: откроется окно сообществ с кнопкой «Вступить». Не открылось — рядом ссылка "
         .. "для браузера.", told[2])
     for _, line in ipairs(told) do
         assert(line:find("Barrens Voice|r: ", 1, true) and not line:find("→", 1, true) and not line:find("–", 1, true),
@@ -1170,7 +1170,7 @@ assert(ChatFrame1:GetAlpha() == 1, "no companion: the chat is not faded")
 local before = #said
 Co.SayAtLogin()
 assert(#said == before + 2 and said[before + 1]:find("не запущен — чат будет озвучиваться, как только ты его запустишь.$")
-    and said[#said] == "|cff66ccffBarrens Voice|r: прозрачный чат пока выключен: включится только после /reload, "
+    and said[#said] == ns.ICON .. " |cff66ccffBarrens Voice|r: прозрачный чат пока выключен: включится только после /reload, "
         .. "когда заработает лаунчер.", "the hidden chat off: a line of its own - " .. tostring(said[#said]))
 Co.Read({ beat = 1000 }, 1010)
 ns.ChatFade.Apply()
@@ -1199,8 +1199,9 @@ assert(#welcome == 5 and welcome[1]:find("озвучка чата") and welcome[
     and welcome[3]:find("Barrens Voice Launcher — программа для Windows", 1, true) and welcome[5]:find("«Помощь»", 1, true)
     and welcome[5]:find("сообщество в Battle.net", 1, true), "whether the reading works, then the welcome")
 assert(welcome[2]:find("Barrens Voice 0.4.0b1", 1, true), "the welcome names the addon's version")
-assert(welcome[2]:sub(1, #ns.ICON + 1) == ns.ICON .. " " and welcome[2]:find(ns.PREFIX, 1, true)
-    and not welcome[3]:find(ns.ICON, 1, true), "the icon before the welcome's first line only")
+for i = 2, 5 do       -- every line with «Barrens Voice:» has the icon (the welcome's next lines too)
+    assert(welcome[i]:sub(1, #ns.ICON + 1 + #ns.PREFIX) == ns.ICON .. " " .. ns.PREFIX, "the icon: " .. welcome[i])
+end
 assert(ns.db.seenVersion == "0.4.0b15", "the program's version is kept")
 assert(ns.db.newsSeen["0.4.0"] and ns.db.newsSeen["0.1.0"], "the first run: every entry seen")
 ns.firstRun = false
@@ -1524,7 +1525,8 @@ do
     print("tooltips ok")
 end
 
--- The icon: before every message's first line (login, commands, buttons, warnings); a message's next lines without it
+-- The icon: before every line with «Barrens Voice:» (login, commands, buttons, warnings, a message's next lines); lines
+-- without the prefix (the commands under «команды:») without it
 do
     local lines, plain = {}, print
     print = function(s) lines[#lines + 1] = s end
@@ -1540,7 +1542,8 @@ do
     ns.Companion.Read(nil, 1100)
     ns.db.fadeChat = true
     local said = run(ns.Companion.SayAtLogin, "login: not running")
-    assert(#said == 2 and said[2]:sub(1, #ns.PREFIX) == ns.PREFIX, "its next line: no icon - " .. tostring(said[2]))
+    assert(#said == 2 and said[2]:sub(1, #ns.ICON + 1 + #ns.PREFIX) == ns.ICON .. " " .. ns.PREFIX,
+        "its next line has the icon too - " .. tostring(said[2]))
     ns.db.fadeChat = false
     run(function() SlashCmdList.BARRENSVOICE("help") end, "/bv help")
     assert(not lines[2]:find(ns.ICON, 1, true), "the commands under it: no icon")
@@ -1551,7 +1554,7 @@ do
     run(function() ns.OpenLink("discord") end, "«Открыть»")
     run(function() ns.CopyLink("discord") end, "«Копировать»")
     local welcome = run(ns.Welcome, "the welcome")
-    for i = 2, #welcome do assert(not welcome[i]:find(ns.ICON, 1, true), "the welcome's next lines: no icon") end
+    for i = 2, #welcome do assert(welcome[i]:find(ns.ICON, 1, true) == 1, "the welcome's next lines: the icon too") end
     print = plain
     print("icons ok")
 end

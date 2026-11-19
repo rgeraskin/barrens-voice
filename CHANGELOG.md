@@ -136,7 +136,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - The first run's welcome is easier to see
 
-  It comes 5 s after login, after «озвучка чата работает», so other addons' lines at login no longer bury it; its first line has the addon's icon, as the «Что нового» line and the community's lines do, and it names the community in Battle.net among the places to write.
+  It comes 5 s after login, after «озвучка чата работает», so other addons' lines at login no longer bury it; its lines have the addon's icon, as every line of the addon does, and it names the community in Battle.net among the places to write.
 
 - Whispers and guild lines show the hidden chat by default
 
@@ -148,7 +148,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Every message of the addon in the chat starts with its icon
 
-  A small icon of its own: the speech bubble on a clear background (`Media/chat.tga`), not the framed icon, an opaque dark square on the chat's clear background. Not only the welcome, the community and «Что нового»: the login line, the answers to the commands and buttons and the warnings too, before «Barrens Voice:» on a message's first line; its next lines (the welcome's, the community's second, the list of commands) go without it.
+  A small icon of its own: the speech bubble on a clear background (`Media/chat.tga`), not the framed icon, an opaque dark square on the chat's clear background. Not only the welcome, the community and «Что нового»: the login line, the answers to the commands and buttons and the warnings too, before every «Barrens Voice:», a message's next lines too (the welcome's, the community's second, «прозрачный чат пока выключен…»); only lines without the prefix, the list of commands, go without it.
 
 - The program is called Barrens Voice Launcher
 

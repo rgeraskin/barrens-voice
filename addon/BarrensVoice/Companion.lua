@@ -30,14 +30,13 @@ end
 
 --- The line at login.
 function C.SayAtLogin()
-    local plain = "|cff66ccffBarrens Voice|r: "                    -- a message's next line
-    local prefix = (ns.ICON and ns.ICON .. " " or "") .. plain      -- its first: with the icon (Core.lua)
+    local prefix = (ns.ICON and ns.ICON .. " " or "") .. "|cff66ccffBarrens Voice|r: "   -- with the icon (Core.lua)
     if C.State() == "running" then
         print(prefix .. "озвучка чата работает.")
     else
         print(prefix .. "Barrens Voice Launcher не запущен — чат будет озвучиваться, как только ты его запустишь.")
         if ns.db and ns.db.fadeChat then     -- its own line: easy to miss at the end of the first
-            print(plain .. "прозрачный чат пока выключен: включится только после /reload, когда заработает лаунчер.")
+            print(prefix .. "прозрачный чат пока выключен: включится только после /reload, когда заработает лаунчер.")
         end
     end
 end
