@@ -548,8 +548,9 @@ end
 
 --- Open the window on the tab `name` ("general", "reading", "voices", "dictionary", "help"; another
 --- name: the first).
---- For the tests: the status line and how far it moved the rest of «Общее».
-function O.Status() return programState, statusExtra, tabHeight.general end
+--- For the tests: the status line, how far it moved the rest of «Общее», the tab's height, the rest's frame and its
+--- top without the move.
+function O.Status() return programState, statusExtra, tabHeight.general, statusRest, statusTop end
 
 function O.Open(name)
     if not window then Build() end

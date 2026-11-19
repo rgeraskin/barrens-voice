@@ -1551,17 +1551,21 @@ end
 -- grows; back on one line, back in place
 do
     ns.Options.Open("general")
-    local status, extra, height = ns.Options.Status()
+    local status, extra, height, rest, top = ns.Options.Status()
     assert(status and extra == 0, "one line: nothing moved")
+    local at = {}
+    rest.SetPoint = function(_, point, x, y) at[#at + 1] = { point, x, y } end
     status.GetNumLines = function() return 2 end
     status.GetStringHeight = function() return 26 end
     ns.Options.Open("general")                               -- the window shown again: Refresh
     local _, moved, taller = ns.Options.Status()
     assert(moved == 13 and taller == height + 13, ("two lines: the rest down by one, the tab taller - %s, %s"):format(moved, taller))
+    assert(#at == 1 and at[1][1] == "TOPLEFT" and at[1][2] == 0 and at[1][3] == top - 13, "the rest itself moved down")
     status.GetNumLines = function() return 1 end
     status.GetStringHeight = function() return 13 end
     ns.Options.Open("general")
     local _, back, again = ns.Options.Status()
     assert(back == 0 and again == height, "one line again: back in place")
+    assert(#at == 2 and at[2][3] == top, "the rest itself back in place")
     print("status line fits ok")
 end
