@@ -2120,6 +2120,25 @@ class UpdateInWindow(unittest.TestCase):
         self.app.App.apply_update_when_idle(win(None, True, exit_with_wow=True))
         self.assertEqual(said, ["версия 0.4.1 установится, когда остановится озвучка"])
 
+    def test_turning_auto_updates_on_checks_at_once(self):
+        # a version found with automatic updates off waited for the next hourly check after the box was ticked
+        from unittest import mock
+        started = []
+        win = self.ns(updater=self.ns(), _check_update=lambda: started.append("check"))
+        with mock.patch.object(self.app.threading, "Thread", lambda target, **kw: self.ns(start=target)):
+            self.app.App.update_settings_changed(win, {"auto_update": False, "update_channel": "stable"},
+                                                 {"auto_update": True, "update_channel": "stable"})
+            self.assertEqual(started, ["check"])
+            self.app.App.update_settings_changed(win, {"auto_update": True, "update_channel": "stable"},
+                                                 {"auto_update": True, "update_channel": "beta"})
+            self.assertEqual(started, ["check", "check"])              # test builds asked for: looked for now
+            self.app.App.update_settings_changed(win, {"auto_update": True, "update_channel": "beta"},
+                                                 {"auto_update": False, "update_channel": "beta"})
+            self.assertEqual(len(started), 2)                           # turned off: nothing to do
+            self.app.App.update_settings_changed(self.ns(updater=None, _check_update=lambda: started.append("x")),
+                                                 {"auto_update": False}, {"auto_update": True})
+            self.assertEqual(len(started), 2)                           # from the source: no updater
+
     def test_companion_starts_as_the_window_says(self):
         # a change config.json did not take held in the window only: «компаньон запускается (WoW Retail)» while the
         # companion read Forever from the file, and with «Запускать игру…» the window went to the tray for a game

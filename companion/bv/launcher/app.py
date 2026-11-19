@@ -889,6 +889,7 @@ class App:
                 messagebox.showerror("Barrens Voice Launcher", f"Не нашёл Wow.exe в папке {', '.join(missing)}.", parent=win)
                 return
             changed = differs(changes)
+            before = {"auto_update": cfg.get("auto_update", True) is not False, "update_channel": cfg.get("update_channel")}
             try:
                 self.write_config(**changes)
             except model.BrokenConfig as e:
@@ -900,6 +901,7 @@ class App:
             win.destroy()
             if changed:
                 self.say("настройки сохранены")
+                self.update_settings_changed(before, changes)
                 own = {k: v for k, v in changes.items() if k not in ("auto_update", "update_channel")}
                 if self.companion.running and differs(own):     # the update settings are the launcher's own
                     self.restart_companion(["--no-launch"])
@@ -925,6 +927,17 @@ class App:
             win.destroy()
         win.protocol("WM_DELETE_WINDOW", close)
         p.button(width - 150, height - 60, width - 30, height - 26, "Закрыть", "close", close)
+
+    def update_settings_changed(self, before: dict, after: dict) -> None:
+        """«Обновлять автоматически» turned on, or the channel changed: check now, not at the next hourly check - a
+        version found while updates were off gets prepared (Updater.check: prepare unless the version failed here),
+        a test build is looked for. The switch is as always: with no game and no voice-over (apply_update_when_idle).
+        The addon goes on as before (update_addons, every tick)."""
+        if self.updater is None:
+            return
+        turned_on = after.get("auto_update") is True and before.get("auto_update") is False
+        if turned_on or after.get("update_channel") != before.get("update_channel"):
+            threading.Thread(target=self._check_update, daemon=True, name="update-check").start()
 
     def open_help(self) -> None:
         if self.help_win is not None and self.help_win.winfo_exists():

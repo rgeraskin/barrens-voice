@@ -158,6 +158,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Turning «Обновлять автоматически» on prepares a version found already
+
+  A version found while automatic updates were off waited for the next check (at start or an hour later) after the box was ticked and saved. Saving it on, or another channel («Получать тестовые версии»), checks at once now: the version found is prepared, and installed as always once no game and no voice-over run.
+
 - «полоска аддона пропала» names the causes there are
 
   It guessed «игра свёрнута или скрыт интерфейс», and neither fits: a minimized game has its own line («окно игры не найдено или свёрнуто»), and the strip has not hidden with the interface since 0.2.1. It says now «озвучка выключена в игре (/bv off), экран загрузки или полоску закрыл другой аддон?».
