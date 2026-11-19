@@ -1480,10 +1480,19 @@ do
     pane._scripts.OnShow(pane)
     assert(edit._text == ns.Dictionary.Escaped(ns.Dictionary.Text()) and edit._text ~= typed,
         "sorted at the next showing, shown escaped again")
-    -- typed and closed at once, no focus lost first: the hiding keeps it
+    -- typed and closed at once, no focus lost first: the keystroke saved it, the hiding takes the focus off
     edit._text = edit._text .. "новоеслово=нов\n"
+    edit._scripts.OnTextChanged(edit, true)
+    local cleared = 0
+    edit.HasFocus, edit.ClearFocus = function() return true end, function() cleared = cleared + 1 end
     pane._scripts.OnHide(pane)
-    assert(ns.Dictionary.Text():find("новоеслово=нов", 1, true), "kept when the window hides")
+    assert(cleared == 1 and ns.Dictionary.Text():find("новоеслово=нов", 1, true), "kept, the focus off")
+    -- a box left empty (its filling failed) is not saved when the window hides: the entries stay
+    edit.HasFocus = function() return false end
+    edit._text = ""
+    pane._scripts.OnHide(pane)
+    assert(ns.Dictionary.Text():find("новоеслово=нов", 1, true) and ns.Dictionary.Text():find("кд=", 1, true),
+        "an empty box does not wipe the dictionary")
     assert(ns.Dictionary.Text():find("~\\b(тестраз|тестдва)\\b=окей", 1, true), "kept with «|»")
     ns.Dictionary.Reset()
     print("dictionary window ok")

@@ -152,9 +152,10 @@ function W.Create(pane)
     window:SetScript("OnShow", function()                  -- in order: the dictionary as saved, sorted
         edit:SetText(ns.Dictionary.Escaped(ns.Dictionary.Text()))
     end)
-    window:SetScript("OnHide", function()                  -- the last edit kept, whatever closed the window
+    -- focus off when the window goes: every keystroke saved the text already (OnTextChanged). No second save here:
+    -- were the box not filled (OnShow failed), it would save an empty text and drop every entry
+    window:SetScript("OnHide", function()
         if edit:HasFocus() then edit:ClearFocus() end
-        Save(ns.Dictionary.Unescaped(edit:GetText()))
     end)
 end
 
