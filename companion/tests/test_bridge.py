@@ -203,6 +203,18 @@ class Bookkeeping(Base):
         self.at(2.4, frame(2))
         self.assertEqual(len(self.capturer.kept), 1)               # once
 
+    def test_the_search_place_not_kept_when_the_window_changed(self):
+        # a new window between the hit and the first frame: the rectangle is the addon's place again, not the hit
+        self.capturer.whole = (b"picture", 1920, 1080)
+        self.hit = (0, 1064, 600, 64, frame(1))
+        self.at(0)
+        self.at(2.1)
+        self.capturer.rect = (0, 1078, 1920, 16)                   # _fit for another window
+        self.at(2.3, frame(1))
+        self.assertEqual(self.capturer.kept, [])
+        self.at(2.4, frame(2))
+        self.assertEqual(self.capturer.kept, [])                   # nor later
+
     def test_a_strip_thicker_than_asked_is_looked_for(self):
         self.strip.config["capture_height"] = 80
         self.capturer.whole = (b"picture", 1920, 1080)

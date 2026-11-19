@@ -108,7 +108,8 @@ class StripReader:
             return Step(pause)
         self.misses = 0
         if self.found is not None:                 # the search's place works: kept for a restart
-            self.capturer.remember(self.found)
+            if self.found[:4] == self.capturer.rect:   # read from there, not from a rectangle a new window gave
+                self.capturer.remember(self.found)
             self.found = None
         self.damaged_since = None
         if self.damaged_told:                      # readable again: a later cover is told again
