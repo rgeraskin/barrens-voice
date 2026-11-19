@@ -1151,6 +1151,7 @@ Co.Read(nil, 1100)
 assert(Co.State() == "stopped", "no time at all (the file as shipped): not running")
 Co.SayAtLogin()
 assert(said[2]:find("приложение%-компаньон Barrens Voice не запущено — чат будет озвучиваться, как только"), tostring(said[2]))
+assert(#said == 2 and not ns.db.fadeChat, "the hidden chat off: no line about it")
 assert(Co.Describe():find("не был запущен"), Co.Describe())
 Co.Read({ beat = 1000 }, 1010)
 assert(Co.Describe():find("был запущен") and not Co.Describe():find("не был"), Co.Describe())
@@ -1163,8 +1164,11 @@ ns.ChatFade.Apply()
 now = now + 20                               -- past the 10 s the last line not read showed the window for
 assert(not ns.ChatFade.Voiced())
 assert(ChatFrame1:GetAlpha() == 1, "no companion: the chat is not faded")
+local before = #said
 Co.SayAtLogin()
-assert(said[#said]:find("Прозрачный чат пока выключен"), tostring(said[#said]))
+assert(#said == before + 2 and said[before + 1]:find("не запущено — чат будет озвучиваться, как только ты его запустишь.$")
+    and said[#said] == "|cff66ccffBarrens Voice|r: прозрачный чат пока выключен: включится только после /reload, "
+        .. "когда компаньон заработает.", "the hidden chat off: a line of its own - " .. tostring(said[#said]))
 Co.Read({ beat = 1000 }, 1010)
 ns.ChatFade.Apply()
 for _ = 1, 10 do ns.ChatFade.Update(nil, 0.3) end

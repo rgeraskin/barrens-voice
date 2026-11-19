@@ -46,7 +46,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - The hidden chat says it needs a `/reload`
 
-  A companion started after the player entered the world says that the hidden chat needs a `/reload`, in the log and as a tray notice. It asks before its first beat (`bv/reloadhint.py`): «Прятать окно чата» on and the addon not switched off in its saved settings, no companion running a moment ago (a restart by the launcher — the addon saw that one), and the strip already on screen.
+  A companion started after the player entered the world says that the hidden chat needs a `/reload`, in the log and as a tray notice. It asks before its first beat (`bv/reloadhint.py`): «Прятать окно чата» on and the addon not switched off in its saved settings, no companion running a moment ago (a restart by the launcher — the addon saw that one), and the strip already on screen. At login without the companion the addon says it too, as a line of its own under «…не запущено…»: «прозрачный чат пока выключен: включится только после /reload, когда компаньон заработает.»
 
 - A «Помощь» tab in the settings
 

@@ -34,8 +34,10 @@ function C.SayAtLogin()
     if C.State() == "running" then
         print(prefix .. "озвучка чата работает.")
     else
-        print(prefix .. "приложение-компаньон Barrens Voice не запущено — чат будет озвучиваться, как только ты его запустишь."
-            .. (ns.db and ns.db.fadeChat and " Прозрачный чат пока выключен: включится после /reload, когда компаньон заработает." or ""))
+        print(prefix .. "приложение-компаньон Barrens Voice не запущено — чат будет озвучиваться, как только ты его запустишь.")
+        if ns.db and ns.db.fadeChat then     -- its own line: easy to miss at the end of the first
+            print(prefix .. "прозрачный чат пока выключен: включится только после /reload, когда компаньон заработает.")
+        end
     end
 end
 
