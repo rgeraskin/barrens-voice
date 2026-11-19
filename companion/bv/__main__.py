@@ -393,13 +393,16 @@ def install_crash_logging() -> None:
                                             a.exc_value, a.exc_traceback)
 
 
+OFFLINE_VARS = ("HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE")   # set by offline_models
+
+
 def offline_models() -> bool:
     """After the models were loaded once (F5, Vocos, RUAccent in the Hugging Face cache), never ask
     the hub again: no update checks at start, no "unauthenticated requests" warnings, and nothing
     breaks if the site is down or a model is taken away. Must run before huggingface_hub loads."""
     if MODELS_READY.exists():
-        os.environ["HF_HUB_OFFLINE"] = "1"
-        os.environ["TRANSFORMERS_OFFLINE"] = "1"
+        for name in OFFLINE_VARS:
+            os.environ[name] = "1"
         return True
     return False
 
@@ -425,14 +428,16 @@ def restart_online(log) -> None:
 
 def run_again() -> None:
     """The console's restart: this companion's mutex freed, the same command run as a child, its exit
-    code this process's."""
+    code this process's. The child goes online: offline_models' variables are not handed down (the mark
+    is gone, so it does not set them again)."""
     global _mutex
     if _mutex:
         import ctypes
         ctypes.WinDLL("kernel32").CloseHandle(_mutex)
         _mutex = None
     import subprocess
-    os._exit(subprocess.call([sys.executable, "-m", "bv"] + sys.argv[1:]))
+    env = {k: v for k, v in os.environ.items() if k not in OFFLINE_VARS}
+    os._exit(subprocess.call([sys.executable, "-m", "bv"] + sys.argv[1:], env=env))
 
 
 def describe_place(place) -> str:

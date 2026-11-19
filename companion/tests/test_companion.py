@@ -413,7 +413,7 @@ class RestartOnline(unittest.TestCase):
     def test_how_it_starts_again(self):
         import threading
         from unittest import mock
-        exits, calls = [], []
+        exits, calls, envs = [], [], []
 
         class Exited(Exception):
             pass
@@ -422,15 +422,17 @@ class RestartOnline(unittest.TestCase):
             exits.append(code)
             raise Exited
 
-        def call(args):
+        def call(args, env=None):
             calls.append(args)
+            envs.append(env)
             return 7
         with tempfile.TemporaryDirectory() as d, \
                 mock.patch.object(companion, "MODELS_READY", Path(d) / ".models_ready"), \
                 mock.patch.object(companion.os, "_exit", exit_), \
                 mock.patch("subprocess.call", call), \
                 mock.patch.object(companion.sys, "argv", ["bv", "--forever"]), \
-                mock.patch.dict(companion.os.environ, {companion.LAUNCHED: "1"}):
+                mock.patch.dict(companion.os.environ, {companion.LAUNCHED: "1", "HF_HUB_OFFLINE": "1",
+                                                       "TRANSFORMERS_OFFLINE": "1", companion.LAUNCHED + "_PROBE": "kept"}):
             (Path(d) / ".models_ready").touch()
             with self.assertRaises(Exited):
                 companion.restart_online(lambda *a: None)       # under the launcher: its exit code
@@ -443,6 +445,10 @@ class RestartOnline(unittest.TestCase):
                 companion.restart_online(lambda *a: None)
             self.assertEqual(calls, [[companion.sys.executable, "-m", "bv", "--forever"]])
             self.assertEqual(exits[-1], 7)
+            # ... online: offline_models' variables not handed down (they made the child fail at once)
+            self.assertNotIn("HF_HUB_OFFLINE", envs[-1])
+            self.assertNotIn("TRANSFORMERS_OFFLINE", envs[-1])
+            self.assertEqual(envs[-1].get(companion.LAUNCHED + "_PROBE"), "kept")
             # off the main thread: left to the main loop, which first stops reading the strip
             worker = threading.Thread(target=companion.restart_online, args=(lambda *a: None,))
             worker.start()

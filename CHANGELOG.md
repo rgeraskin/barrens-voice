@@ -150,6 +150,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- The restart to fetch models works in the console too
+
+  A companion started in the console (`python -m bv`) that found a model missing from the cache restarted itself still offline and failed at once («OfflineModeIsEnabled»): the new process inherited the offline switches. It starts online now, as under the launcher.
+
 - The /reload reminder after a quick restart with a /reload between
 
   A companion closed and started again within a minute took the addon for having seen the previous one, and gave no reminder, though the game had been reloaded in between without it and kept the chat visible. Now a /reload since (the game writes the addon's saved variables then) counts: the reminder comes. A restart by the launcher, with no /reload between, still gives none.
