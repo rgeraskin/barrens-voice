@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / "dist"
 LUA = ROOT / "addon" / "BarrensVoice" / "Dictionary.lua"
 sys.path.insert(0, str(ROOT / "companion"))
-from bv.dictionary import DEFAULT_BLOCK  # noqa: E402
+from bv.dictionary import default_text  # noqa: E402
 from bv.online_dictionary import FORMAT, regexes_ok  # noqa: E402
 
 # D.RENAMED as the addon builds it, whichever way the table is written (a constructor, assignments, long
@@ -67,13 +67,13 @@ def renamed(lua: str) -> dict[str, str]:
 
 def build(text: str | None = None, rev: int | None = None) -> dict:
     lua = text if text is not None else LUA.read_text(encoding="utf-8")
-    default = DEFAULT_BLOCK.search(lua)
-    if not default:
+    default = default_text(lua)            # every part: the online file is format 2, for launchers that know «=!»
+    if default is None:
         sys.exit("Dictionary.lua: no D.DEFAULT = [[...]]")
     rev = rev if rev is not None else revision()
     return {"format": FORMAT, "revision": rev,
             "date": datetime.fromtimestamp(rev, timezone.utc).strftime("%Y-%m-%d"),
-            "text": default.group(1), "renamed": renamed(lua)}
+            "text": default, "renamed": renamed(lua)}
 
 
 def write(data: dict, out: Path) -> Path:

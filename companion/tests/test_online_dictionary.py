@@ -42,7 +42,12 @@ class Build(unittest.TestCase):
         import dictionary_json
         data = dictionary_json.build(rev=1794864817)
         lua = (ROOT / "addon" / "BarrensVoice" / "Dictionary.lua").read_text(encoding="utf-8")
-        self.assertIn(data["text"], lua)
+        from bv.dictionary import DEFAULT_BLOCK, default_text
+        self.assertEqual(data["text"], default_text(lua))                # every part of D.DEFAULT, joined
+        self.assertTrue(data["text"].startswith(DEFAULT_BLOCK.search(lua).group(1)))
+        # what a launcher before «=!» reads - the first part only - has none: it would read «!» aloud
+        first = [line for line in DEFAULT_BLOCK.search(lua).group(1).splitlines() if not line.startswith("#")]
+        self.assertFalse([line for line in first if "=!" in line], "«=!» entries go after the first part")
         self.assertIn("кд=", data["text"])
         self.assertEqual((data["format"], data["revision"], data["date"]), (od.FORMAT, 1794864817, "2026-11-16"))
         self.assertIsNone(od.regexes_ok(data["text"]), "the shipped dictionary passes the companions' check")
@@ -300,3 +305,15 @@ class Release(unittest.TestCase):
         self.assertGreater(release.dictionary_revision(), 1700000000)
         lua = (ROOT / "addon" / "BarrensVoice" / "Dictionary.lua").read_text(encoding="utf-8")
         self.assertRegex(lua, r"(?m)^D\.REVISION = 0$")                              # what release.py replaces
+
+class DefaultParts(unittest.TestCase):
+    """dictionary.default_text: D.DEFAULT's long strings joined as Lua joins them, comments between allowed."""
+
+    def test_parts_joined(self):
+        from bv.dictionary import DEFAULT_BLOCK, default_text
+        lua = 'D.DEFAULT = [[\nа=б\n]] ..\n-- a note\n[[\nв=!г\n]]\nD.REVISION = 1\n'
+        self.assertEqual(default_text(lua), "\nа=б\n\nв=!г\n")
+        self.assertEqual(DEFAULT_BLOCK.search(lua).group(1), "\nа=б\n")     # what an older launcher reads
+        self.assertEqual(default_text('D.DEFAULT = [[\nа=б\n]]\n'), "\nа=б\n")
+        self.assertIsNone(default_text("local D = {}\n"))
+

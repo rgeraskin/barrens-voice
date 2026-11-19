@@ -18,7 +18,9 @@ from .morph import KEEP     # what marks a «=!» replacement for the inflector
 SAVED = "BarrensVoice.lua"
 # The player's layer the addon keeps for us in its saved variables (as it sends it over the strip).
 LUA_USER = re.compile(r'\["dictionaryUser"\]\s*=\s*"((?:[^"\\]|\\.)*)"', re.S)
-DEFAULT_BLOCK = re.compile(r"D\.DEFAULT\s*=\s*\[\[(.*?)\]\]", re.S)
+DEFAULT_BLOCK = re.compile(r"D\.DEFAULT\s*=\s*\[\[(.*?)\]\]", re.S)     # its first part: what launchers up to beta 19 read
+# its parts after that: "]] .. [[", Lua's line comments between them allowed (default_text)
+DEFAULT_MORE = re.compile(r"(?:\s|--[^\n]*)*\.\.(?:\s|--[^\n]*)*\[\[(.*?)\]\]", re.S)
 REVISION = re.compile(r"^D\.REVISION\s*=\s*(\d+)", re.M)      # the default's revision (tools/release.py)
 # D.RENAMED as Dictionary.lua writes it: long strings, "[ [[old]] ] = [[new]]" or "= { [[new]], [[new]] }"
 # (an empty one "{}" ends where it starts, not at the next table's "}"); read with Lua's comments taken out
@@ -174,6 +176,22 @@ def plurals(text: str) -> str:
 KEEP_CASE = "!"   # a replacement starting with it is never declined after a preposition: «скачки=!ск+ачки»
 
 
+def default_text(lua: str) -> str | None:
+    """The default dictionary in Dictionary.lua's text: D.DEFAULT's long strings joined, as Lua joins them
+    («[[…]] .. [[…]]»). The entries a launcher before «=!» must not see (it would read «!» aloud) are in a part after
+    the first: it read the first only. None when there is no D.DEFAULT."""
+    first = DEFAULT_BLOCK.search(lua)
+    if not first:
+        return None
+    parts, at = [first.group(1)], first.end()
+    while True:
+        more = DEFAULT_MORE.match(lua, at)
+        if not more:
+            return "".join(parts)
+        parts.append(more.group(1))
+        at = more.end()
+
+
 def keep_case(value: str) -> tuple[str, bool]:
     """A replacement without its «!» and whether it had one (to stay as written: morph.KEEP)."""
     return (value[1:], True) if value.startswith(KEEP_CASE) else (value, False)
@@ -306,10 +324,10 @@ class Dictionary:
             stamp = lua.stat().st_mtime
             if stamp != self.default_stamp:
                 text = lua.read_text(encoding="utf-8", errors="replace")
-                match = DEFAULT_BLOCK.search(text)
-                if match:
+                default = default_text(text)
+                if default is not None:
                     revision = REVISION.search(text)
-                    self.default, self.default_stamp = match.group(1), stamp
+                    self.default, self.default_stamp = default, stamp
                     self.revision = int(revision.group(1)) if revision else 0
                     self.renamed = addon_renamed(text)
                     changed.append("стандартный")

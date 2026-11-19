@@ -82,7 +82,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - A dictionary replacement can stay as written
 
-  A replacement starting with «!» («скачки=!ск+ачки», in a regex too) is not put into the case of the preposition before it: «после скачки клиента» stays «скачки», not «скачек». The others are declined as before («в ОП» → «в Огненную пропасть»). The dictionary online is format 2 now: a program before it would read «!» as is, so it keeps its last dictionary until it updates.
+  A replacement starting with «!» («скачки=!ск+ачки», in a regex too) is not put into the case of the preposition before it: «после скачки клиента» stays «скачки», not «скачек». The others are declined as before («в ОП» → «в Огненную пропасть»). The dictionary online is format 2 now: a program before it would read «!» as is, so it keeps its last dictionary until it updates. In the addon's own Dictionary.lua such entries are in a second part of the default, which an older program does not read (a rolled-back program with a newer addon reads these words as before, not «после! скачек»).
 
 ### Changed
 
