@@ -162,6 +162,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- A broken config.json is said once, plainly, and the voice-over does not start on it
+
+  The main window had the error twice — the launcher's warning with the JSON parser's English, the voice-over's error — after the voice-over had started only to stop with code 5. Now the launcher does not start the voice-over while config.json does not read, says one error in the player's words («config.json не читается: ошибка в строке 3, столбец 3 — исправь его («Открыть config.json» в «Настройках»)…», the parser's words in the log window), shows «config.json не читается — открой «Настройки»» as the state line and in the tray icon's hint, and says when the file reads again (checked every 2 s).
+
 - Turning «Обновлять автоматически» on prepares a version found already
 
   A version found while automatic updates were off waited for the next check (at start or an hour later) after the box was ticked and saved. Saving it on, or another channel («Получать тестовые версии»), checks at once now: the version found is prepared, and installed as always once no game and no voice-over run.

@@ -153,9 +153,11 @@ class Layout(unittest.TestCase):
         patches = [mock.patch.object(app, "Companion", FakeCompanion), mock.patch.object(app, "Tray", FakeTray),
                    mock.patch.object(app, "launcher_log", lambda *_: None),
                    mock.patch.object(app, "window_icon", lambda *_: None),
-                   mock.patch.object(model, "read_config", lambda: dict(config or {})),
+                   mock.patch.object(model, "read_config", lambda *a, **k: dict(config or {})),
                    mock.patch.object(model, "update_config", lambda **kw: dict(config or {}, **kw)),
                    mock.patch.object(model, "config_problem", lambda: problem),
+                   mock.patch.object(model, "config_error",
+                                     lambda *a: model.BrokenConfig(problem, "Expecting value (char 0)") if problem else None),
                    mock.patch.object(model, "find_games", lambda *a, **k: []),
                    mock.patch.object(model, "autostart", lambda: False),
                    mock.patch.object(model, "app_version", lambda: "0.4.0b7"),
@@ -266,6 +268,8 @@ class Layout(unittest.TestCase):
         self.assertTrue(any("переход на другую версию в прошлый раз прервался" in m for m in lines), lines)
         self.assertIn((app.PRUNE_AFTER_MS, a.prune_versions), self.after_calls)
         self.assertEqual(a.config_told, {"broken"})
+        a.redraw()                                               # the state line and the tray's hint say it
+        self.assertEqual(a.tray.said, "Barrens Voice Launcher — config.json не читается — открой «Настройки»")
         b = self.make()                                          # run from the source: none of it
         self.assertNotIn(app.PRUNE_AFTER_MS, [c[0] for c in self.after_calls])
         self.assertEqual(b.config_told, set())

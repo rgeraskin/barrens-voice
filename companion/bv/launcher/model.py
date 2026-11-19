@@ -189,7 +189,12 @@ def remember(config: dict, game: str, folder: Path) -> dict | None:
 class BrokenConfig(ValueError):
     """config.json is there but is not a JSON object of settings (a hand edit gone wrong: a single backslash
     in a path, a missing comma), or it cannot be read at all right now (in use, an antivirus scan, its
-    permissions)."""
+    permissions). Its text is for the player (Russian: the line and column); `detail` the parser's own words, for
+    the log window."""
+
+    def __init__(self, message: str, detail: str = ""):
+        super().__init__(message)
+        self.detail = detail
 
 
 class ConfigNotWritten(BrokenConfig):
@@ -212,7 +217,10 @@ def read_config(path: Path = CONFIG_PATH, strict: bool = False) -> dict:
         return config
     except ValueError as e:
         if strict:
-            raise BrokenConfig(f"config.json не читается: {e}") from e
+            if isinstance(e, json.JSONDecodeError):
+                raise BrokenConfig(f"config.json не читается: ошибка в строке {e.lineno}, столбец {e.colno}",
+                                   f"{e.msg} (char {e.pos})") from e
+            raise BrokenConfig("config.json не читается", str(e)) from e
         return config
     if not isinstance(saved, dict):
         if strict:
@@ -224,11 +232,17 @@ def read_config(path: Path = CONFIG_PATH, strict: bool = False) -> dict:
 
 def config_problem(path: Path = CONFIG_PATH) -> str | None:
     """Why config.json cannot be read (None when it can, or when there is none yet)."""
+    error = config_error(path)
+    return str(error) if error else None
+
+
+def config_error(path: Path = CONFIG_PATH) -> BrokenConfig | None:
+    """What is wrong with config.json (BrokenConfig, its words and detail), None when it reads or is not there."""
     try:
         read_config(path, strict=True)
         return None
     except BrokenConfig as e:
-        return str(e)
+        return e
 
 
 def update_config(path: Path = CONFIG_PATH, **changes) -> dict:

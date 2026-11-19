@@ -199,6 +199,34 @@ class Config(unittest.TestCase):
             self.assertEqual(update_config(path, game="retail")["rate"], 3)
             self.assertIsNone(config_problem(Path(d) / "none.json"))                 # none yet: written fresh
 
+    def test_a_broken_file_said_once_in_the_players_words(self):
+        # the main window had it twice - the launcher's WARN with the parser's English, the voice-over's ERROR - and
+        # the voice-over started only to stop with code 5: one ERROR now, line and column, what to do; the parser's
+        # words a DEBUG line; no voice-over (start_companion) until the file reads again
+        from bv.launcher import app
+        from bv.launcher.model import config_error
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "config.json"
+            path.write_text('{\n  "rate": 3,\n  rate: 4\n}', encoding="utf-8")      # a name without quotes
+            error = config_error(path)
+            self.assertEqual(str(error), "config.json не читается: ошибка в строке 3, столбец 3")
+            self.assertIn("Expecting property name", error.detail)
+            self.assertIn("char", error.detail)
+        said = []
+        win = SimpleNamespace(checked={}, config_told=set(), config_error=None,
+                              say=lambda text, level="INFO": said.append((level, text)))
+        app.App.check_config(win, 1.0, error)
+        self.assertEqual([lvl for lvl, _ in said], ["ERROR", "DEBUG"])
+        self.assertTrue(said[0][1].startswith("config.json не читается: ошибка в строке 3, столбец 3 — исправь его "
+                                              "(«Открыть config.json» в «Настройках»)"), said[0][1])
+        self.assertNotIn(";", said[0][1])
+        self.assertEqual(win.config_told, {"broken"})                        # set_config: no second word of it
+        app.App.check_config(win, 3.0, error)
+        self.assertEqual(len(said), 2)                                        # the same: said once
+        app.App.check_config(win, 5.0, None)
+        self.assertEqual(said[-1], ("INFO", "config.json снова читается"))
+        self.assertEqual((win.config_error, win.config_told, win.checked["config"]), (None, set(), 5.0))
+
     def test_unreadable_file_never_written_over(self):
         # in use (a sharing violation, an antivirus scan) or its permissions: the launcher wrote the defaults over it
         from unittest import mock
@@ -319,15 +347,18 @@ class LiveFromTheWindow(unittest.TestCase):
                 self.assertEqual(json.loads((Path(d) / "live.json").read_text(encoding="utf-8")),
                                  {"exit_with_wow": exit_with_wow})
             self.assertEqual(got[0], ["--forever", launch])
-        # a file that cannot be read now: the window's copy
-        got = []
+        # a file that cannot be read now: no voice-over (it would end at once on the same file, its error twice), and
+        # the window is told what is wrong (check_config: the ERROR line, the state line)
+        got, told = [], []
+        broken = model.BrokenConfig("config.json не читается: ошибка в строке 3, столбец 3", "Expecting value (char 9)")
         win = SimpleNamespace(companion=SimpleNamespace(running=False, start=got.append), busy="", selected="forever",
                               addon_missing=lambda: False, pending={}, extra=[], say=lambda *a: None, settle_due=False,
-                              config={"game": "forever", "launch_wow": True, "exit_with_wow": True})
+                              config={"game": "forever", "launch_wow": True, "exit_with_wow": True},
+                              check_config=lambda now, error: told.append(error))
         with tempfile.TemporaryDirectory() as d, mock.patch.object(companion, "LIVE_FILE", Path(d) / "live.json"), \
-                mock.patch.object(model, "read_config", side_effect=model.BrokenConfig("config.json не читается")):
-            app.App.start_companion(win)
-        self.assertEqual(got[0], ["--forever", "--launch"])
+                mock.patch.object(model, "read_config", side_effect=broken):
+            self.assertFalse(app.App.start_companion(win))
+        self.assertEqual((got, told), ([], [broken]))
 
     def test_a_change_config_json_did_not_take_reaches_the_running_companion(self):
         # «Закрываться вместе с игрой» unchecked with config.json read-only: the companion still ended with the game

@@ -57,6 +57,7 @@ SHOW_FILE = DATA_DIR / "tmp" / "launcher.show"   # a second launcher asks the fi
 LAUNCHER_LOG = DATA_DIR / "logs" / "launcher.log"
 TICK_MS = 400
 UPDATE_EVERY = 3600          # an hour; and at every start
+CONFIG_EVERY = 2.0           # seconds between looks at whether config.json reads (check_config)
 PRUNE_AFTER_MS = 5000        # old versions removed this long after the start (update.prune_unwatched)
 
 
@@ -150,11 +151,8 @@ class App:
 
         root.protocol("WM_DELETE_WINDOW", self.close)
         self.say(f"Barrens Voice {display_version(self.version)}" + (", ждёт игру в трее" if resident else ""))
-        problem = model.config_problem()
-        if problem:
-            self.config_told.add("broken")
-            self.say(f"{problem} — исправь его («Открыть config.json» в «Настройках»), до тех пор лаунчер "
-                     "в него не пишет", "WARN")
+        self.config_error = None         # config.json that does not read (check_config): no voice-over until it does
+        self.check_config(time.monotonic())
         if INSTALL_DIR is not None:                # an update by an older version did not bring the starter yet,
             from ..install import place_starter, repair_current    # nor set the version Windows «Apps» shows
             from ..paths import CODE_DIR
@@ -202,6 +200,25 @@ class App:
             self.start_companion()
         else:
             self.say("ждёт игру: «Играть» или запуск из Battle.net")
+
+    def check_config(self, now: float, error="read") -> None:
+        """Whether config.json reads; checked at start, every CONFIG_EVERY s and before the voice-over starts. A new
+        problem is said once, an ERROR in the main window (the player's words: the line and column, what to do),
+        its parser's words a DEBUG line under it; the file fixed is said too. While it does not read the voice-over
+        does not start (start_companion) and the state line says so (snapshot)."""
+        self.checked["config"] = now
+        error = model.config_error() if error == "read" else error
+        old = getattr(self, "config_error", None)
+        self.config_error = error
+        if error is not None and (old is None or str(old) != str(error)):
+            self.config_told.add("broken")              # set_config: no second word of it
+            self.say(f"{error} — исправь его («Открыть config.json» в «Настройках»), до тех пор лаунчер в него не "
+                     "пишет и озвучку не запускает", "ERROR")
+            if error.detail:
+                self.say(f"    {error.detail}", "DEBUG")
+        elif error is None and old is not None:
+            self.config_told.discard("broken")
+            self.say("config.json снова читается")
 
     def set_config(self, **changes) -> dict:
         """Settings changed in config.json; when the file does not parse it is not written over (the player's
@@ -266,8 +283,12 @@ class App:
             # with what it did not take over it: the launch choice and tmp/live.json go by this, not by the window's
             # copy from its start
             self.config = {**model.read_config(strict=True), **self.pending}
-        except model.BrokenConfig:
-            pass                                 # unreadable now: the window's copy (the companion says what is wrong)
+        except model.BrokenConfig as e:
+            # unreadable: no voice-over (it would end at once on the same file, with the same error a second time)
+            self.check_config(time.monotonic(), e)
+            return False
+        if getattr(self, "config_error", None) is not None:
+            self.check_config(time.monotonic(), None)      # fixed since: said
         if self.config.get("game") != self.selected:
             self.set_config(game=self.selected)
         self.companion_game = self.selected
@@ -518,6 +539,8 @@ class App:
 
     def _tick(self) -> None:
         now = time.monotonic()
+        if now - self.checked.get("config", 0.0) > CONFIG_EVERY:
+            self.check_config(now)                 # fixed or broken by hand while the window is open
         new = []
         while not self.incoming.empty():
             new.append(parse(self.incoming.get_nowait()))
@@ -654,6 +677,8 @@ class App:
                                self.addon_missing() and not self.companion.running)
         if self.busy:
             lines[0] = (model.YELLOW, "Озвучка перезапускается…" if self.busy == "restarting" else "Озвучка останавливается…")
+        elif getattr(self, "config_error", None) is not None and not self.companion.running:
+            lines[0] = (model.RED, "config.json не читается — открой «Настройки»")     # the tray's hint says it too
         show_update = bool(self.update) and self.config.get("launcher_dismissed") != self.update["version"]
         games = tuple((g.key, g.addon, str(g.root)) for g in self.games)
         progress = model.main_lines(list(self.main))
