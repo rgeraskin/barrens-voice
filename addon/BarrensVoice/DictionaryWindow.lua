@@ -17,7 +17,7 @@ local HELP = {
     "|cffffd100!|r в начале замены — не склонять её после предлога:",
     "     |cffffd100скачки=!ск+ачки|r: «после скачки» не станет «после скачек»",
     "Пустая замена удаляет слово, |cffffd100#|r в начале строки — комментарий.",
-    "После правки записи сами выстраиваются по алфавиту:",
+    "При следующем открытии записи сами выстроятся по алфавиту:",
     "     сначала русские, потом латиница и цифры, регулярки — в конце.",
     "",
     "|cffffd100Регулярные выражения|r",
@@ -74,7 +74,7 @@ function W.Create(pane)
     local RULES = {
         "Одна строка — одна запись: |cffffd100ключ=как читать|r (WTS=продам)",
         "Регистр и ё/е не важны",
-        "После правки записи сами выстраиваются по алфавиту, регулярки — в конце",
+        "При следующем открытии записи выстроятся по алфавиту, регулярки — в конце",
         "Ударение — |cffffd100+|r перед гласной: дам+агер",
         "Строки с |cffffd100~|r — регулярные выражения, их применяет лаунчер",
         "Подробности и примеры — кнопка |cffffd100?|r справа",
@@ -112,11 +112,10 @@ function W.Create(pane)
         if not userInput then return end
         ns.Dictionary.SetText(ns.Dictionary.Unescaped(self:GetText()))
     end)
-    -- Sorted when editing is done, not while typing (the cursor would jump).
+    -- Saved when editing is done; sorted only at the next showing (OnShow): a line just typed stays where it was
+    -- typed while the window is open, instead of jumping to its place in the alphabet
     edit:SetScript("OnEditFocusLost", function(self)
         Save(ns.Dictionary.Unescaped(self:GetText()))
-        local text = ns.Dictionary.Escaped(ns.Dictionary.Text())
-        if self:GetText() ~= text then self:SetText(text) end
     end)
     scroll:SetScrollChild(edit)
     scroll:SetScript("OnSizeChanged", function(_, w) edit:SetWidth(w) end)
@@ -150,8 +149,12 @@ function W.Create(pane)
     say:SetPoint("LEFT", try, "RIGHT", 8, 0)
     UI.Tooltip(say, "Прочитать строку слева твоим голосом — со словарём и регулярками.")
 
-    window:SetScript("OnShow", function()
+    window:SetScript("OnShow", function()                  -- in order: the dictionary as saved, sorted
         edit:SetText(ns.Dictionary.Escaped(ns.Dictionary.Text()))
+    end)
+    window:SetScript("OnHide", function()                  -- the last edit kept, whatever closed the window
+        if edit:HasFocus() then edit:ClearFocus() end
+        Save(ns.Dictionary.Unescaped(edit:GetText()))
     end)
 end
 

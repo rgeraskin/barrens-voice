@@ -86,6 +86,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- The dictionary window keeps a line where it was typed
+
+  It sorted the text as soon as the box lost focus, and a line just typed jumped to its place in the alphabet. The entries are sorted when the window is shown again; while it is open they stay as typed. Every edit is still saved at once.
+
 - The mod speaks to the player with «ты»
 
   The addon, the launcher, the companion's log, the installer's starter, README and the player's docs say «ты» instead of «вы»: a fan mod for players, like most Russian addons. The test lines spoken to a group keep their plural, and Windows' own wording stays as it is.

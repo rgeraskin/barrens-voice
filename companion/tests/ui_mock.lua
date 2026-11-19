@@ -1472,8 +1472,17 @@ do
     edit._scripts.OnTextChanged(edit, true)
     local layer = ns.Dictionary.UserLayer()
     assert(layer:find("~\\b(тестраз|тестдва)\\b=окей", 1, true) and not layer:find("||", 1, true), layer)
+    local typed = edit._text
     edit._scripts.OnEditFocusLost(edit)
-    assert(edit._text == ns.Dictionary.Escaped(ns.Dictionary.Text()), "sorted and shown escaped again")
+    assert(edit._text == typed, "saved, not sorted while the window is open: the line stays where it was typed")
+    pane._scripts.OnHide(pane)
+    pane._scripts.OnShow(pane)
+    assert(edit._text == ns.Dictionary.Escaped(ns.Dictionary.Text()) and edit._text ~= typed,
+        "sorted at the next showing, shown escaped again")
+    -- typed and closed at once, no focus lost first: the hiding keeps it
+    edit._text = edit._text .. "новоеслово=нов\n"
+    pane._scripts.OnHide(pane)
+    assert(ns.Dictionary.Text():find("новоеслово=нов", 1, true), "kept when the window hides")
     assert(ns.Dictionary.Text():find("~\\b(тестраз|тестдва)\\b=окей", 1, true), "kept with «|»")
     ns.Dictionary.Reset()
     print("dictionary window ok")
