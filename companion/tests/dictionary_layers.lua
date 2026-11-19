@@ -99,6 +99,25 @@ end
 -- «|» in the edit box: the game keeps a typed one as «||»; the window escapes and unescapes, so the layer has «|»
 assert(D.Escaped("~(а|б)=в") == "~(а||б)=в" and D.Unescaped("~(а||б)=в") == "~(а|б)=в")
 for _, t in ipairs({ "", "a|b", "||", "|||", "x|cffff|r" }) do assert(D.Unescaped(D.Escaped(t)) == t, t) end
+-- saved by beta 17 and before as typed: «||» once taken back, a regex's key with it; a header too
+do
+    local edits = { lines = { ["~\\b(тестраз||тестдва)\\b"] = "# моё\n~\\b(тестраз||тестдва)\\b=окей",
+                              ["абв"] = "абв=где" }, removed = {}, header = "# мой || словарь" }
+    local Dp, e = migrated(edits)
+    assert(e.lines["~\\b(тестраз|тестдва)\\b"] == "# моё\n~\\b(тестраз|тестдва)\\b=окей", "the line and its key")
+    assert(e.lines["~\\b(тестраз||тестдва)\\b"] == nil and e.lines["абв"] == "абв=где", "the old key gone, others kept")
+    assert(e.header == "# мой | словарь")
+    local db = { dictionaryEdits = e, dictionaryPipes = true }
+    e.lines["~а||б"] = "~а||б=в"                            -- after the migration: left alone (once only)
+    Dp.Migrate(db)
+    assert(e.lines["~а||б"] == "~а||б=в", "once only")
+    local layer = { db = { dictionaryEdits = { lines = { ["~(а||б)"] = "~(а||б)=в" }, removed = {} } } }
+    dofile("../../companion/tests/toc.lua")(layer, { "Protocol.lua", "Dictionary.lua" })
+    layer.Dictionary.Migrate(layer.db)
+    layer.Dictionary.Rebuild()
+    assert(layer.Dictionary.UserLayer() == "~(а|б)=в" and layer.db.dictionaryUser:find("~(а|б)=в", 1, true)
+        and not layer.db.dictionaryUser:find("||", 1, true), "the program gets «|» at once: " .. layer.Dictionary.UserLayer())
+end
 print("pipes ok")
 
 assert(#D.RenamedTo(D.RENAMED[OLD_K]) == 6, "the «к» rule's six")

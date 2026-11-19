@@ -164,7 +164,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - A «|» typed in the dictionary window is a «|»
 
-  The game's edit box keeps a typed or pasted «|» as «||», and the window saved it so: a regex «~\b(тестраз|тестдва)\b=окей» became «(тестраз||тестдва)», whose empty alternative matches everywhere («тестдва привет» was read «окейокейокей окейприветокей»), and the message about a too long line showed «||». The window now shows the text escaped and takes it back unescaped.
+  The game's edit box keeps a typed or pasted «|» as «||», and the window saved it so: a regex «~\b(тестраз|тестдва)\b=окей» became «(тестраз||тестдва)», whose empty alternative matches everywhere («тестдва привет» was read «окейокейокей окейприветокей»), and the message about a too long line showed «||». The window now shows the text escaped and takes it back unescaped, and edits saved so by the test builds are taken back to «|» once at login.
 
 - The strip is found at once after a restart mid-game
 

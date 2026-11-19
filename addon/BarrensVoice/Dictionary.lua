@@ -668,6 +668,20 @@ function D.Migrate(db)
     db.dictionaryEdits = db.dictionaryEdits or { lines = {}, removed = {} }
     local e = db.dictionaryEdits
     e.lines, e.removed = e.lines or {}, e.removed or {}
+    -- 0.4.0 beta 17 and before saved the edit box's text as it was: a typed "|" as "||" (D.Escaped), and a regex
+    -- "(а||б)" matches the empty string, so every chat line came out garbled. Once, taken back to "|" (no rule has a
+    -- real "||"), a regex's key with it: its pattern is the key.
+    if not db.dictionaryPipes then
+        local lines = {}
+        for key, block in pairs(e.lines) do
+            block = D.Unescaped(block)
+            local last = block:match("([^\n]*)$")
+            lines[key == "#" and "#" or (D.KeyOf(last) or ("?" .. last))] = block
+        end
+        e.lines = lines
+        if e.header then e.header = D.Unescaped(e.header) end
+        db.dictionaryPipes = true
+    end
     for old, new in pairs(D.RENAMED) do
         if e.removed[old] or e.lines[old] then
             for _, key in ipairs(D.RenamedTo(new)) do e.removed[key] = true end
