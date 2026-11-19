@@ -21,7 +21,7 @@ from . import update
 
 URL = "https://raw.githubusercontent.com/rgeraskin/barrens-voice/dictionary/"
 FILE = "dictionary.json"
-FORMAT = 1
+FORMAT = 2       # 2: a replacement may start with «!» (not declined): a companion before it would read «!ск+ачки»
 CHECK_EVERY = 3600.0          # seconds between fetches while the companion runs
 MAX_PATTERN = 400             # characters: a longer regex is not one we write
 CHECK_TIMEOUT = 15.0          # seconds for all the regexes on the probe strings, in a process of their own

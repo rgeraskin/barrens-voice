@@ -38,8 +38,11 @@ CONJUNCTIONS = {"и", "или", "либо", "да"}   # "с танком и че
 RANGE = re.compile(r"(?<![\w'+-])(?:с|со)\s+(\d+(?:-?[а-яё]{1,3})?|[а-яё]+)(?:\s+года)?\s+по\W*$", re.IGNORECASE)
 
 
+KEEP = "\x04"   # first in a marked replacement: not declined - the dictionary's «=!» (dictionary.KEEP_CASE)
+
+
 def strip_marks(text: str) -> str:
-    return text.replace("\x02", "").replace("\x03", "")
+    return text.replace("\x02", "").replace("\x03", "").replace(KEEP, "")
 
 
 class Inflector:
@@ -82,7 +85,8 @@ class Inflector:
                     case = carried          # "X и Y": Y takes X's case
                 else:
                     case = None
-                out.append(self.decline(m.group(1), case) if case else m.group(1))
+                keep = m.group(1).startswith(KEEP)        # «=!» in the dictionary: as written, whatever comes before
+                out.append(self.decline(m.group(1), case) if case and not keep else m.group(1))
                 carried = case
                 last = m.end()
             out.append(text[last:])

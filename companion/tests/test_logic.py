@@ -763,6 +763,19 @@ class Pipeline(unittest.TestCase):
                     "с лвлом": "с уровнем", "без лвлов": "без уровней", "на каком ты лвле": "на каком ты уровне",
                     "апнул лвл": "апнул уровень", "ниче страшного": "ничё страшного"})
 
+    def test_keep_case_mark(self):
+        # «=!»: a replacement as written, never declined after a preposition - a word, a regex; without it: declined
+        from bv.__main__ import speech_text
+        from bv.dictionary import Dictionary, parse
+        book = Dictionary({}, lambda *a: None, self.ADDON)
+        book.exact = {"хрусталь": "перекрёсток", "кристалл": "!перекрёсток"}
+        book.stems, book.phrases = [], {}
+        book.rules = parse("~\\bальфа\\b=перекрёсток\n~\\bбета\\b=!перекрёсток", print)
+        said = {t: speech_text(t, book, self.inflector, True) for t in ("у хрусталь", "у кристалл", "у альфа", "у бета")}
+        self.assertEqual(said, {"у хрусталь": "у перекрёстка", "у кристалл": "у перекрёсток",
+                                "у альфа": "у перекрёстка", "у бета": "у перекрёсток"})
+        self.assertEqual(speech_text("у бета", book, self.inflector, False), "у перекрёсток")   # declension off: no «\x04» left
+
     def test_dolboyob_with_yo_in_every_form(self):
         self.check({"эти долбаебами": "эти долбаёбами", "с долбоебами": "с долбоёбами", "он долбоеб": "он долбоёб",
                     "у долбоеба": "у долбоёба", "долбаебы": "долбаёбы", "долбить": "долбить"})

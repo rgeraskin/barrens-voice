@@ -80,6 +80,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   The whispers one sends, to a character or to a Battle.net friend, are read under «Шёпот» when «Свои сообщения» is on (as it is by default): «Джайна шепчет: …», by one's own name, in one's own voice, without the name of the one whispered to. The name is the one the chat gives the character's own lines (on Forever the game's own name parts may differ from it), so one's own whispers are read once the character has written a line the addon heard, in any chat; it is kept per character over `/reload` and restarts. Until then `/bv debug` says why one is not read. With «Свои сообщения» off they are not read and the hidden chat shows them as before; read, they show it only with «при шёпоте», like a whisper one gets.
 
+- A dictionary replacement can stay as written
+
+  A replacement starting with «!» («скачки=!ск+ачки», in a regex too) is not put into the case of the preposition before it: «после скачки клиента» stays «скачки», not «скачек». The others are declined as before («в ОП» → «в Огненную пропасть»). The dictionary online is format 2 now: a program before it would read «!» as is, so it keeps its last dictionary until it updates.
+
 ### Changed
 
 - The mod speaks to the player with «ты»

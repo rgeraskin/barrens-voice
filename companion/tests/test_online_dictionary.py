@@ -46,6 +46,10 @@ class Build(unittest.TestCase):
         self.assertIn("кд=", data["text"])
         self.assertEqual((data["format"], data["revision"], data["date"]), (od.FORMAT, 1794864817, "2026-11-16"))
         self.assertIsNone(od.regexes_ok(data["text"]), "the shipped dictionary passes the companions' check")
+        # a syntax an older companion does not know goes out only with a format it refuses: «=!» (format 2)
+        keeps = [line for line in data["text"].splitlines() if not line.startswith("#") and "=!" in line]
+        if keeps:
+            self.assertGreaterEqual(od.FORMAT, 2, keeps[0])
 
     def test_bytes_as_signed(self):
         # "\n" only, whatever the system: GitHub serves the bytes git keeps, and the signature is over them

@@ -168,6 +168,14 @@ def plurals(text: str) -> str:
     return PLURAL.sub(form, text)
 
 
+KEEP_CASE = "!"   # a replacement starting with it is never declined after a preposition: «скачки=!ск+ачки»
+
+
+def keep_case(value: str) -> tuple[str, bool]:
+    """A replacement without its «!» and whether it had one (to stay as written: morph.KEEP)."""
+    return (value[1:], True) if value.startswith(KEEP_CASE) else (value, False)
+
+
 def parse(dictionary: str, log) -> list[tuple[re.Pattern, str]]:
     rules = []
     for line in dictionary.splitlines():
@@ -185,7 +193,7 @@ def parse(dictionary: str, log) -> list[tuple[re.Pattern, str]]:
         except (re.error, IndexError) as e:
             log(f"словарь: замена «{replacement.strip()}» регулярки «{pattern}» с ошибкой: {e}")
             continue
-        rules.append((compiled, replacement.strip()))
+        rules.append((compiled, replacement.strip()))      # «!» kept: apply() reads it (keep_case)
     return rules
 
 
@@ -388,7 +396,8 @@ class Dictionary:
                 i += 1
                 continue
             out.append(text[last:t.start()])
-            out.append("" if value == "" else value if took_ending else "\x02" + value + "\x03")
+            value, keep = keep_case(value)
+            out.append("" if value == "" else value if took_ending else "\x02" + ("\x04" if keep else "") + value + "\x03")
             last = tokens[i + span - 1].end()
             i += span
         out.append(text[last:])
@@ -419,9 +428,11 @@ class Dictionary:
         can be declined after a preposition, like the word replacements of `apply_words` - and so the
         regexes after it leave it alone ("уровень 40" made of "лок40" is no "40 к" for the "к" rule)."""
         for pattern, replacement in self.rules:
+            replacement, keep = keep_case(replacement)
             try:
-                if mark:
-                    text = pattern.sub(lambda m, r=replacement: "\x02" + m.expand(r) + "\x03", text)
+                if mark:     # «!»: still marked (no later regex touches it), but with \x04 - not declined (morph.KEEP)
+                    text = pattern.sub(lambda m, r=replacement, k=keep: "\x02" + ("\x04" if k else "") + m.expand(r) + "\x03",
+                                       text)
                 else:
                     text = pattern.sub(replacement, text)
             except (re.error, IndexError) as e:
