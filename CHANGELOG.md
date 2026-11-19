@@ -142,6 +142,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- The /reload reminder after a quick restart with a /reload between
+
+  A companion closed and started again within a minute took the addon for having seen the previous one, and gave no reminder, though the game had been reloaded in between without it and kept the chat visible. Now a /reload since (the game writes the addon's saved variables then) counts: the reminder comes. A restart by the launcher, with no /reload between, still gives none.
+
 - A «|» typed in the dictionary window is a «|»
 
   The game's edit box keeps a typed or pasted «|» as «||», and the window saved it so: a regex «~\b(тестраз|тестдва)\b=окей» became «(тестраз||тестдва)», whose empty alternative matches everywhere («тестдва привет» was read «окейокейокей окейприветокей»), and the message about a too long line showed «||». The window now shows the text escaped and takes it back unescaped.

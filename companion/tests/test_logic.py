@@ -1,4 +1,5 @@
 """Text, voice assignment and payload parsing (no Windows, no GPU)."""
+import os
 import re
 import sys
 import tempfile
@@ -1701,11 +1702,12 @@ class SavedFlag(unittest.TestCase):
 class ReloadHint(unittest.TestCase):
     """The /reload reminder: only for a player already in the world, with the hidden chat on, no restart."""
 
-    def setup(self, d, fade="true", enabled="true", status=None):
+    def setup(self, d, fade="true", enabled="true", status=None, saved_at=900_000):
         saved = Path(d) / "_forever_" / "WTF" / "Account" / "X" / "SavedVariables"
         saved.mkdir(parents=True)
         (saved / "BarrensVoice.lua").write_text(f'BarrensVoiceDB = {{\n["fadeChat"] = {fade},\n["enabled"] = {enabled},\n}}\n',
                                                  encoding="utf-8")
+        os.utime(saved / "BarrensVoice.lua", (saved_at, saved_at))   # when the game wrote them: /reload, logout
         addon = Path(d) / "_forever_" / "Interface" / "AddOns" / "BarrensVoice"
         addon.mkdir(parents=True)
         if status:
@@ -1715,18 +1717,26 @@ class ReloadHint(unittest.TestCase):
     def test_cases(self):
         from bv.reloadhint import needed
         now = 1_000_000
-        cases = [  # (fade, enabled, status file, strip in view) -> remind
+        cases = [  # (fade, enabled, status file, strip in view[, saved variables written at]) -> remind
             (("true", "true", None, True), True),
             (("true", "true", None, False), False),                          # at character select: no
             (("false", "true", None, True), False),                          # the hidden chat off
             (("true", "false", None, True), False),                          # the addon switched off
             (("true", "true", "{ beat = 0, stopped = 999990 }", True), False),   # a restart: the addon saw the last one
             (("true", "true", "{ beat = 999000 }", True), True),             # an old beat: nobody at login
+            # stopped 49 s ago, but a /reload since (the saved variables are newer): the addon loaded without it
+            (("true", "true", "{ beat = 999940, stopped = 999951 }", True, 999970), True),
+            # the launcher's restart: no /reload between the stop and the start
+            (("true", "true", "{ beat = 999940, stopped = 999951 }", True, 999000), False),
+            (("true", "true", "{ beat = 999990, stopped = 0 }", True, 999980), False),   # running at that /reload: seen
+            # killed (no stop written): the addon takes a beat for 45 s - a /reload within them saw it, a later one not
+            (("true", "true", "{ beat = 999950 }", True, 999990), False),
+            (("true", "true", "{ beat = 999940 }", True, 999990), True),
         ]
-        for (fade, enabled, status, in_view), want in cases:
-            with self.subTest(fade=fade, enabled=enabled, status=status, in_view=in_view):
+        for (fade, enabled, status, in_view, *at), want in cases:
+            with self.subTest(fade=fade, enabled=enabled, status=status, in_view=in_view, at=at):
                 with tempfile.TemporaryDirectory() as d:
-                    config, addon = self.setup(d, fade, enabled, status)
+                    config, addon = self.setup(d, fade, enabled, status, *at)
                     self.assertEqual(needed(config, addon, in_view=lambda c: in_view, now=now), want)
 
 
