@@ -42,8 +42,10 @@ function C.SayAtLogin()
     end
 end
 
---- The state as the settings window says it.
+--- The state as the settings window says it - for information: the chat is read either way. What it changes is
+--- the hidden chat (ChatFade.lua), which hides the windows only when the companion ran at login: then a /reload.
 function C.Describe()
     if C.State() == "running" then return "при входе в игру компаньон |cff40ff40был запущен|r" end
-    return "при входе в игру компаньон |cffffd100не был запущен|r (запущен позже — он читает чат и так)"
+    return "при входе в игру компаньон |cffffd100не был запущен|r"
+        .. (ns.db and ns.db.fadeChat and " — прозрачный чат включится после /reload" or "")
 end

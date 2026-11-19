@@ -1152,7 +1152,10 @@ assert(Co.State() == "stopped", "no time at all (the file as shipped): not runni
 Co.SayAtLogin()
 assert(said[2]:find("приложение%-компаньон Barrens Voice не запущено — чат будет озвучиваться, как только"), tostring(said[2]))
 assert(#said == 2 and not ns.db.fadeChat, "the hidden chat off: no line about it")
-assert(Co.Describe():find("не был запущен"), Co.Describe())
+assert(Co.Describe():find("не был запущен") and not Co.Describe():find("reload"), Co.Describe())
+ns.db.fadeChat = true                        -- the hidden chat on: the status says what it needs
+assert(Co.Describe():find("не был запущен|r — прозрачный чат включится после /reload", 1, true), Co.Describe())
+ns.db.fadeChat = false
 Co.Read({ beat = 1000 }, 1010)
 assert(Co.Describe():find("был запущен") and not Co.Describe():find("не был"), Co.Describe())
 Co.Read({ beat = 0, stopped = 1090 }, 1100)
