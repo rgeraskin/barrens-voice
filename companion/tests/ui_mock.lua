@@ -215,7 +215,7 @@ do  -- «Открыть» for the community: its invite as a link in the chat, f
     GetBindingKeyForAction = function(action) assert(action == "TOGGLEGUILDTAB") return "J" end
     CommunitiesHyperlink = { OnClickLink = function() error("the addon must not open it itself (taint)") end }
     local PREFIX = "|cff66ccffBarrens Voice|r: "
-    local ICON = "|TInterface\\AddOns\\BarrensVoice\\Icon:14:14:0:0:64:64:4:60:4:60|t " .. PREFIX
+    local ICON = "|TInterface\\AddOns\\BarrensVoice\\Media\\chat:14:14|t " .. PREFIX
     ns.Options.Open("help")
     assert(ns.Options.IsShown(), "the settings are up before the click")
     ns.OpenLink("community")

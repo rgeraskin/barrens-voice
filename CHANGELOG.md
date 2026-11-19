@@ -144,7 +144,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Every message of the addon in the chat starts with its icon
 
-  Not only the welcome, the community and «Что нового»: the login line, the answers to the commands and buttons and the warnings too, before «Barrens Voice:» on a message's first line; its next lines (the welcome's, the community's second, the list of commands) go without it.
+  A small icon of its own: the speech bubble on a clear background (`Media/chat.tga`), not the framed icon, an opaque dark square on the chat's clear background. Not only the welcome, the community and «Что нового»: the login line, the answers to the commands and buttons and the warnings too, before «Barrens Voice:» on a message's first line; its next lines (the welcome's, the community's second, the list of commands) go without it.
 
 - The program is called Barrens Voice Launcher
 

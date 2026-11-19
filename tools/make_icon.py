@@ -1,7 +1,9 @@
 """Draws the addon icon: a golden speech bubble with sound waves on a dark arcane background.
 Writes addon/BarrensVoice/Icon.tga (64x64, what the game reads), the launcher's window, tray and
-shortcut icon companion/bv/launcher/icon.ico (16-256 px), tools/icon_preview.png, and the smiley
-of the «Помощь» texts, addon/BarrensVoice/Media/smile.tga (the game's fonts have no emoji).
+shortcut icon companion/bv/launcher/icon.ico (16-256 px), tools/icon_preview.png, the chat's icon
+addon/BarrensVoice/Media/chat.tga (the bubble alone on a clear background: before «Barrens Voice:» in the chat,
+whose background shows through), and the smiley of the «Помощь» texts, addon/BarrensVoice/Media/smile.tga (the
+game's fonts have no emoji).
 Run: mise run icon"""
 import math
 from pathlib import Path
@@ -30,7 +32,12 @@ def main():
     # Bevelled frame, like the game's ability icons.
     d.rectangle([0, 0, S - 1, S - 1], outline=(150, 115, 50, 255), width=14)
     d.rectangle([14, 14, S - 15, S - 15], outline=(40, 28, 10, 255), width=6)
+    symbol(img)
+    finish(img)
 
+
+def symbol(img):
+    """The speech bubble with its dots and the sound waves, drawn onto `img` (S x S)."""
     # Speech bubble: shadow, body, tail.
     def bubble(draw, dx, dy, fill):
         draw.rounded_rectangle([70 + dx, 110 + dy, 330 + dx, 330 + dy], radius=95, fill=fill)
@@ -61,6 +68,21 @@ def main():
         box = [290 - r, 220 - r, 290 + r, 220 + r]
         rim.arc(box, start=-38, end=38, fill=(120, 220, 255, 255 - i * 45), width=24 - i * 4)
 
+
+def chat():
+    """The chat's icon: the bubble and waves on a clear background, cut to them (a square, a little room round),
+    32x32. The framed icon is opaque - a dark square on the chat, whose background is clear."""
+    img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    symbol(img)
+    left, top, right, bottom = img.getchannel("A").getbbox()
+    side = max(right - left, bottom - top) + 16
+    cx, cy = (left + right) // 2, (top + bottom) // 2
+    square = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+    square.alpha_composite(img.crop((cx - side // 2, cy - side // 2, cx - side // 2 + side, cy - side // 2 + side)))
+    square.resize((32, 32), Image.LANCZOS).save(ROOT / "addon" / "BarrensVoice" / "Media" / "chat.tga", rle=False)
+
+
+def finish(img):
     icon = img.resize((64, 64), Image.LANCZOS)
     icon.save(ROOT / "addon" / "BarrensVoice" / "Icon.tga")
     img.resize((256, 256), Image.LANCZOS).save(ROOT / "tools" / "icon_preview.png")
@@ -86,4 +108,5 @@ def smile():
 
 if __name__ == "__main__":
     smile()
+    chat()
     main()

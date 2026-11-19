@@ -91,7 +91,7 @@ local VERBS = { say = "говорит", yell = "кричит", whisper = "шеп
 local NOT_ASKED = { yell = true, whisper = true, warning = true }   -- the verb stays even for a question
 local PREFIX = "|cff66ccffBarrens Voice|r: "
 ns.PREFIX = PREFIX   -- every line of the addon in the chat starts with it (News.lua too)
-local ICON = "|TInterface\\AddOns\\BarrensVoice\\Icon:14:14:0:0:64:64:4:60:4:60|t"
+local ICON = "|TInterface\\AddOns\\BarrensVoice\\Media\\chat:14:14|t"   -- the bubble on a clear background (make_icon.py)
 ns.ICON = ICON       -- before the prefix of every message's first line; a message's next lines go without it
 local SAY = ICON .. " " .. PREFIX   -- a message's first line
 
