@@ -577,13 +577,14 @@ class ExitCodes(unittest.TestCase):
         self.assertEqual(returned, ["CONFIG_ERROR"], "a config.json the companion cannot read ends with CONFIG_ERROR")
 
 class Utf8Output(unittest.TestCase):
-    """A console redirected to a file has the code page's encoding: «×» must not raise there."""
+    """A console redirected to a file has the code page's encoding: «×» must not raise there. (The test streams
+    keep "\n": on Windows a text stream writes "\r\n" by default.)"""
 
     def test_a_cp1251_stream_takes_any_character(self):
         import io
         from unittest import mock
-        out = io.TextIOWrapper(io.BytesIO(), encoding="cp1251")
-        err = io.TextIOWrapper(io.BytesIO(), encoding="cp1251")
+        out = io.TextIOWrapper(io.BytesIO(), encoding="cp1251", newline="\n")
+        err = io.TextIOWrapper(io.BytesIO(), encoding="cp1251", newline="\n")
         with self.assertRaises(UnicodeEncodeError):
             out.write("экран 1920×1080")
         out.seek(0); out.truncate()
@@ -595,7 +596,7 @@ class Utf8Output(unittest.TestCase):
         self.assertEqual(err.buffer.getvalue().decode("utf-8"), "×\n")
         companion.utf8_output()                              # a stream without reconfigure: left alone
         # what even UTF-8 cannot write (a lone surrogate, from a broken name): replaced, not raised
-        lone = io.TextIOWrapper(io.BytesIO(), encoding="cp1251")
+        lone = io.TextIOWrapper(io.BytesIO(), encoding="cp1251", newline="\n")
         with mock.patch.object(companion.sys, "stdout", lone), mock.patch.object(companion.sys, "stderr", err):
             companion.utf8_output()
             print("имя \ud800 сломано", flush=True)
