@@ -779,8 +779,14 @@ function ns.BNetFriend(id)
                 game.playerGuid
             if not ns.Secret(client, character, realm, guid) and client == (rawget(_G, "BNET_CLIENT_WOW") or "WoW")
                     and type(character) == "string" and character ~= "" then
-                -- the realm as the chat writes it after a name: no spaces ("Вася-ПиратскаяБухта")
-                realm = type(realm) == "string" and realm:gsub("[%s%-]", "") or ""
+                -- the sender as the chat writes this character, so that one friend has one voice whichever way
+                -- they whisper. Names unique in the region (Forever: RegionalUniqueNamesEnabled) come with no
+                -- realm - and realmName is the server's inner name there ("CAMWOWEU5Realm3PvE"); Blizzard's own
+                -- friends list shows the name alone then (Blizzard_FriendsFrame FriendsListTemplates.lua). Else
+                -- the realm as the chat writes it after a name: no spaces ("Вася-ПиратскаяБухта").
+                local regional = rawget(_G, "RegionalUniqueNamesEnabled")
+                local unique = type(regional) == "function" and select(2, pcall(regional)) == true
+                realm = not unique and type(realm) == "string" and realm:gsub("[%s%-]", "") or ""
                 return { name = character, sender = realm ~= "" and character .. "-" .. realm or character,
                          guid = type(guid) == "string" and guid ~= "" and guid or nil }
             end

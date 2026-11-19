@@ -170,6 +170,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- One friend, one voice: a Battle.net whisper and the character's own
+
+  On Forever a friend whispering through Battle.net was «Имя Фамилия-CAMWOWEU5Realm3PvE» (the server's inner name from Battle.net), as the character «Имя Фамилия» (the chat writes no realm: names are unique in the region) - two senders, two voices. With RegionalUniqueNamesEnabled the Battle.net sender is the character's name alone, as Blizzard's friends list shows it; otherwise name and realm as before.
+
 - A RUAccent download cut short is fetched again
 
   The first start stopped while RUAccent downloaded its dictionaries (the launcher closed, the network gone): every later start ended on «FileNotFoundError: … yo_words.json.gz», since RUAccent fetches a part only when its folder is not there. A load that fails for a missing file (FileNotFoundError, ONNX Runtime's NoSuchFile) now removes the folders RUAccent checks (`dictionary`, `nn/nn_omograph/<size>`, `koziev`) with a WARN line and loads again; its files already downloaded are not fetched again. Offline (the models marked complete, a file gone since) the same: RUAccent then asks the model cache's hub for the folders, and the companion starts again online, as for any model missing from the cache. Another error — no network, a file held by another program — is not taken for a cut download.

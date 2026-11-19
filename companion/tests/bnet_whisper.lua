@@ -88,6 +88,20 @@ print("replay ok")
 f = fields(whisper("го в арену", 13)[1])
 assert(f[2] == "BN:Кейн#5678" and f[3] == "" and f[8] == "Кейн шепчет:\4 го в арену", "another game: " .. f[2] .. " " .. f[8])
 
+-- Forever's names are unique in the region: the chat writes the character with no realm, and realmName is the
+-- server's inner name - one friend had two senders and two voices (beta 20), Battle.net and /w
+friends[14] = { accountName = REAL, battleTag = "Анна#6789", gameAccountInfo = { clientProgram = "WoW",
+    characterName = "Анна Светлая", realmName = "CAMWOWEU5Realm3PvE", playerGuid = "Player-1-77" } }
+RegionalUniqueNamesEnabled = function() return true end
+f = fields(whisper("привет", 14)[1])
+assert(f[2] == "Анна Светлая" and f[8] == "Анна Светлая шепчет:\4 привет", "the name alone: " .. f[2])
+RegionalUniqueNamesEnabled = function() return false end
+assert(fields(whisper("привет", 14)[1])[2] == "Анна Светлая-CAMWOWEU5Realm3PvE", "not unique: name and realm")
+RegionalUniqueNamesEnabled = function() error("no") end
+assert(fields(whisper("привет", 14)[1])[2] == "Анна Светлая-CAMWOWEU5Realm3PvE", "an error: as without it")
+RegionalUniqueNamesEnabled = nil
+print("regional names ok")
+
 -- not told: no answer, an error, no such API - not read, and /bv debug names no one
 ns.db.debug = true
 for _, id in ipairs({ 99, "7", nil }) do
