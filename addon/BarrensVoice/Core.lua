@@ -91,6 +91,9 @@ local VERBS = { say = "говорит", yell = "кричит", whisper = "шеп
 local NOT_ASKED = { yell = true, whisper = true, warning = true }   -- the verb stays even for a question
 local PREFIX = "|cff66ccffBarrens Voice|r: "
 ns.PREFIX = PREFIX   -- every line of the addon in the chat starts with it (News.lua too)
+local ICON = "|TInterface\\AddOns\\BarrensVoice\\Icon:14:14:0:0:64:64:4:60:4:60|t"
+ns.ICON = ICON       -- before the prefix of every message's first line; a message's next lines go without it
+local SAY = ICON .. " " .. PREFIX   -- a message's first line
 
 -- The name before a line is followed by a mark (\4): the program drops it when the same character
 -- goes on while their previous line is still being said or was just said (it knows when a line
@@ -205,7 +208,7 @@ end
 --- for something says so instead of its usual word. True when off.
 function ns.Off()
     if ns.db.enabled then return false end
-    print(PREFIX .. "озвучка выключена, включи её: /bv on.")
+    print(SAY .. "озвучка выключена, включи её: /bv on.")
     return true
 end
 
@@ -237,7 +240,7 @@ local function TellLong(long)
         for _, line in ipairs(long) do
             if not seen[line] then
                 -- "|" starts the chat's markup: "||" shows one (a regex is full of them)
-                print(PREFIX .. ("строка словаря длиннее %d байт, компаньону она не передаётся. Разбей её на "
+                print(SAY .. ("строка словаря длиннее %d байт, компаньону она не передаётся. Разбей её на "
                     .. "несколько: %s…"):format(DICT_PART, (ns.Protocol.TrimUTF8(line, 60):gsub("|", "||"))))
                 break
             end
@@ -311,8 +314,6 @@ end
 -- on retail, so they are looked at only when not).
 local CLUB_LINK_COLOR = "|cff82c5ff"   -- BATTLENET_FONT_COLOR, when the client's own is not there
 local GREY = "|cff999999"
-local ICON = "|TInterface\\AddOns\\BarrensVoice\\Icon:14:14:0:0:64:64:4:60:4:60|t"
-ns.ICON = ICON       -- before the prefix of a line worth noticing (the welcome, the community, News.lua)
 local CLUB_NAME = "Barrens Voice"      -- how the community is told among the player's own
 local JOIN_WAIT = 300                  -- seconds after «Открыть» a community joined is greeted
 local askedAt                          -- when «Открыть» last gave the link
@@ -378,7 +379,7 @@ function ns.OnClubAdded(clubId)
     end
     askedAt = nil
     local key = CommunitiesKey()
-    print(ICON .. " " .. PREFIX .. "ты в сообществе!" .. (key and (" Окно сообществ — клавиша «%s»."):format(key) or ""))
+    print(SAY .. "ты в сообществе!" .. (key and (" Окно сообществ — клавиша «%s»."):format(key) or ""))
 end
 
 --- A community's invite as a link in the chat, for the player to click: the click is the game's own
@@ -398,12 +399,12 @@ local function LinkInChat(link)
     if joined then
         local key = CommunitiesKey()
         -- "|" starts the chat's markup: "||" shows one
-        print(ICON .. " " .. PREFIX .. ("ты уже в сообществе «%s»"):format((joined:gsub("|", "||")))
+        print(SAY .. ("ты уже в сообществе «%s»"):format((joined:gsub("|", "||")))
             .. (key and (" — окно сообществ открывается клавишей «%s»."):format(key) or "."))
     else
         local chatLink = ClubLink(ticket)
         if not chatLink then return false end
-        print(ICON .. " " .. PREFIX .. "сообщество в Battle.net — новости, вопросы, ошибки: " .. chatLink .. "  " .. GREY
+        print(SAY .. "сообщество в Battle.net — новости, вопросы, ошибки: " .. chatLink .. "  " .. GREY
             .. "или в браузере: " .. link[2] .. "|r")
         print(PREFIX .. "щёлкни по ссылке: откроется окно сообществ с кнопкой «Вступить». Не открылось — рядом ссылка для "
             .. "браузера.")
@@ -422,11 +423,11 @@ function ns.OpenLink(key)
     if not link then return end
     if LinkInChat(link) then return end
     if not ns.db.enabled then
-        print(PREFIX .. ("%s: озвучка выключена, и компаньон страницу не откроет. Адрес: %s"):format(link[1], link[2]))
+        print(SAY .. ("%s: озвучка выключена, и компаньон страницу не откроет. Адрес: %s"):format(link[1], link[2]))
         return
     end
     AskCompanion("open", key)
-    print(PREFIX .. ("%s: компаньон откроет страницу в браузере. Если не открылась (компаньон не запущен) — адрес: %s")
+    print(SAY .. ("%s: компаньон откроет страницу в браузере. Если не открылась (компаньон не запущен) — адрес: %s")
         :format(link[1], link[2]))
 end
 
@@ -435,12 +436,12 @@ function ns.CopyLink(key)
     local link = ns.LINKS[key]
     if not link then return end
     if not ns.db.enabled then
-        print(PREFIX .. ("%s: озвучка выключена, и компаньон адрес не скопирует. Щёлкни по адресу в настройках и "
+        print(SAY .. ("%s: озвучка выключена, и компаньон адрес не скопирует. Щёлкни по адресу в настройках и "
             .. "нажми Ctrl+C."):format(link[1]))
         return
     end
     AskCompanion("copy", key)
-    print(PREFIX .. ("%s: компаньон положит адрес в буфер обмена — вставь его в браузер (Ctrl+V). Если компаньон не "
+    print(SAY .. ("%s: компаньон положит адрес в буфер обмена — вставь его в браузер (Ctrl+V). Если компаньон не "
         .. "запущен, щёлкни по адресу в настройках и нажми Ctrl+C."):format(link[1]))
 end
 
@@ -459,12 +460,12 @@ StaticPopupDialogs["BARRENSVOICE_RESET"] = {
 function ns.ResetVoices()
     if not ns.db.enabled then
         ns.db.resetVoices = true
-        print(PREFIX .. "озвучка выключена: голоса рас будут розданы заново, когда ты её включишь (/bv on).")
+        print(SAY .. "озвучка выключена: голоса рас будут розданы заново, когда ты её включишь (/bv on).")
         return
     end
     ns.db.resetVoices = nil
     ns.Strip.Push(ns.ServiceFrame("reset", ns.LineOptions(), "-"))
-    print(PREFIX .. "голоса рас будут розданы заново: каждый персонаж получит голос, когда заговорит.")
+    print(SAY .. "голоса рас будут розданы заново: каждый персонаж получит голос, когда заговорит.")
 end
 
 --- A test line in one Windows voice (the voices window's play buttons).
@@ -480,12 +481,12 @@ function ns.SetVoices(value)
     ns.db.voices = value
     ns.SendControl()
     if not ns.db.enabled then        -- the settings go to the companion at /bv on
-        print(PREFIX .. (value == "f5" and "голоса рас" or "голоса Windows")
+        print(SAY .. (value == "f5" and "голоса рас" or "голоса Windows")
             .. ". Компаньон переключится на них, когда ты включишь озвучку (/bv on).")
     elseif value == "f5" then
-        print(PREFIX .. "голоса рас. Компаньон загружает модель — около 15 секунд, пока читают голоса Windows.")
+        print(SAY .. "голоса рас. Компаньон загружает модель — около 15 секунд, пока читают голоса Windows.")
     else
-        print(PREFIX .. "голоса Windows. Компаньон выгружает модель голосов рас.")
+        print(SAY .. "голоса Windows. Компаньон выгружает модель голосов рас.")
     end
 end
 
@@ -515,7 +516,7 @@ function ns.Replay(n)
     if ns.Off() then return end
     n = math.max(1, math.min(n or 5, #ns.history))
     if #ns.history == 0 then
-        print(PREFIX .. "пока нечего повторять: ни одной прочитанной строки чата.")
+        print(SAY .. "пока нечего повторять: ни одной прочитанной строки чата.")
         return
     end
     -- marked replay=1: the companion drops none of them when its queue is full (live lines it may)
@@ -525,7 +526,7 @@ function ns.Replay(n)
         ns.Send(unpack(h, 1, h.n))
     end
     ns.replaying = false
-    print(PREFIX .. ("повторяю последние строки: %d."):format(n))
+    print(SAY .. ("повторяю последние строки: %d."):format(n))
 end
 
 --- Whether chat window `frame` takes this kind of line: its message types (Chat settings), or for
@@ -743,7 +744,7 @@ function ns.SecretLine()
     if ns.db.debug then ns.Diag("не отправлено (закрытый чат: подземелье, рейд, бой с боссом или PvP)") end
     if not ns.secretTold then
         ns.secretTold = true
-        print(PREFIX .. "здесь игра закрывает чат от аддонов (подземелье, рейд, бой с боссом или PvP): он не "
+        print(SAY .. "здесь игра закрывает чат от аддонов (подземелье, рейд, бой с боссом или PvP): он не "
             .. "озвучивается, строки видны в окне чата.")
     end
 end
@@ -851,7 +852,7 @@ local TESTS = {
 function ns.Test()
     if ns.Off() then return end
     for _, t in ipairs(TESTS) do ns.Send("test", t[1], t[2], t[3], t[4], "", t[5]) end
-    print("|cff66ccffBarrens Voice|r: отправлено " .. #TESTS .. " тестовых строки.")
+    print(SAY .. "отправлено " .. #TESTS .. " тестовых строки.")
 end
 
 --- Silence now: the program cuts the line being said and drops what is waiting (/bv stop).
@@ -888,7 +889,7 @@ end
 --- the settings are.
 function ns.Welcome()
     local version = Version()
-    print(ICON .. " " .. PREFIX .. ("|cffffd100добро пожаловать!|r Barrens Voice %s — озвучка чата: у каждого игрока свой голос "
+    print(SAY .. ("|cffffd100добро пожаловать!|r Barrens Voice %s — озвучка чата: у каждого игрока свой голос "
         .. "его расы и пола."):format(version))
     print(PREFIX .. "читает вслух приложение-компаньон Barrens Voice (Windows): без него аддон молчит. Удобнее всего "
         .. "запускать игру через него — оно само запустит игру.")
@@ -917,7 +918,7 @@ function ns.SetEnabled(enabled)
     if ns.Minimap then ns.Minimap.Refresh() end
     if ns.Options.Refresh then ns.Options.Refresh() end
     ns.ChatFade.Apply()     -- the chat is not read aloud: show it
-    print(PREFIX .. "озвучка чата " .. (ns.db.enabled and "включена" or "выключена"))
+    print(SAY .. "озвучка чата " .. (ns.db.enabled and "включена" or "выключена"))
 end
 
 local function Merge(into, defaults)
@@ -995,7 +996,7 @@ SlashCmdList.BARRENSVOICE = function(msg)
     msg = (msg or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
     if msg == "help" or msg == "?" then
         local G = "|cffffd100"
-        print(PREFIX .. "команды:")
+        print(SAY .. "команды:")
         print("  " .. G .. "/bv|r — окно настроек (то же: значок у миникарты)")
         print("  " .. G .. "/bv on|r, " .. G .. "/bv off|r — включить или выключить озвучку (выключение сразу обрывает фразу)")
         print("  " .. G .. "/bv stop|r — замолчать сейчас и очистить очередь, не выключая")
@@ -1011,17 +1012,17 @@ SlashCmdList.BARRENSVOICE = function(msg)
         ns.Test()
     elseif msg == "stop" then
         if not ns.db.enabled then
-            print(PREFIX .. "озвучка и так выключена: компаньон молчит.")   -- /bv off stopped it
+            print(SAY .. "озвучка и так выключена: компаньон молчит.")   -- /bv off stopped it
         else
             ns.Stop()
-            print(PREFIX .. "замолкаю (очередь очищена).")
+            print(SAY .. "замолкаю (очередь очищена).")
         end
     elseif msg:match("^last") then
         ns.Replay(tonumber(msg:match("%d+")) or 5)
     elseif msg == "debug" then
         ns.db.debug = not ns.db.debug
         -- CatQuest and Wayfarer are Forever's addons: not a word of them on retail
-        print(PREFIX .. (ns.db.debug
+        print(SAY .. (ns.db.debug
             and ("отладка включена: строки чата, которые аддон не отправил, с причиной%s — в журнале компаньона "
                 .. "(кнопка «Журнал» в окне Barrens Voice, строки «диагностика аддона»).")
                 :format(ns.Retail() and "" or ", и речь CatQuest и Wayfarer")

@@ -138,6 +138,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   A long tooltip was one dense block; now what the setting does, the details and the caveat are paragraphs with an empty line between, as the game's own tooltips are, and «с глаголом» lists its verbs a line each.
 
+- Every message of the addon in the chat starts with its icon
+
+  Not only the welcome, the community and «Что нового»: the login line, the answers to the commands and buttons and the warnings too, before «Barrens Voice:» on a message's first line; its next lines (the welcome's, the community's second, the list of commands) go without it.
+
 ### Removed
 
 - BREAKING: `WowChatVoice-Retail.cmd`

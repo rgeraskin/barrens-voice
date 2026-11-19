@@ -1511,3 +1511,35 @@ do
     GameTooltip = saved
     print("tooltips ok")
 end
+
+-- The icon: before every message's first line (login, commands, buttons, warnings); a message's next lines without it
+do
+    local lines, plain = {}, print
+    print = function(s) lines[#lines + 1] = s end
+    local function run(f, what)
+        lines = {}
+        f()
+        assert(#lines > 0, what .. ": said nothing")
+        assert(lines[1]:sub(1, #ns.ICON + 1 + #ns.PREFIX) == ns.ICON .. " " .. ns.PREFIX, what .. ": " .. tostring(lines[1]))
+        return lines
+    end
+    ns.Companion.Read({ beat = 1000 }, 1010)
+    run(ns.Companion.SayAtLogin, "login: running")
+    ns.Companion.Read(nil, 1100)
+    ns.db.fadeChat = true
+    local said = run(ns.Companion.SayAtLogin, "login: not running")
+    assert(#said == 2 and said[2]:sub(1, #ns.PREFIX) == ns.PREFIX, "its next line: no icon - " .. tostring(said[2]))
+    ns.db.fadeChat = false
+    run(function() SlashCmdList.BARRENSVOICE("help") end, "/bv help")
+    assert(not lines[2]:find(ns.ICON, 1, true), "the commands under it: no icon")
+    run(function() SlashCmdList.BARRENSVOICE("stop") end, "/bv stop")
+    run(function() SlashCmdList.BARRENSVOICE("debug") end, "/bv debug")
+    SlashCmdList.BARRENSVOICE("debug")
+    run(function() SlashCmdList.BARRENSVOICE("last 3") end, "/bv last")
+    run(function() ns.OpenLink("discord") end, "«Открыть»")
+    run(function() ns.CopyLink("discord") end, "«Копировать»")
+    local welcome = run(ns.Welcome, "the welcome")
+    for i = 2, #welcome do assert(not welcome[i]:find(ns.ICON, 1, true), "the welcome's next lines: no icon") end
+    print = plain
+    print("icons ok")
+end
