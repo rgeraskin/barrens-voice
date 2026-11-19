@@ -774,9 +774,13 @@ class Pipeline(unittest.TestCase):
         self.assertIn("тэмпа", said.replace("+", ""))
 
     def test_a_heart_is_a_smiley(self):
-        # «<3» was «<три»: a pause, like the other smileys; a number after «<» stays a number
-        for line in ("люблю тебя <3", "спасибо <3 <3", "<333 супер", "</3 жаль"):
+        # «<3» at the end of a line, where it is put, is a pause like the other smileys (it was «<три»)
+        for line in ("люблю тебя <3", "спасибо <3 <3", "<333", "спасибо </3", "<3", "люблю тебя <3!"):
             self.assertNotIn("три", self.say(line), line)
+        # inside a line it is a number: «меньше трёх»
+        for line, number in (("кд <3 сек", "три"), ("<3 минут до ресета", "три"), ("хп <3к осталось", "три тысячи"),
+                             ("цена <3г за штуку", "три золот"), ("<333 супер", "триста")):
+            self.assertIn(number, self.say(line), line)
         self.assertIn("тридцать", self.say("х<30 урон"))
         self.assertIn("тридцать третьем", self.say("о 33 лвл"))        # the dictionary's own «<33>» is no heart
 
