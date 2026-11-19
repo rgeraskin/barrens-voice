@@ -783,7 +783,11 @@ class Pipeline(unittest.TestCase):
         said = {t: speech_text(t, book, self.inflector, True) for t in ("у хрусталь", "у кристалл", "у альфа", "у бета")}
         self.assertEqual(said, {"у хрусталь": "у перекрёстка", "у кристалл": "у перекрёсток",
                                 "у альфа": "у перекрёстка", "у бета": "у перекрёсток"})
-        self.assertEqual(speech_text("у бета", book, self.inflector, False), "у перекрёсток")   # declension off: no «\x04» left
+        self.assertEqual(speech_text("у бета", book, self.inflector, False), "у перекрёсток")   # declension off: no mark left
+        # with a number's forms: the preposition before the number still asks the plural (D12N1: «для второго танка»)
+        from bv.text import numbers_to_words
+        book.rules = parse("~\\b(\\d+)\\s*тнк\\b=!\\1 [танк|танка|танков]", print)
+        self.assertEqual(numbers_to_words(speech_text("для 2 тнк", book, self.inflector, True)), "для двух танков")
 
     def test_dolboyob_with_yo_in_every_form(self):
         self.check({"эти долбаебами": "эти долбаёбами", "с долбоебами": "с долбоёбами", "он долбоеб": "он долбоёб",

@@ -13,6 +13,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from .morph import KEEP     # what marks a «=!» replacement for the inflector
+
 SAVED = "BarrensVoice.lua"
 # The player's layer the addon keeps for us in its saved variables (as it sends it over the strip).
 LUA_USER = re.compile(r'\["dictionaryUser"\]\s*=\s*"((?:[^"\\]|\\.)*)"', re.S)
@@ -157,7 +159,8 @@ def plurals(text: str) -> str:
     ("для второго танка"); not after "нет", which may be an answer ("нет 2 танк" - "нет, два танка")."""
     from .text import GOVERNS
 
-    unmarked = text.replace("\x02", " ").replace("\x03", " ")   # the same offsets
+    # the same offsets; «=!»'s KEEP too, or a number right after it has no preposition before it (D12N1)
+    unmarked = text.replace("\x02", " ").replace("\x03", " ").replace(KEEP, " ")
 
     def form(m):
         n, one, few, many = int(m.group(1)), m.group(3), m.group(4), m.group(5)
@@ -397,7 +400,7 @@ class Dictionary:
                 continue
             out.append(text[last:t.start()])
             value, keep = keep_case(value)
-            out.append("" if value == "" else value if took_ending else "\x02" + ("\x04" if keep else "") + value + "\x03")
+            out.append("" if value == "" else value if took_ending else "\x02" + (KEEP if keep else "") + value + "\x03")
             last = tokens[i + span - 1].end()
             i += span
         out.append(text[last:])
@@ -430,8 +433,8 @@ class Dictionary:
         for pattern, replacement in self.rules:
             replacement, keep = keep_case(replacement)
             try:
-                if mark:     # «!»: still marked (no later regex touches it), but with \x04 - not declined (morph.KEEP)
-                    text = pattern.sub(lambda m, r=replacement, k=keep: "\x02" + ("\x04" if k else "") + m.expand(r) + "\x03",
+                if mark:     # «!»: still marked (no later regex touches it), but with morph.KEEP - not declined
+                    text = pattern.sub(lambda m, r=replacement, k=keep: "\x02" + (KEEP if k else "") + m.expand(r) + "\x03",
                                        text)
                 else:
                     text = pattern.sub(replacement, text)

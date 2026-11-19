@@ -38,7 +38,8 @@ CONJUNCTIONS = {"и", "или", "либо", "да"}   # "с танком и че
 RANGE = re.compile(r"(?<![\w'+-])(?:с|со)\s+(\d+(?:-?[а-яё]{1,3})?|[а-яё]+)(?:\s+года)?\s+по\W*$", re.IGNORECASE)
 
 
-KEEP = "\x04"   # first in a marked replacement: not declined - the dictionary's «=!» (dictionary.KEEP_CASE)
+KEEP = "\x06"   # first in a marked replacement: not declined - the dictionary's «=!» (dictionary.KEEP_CASE); not
+                # \x04/\x05, the protocol's marks after a name (protocol.NAME_MARK): one sign, one meaning
 
 
 def strip_marks(text: str) -> str:
