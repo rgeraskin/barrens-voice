@@ -209,6 +209,11 @@ do  -- «Голоса»: «>» — послушать on the filter row, at the 
         if rawget(f, "_points") and f._points[1][1] == "TOPLEFT" and f._points[1][2] == 24 then filterBox = f end
     end
     assert(filterBox and point[5] == filterBox._points[1][3] - 10, "on the filter's row")
+    local help
+    for _, w in ipairs(created) do
+        if type(rawget(w, "_text")) == "string" and w._text:find("issue на GitHub", 1, true) then help = w end
+    end
+    assert(help and help._text:find("А лучше сразу заведи issue на GitHub", 1, true), "«Помощь»: «А лучше сразу…»")
     print("voices tab ok")
 end
 do  -- «Скачать дополнительные голоса …: RHVoice, Silero»: the companion is asked to open the page; the address goes to the chat too

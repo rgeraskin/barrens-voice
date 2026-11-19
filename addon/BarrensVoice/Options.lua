@@ -123,7 +123,7 @@ local TABS = {
     { "voices", "Голоса", "Чем читать: голоса рас или голоса Windows, и какие голоса Windows раздавать игрокам." },
     { "dictionary", "Словарь", "Как читать сленг и сокращения: WTS = продам, дд = дамагер, ОП = Огненная пропасть." },
     { "help", "Помощь", "Ошибки, улучшения, предложения, или что-то прочитано неправильно — пиши в Discord, Telegram или в сообщество.\n\n"
-        .. "Или сразу заведи issue на GitHub |TInterface\\AddOns\\BarrensVoice\\Media\\smile:14:14|t" },
+        .. "А лучше сразу заведи issue на GitHub |TInterface\\AddOns\\BarrensVoice\\Media\\smile:14:14|t" },
 }
 
 local function Refresh()
