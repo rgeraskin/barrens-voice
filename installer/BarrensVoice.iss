@@ -71,8 +71,10 @@ Name: "{userdesktop}\Barrens Voice"; Filename: "{app}\Barrens Voice.exe"; Workin
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: "Barrens Voice"; Flags: uninsdeletevalue dontcreatekey
 
 [UninstallRun]
-; the launcher and the companion of this install, not other Python programs. StartsWith, not -like: "[" in a
-; folder name is a wildcard there; the folder's "'" doubled for PowerShell's quotes (AppForPowerShell). Inno
+; Uninstall does not start while the launcher or the companion holds its mutex (AppMutex above: it asks to close
+; Barrens Voice): this stops only what is left of this install without one - the launcher and the companion of
+; this install, not other Python programs. StartsWith, not -like: "[" in a folder name is a wildcard there; the
+; folder's "'" doubled for PowerShell's quotes (AppForPowerShell). Inno
 ; reads "{{" as "{" and leaves "}" as it is (its help, "Constants": "You do not need to double } characters")
 Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -Command ""$app = '{code:AppForPowerShell}\'; Get-CimInstance Win32_Process | Where-Object {{ $_.ExecutablePath -and $_.ExecutablePath.StartsWith($app, [StringComparison]::OrdinalIgnoreCase) } | ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force }"""; Flags: runhidden; RunOnceId: "StopBarrensVoice"
 
