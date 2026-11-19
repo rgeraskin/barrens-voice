@@ -594,6 +594,12 @@ class Utf8Output(unittest.TestCase):
         self.assertEqual(out.buffer.getvalue().decode("utf-8"), "экран 1920×1080\n")
         self.assertEqual(err.buffer.getvalue().decode("utf-8"), "×\n")
         companion.utf8_output()                              # a stream without reconfigure: left alone
+        # what even UTF-8 cannot write (a lone surrogate, from a broken name): replaced, not raised
+        lone = io.TextIOWrapper(io.BytesIO(), encoding="cp1251")
+        with mock.patch.object(companion.sys, "stdout", lone), mock.patch.object(companion.sys, "stderr", err):
+            companion.utf8_output()
+            print("имя \ud800 сломано", flush=True)
+        self.assertEqual(lone.buffer.getvalue().decode("utf-8"), "имя ? сломано\n")
 
 
 if __name__ == "__main__":
