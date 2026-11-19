@@ -170,6 +170,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- A RUAccent download cut short is fetched again
+
+  The first start stopped while RUAccent downloaded its dictionaries (the launcher closed, the network gone): every later start ended on «FileNotFoundError: … yo_words.json.gz», since RUAccent fetches a part only when its folder is not there. A load that fails for a missing file (FileNotFoundError, ONNX Runtime's NoSuchFile) now removes the folders RUAccent checks (`dictionary`, `nn/nn_omograph/<size>`, `koziev`) with a WARN line and loads again; its files already downloaded are not fetched again. Offline (the models marked complete, a file gone since) the same: RUAccent then asks the model cache's hub for the folders, and the companion starts again online, as for any model missing from the cache. Another error — no network, a file held by another program — is not taken for a cut download.
+
 - A broken config.json is said once, plainly, and the voice-over does not start on it
 
   The main window had the error twice — the launcher's warning with the JSON parser's English, the voice-over's error — after the voice-over had started only to stop with code 5. Now the launcher does not start the voice-over while config.json does not read, says one error in the player's words («config.json не читается: ошибка в строке 3, столбец 3 — исправь его («Открыть config.json» в «Настройках»)…», the parser's words in the log window), shows «config.json не читается — открой «Настройки»» as the state line and in the tray icon's hint, and says when the file reads again (checked every 2 s). A file that does not open (another program holds it, its permissions) is told so, with what to do about that; one held for a moment is read again after 0.1 s and is no error. «Играть» says the error again.

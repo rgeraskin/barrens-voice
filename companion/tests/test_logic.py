@@ -1734,6 +1734,130 @@ class RuaccentFiles(unittest.TestCase):
             keep_koziev(str(fresh), before=True)                        # a new environment gets it back
             self.assertTrue((fresh / "koziev" / "m.bin").exists())
 
+    def accentor_with(self, d, offline=False, error=None):
+        """An Accentor over a stand-in RUAccent that downloads, as the real one, only a folder that is not there:
+        dictionary/ with yo_words.json.gz, and its package's koziev/."""
+        import sys
+        import types
+        from unittest import mock
+
+        import numpy  # noqa: F401 - before sys.modules is patched: its restore would drop a numpy loaded under it
+        from bv.text import Accentor
+        package = Path(d) / "site" / "ruaccent"
+        downloads = []
+
+        class RUAccent:
+            def __init__(self):
+                self.module_path = str(package)
+
+            def load(self, omograph_model_size, use_dictionary, tiny_mode, workdir):
+                if error is not None:
+                    raise error
+                folder = Path(workdir) / "dictionary"
+                if not folder.exists():
+                    if os.environ.get("HF_HUB_OFFLINE") == "1":       # as huggingface_hub: no asking the hub
+                        from huggingface_hub.errors import OfflineModeIsEnabled
+                        raise OfflineModeIsEnabled("offline mode is enabled")
+                    downloads.append("dictionary")
+                    folder.mkdir(parents=True)
+                    (folder / "yo_words.json.gz").write_bytes(b"x")
+                if not (package / "koziev").exists():
+                    (package / "koziev").mkdir(parents=True)
+                (folder / "yo_words.json.gz").read_bytes()             # FileNotFoundError when it is not there
+        env = {"HF_HOME": str(Path(d) / "hf"), **({"HF_HUB_OFFLINE": "1"} if offline else {})}
+        patches = [mock.patch.dict(os.environ, env), mock.patch.dict(sys.modules, {"ruaccent": types.SimpleNamespace(RUAccent=RUAccent)})]
+        logged = []
+        return Accentor(logged.append), patches, logged, downloads
+
+    def cut_download(self, d):
+        folder = Path(d) / "hf" / "ruaccent" / "dictionary"
+        folder.mkdir(parents=True)
+        (folder / "omographs.json.gz").write_bytes(b"x")                # yo_words.json.gz never came
+        return folder
+
+    def test_a_cut_download_is_fetched_again(self):
+        # beta 20: the first start stopped during «загружаю RUAccent ...»; every later start, online, ended on
+        # «FileNotFoundError: … yo_words.json.gz» - RUAccent fetches a folder only when it is not there
+        from contextlib import ExitStack
+        from bv.logs import level_of
+        with tempfile.TemporaryDirectory() as d:
+            accentor, patches, logged, downloads = self.accentor_with(d)
+            folder = self.cut_download(d)
+            with ExitStack() as stack:
+                for p in patches:
+                    stack.enter_context(p)
+                os.environ.pop("HF_HUB_OFFLINE", None)
+                accentor.load()
+            self.assertIsNotNone(accentor.model)
+            self.assertEqual(downloads, ["dictionary"])
+            self.assertTrue((folder / "yo_words.json.gz").exists())
+            self.assertEqual(logged[0], "загрузка RUAccent в прошлый раз оборвалась — удаляю недокачанное и скачиваю заново")
+            self.assertEqual(level_of(logged[0]), "WARN")
+            self.assertIn("FileNotFoundError", logged[1])
+            self.assertEqual(level_of(logged[1]), "DEBUG")
+
+    def test_offline_the_cut_download_is_cleared_and_the_start_goes_online(self):
+        # the models' mark set (they loaded once), a file gone since: offline the folders are cleared all the same,
+        # and RUAccent asking the hub for them raises what models_missing takes for a start online
+        from contextlib import ExitStack
+        from bv.f5engine import models_missing
+        with tempfile.TemporaryDirectory() as d:
+            accentor, patches, logged, downloads = self.accentor_with(d, offline=True)
+            folder = self.cut_download(d)
+            with ExitStack() as stack:
+                for p in patches:
+                    stack.enter_context(p)
+                with self.assertRaises(Exception) as raised:
+                    accentor.load()
+            self.assertTrue(models_missing(raised.exception), raised.exception)
+            self.assertFalse(folder.exists())                                       # online it is fetched whole
+            self.assertEqual(logged[0], "загрузка RUAccent в прошлый раз оборвалась — удаляю недокачанное и скачиваю заново")
+            self.assertEqual(downloads, [])
+
+    def test_another_error_leaves_the_files(self):
+        # an error that is no missing file is no reason to download 0.7 GB again: no network, a file held, a model
+        # that does not start
+        from contextlib import ExitStack
+        from huggingface_hub.errors import OfflineModeIsEnabled
+        for error in (RuntimeError("onnxruntime: bad"), PermissionError(13, "held"), TimeoutError("timed out"),
+                      ConnectionResetError(104, "reset"), OfflineModeIsEnabled("offline mode is enabled")):
+            with self.subTest(error=type(error).__name__), tempfile.TemporaryDirectory() as d:
+                accentor, patches, logged, downloads = self.accentor_with(d, error=error)
+                folder = self.cut_download(d)
+                with ExitStack() as stack:
+                    for p in patches:
+                        stack.enter_context(p)
+                    os.environ.pop("HF_HUB_OFFLINE", None)
+                    with self.assertRaises(type(error)):
+                        accentor.load()
+                self.assertTrue((folder / "omographs.json.gz").exists())                 # nothing removed
+                self.assertEqual((logged, downloads), ([], []))
+
+    def test_missing_file_is_a_file_not_there(self):
+        from bv.text import missing_file
+        NoSuchFile = type("NoSuchFile", (RuntimeError,), {})                   # ONNX Runtime's
+        for error, want in ((FileNotFoundError(2, "No such file or directory"), True), (NoSuchFile("x"), True),
+                            (RuntimeError("Load model failed: No such file or directory"), True),
+                            (PermissionError(13, "denied"), False), (TimeoutError(), False),
+                            (ConnectionResetError(104, "reset"), False), (IsADirectoryError(21, "dir"), False),
+                            (RuntimeError("bad"), False)):
+            with self.subTest(error=repr(error)):
+                self.assertEqual(missing_file(error), want)
+
+    def test_clear_ruaccent_removes_the_folders_it_checks(self):
+        from unittest import mock
+        from bv.text import clear_ruaccent
+        with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {"HF_HOME": str(Path(d) / "hf")}):
+            root, package = Path(d) / "hf" / "ruaccent", Path(d) / "site" / "ruaccent"
+            for folder in (root / "dictionary", root / "nn" / "nn_omograph" / "turbo3.1", root / "nn" / "nn_accent",
+                           root / "koziev", package / "koziev"):
+                folder.mkdir(parents=True)
+                (folder / "f").write_bytes(b"x")
+            removed = clear_ruaccent("turbo3.1", str(package))
+            self.assertEqual(len(removed), 4)
+            self.assertTrue((root / "nn" / "nn_accent" / "f").exists())     # fetched before dictionary: whole
+            self.assertFalse(any(f.exists() for f in removed))
+
 
 class SavedFlag(unittest.TestCase):
     def test_reads_the_addon_setting(self):

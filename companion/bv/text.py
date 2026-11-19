@@ -717,6 +717,41 @@ def keep_koziev(package: str | None, before: bool) -> None:
         pass                                        # RUAccent goes online for it, as before
 
 
+OMOGRAPH_SIZE = "turbo3.1"
+
+
+def missing_file(error: BaseException) -> bool:
+    """Whether a RUAccent load failed for a file that is not there: FileNotFoundError (the yo words, a tokenizer's
+    file) or ONNX Runtime's NoSuchFile (or its message) - not some other trouble, which a new download would not
+    mend: no network (a timeout, a reset connection, the hub in offline mode), a file held by another program."""
+    if isinstance(error, OSError):
+        return isinstance(error, FileNotFoundError)
+    return type(error).__name__ == "NoSuchFile" or "No such file" in str(error)
+
+
+def clear_ruaccent(size: str = OMOGRAPH_SIZE, package: str | None = None) -> list[Path]:
+    """RUAccent downloads a part only when its folder is not there - `dictionary` (with the nn_accent, stress and yo
+    models before it), `nn/nn_omograph/<size>`, `koziev` in its package - so a download cut short in one of them is
+    never completed (the player, beta 20: «FileNotFoundError: … yo_words.json.gz» at every start). Those folders
+    removed (the kept copy of koziev too: keep_koziev); its files already downloaded are not fetched again (their
+    download metadata stays). The removed folders."""
+    import shutil
+    if package is None:
+        import importlib.util
+        spec = importlib.util.find_spec("ruaccent")
+        package = str(Path(spec.origin).parent) if spec is not None and spec.origin else None
+    root = ruaccent_dir()
+    folders = [root / "dictionary", root / "nn" / "nn_omograph" / size, root / "koziev"]
+    if package:
+        folders.append(Path(package) / "koziev")
+    removed = []
+    for folder in folders:
+        if folder.is_dir():
+            shutil.rmtree(folder, ignore_errors=True)
+            removed.append(folder)
+    return removed
+
+
 class Accentor:
     """RUAccent, loaded on first use (about 10 s; its files in `ruaccent_dir`)."""
 
@@ -739,9 +774,18 @@ class Accentor:
             self.enabled = False
             return
         model = RUAccent()
-        keep_koziev(model.module_path if hasattr(model, "module_path") else None, before=True)
-        model.load(omograph_model_size="turbo3.1", use_dictionary=True, tiny_mode=False, workdir=str(ruaccent_dir()))
-        keep_koziev(getattr(model, "module_path", None), before=False)
+        try:
+            self._load_model(model)
+        except Exception as e:  # noqa: BLE001 - a download cut short: its folders cleared, fetched again once
+            if not missing_file(e):
+                raise
+            self.log("загрузка RUAccent в прошлый раз оборвалась — удаляю недокачанное и скачиваю заново")
+            self.log(f"    {type(e).__name__}: {e}")
+            clear_ruaccent(OMOGRAPH_SIZE, getattr(model, "module_path", None))
+            model = RUAccent()
+            # offline (the models' mark set, a file gone since) RUAccent asks the hub for the folders just removed:
+            # OfflineModeIsEnabled, which f5engine.models_missing knows, and main() starts again online to fetch them
+            self._load_model(model)
         # This ruaccent does not feed token_type_ids, which its downloaded ONNX models want: zeros.
         for part in vars(model).values():
             session = getattr(part, "session", None)
@@ -756,6 +800,12 @@ class Accentor:
 
             session.run = run
         self.model = model
+
+    @staticmethod
+    def _load_model(model) -> None:
+        keep_koziev(model.module_path if hasattr(model, "module_path") else None, before=True)
+        model.load(omograph_model_size=OMOGRAPH_SIZE, use_dictionary=True, tiny_mode=False, workdir=str(ruaccent_dir()))
+        keep_koziev(getattr(model, "module_path", None), before=False)
 
     def accent(self, text: str) -> str:
         """`text` with "+" before each stressed vowel; words marked by the dictionary kept."""
