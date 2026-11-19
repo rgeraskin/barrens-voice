@@ -617,6 +617,14 @@ class App:
                 and self.updater.due(bool(self.running_game), self.companion.running, bool(self.busy))):
             if self.updater.apply():
                 self.relaunch(updated=True)
+            return
+        ready = getattr(self.updater, "ready", None)
+        # what it waits for, once per version, and only when it does wait (no game, no voice-over: switched at once)
+        if ready and ready != getattr(self, "wait_told", None) and (self.running_game or self.companion.running):
+            self.wait_told = ready
+            name = display_version(ready)
+            self.say(f"версия {name} установится, когда закроешь игру" if self.running_game
+                     else f"версия {name} установится, когда остановится озвучка")
 
     def relaunch(self, updated: bool = False) -> None:
         """Start the launcher anew through the install's starter (a moment after this one has gone); end this one.

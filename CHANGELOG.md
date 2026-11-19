@@ -154,6 +154,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- «установится, когда закроешь игру» only while a game or the voice-over runs
+
+  A version prepared with no game running said it would install when the game closed, and switched the same second. The update now says only «версия … готова»; the launcher adds «установится, когда закроешь игру» (or «…когда остановится озвучка») once, when the switch really waits.
+
 - «в первый раз скачивается ~760 МБ» only when it does
 
   The log said F5's models were being downloaded at every online start, though they were in the cache and nothing was fetched. The cache is asked first now, without the network, and the line comes only with a real download.

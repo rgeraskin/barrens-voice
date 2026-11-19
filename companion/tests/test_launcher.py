@@ -1895,6 +1895,11 @@ class OldClients(unittest.TestCase):
         # pruning by name and after current, settling while running, the refusal history: a release still installs
         self.updater_client("v0_4_0b17", "0.4.0b17", release=None)
 
+    def test_beta19_client_updates_through_its_updater(self):
+        # the ready version said without «когда закроешь игру» (the launcher says what it waits for): a release
+        # still installs
+        self.updater_client("v0_4_0b19", "0.4.0b19", release=None)
+
     def updater_client(self, client: str, current: str, release: str | None = "v0.4.0-beta.99"):
         import base64
         import io
@@ -2076,6 +2081,26 @@ class UpdateInWindow(unittest.TestCase):
         win.exit_seen = True
         self.app.App.apply_update_when_idle(win)
         self.assertEqual(done, ["apply", "relaunch"])
+
+    def test_the_wait_is_said_only_when_there_is_one(self):
+        # «готова — установится, когда закроешь игру» came with no game at all, the switch a second later
+        said = []
+
+        def win(game, running):
+            return self.ns(exit_seen=True, running_game=game, busy="", companion=self.ns(running=running),
+                           updater=self.ns(ready="0.4.1", due=lambda g, c, b: not g and not c, apply=lambda: None),
+                           relaunch=lambda updated=False: None, say=lambda text, *a: said.append(text))
+        w = win("forever", True)
+        self.app.App.apply_update_when_idle(w)
+        self.app.App.apply_update_when_idle(w)
+        self.assertEqual(said, ["версия 0.4.1 установится, когда закроешь игру"])      # once
+        said.clear()
+        w = win(None, True)                                    # the game closed, the voice-over still ending
+        self.app.App.apply_update_when_idle(w)
+        self.assertEqual(said, ["версия 0.4.1 установится, когда остановится озвучка"])
+        said.clear()
+        self.app.App.apply_update_when_idle(win(None, False))  # nothing to wait for: switched, no word of waiting
+        self.assertEqual(said, [])
 
     def test_companion_starts_as_the_window_says(self):
         # a change config.json did not take held in the window only: «компаньон запускается (WoW Retail)» while the

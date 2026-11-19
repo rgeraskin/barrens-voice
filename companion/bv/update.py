@@ -449,7 +449,7 @@ class Updater:
             self.say(f"готовлю версию {name} ...")
             self.ready = prepare(self.root, archive, log=self.detail, manifest=found)
             self.status = "ready"
-            self.say(f"версия {name} готова — установится, когда закроешь игру")
+            self.say(f"версия {name} готова")     # whether it waits for anything, the launcher says (due)
             return self.ready
         except Exception as e:  # noqa: BLE001 - the current version goes on
             if isinstance(e, WontStart):
