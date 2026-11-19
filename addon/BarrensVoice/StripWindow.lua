@@ -43,7 +43,7 @@ local function Refresh()
     local x, y, w, h = ns.Strip.Geometry(pending.place, pending.x, pending.y, pending.width)
     local rows = math.floor(h / ns.db.cell)
     screen:SetText(("Экран %d × %d. Линия: x %d, y %d, ширина %d, толщина %d px (%d %s) — вмещает самую "
-        .. "длинную строку чата; чем уже линия, тем она толще."):format(physW, physH, x, y, w, h, rows,
+        .. "длинную строку чата. Чем уже линия, тем она толще."):format(physW, physH, x, y, w, h, rows,
         rows % 10 == 1 and rows % 100 ~= 11 and "ряд" or (rows % 10 >= 2 and rows % 10 <= 4
             and (rows % 100 < 12 or rows % 100 > 14)) and "ряда" or "рядов"))
     Preview()

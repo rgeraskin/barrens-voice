@@ -367,5 +367,5 @@ def build(config: dict, out: Path, log, checker, clock=time.monotonic) -> list[S
     os.replace(tmp, out / "bank.json")
     log(f"голоса рас собраны: {len({s.base for s in slots})} из {len(table)} за {took(clock() - started)}")
     log(f"голосов рас: {len({s.base for s in slots})}, вариантов с тембром: {len(slots)}"
-        + (f"; без голоса (мало реплик): {', '.join(skipped)}" if skipped else ""))
+        + (f". Без голоса (мало реплик): {', '.join(skipped)}" if skipped else ""))
     return slots

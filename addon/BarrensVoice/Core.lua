@@ -893,7 +893,7 @@ function ns.Welcome()
         .. "его расы и пола."):format(version))
     print(PREFIX .. "читает вслух приложение-компаньон Barrens Voice (Windows): без него аддон молчит. Удобнее всего "
         .. "запускать игру через него — оно само запустит игру.")
-    print(PREFIX .. "настройки — значок у миникарты или /bv; команды — /bv help.")
+    print(PREFIX .. "настройки — значок у миникарты или /bv. Команды — /bv help.")
     print(PREFIX .. HELP_HINT)
 end
 

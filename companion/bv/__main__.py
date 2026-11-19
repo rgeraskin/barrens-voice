@@ -634,7 +634,7 @@ def main() -> int:
     from .dictionary import game_of
     state.init(STATE_FILE, phase="starting", game=game_of(config))
     # the launcher says «компаньон запускается (игра)» itself: here only the details, for the full log
-    log(f"компаньон стартует; игра: {'WoW (ритейл)' if game_of(config) == 'retail' else 'WoW Forever'}; "
+    log(f"компаньон стартует, игра: {'WoW (ритейл)' if game_of(config) == 'retail' else 'WoW Forever'}, "
         f"настройки: {CONFIG_PATH}", "DEBUG")
     prune_logs(config["log_keep_days"])
     from . import launch

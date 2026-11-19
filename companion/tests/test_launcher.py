@@ -643,7 +643,7 @@ class Report(unittest.TestCase):
                                    runtime="onnxruntime-gpu 1.32.0")
         self.assertIn("Barrens Voice 0.4.0", head)
         self.assertIn("Голоса рас: готовы на RTX (CUDAExecutionProvider)", head)
-        self.assertIn("WoW Forever (аддон 0.4.0); запущена: WoW Forever", head)
+        self.assertIn("WoW Forever (аддон 0.4.0). Запущена: WoW Forever", head)
         self.assertIn("volume = 70", head)
         stopped = model.report_header("0.4.0", dict(state, phase="stopped"), {"_help": "x"}, [], None,
                                       running=False, gpus=[], runtime="x")

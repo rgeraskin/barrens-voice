@@ -495,7 +495,7 @@ def report_header(version: str, state: dict, config: dict, games: list, running_
         f"ONNX Runtime: {runtime or onnx_runtime()}",
         f"Видеокарты: {', '.join(gpus) or 'Windows не назвала'}",
         f"Голоса рас: {voices}",
-        f"Игры: {played}; запущена: {GAME_NAMES.get(running_game, 'нет') if running_game else 'нет'}",
+        f"Игры: {played}. Запущена: {GAME_NAMES.get(running_game, 'нет') if running_game else 'нет'}",
         f"Компаньон: {phase if running else f'не запущен (в прошлый раз: {phase})'}",
         "Настройки не по умолчанию: " + ("; ".join(changed_settings(config, DEFAULT_CONFIG)) or "нет"),
     ]

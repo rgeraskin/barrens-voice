@@ -62,4 +62,4 @@ def write(config: dict, voices, default_off, log) -> None:
     except OSError as e:          # the game holds the file: the addon keeps the list it has
         log(f"не удалось записать список голосов Windows в аддон: {e}")
         return
-    log(f"список голосов Windows записан в аддон ({len(voices)}); в игре он появится после /reload")
+    log(f"список голосов Windows записан в аддон ({len(voices)}). В игре он появится после /reload")
