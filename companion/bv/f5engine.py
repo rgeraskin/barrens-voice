@@ -161,9 +161,15 @@ def model_dir(config: dict, home: Path) -> Path | None:
 
 def fetch_models(config: dict, log) -> Path:
     """F5's ONNX graphs from Hugging Face into the model cache (~760 MB once; then from the cache,
-    offline like the other models)."""
+    offline like the other models). The cache is asked first, without the network: the word about the download
+    only when there is one (a snapshot missing or incomplete: LocalEntryNotFoundError, IncompleteSnapshotError)."""
     from huggingface_hub import snapshot_download
+    from huggingface_hub.errors import LocalEntryNotFoundError
     repo = config.get("f5_onnx_repo") or ONNX_REPO
+    try:
+        return Path(snapshot_download(repo, allow_patterns=["*.onnx"], local_files_only=True))
+    except LocalEntryNotFoundError:
+        pass
     if os.environ.get("HF_HUB_OFFLINE") != "1":
         log(f"модели F5 (ONNX): {repo} — в первый раз скачивается ~760 МБ ...")
     return Path(snapshot_download(repo, allow_patterns=["*.onnx"]))

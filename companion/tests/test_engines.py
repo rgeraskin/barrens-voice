@@ -483,5 +483,37 @@ class ModelsMissing(unittest.TestCase):
         self.assertFalse(missing_of(None))
 
 
+class FetchModels(unittest.TestCase):
+    """F5's models: the word about a ~760 MB download only when they are not in the cache."""
+
+    def test_the_download_said_only_when_it_happens(self):
+        from unittest import mock
+
+        from huggingface_hub.errors import LocalEntryNotFoundError
+
+        from bv.f5engine import fetch_models
+        calls, said = [], []
+
+        def cached(repo, allow_patterns, local_files_only=False):
+            calls.append(local_files_only)
+            return "/cache/f5"
+
+        def missing(repo, allow_patterns, local_files_only=False):
+            calls.append(local_files_only)
+            if local_files_only:
+                raise LocalEntryNotFoundError("not in the cache")
+            return "/cache/f5"
+        with mock.patch.dict("os.environ", {"HF_HUB_OFFLINE": "0"}):
+            with mock.patch("huggingface_hub.snapshot_download", cached):
+                self.assertEqual(fetch_models({}, said.append), Path("/cache/f5"))
+            self.assertEqual((calls, said), ([True], []))               # in the cache: no network, no word
+            calls.clear()
+            with mock.patch("huggingface_hub.snapshot_download", missing):
+                fetch_models({}, said.append)
+            self.assertEqual(calls, [True, False])                      # then downloaded
+            self.assertEqual(len(said), 1)
+            self.assertIn("в первый раз скачивается", said[0])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -154,6 +154,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- «в первый раз скачивается ~760 МБ» only when it does
+
+  The log said F5's models were being downloaded at every online start, though they were in the cache and nothing was fetched. The cache is asked first now, without the network, and the line comes only with a real download.
+
 - The companion in a console with its output in a file
 
   `python -m bv > out.txt` in a console whose code page has no «×» (cp1251) stopped at the first «экран 1920×1080»: the output goes in UTF-8 now, a character it cannot take replaced. Under the launcher nothing changes (it sets PYTHONUTF8).
