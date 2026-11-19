@@ -137,6 +137,7 @@ function ns.Send(kind, sender, race, sex, class, channel, text, spoken)
         elseif ns.db.sayVerb then
             local verb = VERBS[kind] or "пишет"
             if not NOT_ASKED[kind] and ns.IsQuestion(text) then verb = "спрашивает" end
+            if place and verb == "пишет" then place = ns.Place(kind, channel, true) end   -- «пишет в общий»
             -- "Вася пишет в гильдии:"; the place goes with the name when the program drops it
             text = name .. " " .. verb .. (place and " " .. place or "") .. ":" .. NAME_MARK .. " " .. text
         else

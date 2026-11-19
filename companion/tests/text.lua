@@ -132,5 +132,13 @@ eq(P("channels", "3. Оборона: Оргриммар"), "в обороне", 
 eq(P("channels", "5. мойканал"), "в канале мойканал", "a channel of one's own, by its name")
 eq(P("channels", "6. Услуги - Город"), "в канале Услуги", "another one: without the zone")
 eq(P("channels", ""), "в канале", "no name at all")
+-- after «пишет»: where the line goes («в общем» sounded like the writer's own «в общем»)
+eq(P("channels", "1. Общий - Оргриммар", true), "в общий", "General, into")
+eq(P("channels", "2. Торговля - Город", true), "в торговлю", "Trade, into")
+eq(P("channels", "4. LookingForGroup", true), "в поиск спутников", "LookingForGroup, into")
+eq(P("channels", "3. Оборона: Оргриммар", true), "в оборону", "LocalDefense, into")
+eq(P("channels", "5. мойканал", true), "в канал мойканал", "a channel of one's own, into")
+eq(P("channels", "", true), "в канал", "no name at all, into")
+eq(P("guild", nil, true), "в гильдии", "a place that is no channel stays")
 for _, kind in ipairs({ "say", "yell", "whisper", "emote", "test" }) do eq(P(kind), nil, kind .. ": the verb says it") end
 print("places ok")

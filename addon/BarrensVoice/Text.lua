@@ -111,16 +111,22 @@ local PLACES = { party = "в группе", raid = "в рейде", warning = "�
                  guild = "в гильдии", officer = "в офицерском чате" }
 local CHANNEL_PLACES = { chGeneral = "в общем", chTrade = "в торговле", chLfg = "в поиске спутников",
                          chDefense = "в обороне" }
+-- after «пишет» a channel is where the line goes: «пишет в общий», not «пишет в общем», which sounds like the
+-- writer's own «в общем» (so to say). «спрашивает в общем» reads well and stays
+local CHANNEL_INTO = { chGeneral = "в общий", chTrade = "в торговлю", chLfg = "в поиск спутников",
+                       chDefense = "в оборону" }
 
 --- The place of a line of `kind` ("в гильдии"), or nil. `channel`: a numbered channel's name as the chat
---- event gives it ("2. Торговля - Оргриммар", "5. мойканал").
-function ns.Place(kind, channel)
+--- event gives it ("2. Торговля - Оргриммар", "5. мойканал"). `into`: a numbered channel as where the line
+--- goes, for «пишет» ("в торговлю", "в канал мойканал"); other places are the same either way.
+function ns.Place(kind, channel, into)
     if kind == "channels" then
-        local place = CHANNEL_PLACES[ns.ChannelSetting(nil, channel)]
+        local place = (into and CHANNEL_INTO or CHANNEL_PLACES)[ns.ChannelSetting(nil, channel)]
         if place then return place end
         -- a channel of its own (or one not in the list): by its name, without the number and the zone
         local name = tostring(channel or ""):gsub("^%s*%d+%.%s*", ""):gsub("%s+%-%s+.*$", ""):gsub("%s+$", "")
-        return name ~= "" and ("в канале " .. name) or "в канале"
+        local word = into and "в канал" or "в канале"
+        return name ~= "" and (word .. " " .. name) or word
     end
     return PLACES[kind]
 end
