@@ -763,6 +763,10 @@ class Pipeline(unittest.TestCase):
                     "с лвлом": "с уровнем", "без лвлов": "без уровней", "на каком ты лвле": "на каком ты уровне",
                     "апнул лвл": "апнул уровень", "ниче страшного": "ничё страшного"})
 
+    def test_skachki_by_meaning_and_not_declined(self):
+        self.check({"скачки патча долгие": "ск+ачки патча долгие", "после скачки клиента": "после ск+ачки клиента",
+                    "у меня скачки фпс": "у меня скачк+и фпс", "из-за скачки пинга": "из-за скачк+и пинга"})
+
     def test_keep_case_mark(self):
         # «=!»: a replacement as written, never declined after a preposition - a word, a regex; without it: declined
         from bv.__main__ import speech_text
