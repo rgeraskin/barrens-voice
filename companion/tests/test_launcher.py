@@ -2115,6 +2115,10 @@ class UpdateInWindow(unittest.TestCase):
         w.running_game = None
         self.app.App.apply_update_when_idle(w)
         self.assertEqual(said, ["версия 0.4.1 установится, когда закроешь игру"])
+        # ... but a voice-over that has seen no game yet waits for one: said
+        said.clear()
+        self.app.App.apply_update_when_idle(win(None, True, exit_with_wow=True))
+        self.assertEqual(said, ["версия 0.4.1 установится, когда остановится озвучка"])
 
     def test_companion_starts_as_the_window_says(self):
         # a change config.json did not take held in the window only: «компаньон запускается (WoW Retail)» while the

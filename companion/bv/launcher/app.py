@@ -272,6 +272,7 @@ class App:
             self.set_config(game=self.selected)
         self.companion_game = self.selected
         self.companion_started = time.monotonic()
+        self.game_seen = False          # a game while this voice-over runs: with «Закрываться вместе с игрой» it ends after it
         self.settle_due = True
         self.exit_seen = False
         self.reload_told = False
@@ -620,9 +621,13 @@ class App:
             return
         ready = getattr(self.updater, "ready", None)
         # what it waits for, once per version and cause, and only when it does wait (no game, no voice-over: switched
-        # at once); the game closed with the voice-over going on is a new cause - with «Закрываться вместе с игрой»
-        # off only: on, the voice-over ends by itself a second or two after the game, just before the switch
-        voice_waits = self.companion.running and not (getattr(self, "config", {}) or {}).get("exit_with_wow", True)
+        # at once); the game closed with the voice-over going on is a new cause. With «Закрываться вместе с игрой» on
+        # the voice-over ends by itself some 10 s after a game it saw (bv/__main__.py), just before the switch: no
+        # word then - but one that has seen no game yet waits for one, and the switch with it
+        if self.running_game:
+            self.game_seen = True
+        closes = (getattr(self, "config", {}) or {}).get("exit_with_wow", True)
+        voice_waits = self.companion.running and not (closes and getattr(self, "game_seen", False))
         cause = "game" if self.running_game else "voice" if voice_waits else None
         if ready and cause and (ready, cause) != getattr(self, "wait_told", None):
             self.wait_told = (ready, cause)
