@@ -83,7 +83,7 @@ MARKUP = re.compile(r"\|c[0-9a-fA-F]{8}|\|r|\|T.*?\|t|\|A.*?\|a")
 LABELS = {"party": "группа", "raid": "рейд", "warning": "объявление", "instance": "подземелье",
           "say": "сказать", "yell": "крик", "whisper": "шёпот", "guild": "гильдия", "officer": "офицеры",
           "channels": "канал", "emote": "эмоция", "test": "тест",
-          "notice": "лаунчер"}
+          "notice": "озвучка"}
 
 
 def speech_text(text: str, dictionary, inflector, declension: bool, restore_yo=lambda t: t) -> str:
@@ -388,7 +388,7 @@ def install_crash_logging() -> None:
             for line in chunk.rstrip().splitlines():
                 log("  " + line)
 
-    sys.excepthook = lambda t, e, tb: report("лаунчер", t, e, tb)
+    sys.excepthook = lambda t, e, tb: report("озвучка", t, e, tb)
     threading.excepthook = lambda a: report(f"поток {a.thread.name if a.thread else '?'}", a.exc_type,
                                             a.exc_value, a.exc_traceback)
 
