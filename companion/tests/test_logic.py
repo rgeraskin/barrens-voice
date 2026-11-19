@@ -784,6 +784,19 @@ class Pipeline(unittest.TestCase):
         self.check({"скрафтить": "скр+афтить", "скрафтил": "скр+афтил",
                     "у вендора": "у в+ендора", "вендоров": "в+ендоров", "крафт": "крафт"})
 
+    def test_sm_by_case(self):
+        # «см» in lower case after a number is centimetres, bare it is left alone («смотри», the dungeon typed
+        # small), the dungeon «СМ» (Scarlet Monastery) in capitals only
+        self.check({"всего 5 см": "всего пять сантиметров", "2см": "два сантиметра", "на 1 см": "на один сантиметр",
+                    "го в СМ": "го в Монастырь Алого ордена", "из СМ": "из Монастыря Алого ордена",
+                    "ещё см": "ещё см", "см. выше": "см. выше", "го в см": "го в см", "смайл": "смайл"})
+
+    def test_rmt_by_letters(self):
+        self.check({"это рмт": "это Эр Эм Тэ", "за RMT бан": "за Эр Эм Тэ бан", "РМТ": "Эр Эм Тэ"})
+
+    def test_v_dushe_is_the_soul(self):
+        self.check({"я в душе не знаю": "я в душ+е не знаю", "Добрый в душе": "Добрый в душ+е", "душевный": "душевный"})
+
     def test_np_by_case(self):
         # «нп» in lower case (or «Нп» starting a phrase) is «без проблем», the dungeon only in capitals
         self.check({"спасибо! нп": "спасибо! без проблем", "Нп, обращайся": "без проблем, обращайся",

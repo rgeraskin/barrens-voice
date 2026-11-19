@@ -153,6 +153,15 @@ do
     local _, edited = migrated({ lines = { ["нп"] = "нп=моя пучина" }, removed = {} })
     assert(edited.removed[NP] and edited.lines["нп"] == "нп=моя пучина", "edited «нп»: theirs kept alone")
 end
+-- «СМ» the same: a word (any case) once, the dungeon's case-sensitive regex now
+do
+    local SM = [[~\b(?-i:СМ)\b]]
+    local Ds, deleted = migrated({ lines = {}, removed = { ["см"] = true } })
+    assert(deleted.removed[SM] and not deleted.removed["см"], "deleted «см»: the dungeon's regex deleted too")
+    assert(not Ds.Text():find(SM .. "=", 1, true), "and not in the text")
+    local _, edited = migrated({ lines = { ["см"] = "см=мой монастырь" }, removed = {} })
+    assert(edited.removed[SM] and edited.lines["см"] == "см=мой монастырь", "edited «см»: theirs kept alone")
+end
 print("dictionary layers ok")
 
 -- the dictionary online (DictionaryOnline.lua, loaded before Dictionary.lua): the newer default wins
