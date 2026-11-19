@@ -1734,11 +1734,15 @@ class ReloadHint(unittest.TestCase):
             (("true", "true", "{ beat = 999000 }", True), True),             # an old beat: nobody at login
             # stopped 49 s ago, but a /reload since (the saved variables are newer): the addon loaded without it
             (("true", "true", "{ beat = 999940, stopped = 999951 }", True, 999970), True),
+            # a /reload begun a few seconds before the stop: the addon may have read the status after it - reminded
+            (("true", "true", "{ beat = 0, stopped = 999951 }", True, 999945), True),
             # the launcher's restart: no /reload between the stop and the start
             (("true", "true", "{ beat = 999940, stopped = 999951 }", True, 999000), False),
             (("true", "true", "{ beat = 999990, stopped = 0 }", True, 999980), False),   # running at that /reload: seen
-            # killed (no stop written): the addon takes a beat for 45 s - a /reload within them saw it, a later one not
-            (("true", "true", "{ beat = 999950 }", True, 999990), False),
+            # killed (no stop written): the addon takes a beat for 45 s - a /reload well within them saw it, a later
+            # one (or one in the last RELOAD_SLACK seconds of them) not
+            (("true", "true", "{ beat = 999950 }", True, 999970), False),
+            (("true", "true", "{ beat = 999950 }", True, 999990), True),
             (("true", "true", "{ beat = 999940 }", True, 999990), True),
         ]
         for (fade, enabled, status, in_view, *at), want in cases:

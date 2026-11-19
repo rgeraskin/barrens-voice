@@ -18,6 +18,10 @@ from pathlib import Path
 
 RECENT = 60.0      # seconds: a companion beating or stopped this recently was there at the player's login
 FRESH = 45.0       # seconds the addon takes a beat for a running companion (Companion.lua C.FRESH)
+# The game writes the saved variables as a /reload starts, the addon reads the status file seconds later: a /reload
+# begun this long before the companion went may already have missed it. A needless reminder is harmless (it says
+# «если окно чата не прячется»), a missing one leaves the chat visible without a word.
+RELOAD_SLACK = 10.0
 
 
 def status_recent(addon_dir: Path | None, now: float | None = None) -> float | None:
@@ -43,7 +47,7 @@ def reloaded_since(config: dict, moment: float) -> bool:
     from .dictionary import find_saved
     path = find_saved(config)
     try:
-        return path is not None and path.stat().st_mtime > moment
+        return path is not None and path.stat().st_mtime > moment - RELOAD_SLACK
     except OSError:
         return False
 
