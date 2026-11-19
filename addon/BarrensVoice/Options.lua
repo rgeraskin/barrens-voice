@@ -14,7 +14,7 @@ ns.Options = O
 local TITLE = "Barrens Voice"
 
 -- What "Мост" is, for the player (the settings' button and the bridge window).
-ns.BRIDGE_TIP = "Мост — то, через что аддон передаёт строки чата приложению-компаньону Barrens Voice, которое читает их вслух: тонкая тёмная линия у края экрана.\n\nКомпаньон видит окно игры и читает эту линию — другого пути наружу у аддонов WoW нет.\n\nЕсли линию закрывает другой аддон (рисует что-то в том же месте), чат перестаёт читаться — тогда перенеси её."
+ns.BRIDGE_TIP = "Мост — то, через что аддон передаёт строки чата в Barrens Voice Launcher, который читает их вслух: тонкая тёмная линия у края экрана.\n\nЛаунчер видит окно игры и читает эту линию — другого пути наружу у аддонов WoW нет.\n\nЕсли линию закрывает другой аддон (рисует что-то в том же месте), чат перестаёт читаться — тогда перенеси её."
 
 -- The numbered channels, under "Общие каналы": setting, label, tooltip. No numbers: a channel's number is
 -- the player's own (in the author's logs Trade was 2 in one town and 4 elsewhere, "Торговля (локальный)").
@@ -118,7 +118,7 @@ local current = "general"
 local bridgeHeight, bridgeOpen = 0, false
 
 local TABS = {
-    { "general", "Общее", "Включение озвучки, скорость и громкость, прозрачное окно чата и мост к компаньону." },
+    { "general", "Общее", "Включение озвучки, скорость и громкость, прозрачное окно чата и мост к лаунчеру." },
     { "reading", "Каналы и чтение", "Какие каналы и строки читать вслух и как произносить имена." },
     { "voices", "Голоса", "Чем читать: голоса рас или голоса Windows, и какие голоса Windows раздавать игрокам." },
     { "dictionary", "Словарь", "Как читать сленг и сокращения: WTS = продам, дд = дамагер, ОП = Огненная пропасть." },
@@ -211,7 +211,7 @@ local function BuildGeneral(tab, description)
     local W = (TEXT_W + 8 - GAP) / 2
     toggle = UI.Button(tab, "", W, function() ns.SetEnabled(not ns.db.enabled) end)
     toggle:SetPoint("TOPLEFT", LEFT, y)
-    UI.Tooltip(toggle, "Включить или выключить всю озвучку: мост к компаньону (линию у края экрана) и передачу чата "
+    UI.Tooltip(toggle, "Включить или выключить всю озвучку: мост к лаунчеру (линию у края экрана) и передачу чата "
         .. "ему.\n\nТо же — ПКМ по значку у миникарты или /bv on, /bv off.")
     local test = UI.Button(tab, "Проверка", W, ns.Test)
     test:SetPoint("TOPLEFT", LEFT + W + GAP, y)
@@ -232,9 +232,9 @@ local function BuildGeneral(tab, description)
     programState:SetPoint("TOPLEFT", LEFT + 4, y)
     programState:SetPoint("RIGHT", -LEFT, 0)
     programState:SetJustifyH("LEFT")
-    UI.TextTooltip(tab, programState, "Только для сведения: работало ли приложение-компаньон Barrens Voice в момент "
-        .. "входа в игру или последнего /reload. Чат озвучивается в любом случае, и запущенный позже компаньон "
-        .. "тоже его читает.\n\nЭто важно только для «Прятать окно чата»: окна прячутся, если компаньон работал "
+    UI.TextTooltip(tab, programState, "Только для сведения: работал ли Barrens Voice Launcher в момент "
+        .. "входа в игру или последнего /reload. Чат озвучивается в любом случае, и запущенный позже лаунчер "
+        .. "тоже его читает.\n\nЭто важно только для «Прятать окно чата»: окна прячутся, если лаунчер работал "
         .. "при входе. Запустил его позже — сделай /reload, и прозрачный чат включится.")
     y = y - 24
     -- the rest of the tab hangs from here, so a status line that wraps pushes it down (StatusFits)
@@ -285,7 +285,7 @@ local function BuildGeneral(tab, description)
     get, set = Setting("fadeChat", function() ns.ChatFade.Apply() Refresh() end)
     checks[#checks + 1] = UI.Check(tab, LEFT, y, "Прятать окно чата, пока на нём нет мыши", "Чат и так "
         .. "звучит: окна чата (текст, фон, вкладки, поле ввода) прозрачны, пока на них не наведена мышь и ты ничего "
-        .. "не пишешь.\n\nСтрока, которую компаньон не читает вслух — системное сообщение, добыча, выключенный канал, "
+        .. "не пишешь.\n\nСтрока, которая не озвучивается — системное сообщение, добыча, выключенный канал, "
         .. "твоя собственная, сообщение аддона, — показывает окно на 10 секунд: то, чего не слышно, видно.\n\n"
         .. "Работает, пока озвучка включена.", get, set)
     for i, item in ipairs({
@@ -306,7 +306,7 @@ local function BuildGeneral(tab, description)
     -- "Мост к компаньону": folded, as it is needed rarely - when another addon covers the line.
     y = UI.Header(tab, "Дополнительно", y)
     -- CatQuest and Wayfarer are Forever's addons: not a word of them on retail
-    checks[#checks + 1] = UI.Check(tab, LEFT, y, "Отладка (/bv debug)", "Аддон пишет в журнал компаньона каждую "
+    checks[#checks + 1] = UI.Check(tab, LEFT, y, "Отладка (/bv debug)", "Аддон пишет в журнал лаунчера каждую "
         .. "строку чата, которую не отправил, с причиной (канал выключен, строку не видно ни в одном окне чата, "
         .. "её скрыл другой аддон)" .. (ns.Retail() and "" or ", и когда CatQuest или Wayfarer начинает и заканчивает "
         .. "говорить") .. ".\n\nСтроки отладки идут по мосту вместе с чатом, поэтому включай её, только когда ищешь, "
@@ -323,14 +323,14 @@ local function BuildGeneral(tab, description)
     local function Fold(open)
         bridge:SetShown(open)
         bridgeOpen = open
-        fold:SetText(open and "Мост к компаньону: свернуть" or "Мост к компаньону…")
+        fold:SetText(open and "Мост к лаунчеру: свернуть" or "Мост к лаунчеру…")
         Resize()
     end
     fold:SetScript("OnClick", function() Fold(not bridge:IsShown()) end)
     bridgeHeight = ns.StripWindow.Create(bridge, function() Fold(false) end)
     bridge:SetHeight(bridgeHeight)
     O.Bridge = Fold
-    fold:SetText("Мост к компаньону…")
+    fold:SetText("Мост к лаунчеру…")
     y = y - 34
     rest:SetHeight(-y)
     statusBase = -(statusTop + y)
@@ -435,7 +435,7 @@ local function BuildVoices(tab, description)
         end, tip)
     end
     Radio("f5", "Расы", "Голоса рас из русской озвучки самой игры через нейросеть: у каждого персонажа свой голос его "
-        .. "расы и пола.\n\nНужна видеокарта с DirectX 12 (проверено пока только на NVIDIA). Без неё компаньон читает голосами Windows.", 100)
+        .. "расы и пола.\n\nНужна видеокарта с DirectX 12 (проверено пока только на NVIDIA). Без неё чат читается голосами Windows.", 100)
     Radio("sapi", "Windows", "Русские голоса Windows. Звучат механически — заметно хуже голосов рас, а для разнообразия "
         .. "их нужно искать и ставить отдельно: в Windows по умолчанию только Ирина.\n\nОставлены на всякий случай — если голоса "
         .. "рас отвечают с большой задержкой или не работают на твоём компьютере.\n\nКакие голоса раздавать игрокам — список ниже.", 190)
@@ -464,8 +464,8 @@ local function BuildHelp(tab, description)
     end
     y = y - GAP
     local _, height = UI.Text(tab, "GameFontHighlight", LEFT + 4, y, TEXT_W,
-        "Что прислать: что прозвучало и как надо, а лучше — строку из журнала компаньона (кнопка «Журнал» "
-        .. "в окне Barrens Voice). Неверное ударение можно сразу поправить себе на вкладке «Словарь».")
+        "Что прислать: что прозвучало и как надо, а лучше — строку из журнала лаунчера (кнопка «Журнал» "
+        .. "в окне Barrens Voice Launcher). Неверное ударение можно сразу поправить себе на вкладке «Словарь».")
     y = y - height - GAP
     local news = UI.Button(tab, "Что нового", 140, function() ns.NewsWindow.Show() end)
     news:SetPoint("TOP", tab, "TOP", 0, y)          -- centred under the links

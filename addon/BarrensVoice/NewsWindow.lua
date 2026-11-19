@@ -21,7 +21,7 @@ local GAP_ENTRY, GAP_ITEM = 18, 6
 local TOP_TEXT = "Сверху — самое новое. Снова открыть это окно — /bv news или кнопкой на вкладке «Помощь» в "
     .. "настройках (/bv). Там же — куда писать об ошибках и идеях."
 -- no entries: the companion has not written NewsData.lua yet (News.lua)
-W.EMPTY = "Записи «Что нового» приносит приложение-компаньон Barrens Voice: запусти его, и после /reload они "
+W.EMPTY = "Записи «Что нового» приносит Barrens Voice Launcher: запусти его, и после /reload они "
     .. "будут здесь."
 
 local window, scroll, content

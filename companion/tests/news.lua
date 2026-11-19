@@ -212,7 +212,7 @@ do  -- the first run: the welcome, nothing of the news, every entry seen
     fresh()
     DATA.version, BarrensVoiceNewsData, ns.firstRun, said = "0.4.0b16", DATA, true, {}
     ns.LoginWord()
-    assert(#said == 1 and said[1]:find("приложение-компаньон", 1, true), "at once only the companion's word")
+    assert(#said == 1 and said[1]:find("Barrens Voice Launcher не запущен", 1, true), "at once only the companion's word")
     local delays = {}
     for _, t in ipairs(timers) do delays[#delays + 1] = t.seconds end
     assert(#delays == 2 and delays[1] == 5, "the welcome a few seconds later")
@@ -238,7 +238,7 @@ do  -- an update with a big entry (an addon from before this list: only seenVers
     fresh({ seenVersion = "0.3.0" })
     DATA.version, ns.firstRun, said = "0.4.0b16", false, {}
     ns.LoginWord()
-    assert(#said == 1 and said[1]:find("приложение-компаньон", 1, true) and not W.IsShown(),
+    assert(#said == 1 and said[1]:find("Barrens Voice Launcher не запущен", 1, true) and not W.IsShown(),
         "first the companion's word, nothing else yet")
     assert(#timers == 1 and timers[1].seconds == N.DELAY and N.DELAY >= 3, "a few seconds after login")
     runTimers()

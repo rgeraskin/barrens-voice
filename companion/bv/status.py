@@ -50,7 +50,7 @@ class Beat(threading.Thread):
 
     def run(self) -> None:
         if self.addon is None:
-            self.log("папка аддона не найдена: аддон не узнает о компаньоне")
+            self.log("папка аддона не найдена: аддон не узнает о лаунчере")
             return
         while True:
             write(self.addon)

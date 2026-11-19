@@ -252,8 +252,8 @@ def update_config(path: Path = CONFIG_PATH, **changes) -> dict:
 
 # --- what the companion is doing, in words ----------------------------------------------------
 
-EXIT_WORDS = {1: "Компаньон остановился с ошибкой — подробности в журнале", 4: "Компаньон уже запущен отдельно",
-              5: "Компаньон не прочитал config.json — подробности в журнале"}
+EXIT_WORDS = {1: "Озвучка остановилась с ошибкой — подробности в журнале", 4: "Озвучка уже запущена отдельно",
+              5: "Озвучка не прочитала config.json — подробности в журнале"}
 
 
 def describe(state: dict, running: bool, exit_code: int | None, game: str | None, addon_missing: bool) -> list:
@@ -263,15 +263,15 @@ def describe(state: dict, running: bool, exit_code: int | None, game: str | None
     if addon_missing:
         first = (RED, "Аддон не установлен — «Установить» в блоке «Игра»")
     elif running:
-        first = (GREEN, "Компаньон работает") if phase == "running" else (YELLOW, "Компаньон запускается…")
+        first = (GREEN, "Озвучка работает") if phase == "running" else (YELLOW, "Озвучка запускается…")
     elif exit_code is None:
-        first = (GREY, "Компаньон не запущен")
+        first = (GREY, "Озвучка не запущена")
     elif phase == "error" and state.get("error"):
-        first = (RED, "Компаньон: " + state["error"][:90])
+        first = (RED, "Озвучка: " + state["error"][:90])
     elif phase == "game_closed":
-        first = (GREY, "Компаньон остановлен: игра закрыта")
+        first = (GREY, "Озвучка остановлена: игра закрыта")
     else:
-        first = (RED if exit_code else GREY, EXIT_WORDS.get(exit_code, "Компаньон остановлен"))
+        first = (RED if exit_code else GREY, EXIT_WORDS.get(exit_code, "Озвучка остановлена"))
 
     second = (GREEN, f"{game} запущена") if game else (GREY, "Игра не запущена")
 
@@ -287,7 +287,7 @@ def describe(state: dict, running: bool, exit_code: int | None, game: str | None
     if not running:
         fourth = (GREY, "Мост: нет связи")
     elif state.get("mismatch") == "newer":
-        fourth = (RED, "Мост: аддон новее программы — обнови Barrens Voice")
+        fourth = (RED, "Мост: аддон новее лаунчера — обнови Barrens Voice Launcher")
     elif state.get("mismatch") == "older":
         fourth = (RED, "Мост: аддон устарел — «обновить аддон» и /reload")
     elif state.get("linked"):
@@ -496,7 +496,7 @@ def report_header(version: str, state: dict, config: dict, games: list, running_
         f"Видеокарты: {', '.join(gpus) or 'Windows не назвала'}",
         f"Голоса рас: {voices}",
         f"Игры: {played}. Запущена: {GAME_NAMES.get(running_game, 'нет') if running_game else 'нет'}",
-        f"Компаньон: {phase if running else f'не запущен (в прошлый раз: {phase})'}",
+        f"Озвучка: {phase if running else f'не запущена (в прошлый раз: {phase})'}",
     ]
     # one setting a line: a value may have commas of its own (game_dirs, a list)
     changed = changed_settings(config, DEFAULT_CONFIG)

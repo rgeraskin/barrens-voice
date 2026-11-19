@@ -38,19 +38,19 @@ TOP, GAP, ROW1 = 100, 14, 140                   # State and Start: one height
 MAIN_COLORS = {"WARN": "#e0b33a", "ERROR": "#ff6a5a"}
 # hints on the main window's checks and links (what the window does not show by itself)
 TIPS = {
-    "launch_wow": "Открываешь Barrens Voice ярлыком — он сразу запускает игру через Battle.net и уходит в трей. "
+    "launch_wow": "Открываешь лаунчер ярлыком — он сразу запускает игру через Battle.net и уходит в трей. "
                   "При входе в Windows игра сама не запускается.",
-    "exit_with_wow": "Игра закрылась — озвучка выключается и освобождает память (если Barrens Voice запущен при входе "
+    "exit_with_wow": "Игра закрылась — озвучка выключается и освобождает память (если лаунчер запущен при входе "
                      "в Windows, он остаётся ждать игру в трее). Выключено — озвучка остаётся включённой до следующей "
                      "игры, голоса рас занимают видеопамять.",
-    "autostart": "Barrens Voice запускается при входе в Windows и ждёт в трее (значок у часов). Озвучка включается "
+    "autostart": "Лаунчер запускается при входе в Windows и ждёт в трее (значок у часов). Озвучка включается "
                  "сама, когда ты запустишь игру. До этого ничего не загружается и видеопамять свободна.",
     "install": "Скопировать аддон Barrens Voice в папку игры (Interface\\AddOns\\BarrensVoice). "
                "Если игра запущена — потом /reload.",
-    "update_now": "Версия готова и сама установится, когда ты закроешь игру. Установить сейчас — Barrens Voice "
+    "update_now": "Версия готова и сама установится, когда ты закроешь игру. Установить сейчас — лаунчер "
                   "перезапустится с ней, озвучка прервётся примерно на полминуты (пока загружаются голоса). "
                   "Если менялся аддон — в игре потом нужен /reload.",
-    "update": "Заменить аддон в игре версией, которая пришла с Barrens Voice. Твои настройки аддона сохранятся. "
+    "update": "Заменить аддон в игре версией, которая пришла с лаунчером. Твои настройки аддона сохранятся. "
               "Если игра запущена — потом /reload.",
 }
 SHOW_FILE = DATA_DIR / "tmp" / "launcher.show"   # a second launcher asks the first to show itself
@@ -95,7 +95,7 @@ class App:
         self.root, self.args, self.scale = root, args, scale
         self.resident = resident = args["tray"]
         self.title_font = register_font()
-        root.title("Barrens Voice")
+        root.title("Barrens Voice Launcher")
         root.resizable(False, False)
         window_icon(root)
         self.canvas = ScaledCanvas(root, scale, width=W, height=560, highlightthickness=0, bg="#0b0705")
@@ -176,7 +176,7 @@ class App:
                 self.running_game = launch.running_game()[0]
             self.start_on_open()
             if self.config.get("launch_wow") and self.companion.running and not self.running_game:
-                self.hide(told="Barrens Voice запускает игру и ждёт её в трее — щёлкни значок, чтобы открыть окно.")
+                self.hide(told="Лаунчер запускает игру и ждёт её в трее — щёлкни значок, чтобы открыть окно.")
         if args["open"]:                           # --open settings|help: straight to that window
             root.after(300, {"settings": self.open_settings, "help": self.open_help, "log": self.open_log}.get(args["open"], lambda: None))
         root.after(TICK_MS, self.tick)
@@ -285,7 +285,7 @@ class App:
         from ..__main__ import write_live
         write_live(self.config)                # «Закрываться вместе с игрой» as the window has it, read live
         self.companion.start([f"--{self.selected}", *extra, *flags])
-        self.say(f"компаньон запускается ({GAME_NAMES[self.selected]})")
+        self.say(f"озвучка запускается ({GAME_NAMES[self.selected]})")
         return True
 
     def stop_companion(self, then=None, why="stopping") -> None:
@@ -302,7 +302,7 @@ class App:
         threading.Thread(target=work, daemon=True, name="companion-stop").start()
 
     def restart_companion(self, args: list[str] | None = None) -> None:
-        self.say("перезапускаю компаньон")
+        self.say("перезапускаю озвучку")
         self.stop_companion(lambda: self.start_companion(args), why="restarting")
 
     def settle_running(self, now: float) -> None:
@@ -326,7 +326,7 @@ class App:
                                        say=lambda message: self.say(message, "ERROR"))
             if back:
                 self.say(f"версия {self.version} не запускается — вернулся на {back}", "ERROR")
-                self.tray.notify(f"Новая версия Barrens Voice не запустилась, вернулся на {back}. "
+                self.tray.notify(f"Новая версия лаунчера не запустилась, вернулся на {back}. "
                                  "Подробности — в журнале.")
                 self.relaunch()
                 return
@@ -339,7 +339,7 @@ class App:
                              "запустит её снова, а скрытый чат в игре вернёт /reload.")
         state = self.companion.state()
         if Companion.wants_restart(code):
-            self.say("компаньону нужна сеть для моделей — запускаю снова")
+            self.say("озвучке нужна сеть для моделей — запускаю снова")
             self.start_companion()
             return
         if state.get("phase") == "game_closed":
@@ -350,7 +350,7 @@ class App:
                 self.quit()
             return
         if code not in (0, None):
-            self.say(f"компаньон остановился (код {code}) — подробности в «Журнале»", "ERROR")
+            self.say(f"озвучка остановилась (код {code}) — подробности в «Журнале»", "ERROR")
 
     def start_failed(self, code: int | None) -> bool | None:
         """How the companion's end counts for a freshly applied version (update.record_start): True - an error,
@@ -417,9 +417,9 @@ class App:
     def install_addon(self, g, ask=False) -> bool:
         source = model.addon_source()
         if source is None:
-            self.say("аддона нет рядом с Barrens Voice — переустанови его", "WARN")
+            self.say("аддона нет рядом с лаунчером — переустанови его", "WARN")
             return False
-        if ask and not messagebox.askyesno("Barrens Voice", f"В {g.name} нет аддона Barrens Voice. Установить его?",
+        if ask and not messagebox.askyesno("Barrens Voice Launcher", f"В {g.name} нет аддона Barrens Voice. Установить его?",
                                            parent=self.root):
             return False
         try:
@@ -444,7 +444,7 @@ class App:
         else:
             self.set_config(**{key: not self.config.get(key)})
             if self.companion.running and key != "exit_with_wow":     # that one the companion reads at once
-                self.say("изменение подействует при следующем запуске компаньона")
+                self.say("изменение подействует при следующем запуске озвучки")
         self.redraw()
 
     def open_log(self) -> None:
@@ -472,7 +472,7 @@ class App:
             self.hide()
             return
         if (self.running_game and self.companion.running and not messagebox.askyesno(
-                "Barrens Voice", "Игра запущена — озвучка чата остановится. Закрыть Barrens Voice?", parent=self.root)):
+                "Barrens Voice Launcher", "Игра запущена — озвучка чата остановится. Закрыть Barrens Voice Launcher?", parent=self.root)):
             return
         self.quit()
 
@@ -482,7 +482,7 @@ class App:
             return
         self.root.withdraw()
         if told or not self.config.get("launcher_tray_told"):
-            self.tray.notify(told or "Barrens Voice работает в трее: щёлкни значок, чтобы открыть окно. "
+            self.tray.notify(told or "Barrens Voice Launcher работает в трее: щёлкни значок, чтобы открыть окно. "
                                      "Выйти — правой кнопкой по значку.")
             if not self.config.get("launcher_tray_told"):
                 self.set_config(launcher_tray_told=True)
@@ -602,7 +602,7 @@ class App:
         if self.updater is None or not self.updater.ready or self.busy:
             return
         if self.running_game and not messagebox.askyesno(
-                "Barrens Voice", "Установить новую версию сейчас? Озвучка прервётся примерно на полминуты.", parent=self.root):
+                "Barrens Voice Launcher", "Установить новую версию сейчас? Озвучка прервётся примерно на полминуты.", parent=self.root):
             return
 
         def switch():
@@ -636,7 +636,7 @@ class App:
                                GAME_NAMES.get(self.running_game) if self.running_game else None,
                                self.addon_missing() and not self.companion.running)
         if self.busy:
-            lines[0] = (model.YELLOW, "Компаньон перезапускается…" if self.busy == "restarting" else "Компаньон останавливается…")
+            lines[0] = (model.YELLOW, "Озвучка перезапускается…" if self.busy == "restarting" else "Озвучка останавливается…")
         show_update = bool(self.update) and self.config.get("launcher_dismissed") != self.update["version"]
         games = tuple((g.key, g.addon, str(g.root)) for g in self.games)
         progress = model.main_lines(list(self.main))
@@ -663,7 +663,7 @@ class App:
         h = bottom + 30
         c.config(height=h)
         p.background(W, h)
-        p.title(W, "Barrens Voice", "озвучка чата голосами рас")
+        p.title(W, "Barrens Voice Launcher", "озвучка чата голосами рас")
 
         # row 1: State | Start
         p.panel(LX0, TOP, LX1, TOP + ROW1, "Состояние")
@@ -672,7 +672,7 @@ class App:
             c.create_oval(LX0 + 16, yy - 5, LX0 + 26, yy + 5, fill=color, outline="")
             c.create_text(LX0 + 36, yy, text=p.fit(text, p.body, LX1 - LX0 - 50), anchor="w", fill=PARCHMENT, font=p.body)
         p.panel(RX0, TOP, RX1, TOP + ROW1, "Запуск")
-        for i, (key, text, on) in enumerate((("launch_wow", "Запускать игру вместе с Barrens Voice", launch_wow),
+        for i, (key, text, on) in enumerate((("launch_wow", "Запускать игру вместе с лаунчером", launch_wow),
                                              ("exit_with_wow", "Закрываться вместе с игрой", exit_with_wow),
                                              ("autostart", "Запускать при входе в Windows", autostart))):
             p.check(RX0 + 14, TOP + 48 + i * 24, text, bool(on), f"check{i}", lambda k=key: self.toggle(k), tip=TIPS[key])
@@ -718,7 +718,7 @@ class App:
             c.create_text(RX0 + 26, y0 + 34, text=p.fit(str(g.root), p.small, RX1 - RX0 - 52), anchor="w", fill=DIM,
                           font=p.small, tags=tag)
         c.create_text(RX0 + 14, y2 + 36 + n * 56, anchor="nw", width=RX1 - RX0 - 28, fill=DIM, font=p.small,
-                      text="Запускаешь игру прямо из Battle.net — компаньон подхватит её сам.")
+                      text="Запускаешь игру прямо из Battle.net — лаунчер подхватит её сам.")
 
         # row 3: the buttons under the log | Play under Game
         bw = (LX1 - LX0 - 2 * 10) / 3
@@ -761,7 +761,7 @@ class App:
 
     def _child(self, title: str, width: int, height: int):
         win = tk.Toplevel(self.root)
-        win.title(f"Barrens Voice — {title}")
+        win.title(f"Barrens Voice Launcher — {title}")
         win.resizable(False, False)
         win.transient(self.root)
         if self.root.winfo_viewable():           # over the main window, not in the screen's corner
@@ -864,12 +864,12 @@ class App:
         def save():
             changes = edited()
             if changes is None:
-                messagebox.showerror("Barrens Voice", "Дни хранения журналов — целое число.", parent=win)
+                messagebox.showerror("Barrens Voice Launcher", "Дни хранения журналов — целое число.", parent=win)
                 return
             missing = [GAME_NAMES[g] for g, d in changes["game_dirs"].items()
                        if d and not (Path(d) / "Wow.exe").is_file()]
             if missing:
-                messagebox.showerror("Barrens Voice", f"Не нашёл Wow.exe в папке {', '.join(missing)}.", parent=win)
+                messagebox.showerror("Barrens Voice Launcher", f"Не нашёл Wow.exe в папке {', '.join(missing)}.", parent=win)
                 return
             changed = differs(changes)
             try:
@@ -877,7 +877,7 @@ class App:
             except model.BrokenConfig as e:
                 fix = ("Сними с него «Только чтение» или закрой программу, которая его держит"
                        if isinstance(e, model.ConfigNotWritten) else "Исправь его («Открыть config.json»)")
-                messagebox.showerror("Barrens Voice", f"{e}\n\n{fix} и сохрани настройки снова.", parent=win)
+                messagebox.showerror("Barrens Voice Launcher", f"{e}\n\n{fix} и сохрани настройки снова.", parent=win)
                 return
             self.games = model.find_games(self.config)
             win.destroy()
@@ -899,7 +899,7 @@ class App:
             """The cross and «Закрыть»: changes not saved are asked about, not lost silently."""
             changes = edited()
             if changes is None or differs(changes):
-                answer = messagebox.askyesnocancel("Barrens Voice", "Сохранить изменения в настройках?", parent=win)
+                answer = messagebox.askyesnocancel("Barrens Voice Launcher", "Сохранить изменения в настройках?", parent=win)
                 if answer is None:
                     return
                 if answer:
@@ -1026,7 +1026,7 @@ def main() -> int:
         root = tk.Tk()
         root.withdraw()
         text = (f"Неизвестно: {' '.join(args['unknown'])}\n\n" if args["unknown"] else "") + model.USAGE
-        messagebox.showinfo("Barrens Voice", text, parent=root)
+        messagebox.showinfo("Barrens Voice Launcher", text, parent=root)
         return 0 if args["help"] else 2
     if args["console"]:
         run_in_console(args)

@@ -121,4 +121,4 @@ class Companion:
             handle = win32api.OpenProcess(win32con.PROCESS_SET_QUOTA | win32con.PROCESS_TERMINATE, False, proc.pid)
             win32job.AssignProcessToJobObject(self.job, handle)
         except Exception as e:  # noqa: BLE001 - without it the companion may outlive a killed launcher
-            self.on_line(f"{time.strftime('%H:%M:%S')} [лаунчер] не удалось привязать компаньон к лаунчеру: {e}")
+            self.on_line(f"{time.strftime('%H:%M:%S')} [лаунчер] не удалось привязать озвучку к лаунчеру: {e}")

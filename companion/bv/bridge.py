@@ -95,7 +95,7 @@ class StripReader:
             if not self.foreign_told and now - self.foreign_since > self.FOREIGN_AFTER:
                 which, words = protocol.mismatch(other_version)
                 self.log(words)
-                self.log(f"    протокол полоски: у аддона {other_version}, у программы {protocol.VERSION}")
+                self.log(f"    протокол полоски: у аддона {other_version}, у лаунчера {protocol.VERSION}")
                 self.foreign_told = True
                 self.report(mismatch=which)
         elif self.foreign_since is not None:

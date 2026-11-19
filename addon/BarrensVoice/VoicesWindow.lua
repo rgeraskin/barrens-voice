@@ -160,7 +160,7 @@ function V.Create(pane, width)
     empty = window:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     empty:SetPoint("CENTER")
     empty:SetWidth(420)
-    empty:SetText("Список пуст: запусти приложение-компаньон (оно запишет голоса в аддон) и сделай /reload.")
+    empty:SetText("Список пуст: запусти Barrens Voice Launcher (он запишет голоса в аддон) и сделай /reload.")
 
     window:SetScript("OnShow", Refresh)
     return -(y - 28)

@@ -196,7 +196,7 @@ def write(addon: Path | None, log, root: Path | None = None) -> bool:
         log(f"не удалось прочитать {SOURCE}: {e}")
         return False
     if not VERSION.fullmatch(version):
-        log(f"не удалось записать «Что нового» в аддон: версия программы {version!r}")
+        log(f"не удалось записать «Что нового» в аддон: версия лаунчера {version!r}")
         return False
     from .paths import write_if_changed
     try:

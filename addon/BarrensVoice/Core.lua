@@ -240,7 +240,7 @@ local function TellLong(long)
         for _, line in ipairs(long) do
             if not seen[line] then
                 -- "|" starts the chat's markup: "||" shows one (a regex is full of them)
-                print(SAY .. ("строка словаря длиннее %d байт, компаньону она не передаётся. Разбей её на "
+                print(SAY .. ("строка словаря длиннее %d байт, в лаунчер она не передаётся. Разбей её на "
                     .. "несколько: %s…"):format(DICT_PART, (ns.Protocol.TrimUTF8(line, 60):gsub("|", "||"))))
                 break
             end
@@ -423,11 +423,11 @@ function ns.OpenLink(key)
     if not link then return end
     if LinkInChat(link) then return end
     if not ns.db.enabled then
-        print(SAY .. ("%s: озвучка выключена, и компаньон страницу не откроет. Адрес: %s"):format(link[1], link[2]))
+        print(SAY .. ("%s: озвучка выключена, и лаунчер страницу не откроет. Адрес: %s"):format(link[1], link[2]))
         return
     end
     AskCompanion("open", key)
-    print(SAY .. ("%s: компаньон откроет страницу в браузере. Если не открылась (компаньон не запущен) — адрес: %s")
+    print(SAY .. ("%s: Barrens Voice Launcher откроет страницу в браузере. Если не открылась (он не запущен) — адрес: %s")
         :format(link[1], link[2]))
 end
 
@@ -436,17 +436,17 @@ function ns.CopyLink(key)
     local link = ns.LINKS[key]
     if not link then return end
     if not ns.db.enabled then
-        print(SAY .. ("%s: озвучка выключена, и компаньон адрес не скопирует. Щёлкни по адресу в настройках и "
+        print(SAY .. ("%s: озвучка выключена, и лаунчер адрес не скопирует. Щёлкни по адресу в настройках и "
             .. "нажми Ctrl+C."):format(link[1]))
         return
     end
     AskCompanion("copy", key)
-    print(SAY .. ("%s: компаньон положит адрес в буфер обмена — вставь его в браузер (Ctrl+V). Если компаньон не "
+    print(SAY .. ("%s: Barrens Voice Launcher положит адрес в буфер обмена — вставь его в браузер (Ctrl+V). Если он не "
         .. "запущен, щёлкни по адресу в настройках и нажми Ctrl+C."):format(link[1]))
 end
 
 StaticPopupDialogs["BARRENSVOICE_RESET"] = {
-    text = "Раздать голоса рас заново?\n\nКомпаньон забудет, у кого какой голос был, и выдаст их снова — "
+    text = "Раздать голоса рас заново?\n\nЛаунчер забудет, у кого какой голос был, и выдаст их снова — "
         .. "так же, без повторов, начиная с тех, кто заговорит первым.",
     button1 = YES, button2 = NO,
     OnAccept = function() ns.ResetVoices() end,
@@ -482,11 +482,11 @@ function ns.SetVoices(value)
     ns.SendControl()
     if not ns.db.enabled then        -- the settings go to the companion at /bv on
         print(SAY .. (value == "f5" and "голоса рас" or "голоса Windows")
-            .. ". Компаньон переключится на них, когда ты включишь озвучку (/bv on).")
+            .. ". Озвучка переключится на них, когда ты её включишь (/bv on).")
     elseif value == "f5" then
-        print(SAY .. "голоса рас. Компаньон загружает модель — около 15 секунд, пока читают голоса Windows.")
+        print(SAY .. "голоса рас. Модель загружается около 15 секунд, пока читают голоса Windows.")
     else
-        print(SAY .. "голоса Windows. Компаньон выгружает модель голосов рас.")
+        print(SAY .. "голоса Windows. Модель голосов рас выгружается.")
     end
 end
 
@@ -891,8 +891,8 @@ function ns.Welcome()
     local version = Version()
     print(SAY .. ("|cffffd100добро пожаловать!|r Barrens Voice %s — озвучка чата: у каждого игрока свой голос "
         .. "его расы и пола."):format(version))
-    print(PREFIX .. "читает вслух приложение-компаньон Barrens Voice (Windows): без него аддон молчит. Удобнее всего "
-        .. "запускать игру через него — оно само запустит игру.")
+    print(PREFIX .. "читает вслух Barrens Voice Launcher — программа для Windows: без него аддон молчит. Удобнее всего "
+        .. "запускать игру через него — он сам её запустит.")
     print(PREFIX .. "настройки — значок у миникарты или /bv. Команды — /bv help.")
     print(PREFIX .. HELP_HINT)
 end
@@ -1002,7 +1002,7 @@ SlashCmdList.BARRENSVOICE = function(msg)
         print("  " .. G .. "/bv stop|r — замолчать сейчас и очистить очередь, не выключая")
         print("  " .. G .. "/bv test|r — четыре тестовые строки разными голосами")
         print("  " .. G .. "/bv last 5|r — ещё раз прочитать последние 5 строк чата (через текущий словарь)")
-        print("  " .. G .. "/bv debug|r — отладка: почему строка чата не прочитана — в журнал компаньона")
+        print("  " .. G .. "/bv debug|r — отладка: почему строка чата не прочитана — в журнал лаунчера")
         print("  " .. G .. "/bv reset-voices|r — раздать голоса рас заново (спросит)")
         print("  " .. G .. "/bv news|r — что нового в последних версиях")
         print("  " .. G .. "/bv help|r — этот список")
@@ -1012,7 +1012,7 @@ SlashCmdList.BARRENSVOICE = function(msg)
         ns.Test()
     elseif msg == "stop" then
         if not ns.db.enabled then
-            print(SAY .. "озвучка и так выключена: компаньон молчит.")   -- /bv off stopped it
+            print(SAY .. "озвучка и так выключена.")   -- /bv off stopped it
         else
             ns.Stop()
             print(SAY .. "замолкаю (очередь очищена).")
@@ -1023,8 +1023,8 @@ SlashCmdList.BARRENSVOICE = function(msg)
         ns.db.debug = not ns.db.debug
         -- CatQuest and Wayfarer are Forever's addons: not a word of them on retail
         print(SAY .. (ns.db.debug
-            and ("отладка включена: строки чата, которые аддон не отправил, с причиной%s — в журнале компаньона "
-                .. "(кнопка «Журнал» в окне Barrens Voice, строки «диагностика аддона»).")
+            and ("отладка включена: строки чата, которые аддон не отправил, с причиной%s — в журнале лаунчера "
+                .. "(кнопка «Журнал» в окне Barrens Voice Launcher, строки «диагностика аддона»).")
                 :format(ns.Retail() and "" or ", и речь CatQuest и Wayfarer")
             or "отладка выключена."))
     elseif msg == "on" or msg == "off" then

@@ -59,7 +59,7 @@ function W.Create(pane, close)
     note:SetPoint("TOPLEFT", 22, y)
     note:SetPoint("RIGHT", -18, 0)
     note:SetJustifyH("LEFT")
-    note:SetText("Мост — тонкая тёмная линия у края экрана: через неё аддон передаёт строки чата компаньону. Если её "
+    note:SetText("Мост — тонкая тёмная линия у края экрана: через неё аддон передаёт строки чата лаунчеру. Если её "
         .. "закрывает другой аддон (рисует что-то в том же месте), перенеси её. Оранжевая рамка показывает, где она будет.")
     UI.TextTooltip(window, note, ns.BRIDGE_TIP)
     y = y - 36
@@ -113,7 +113,7 @@ function W.Create(pane, close)
         function(v) pending.from = v and "right" or "left" end)
     local save = UI.Button(window, "Сохранить", 120, function() W.Save() end)
     save:SetPoint("TOPLEFT", 300, y)
-    UI.Tooltip(save, "Перенести линию. Компаньон узнаёт новое место от аддона ещё по старой линии, затем линия переезжает.")
+    UI.Tooltip(save, "Перенести линию. Лаунчер узнаёт новое место от аддона ещё по старой линии, затем линия переезжает.")
     local cancel = UI.Button(window, "Отмена", 110, function() if W.close then W.close() end end)
     cancel:SetPoint("TOPLEFT", 430, y)
     y = y - 32

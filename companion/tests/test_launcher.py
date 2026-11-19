@@ -369,7 +369,7 @@ class StateLines(unittest.TestCase):
         self.assertIn("config.json", describe({}, False, 5, None, False)[0][1])
         self.assertIn("игра закрыта", describe({"phase": "game_closed"}, False, 0, None, False)[0][1])
         error = describe({"phase": "error", "error": "аддон не установлен"}, False, 1, None, False)[0]
-        self.assertEqual(error, (RED, "Компаньон: аддон не установлен"))
+        self.assertEqual(error, (RED, "Озвучка: аддон не установлен"))
         self.assertEqual(describe({"voices": "ready"}, False, 0, None, False)[2][0], GREY)  # stale file: not ready
 
     def test_bridge(self):
@@ -501,12 +501,12 @@ class LogLines(unittest.TestCase):
 
     def test_progress_kept_in_one_line(self):
         from bv.launcher.model import main_lines
-        items = [("04:45:32", "INFO", "компаньон запускается"), ("04:45:32", "DEBUG", "детали"),
+        items = [("04:45:32", "INFO", "озвучка запускается"), ("04:45:32", "DEBUG", "детали"),
                  ("04:45:46", "INFO", "собираю голоса рас из игры — несколько минут ..."),
                  ("04:45:56", "INFO", "собираю голоса рас: 3 из 66"), ("04:45:57", "WARN", "что-то"),
                  ("04:46:06", "INFO", "собираю голоса рас: 7 из 66")]
         self.assertEqual([m for _, _, m in main_lines(items)],
-                         ["компаньон запускается", "что-то", "собираю голоса рас: 7 из 66"])
+                         ["озвучка запускается", "что-то", "собираю голоса рас: 7 из 66"])
         items.append(("04:49:06", "INFO", "голоса рас собраны: 66 из 66 за 3 мин"))
         self.assertEqual([m for _, _, m in main_lines(items)][-1], "голоса рас собраны: 66 из 66 за 3 мин")
         self.assertEqual(len([m for _, _, m in main_lines(items) if "голоса рас" in m]), 1)
@@ -518,7 +518,7 @@ class Mismatch(unittest.TestCase):
     def test_bridge_line(self):
         from bv.launcher.model import RED, describe
         self.assertEqual(describe({"mismatch": "newer", "linked": True}, True, None, "WoW Forever", False)[3],
-                         (RED, "Мост: аддон новее программы — обнови Barrens Voice"))
+                         (RED, "Мост: аддон новее лаунчера — обнови Barrens Voice Launcher"))
         self.assertIn("/reload", describe({"mismatch": "older"}, True, None, "WoW Forever", False)[3][1])
 
 
@@ -652,7 +652,7 @@ class Report(unittest.TestCase):
         stopped = model.report_header("0.4.0", dict(state, phase="stopped"), {"_help": "x"}, [], None,
                                       running=False, gpus=[], runtime="x")
         self.assertIn("Видеокарты: RTX", stopped)                       # from the state when Windows lists none
-        self.assertIn("Компаньон: не запущен (в прошлый раз: stopped)", stopped)
+        self.assertIn("Озвучка: не запущена (в прошлый раз: stopped)", stopped)
         self.assertIn("Настройки не по умолчанию: нет", stopped)
 
 
@@ -2061,7 +2061,7 @@ class UpdateInWindow(unittest.TestCase):
 
     def test_update_after_the_game_closed(self):
         # closing with the game: the version is switched, no restart (it reopened the window, or started the game
-        # again with «Запускать игру вместе с Barrens Voice»); else the restart that does not start the game
+        # again with «Запускать игру вместе с лаунчером»); else the restart that does not start the game
         self.assertEqual(self.ended_with_the_game(exit_with_wow=True), ["apply", "quit"])
         self.assertEqual(self.ended_with_the_game(exit_with_wow=False), ["apply", ("relaunch", True)])
         self.assertEqual(self.ended_with_the_game(exit_with_wow=True, resident=True), ["apply", ("relaunch", True)])

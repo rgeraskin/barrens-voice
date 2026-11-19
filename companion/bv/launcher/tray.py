@@ -10,7 +10,7 @@ from .paint import ICON_FILE
 
 
 class Tray:
-    def __init__(self, events: queue.Queue, title: str = "Barrens Voice"):
+    def __init__(self, events: queue.Queue, title: str = "Barrens Voice Launcher"):
         self.events, self.title = events, title
         self.icon = None
 

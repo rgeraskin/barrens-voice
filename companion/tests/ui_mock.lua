@@ -1150,7 +1150,7 @@ assert(Co.State() == "stopped", "a time over 45 s old: not running")
 Co.Read(nil, 1100)
 assert(Co.State() == "stopped", "no time at all (the file as shipped): not running")
 Co.SayAtLogin()
-assert(said[2]:find("приложение%-компаньон Barrens Voice не запущено — чат будет озвучиваться, как только"), tostring(said[2]))
+assert(said[2]:find("Barrens Voice Launcher не запущен — чат будет озвучиваться, как только", 1, true), tostring(said[2]))
 assert(#said == 2 and not ns.db.fadeChat, "the hidden chat off: no line about it")
 assert(Co.Describe():find("не был запущен") and not Co.Describe():find("reload"), Co.Describe())
 ns.db.fadeChat = true                        -- the hidden chat on: the status says what it needs
@@ -1169,9 +1169,9 @@ assert(not ns.ChatFade.Voiced())
 assert(ChatFrame1:GetAlpha() == 1, "no companion: the chat is not faded")
 local before = #said
 Co.SayAtLogin()
-assert(#said == before + 2 and said[before + 1]:find("не запущено — чат будет озвучиваться, как только ты его запустишь.$")
+assert(#said == before + 2 and said[before + 1]:find("не запущен — чат будет озвучиваться, как только ты его запустишь.$")
     and said[#said] == "|cff66ccffBarrens Voice|r: прозрачный чат пока выключен: включится только после /reload, "
-        .. "когда компаньон заработает.", "the hidden chat off: a line of its own - " .. tostring(said[#said]))
+        .. "когда заработает лаунчер.", "the hidden chat off: a line of its own - " .. tostring(said[#said]))
 Co.Read({ beat = 1000 }, 1010)
 ns.ChatFade.Apply()
 for _ = 1, 10 do ns.ChatFade.Update(nil, 0.3) end
@@ -1196,7 +1196,7 @@ GetAddOnMetadata = function() return "0.4.0b1" end
 ns.firstRun, ns.db.seenVersion, ns.db.newsSeen = true, nil, nil
 ns.LoginWord()
 assert(#welcome == 5 and welcome[1]:find("озвучка чата") and welcome[2]:find("добро пожаловать")
-    and welcome[3]:find("приложение%-компаньон") and welcome[5]:find("«Помощь»", 1, true)
+    and welcome[3]:find("Barrens Voice Launcher — программа для Windows", 1, true) and welcome[5]:find("«Помощь»", 1, true)
     and welcome[5]:find("сообщество в Battle.net", 1, true), "whether the reading works, then the welcome")
 assert(welcome[2]:find("Barrens Voice 0.4.0b1", 1, true), "the welcome names the addon's version")
 assert(welcome[2]:sub(1, #ns.ICON + 1) == ns.ICON .. " " and welcome[2]:find(ns.PREFIX, 1, true)

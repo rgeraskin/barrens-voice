@@ -127,7 +127,7 @@ STATES = [   # the companion's state file: every line describe() can say
     ({"phase": "running", "voices": "ready", "mismatch": "newer"}, True, None),
     ({"phase": "running", "voices": "ready", "mismatch": "older"}, True, None),
 ]
-LOG = [("04:45:32", "INFO", "компаньон запускается (WoW Forever)"),
+LOG = [("04:45:32", "INFO", "озвучка запускается (WoW Forever)"),
        ("04:45:46", "INFO", "собираю голоса рас: 23 из 66"),
        ("04:46:00", "WARN", "в WoW Forever нет аддона — «установить аддон» справа"),
        ("04:46:01", "ERROR", "очень длинная строка журнала без пробелов " + "x" * 80),

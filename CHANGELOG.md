@@ -142,6 +142,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   Not only the welcome, the community and «Что нового»: the login line, the answers to the commands and buttons and the warnings too, before «Barrens Voice:» on a message's first line; its next lines (the welcome's, the community's second, the list of commands) go without it.
 
+- The program is called Barrens Voice Launcher
+
+  The addon, the program on Windows and the mod all went by «Barrens Voice», and the program by three more names besides: «программа» in README, «приложение-компаньон» and «компаньон» in the game and the launcher. Now the program is «Barrens Voice Launcher» («лаунчер» for short) in README, the addon's messages and settings, the launcher's window, dialogs, tray and log, and what reads aloud inside it is «озвучка» («озвучка запускается», «озвучка остановилась»). «Barrens Voice» is the mod as a whole. The shortcuts, `Barrens Voice.exe` and the entry in Windows «Apps» keep their name.
+
 ### Removed
 
 - BREAKING: `WowChatVoice-Retail.cmd`

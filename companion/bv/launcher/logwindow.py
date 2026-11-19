@@ -67,7 +67,7 @@ class LogWindow:
         self.lines, self.log_dir, self.on_close = lines, Path(log_dir), on_close
         self.header = header           # () -> str: versions, card, settings (model.report_header)
         self.win = tk.Toplevel(root, bg=PANEL)
-        self.win.title("Barrens Voice — журнал")
+        self.win.title("Barrens Voice Launcher — журнал")
         self.win.geometry(f"{round(940 * scale)}x{round(600 * scale)}")
         self.win.minsize(round(560 * scale), round(300 * scale))
         self.win.protocol("WM_DELETE_WINDOW", self.close)

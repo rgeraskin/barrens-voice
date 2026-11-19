@@ -84,7 +84,7 @@ def signed(raw: bytes, signature: str, public: str = update.PUBLIC_KEY) -> tuple
     if not isinstance(data, dict):
         return None, "не описание словаря"
     if data.get("format") != FORMAT:
-        return None, f"формат {data.get('format')}, а программа читает {FORMAT}"
+        return None, f"формат {data.get('format')}, а лаунчер читает {FORMAT}"
     if not isinstance(data.get("text"), str) or not isinstance(data.get("renamed", {}), dict) \
             or not isinstance(data.get("revision"), int) or isinstance(data.get("revision"), bool):
         return None, "описание без текста или ревизии"

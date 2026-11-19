@@ -35,9 +35,9 @@ function C.SayAtLogin()
     if C.State() == "running" then
         print(prefix .. "озвучка чата работает.")
     else
-        print(prefix .. "приложение-компаньон Barrens Voice не запущено — чат будет озвучиваться, как только ты его запустишь.")
+        print(prefix .. "Barrens Voice Launcher не запущен — чат будет озвучиваться, как только ты его запустишь.")
         if ns.db and ns.db.fadeChat then     -- its own line: easy to miss at the end of the first
-            print(plain .. "прозрачный чат пока выключен: включится только после /reload, когда компаньон заработает.")
+            print(plain .. "прозрачный чат пока выключен: включится только после /reload, когда заработает лаунчер.")
         end
     end
 end
@@ -45,7 +45,7 @@ end
 --- The state as the settings window says it - for information: the chat is read either way. What it changes is
 --- the hidden chat (ChatFade.lua), which hides the windows only when the companion ran at login: then a /reload.
 function C.Describe()
-    if C.State() == "running" then return "при входе в игру компаньон |cff40ff40был запущен|r" end
-    return "при входе в игру компаньон |cffffd100не был запущен|r"
+    if C.State() == "running" then return "при входе в игру лаунчер |cff40ff40был запущен|r" end
+    return "при входе в игру лаунчер |cffffd100не был запущен|r"
         .. (ns.db and ns.db.fadeChat and " — прозрачный чат включится после /reload" or "")
 end

@@ -1771,10 +1771,10 @@ class LogLevels(unittest.TestCase):
             "если окно чата не прячется — /reload в игре": "WARN",
             # where the strip is taken from at start: details, whichever the source
             "полоска (по сохранённым настройкам аддона): верх, x 0, y 0, ширина 1920 (экран 1920×1080)": "DEBUG",
-            "полоска (где её последний раз видел компаньон — новее сохранённых настроек аддона): верх, x 0, y 0, "
+            "полоска (где её последний раз видел лаунчер — новее сохранённых настроек аддона): верх, x 0, y 0, "
             "ширина 1920 (экран 1920×1080)": "DEBUG",
             "Голоса рас недоступны, читаю голосами Windows.": "WARN",
-            "ОШИБКА (программа): KeyError: 1": "ERROR",
+            "ОШИБКА (лаунчер): KeyError: 1": "ERROR",
             "F5-TTS: CUDA out of memory": "ERROR",
         }
         for message, level in cases.items():

@@ -83,7 +83,7 @@ MARKUP = re.compile(r"\|c[0-9a-fA-F]{8}|\|r|\|T.*?\|t|\|A.*?\|a")
 LABELS = {"party": "группа", "raid": "рейд", "warning": "объявление", "instance": "подземелье",
           "say": "сказать", "yell": "крик", "whisper": "шёпот", "guild": "гильдия", "officer": "офицеры",
           "channels": "канал", "emote": "эмоция", "test": "тест",
-          "notice": "программа"}
+          "notice": "лаунчер"}
 
 
 def speech_text(text: str, dictionary, inflector, declension: bool, restore_yo=lambda t: t) -> str:
@@ -242,7 +242,7 @@ def _write_config(path: Path, config: dict, log=log) -> bool:
             tmp.unlink(missing_ok=True)
         except OSError:
             pass
-        log(f"не удалось записать config.json ({e.strerror or e}) — файл остался как был, компаньон работает дальше")
+        log(f"не удалось записать config.json ({e.strerror or e}) — файл остался как был, озвучка работает дальше")
         return False
 
 
@@ -388,7 +388,7 @@ def install_crash_logging() -> None:
             for line in chunk.rstrip().splitlines():
                 log("  " + line)
 
-    sys.excepthook = lambda t, e, tb: report("программа", t, e, tb)
+    sys.excepthook = lambda t, e, tb: report("лаунчер", t, e, tb)
     threading.excepthook = lambda a: report(f"поток {a.thread.name if a.thread else '?'}", a.exc_type,
                                             a.exc_value, a.exc_traceback)
 
@@ -517,7 +517,7 @@ class Lines:
             # a service line of a newer addon: never read aloud what is not chat
             if line.kind not in self.unknown_kinds:
                 self.unknown_kinds.add(line.kind)
-                self.log(f"строки типа «{line.kind}» не озвучиваю (аддон новее программы?)")
+                self.log(f"строки типа «{line.kind}» не озвучиваю (аддон новее лаунчера?)")
         elif not line.text or first:
             return
         elif self.seen_lines.seen(line.options.get("id", "")):
@@ -599,7 +599,7 @@ def main() -> int:
         config, config_stamp = load_config_stamped()
     except (ConfigError, OSError) as e:                 # before anything else: nothing works without it
         log(f"ОШИБКА: {e}")
-        log("    исправь файл или удали его — компаньон создаст новый с настройками по умолчанию")
+        log("    исправь файл или удали его — лаунчер создаст новый с настройками по умолчанию")
         from . import state
         state.init(STATE_FILE, phase="error", error=str(e))
         return CONFIG_ERROR
@@ -630,7 +630,7 @@ def main() -> int:
         return fetch_models(config)
     log("=" * 60)
     if not single_instance():
-        log("компаньон уже запущен — второй не нужен, выхожу")
+        log("озвучка уже запущена — вторая не нужна, выхожу")
         return ALREADY
     STOP_FILE.unlink(missing_ok=True)
     if config.get("share_with_game", True):
@@ -639,7 +639,7 @@ def main() -> int:
     from .dictionary import game_of
     state.init(STATE_FILE, phase="starting", game=game_of(config))
     # the launcher says «компаньон запускается (игра)» itself: here only the details, for the full log
-    log(f"компаньон стартует, игра: {'WoW (ритейл)' if game_of(config) == 'retail' else 'WoW Forever'}, "
+    log(f"озвучка стартует, игра: {'WoW (ритейл)' if game_of(config) == 'retail' else 'WoW Forever'}, "
         f"настройки: {CONFIG_PATH}", "DEBUG")
     prune_logs(config["log_keep_days"])
     from . import launch
@@ -736,7 +736,7 @@ def main() -> int:
         place, source = known
         capturer.set_place(place)
         log(("полоска (по сохранённым настройкам аддона): " if source == "saved" else
-             "полоска (где её последний раз видел компаньон — новее сохранённых настроек аддона): ")
+             "полоска (где её последний раз видел лаунчер — новее сохранённых настроек аддона): ")
             + describe_place(place))
     from .bridge import StripReader
     strip = StripReader(capturer, config, log, state.report)

@@ -392,7 +392,7 @@ class ChatLines(unittest.TestCase):
         self.line("что-то ещё", kind="future")
         self.assertEqual(self.spoken(), ["Тралл: РАЗ"])
         self.assertEqual(self.logged[1:], ["строка 17 уже прочитана — пропускаю повтор",
-                                           "строки типа «future» не озвучиваю (аддон новее программы?)"])
+                                           "строки типа «future» не озвучиваю (аддон новее лаунчера?)"])
         self.assertEqual(self.engines.followed, ["party", "party", "party", "party", "future", "future"])
         self.lines.handle(None, False)                                    # a frame that is no line
         self.assertEqual(len(self.engines.followed), 6)

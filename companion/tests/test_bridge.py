@@ -148,7 +148,7 @@ class Bookkeeping(Base):
         self.assertEqual(self.take(), ([], []))
         self.at(3.1, failure="version", other=newer)
         which, words = protocol.mismatch(newer)
-        self.assertEqual(self.take(), ([words, f"    протокол полоски: у аддона {newer}, у программы {protocol.VERSION}"],
+        self.assertEqual(self.take(), ([words, f"    протокол полоски: у аддона {newer}, у лаунчера {protocol.VERSION}"],
                                        [{"mismatch": which}]))
         self.at(8, failure="version", other=newer)
         self.assertEqual(self.take(), ([], []))                    # told once
