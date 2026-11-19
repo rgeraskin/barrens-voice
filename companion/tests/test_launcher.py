@@ -2191,6 +2191,18 @@ class UpdateInWindow(unittest.TestCase):
         self.app.App.apply_update_when_idle(win(None, True, exit_with_wow=True))
         self.assertEqual(said, ["версия 0.4.1 установится, когда остановится озвучка"])
 
+    def test_no_autostart_while_config_json_does_not_read(self):
+        # a config.json that cannot be opened was read at every tick (400 ms) for the autostart, 0.1 s of waiting
+        # in the window's thread each time: the autostart waits for check_config to see it read
+        from bv.launcher import model
+
+        def win(error):
+            return self.ns(running_game="forever", companion=self.ns(running=False), busy="", exit_seen=True,
+                           last_code=None, config_error=error, game=lambda key: object(), addon_missing=lambda: False)
+        self.assertTrue(self.app.App.autostart_due(win(None)))
+        self.assertFalse(self.app.App.autostart_due(win(model.ConfigNotOpened("config.json не открывается: x"))))
+        self.assertFalse(self.app.App.autostart_due(win(model.BrokenConfig("config.json не читается"))))
+
     def test_turning_auto_updates_on_checks_at_once(self):
         # a version found with automatic updates off waited for the next hourly check after the box was ticked
         from unittest import mock

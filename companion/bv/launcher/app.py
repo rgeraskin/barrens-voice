@@ -601,13 +601,19 @@ class App:
         if self.companion.running and not self.reload_told and self.companion.state().get("reload_hint"):
             self.reload_told = True          # started after the player entered the world: say it outside the game too
             self.tray.notify("Озвучка включена. Если окно чата не прячется — сделай в игре /reload.")
-        # the game started from Battle.net while the companion is not running (waiting in the tray, or
-        # after the last game was closed): start it for that game - unless it ended with an error
-        if (self.running_game and not self.companion.running and not self.busy and self.exit_seen
-                and self.last_code in (0, None) and self.game(self.running_game) and not self.addon_missing()):
+        if self.autostart_due():                 # the game started from Battle.net
             self.selected = self.running_game
             self.start_companion(["--no-launch"])
         self.redraw()
+
+    def autostart_due(self) -> bool:
+        """The game started from Battle.net while the companion is not running (waiting in the tray, or after the
+        last game was closed): start it for that game - unless it ended with an error, or config.json does not
+        read. That one is not read again here, every tick: check_config looks every CONFIG_EVERY s (a file that
+        cannot be opened waits 0.1 s for its second try, in the window's thread) and clears it when it reads."""
+        return bool(self.running_game and not self.companion.running and not self.busy and self.exit_seen
+                    and self.last_code in (0, None) and getattr(self, "config_error", None) is None
+                    and self.game(self.running_game) and not self.addon_missing())
 
     def _check_update(self) -> None:
         """On its own thread: an install checks (and prepares) through its Updater; from the source - only tell."""
