@@ -53,6 +53,7 @@ class StripReader:
         self.absent_since, self.searched = None, 0.0
         self.damaged_since, self.damaged_told = None, False
         self.foreign_since, self.foreign_told = None, False
+        self.found = None               # a place the search found, kept once a frame is read from it
 
     def poll(self, now: float) -> Step:
         """One turn: the window (looked for every WINDOW_EVERY s), a grab of the strip, its frame."""
@@ -106,6 +107,9 @@ class StripReader:
             self._missed(failure, now)
             return Step(pause)
         self.misses = 0
+        if self.found is not None:                 # the search's place works: kept for a restart
+            self.capturer.remember(self.found)
+            self.found = None
         self.damaged_since = None
         if self.damaged_told:                      # readable again: a later cover is told again
             self.damaged_told = False
@@ -150,5 +154,6 @@ class StripReader:
         if hit and hit[:4] != self.capturer.rect:
             self.capturer.use(hit[:4])
             self.log(f"полоска найдена в другом месте: x {hit[0]}, y {hit[1]}, ширина {hit[2]}")
-            # kept for a restart: in the window's pixels, the window taken for the "screen"
-            self.capturer.remember((*hit[:4], whole[1], whole[2]))
+            # kept for a restart once a frame is read from there (a hit can be wrong: a strip half covered by
+            # another addon), in the window's pixels, the window taken for the "screen"
+            self.found = (*hit[:4], whole[1], whole[2])

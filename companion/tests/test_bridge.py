@@ -173,7 +173,7 @@ class Bookkeeping(Base):
         self.assertEqual(self.found, [((b"picture", 1920, 1080), {"width_hint": 1920, "capture_height": 64})])
         self.assertEqual(self.capturer.used, [(0, 1064, 600, 64)])
         self.assertEqual(self.take()[0], ["полоска найдена в другом месте: x 0, y 1064, ширина 600"])
-        self.assertEqual(self.capturer.kept, [(0, 1064, 600, 64, 1920, 1080)])   # kept for a restart, in window pixels
+        self.assertEqual(self.capturer.kept, [])                   # not before a frame is read from there
         self.at(7.0)
         self.assertEqual(len(self.found), 1)                       # every 5 s, not every poll
         self.at(7.2)
@@ -187,6 +187,21 @@ class Bookkeeping(Base):
         self.capturer.whole = None                                 # no picture of the window yet
         self.at(17.4)
         self.assertEqual((len(self.found), self.capturer.fulls), (3, 4))
+
+    def test_the_search_place_kept_once_read(self):
+        # a hit can be wrong (a strip half covered by another addon): kept for a restart only once a frame is
+        # read from the rectangle it gave, in the window's pixels
+        self.capturer.whole = (b"picture", 1920, 1080)
+        self.hit = (0, 1064, 600, 64, frame(1))
+        self.at(0)
+        self.at(2.1)
+        self.assertEqual(self.capturer.kept, [])
+        self.at(2.2)                                               # still nothing read there
+        self.assertEqual(self.capturer.kept, [])
+        self.at(2.3, frame(1))
+        self.assertEqual(self.capturer.kept, [(0, 1064, 600, 64, 1920, 1080)])
+        self.at(2.4, frame(2))
+        self.assertEqual(len(self.capturer.kept), 1)               # once
 
     def test_a_strip_thicker_than_asked_is_looked_for(self):
         self.strip.config["capture_height"] = 80
