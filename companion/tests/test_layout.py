@@ -367,6 +367,23 @@ class Layout(unittest.TestCase):
                 self.assertLessEqual(width, wrap + round(2 * 8 * scale) + 4, f"{name} ×{scale}: within the wrap width")
                 self.assertLess(height, 400 * scale, f"{name} ×{scale}: a hint, not a page")
 
+    def test_help_has_the_addons_links(self):
+        # the launcher's «Помощь» as the addon's tab: its words, the community first with the Battle.net logo
+        from bv.launcher.paint import HERE
+        from bv.links import LINKS
+        a = self.make()
+        a.open_help()
+        c = a.help_win.winfo_children()[0]
+        texts = [c.itemcget(i, "text") for i in c.find_all() if c.type(i) == "text"]
+        self.assertTrue(any(t.endswith("пиши в Discord, Telegram или в сообщество.") for t in texts), texts)
+        self.assertIn("А лучше сразу заведи issue на GitHub", texts)
+        names = [t for t in texts if t in ("Сообщество", "Discord", "Telegram", "GitHub")]
+        self.assertEqual(names, ["Сообщество", "Discord", "Telegram", "GitHub"])
+        boxes = [w.get() for w in c.winfo_children() if isinstance(w, tk.Entry)]
+        self.assertEqual(boxes, [LINKS[k] for k in ("community", "discord", "telegram", "github")])
+        self.assertTrue((HERE / "battlenet.png").is_file())
+        a.help_win.destroy()
+
     def test_settings_and_help(self):
         found: list[tuple[str, str]] = []
         for scale in (1.0, 1.25, 1.5):

@@ -27,7 +27,7 @@ from . import model
 from ..install import display_version, release_tag
 from ..paths import DATA_DIR, INSTALL_DIR, starter
 from .model import APP_DIR, GAME_NAMES
-from .paint import DIM, GOLD, PARCHMENT, Painter, ScaledCanvas, register_font, window_icon
+from .paint import DIM, GOLD, HERE, PARCHMENT, Painter, ScaledCanvas, register_font, window_icon
 from ..logs import level_of, parse
 from .process import Companion
 from .tray import Tray
@@ -1131,7 +1131,7 @@ class App:
             self.help_win.lift()
             return
         from ..links import LINKS
-        width, height = 760, 396
+        width, height = 760, 440
         win, c, p = self._child("Помощь", width, height)
         self.help_win = win
         win.icons = []
@@ -1142,29 +1142,33 @@ class App:
             Image = ImageTk = None
 
         def picture(name: str, size: int):
-            """A picture from the addon's Media (the same as in the game), or None."""
-            if Image is None or media is None:
+            """A picture from the addon's Media (the same as in the game), or the launcher's own (the community's
+            Battle.net logo: the addon's is the game's own texture), or None."""
+            path = HERE / f"{name}.png" if name == "battlenet" else media / "Media" / f"{name}.tga" if media else None
+            if Image is None or path is None:
                 return None
             try:
-                img = ImageTk.PhotoImage(Image.open(media / "Media" / f"{name}.tga").resize((round(size * self.scale),) * 2),
-                                         master=win)
+                img = ImageTk.PhotoImage(Image.open(path).resize((round(size * self.scale),) * 2), master=win)
             except OSError:
                 return None
             win.icons.append(img)
             return img
 
-        # three blocks a gap apart: what this is for, the links, what to send
-        c.create_text(30, 78, anchor="nw", fill=PARCHMENT, font=p.body,
-                      text="Ошибки, улучшения, предложения, или что-то прочитано неправильно — пиши в Discord или Telegram.")
-        github = "Или сразу заведи issue на GitHub"
+        # three blocks a gap apart: what this is for, the links, what to send. The words and the links are the
+        # addon's «Помощь» tab's (Options.lua), the community first
+        c.create_text(30, 78, anchor="nw", width=width - 60, fill=PARCHMENT, font=p.body,
+                      text="Ошибки, улучшения, предложения, или что-то прочитано неправильно — пиши в Discord, Telegram "
+                           "или в сообщество.")
+        github = "А лучше сразу заведи issue на GitHub"
         c.create_text(30, 116, anchor="nw", fill=PARCHMENT, font=p.body, text=github)
         smile = picture("smile", 16)
         if smile:
             c.create_image(30 + p.measure(github, p.body) + 6, 116 + 9, image=smile)
-        for i, (key, name) in enumerate((("discord", "Discord"), ("telegram", "Telegram"), ("github", "GitHub"))):
+        for i, (key, name) in enumerate((("community", "Сообщество"), ("discord", "Discord"), ("telegram", "Telegram"),
+                                         ("github", "GitHub"))):
             y = 168 + i * 44
             x = 30
-            img = picture(key, 22)
+            img = picture("battlenet" if key == "community" else key, 22)
             if img:
                 c.create_image(x + 11, y, image=img)
             c.create_text(x + 32, y, text=name, anchor="w", fill=GOLD, font=p.body)
@@ -1178,7 +1182,7 @@ class App:
             p.button(x + 540, y - 14, x + 630, y + 14, "Копировать", f"copy{key}", copy, font=p.small)
             p.button(x + 638, y - 14, x + 700, y + 14, "Открыть", f"open{key}",
                      lambda url=LINKS[key]: webbrowser.open(url), font=p.small)
-        c.create_text(30, 290, anchor="nw", width=width - 60, fill=PARCHMENT, font=p.body,
+        c.create_text(30, 334, anchor="nw", width=width - 60, fill=PARCHMENT, font=p.body,
                       text="Что прислать: что прозвучало и как надо, а лучше — строку из журнала (кнопка «Журнал»). "
                            "Неверное ударение можно сразу поправить себе на вкладке «Словарь» в настройках аддона.")
         p.button(width - 150, height - 50, width - 30, height - 18, "Закрыть", "close", win.destroy)

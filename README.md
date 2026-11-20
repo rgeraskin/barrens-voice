@@ -137,7 +137,7 @@
 
 Что-то читается не так, или есть идея? Пиши в [игровое сообщество Barrens Voice](https://launch.battle.net/invite/N9KR2WNHDgW), в [issues](https://github.com/rgeraskin/barrens-voice/issues) или в чаты моих модов в [Discord](https://discord.gg/hxpuTQF2Bb) и [Telegram](https://t.me/+NwReoOS9x7hhYjgy).
 
-Те же ссылки есть на вкладке «Помощь» в настройках аддона. «Открыть» у сообщества закроет настройки и покажет ссылку в чате: щёлкни по ней, и сообщество откроется прямо в игре. Если ты уже в нём, аддон так и скажет. Приложи строку из журнала («Журнал» в окне лаунчера): в ней видно, что было написано и как прочитано.
+Те же ссылки есть на вкладке «Помощь» в настройках аддона и в окне «Помощь» лаунчера. «Открыть» у сообщества закроет настройки и покажет ссылку в чате: щёлкни по ней, и сообщество откроется прямо в игре. Если ты уже в нём, аддон так и скажет. Приложи строку из журнала («Журнал» в окне лаунчера): в ней видно, что было написано и как прочитано.
 
 ## Roadmap
 
@@ -163,7 +163,7 @@
 - [F5-TTS](https://github.com/SWivid/F5-TTS) и русская модель [Misha24-10/F5-TTS_RUSSIAN](https://huggingface.co/Misha24-10/F5-TTS_RUSSIAN) — голоса рас, [DakeQQ/F5-TTS-ONNX](https://github.com/DakeQQ/F5-TTS-ONNX) и [ONNX Runtime](https://onnxruntime.ai) — их быстрый запуск на видеокарте.
 - [RUAccent](https://github.com/Den4ikAI/ruaccent) — ударения, [pymorphy3](https://github.com/no-plagiarism/pymorphy3) и [num2words](https://github.com/savoirfairelinux/num2words) — склонение и числа, [eyo-kernel](https://github.com/e2yo/eyo-kernel) — буква «ё».
 - [Whisper](https://huggingface.co/openai/whisper-large-v3-turbo) — распознаёт реплики для образцов голосов, [Parselmouth](https://github.com/YannickJadoul/Parselmouth) — интонация вопросов, [windows-capture](https://github.com/NiiightmareXD/windows-capture) — снимок окна игры.
-- [uv](https://github.com/astral-sh/uv) и [Inno Setup](https://jrsoftware.org/isinfo.php) — установщик, [Simple Icons](https://github.com/simple-icons/simple-icons) — значки на вкладке «Помощь».
+- [uv](https://github.com/astral-sh/uv) и [Inno Setup](https://jrsoftware.org/isinfo.php) — установщик, [Simple Icons](https://github.com/simple-icons/simple-icons) — значки на вкладке «Помощь» и в окне «Помощь» лаунчера.
 
 ## Сделано с AI
 

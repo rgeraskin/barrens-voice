@@ -166,6 +166,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   From the launch until the game's process is seen the launcher's big button reads «Игра запускается…» and takes no click: a second click asked Battle.net once more. Every launch counts: «Играть», the shortcut and the window's start with «Запускать игру вместе с лаунчером». The button comes back when the launch gives up (no Battle.net, a game already running, Battle.net did not start it), when the voice-over ends before it launched, or 130 s after Battle.net was asked with no game.
 
+- The launcher's «Помощь» as the addon's
+
+  The window had Discord, Telegram and GitHub under words of its own. Now it has the addon's «Помощь» tab's words and Barrens Voice's community in Battle.net first: the Battle.net logo (Simple Icons, CC0: the addon's Blizzard logo is the game's own texture), the invite address, «Копировать» and «Открыть» (in the browser). The hint of «Копировать для отчёта» in «Журнал» points to it, the nearer one, instead of the addon's tab.
+
 ### Removed
 
 - BREAKING: `WowChatVoice-Retail.cmd`
