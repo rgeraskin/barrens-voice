@@ -201,6 +201,16 @@ def dictionary_revision() -> int:
         return 0
 
 
+DICTIONARY = "addon/BarrensVoice/Dictionary.lua"
+
+
+def stamp_dictionary(data: bytes, revision: int) -> bytes:
+    """Dictionary.lua with its D.REVISION: which default dictionary this is, against the dictionary online's (the
+    repository's says 0). Every build of the addon stamps it: this archive's, and CurseForge's and Wago's zip
+    (tools/addon_sites.py)."""
+    return re.sub(rb"(?m)^D\.REVISION = \d+", f"D.REVISION = {revision}".encode(), data, count=1)
+
+
 TAG = re.compile(r"v(\d+\.\d+\.\d+)(?:-beta\.(\d+))?")
 
 
@@ -381,8 +391,8 @@ def build() -> Path:
                 data = re.sub(rb'(?m)^version = "[^"]*"', f'version = "{info["version"]}"'.encode(), data, count=1)
             if name == news.SOURCE and own_news is not None:               # with the test build's own entry
                 data = own_news.encode("utf-8")
-            if name == "addon/BarrensVoice/Dictionary.lua":                # which default this is (the dictionary online)
-                data = re.sub(rb"(?m)^D\.REVISION = \d+", f"D.REVISION = {dictionary_revision()}".encode(), data, count=1)
+            if name == DICTIONARY:                                         # which default this is (the dictionary online)
+                data = stamp_dictionary(data, dictionary_revision())
             z.writestr(info_, data)
     data = archive.read_bytes()
     manifest = {**info, "archive": archive.name, "size": len(data), "sha256": hashlib.sha256(data).hexdigest(),
