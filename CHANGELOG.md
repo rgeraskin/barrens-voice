@@ -144,7 +144,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - The first run's welcome is easier to see
 
-  It comes 5 s after login, after «озвучка чата работает», so other addons' lines at login no longer bury it; its lines have the addon's icon, as every line of the addon does, and it names the community in Battle.net among the places to write.
+  It comes 5 s after login, after «озвучка чата работает», so other addons' lines at login no longer bury it; its lines have the addon's icon, as every line of the addon does, and it names the community in Battle.net among the places to write. Its words are friendlier, in the style of the addon's other texts: what the settings hold, that the launcher starts the game and the voice-over, an ask to write and «Приятной игры!».
 
 - Whispers and guild lines show the hidden chat by default
 

@@ -879,7 +879,8 @@ end
 -- The welcome waits a few seconds: at login every addon speaks at once, and the first lines scroll out of sight.
 local WELCOME_DELAY = 5
 -- Where to write about bugs and words read wrong: said at the first run, not at every login.
-local HELP_HINT = "ошибки, неверное произношение, идеи — вкладка «Помощь» в настройках (/bv): там Discord, Telegram, GitHub и сообщество в Battle.net."
+local HELP_HINT = "если что-то прочиталось не так, нашлась ошибка или появилась идея — напиши! Куда писать, есть во "
+    .. "вкладке «Помощь» в настройках: Discord, Telegram, GitHub и сообщество в Battle.net. Приятной игры!"
 
 function ns.LoginWord()
     local installed = ns.News.Installed()      -- nil until the companion has written the news
@@ -896,11 +897,12 @@ end
 --- the settings are.
 function ns.Welcome()
     local version = Version()
-    print(SAY .. ("|cffffd100добро пожаловать!|r Barrens Voice %s — озвучка чата: у каждого игрока свой голос "
-        .. "его расы и пола."):format(version))
-    print(SAY .. "читает вслух Barrens Voice Launcher — программа для Windows: без него аддон молчит. Удобнее всего "
-        .. "запускать игру через него — он сам её запустит.")
-    print(SAY .. "настройки — значок у миникарты или /bv. Команды — /bv help.")
+    print(SAY .. ("|cffffd100добро пожаловать!|r Barrens Voice %s озвучивает чат: у каждого игрока свой голос, "
+        .. "под его расу и пол."):format(version))
+    print(SAY .. "за озвучивание отвечает программа Barrens Voice Launcher для Windows, без неё аддон молчит. Проще "
+        .. "всего запускать игру прямо из лаунчера: он сам откроет её и включит озвучку.")
+    print(SAY .. "загляни в настройки: значок у миникарты или /bv. Там голоса, скорость, громкость и какие каналы "
+        .. "читать. Все команды — /bv help.")
     print(SAY .. HELP_HINT)
 end
 

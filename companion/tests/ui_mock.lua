@@ -1296,7 +1296,8 @@ GetAddOnMetadata = function() return "0.4.0b1" end
 ns.firstRun, ns.db.seenVersion, ns.db.newsSeen = true, nil, nil
 ns.LoginWord()
 assert(#welcome == 5 and welcome[1]:find("озвучка чата") and welcome[2]:find("добро пожаловать")
-    and welcome[3]:find("Barrens Voice Launcher — программа для Windows", 1, true) and welcome[5]:find("«Помощь»", 1, true)
+    and welcome[3]:find("программа Barrens Voice Launcher для Windows", 1, true)
+    and welcome[4]:find("загляни в настройки", 1, true) and welcome[5]:find("Приятной игры!", 1, true) and welcome[5]:find("«Помощь»", 1, true)
     and welcome[5]:find("сообщество в Battle.net", 1, true), "whether the reading works, then the welcome")
 assert(welcome[2]:find("Barrens Voice 0.4.0b1", 1, true), "the welcome names the addon's version")
 for i = 2, 5 do       -- every line with «Barrens Voice:» has the icon (the welcome's next lines too)
