@@ -1,6 +1,7 @@
 """CurseForge and Wago Addons: what the packager zips (.pkgmeta) and what tools/addon_sites.py makes of a release."""
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 import unittest
@@ -70,6 +71,25 @@ class AddonSites(unittest.TestCase):
         self.assertNotIn(";", text)                           # a player's text: no semicolons
         real = addon_sites.release.news_entries()             # the version in work's entry reads
         addon_sites.notes(real[0]["version"], real, "v" + real[0]["version"])
+
+    def test_the_sites_description(self):
+        # pasted by hand into both sites (no API takes it): links and pictures work only absolute, the pictures are
+        # the repository's own, the launcher is said first
+        text = (ROOT / "docs" / "addon-sites-description.md").read_text(encoding="utf-8")
+        links = re.findall(r"\]\(([^)\s]+)\)|src=\"([^\"]+)\"", text)
+        self.assertTrue(links)
+        raw = "https://raw.githubusercontent.com/rgeraskin/barrens-voice/master/"
+        for link in (a or b for a, b in links):
+            self.assertTrue(link.startswith("https://"), link)
+            if link.startswith(raw):
+                self.assertTrue((ROOT / link[len(raw):]).is_file(), link)
+        self.assertLess(text.index("Barrens Voice Launcher"), text.index("## "))
+        # CurseForge: English before any other language, no links that download a file (the release's page instead)
+        english = text[:re.search("[а-яё]", text, re.I).start()]
+        self.assertIn("Barrens Voice Launcher", english)
+        self.assertIn("open-source", english)
+        self.assertNotIn("/download/", text)
+        self.assertNotIn(";", text)
 
 
 if __name__ == "__main__":

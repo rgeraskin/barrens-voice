@@ -214,7 +214,7 @@ items = [
 
 Чтобы задание заработало (один раз, руками):
 
-1. Завести проект на [CurseForge](https://authors.curseforge.com/) и на [Wago Addons](https://addons.wago.io/developers): описание (аддону нужен Barrens Voice Launcher для Windows, ссылка на GitHub), картинки, категория. CurseForge проверяет проект модератором.
+1. Завести проект на [CurseForge](https://authors.curseforge.com/) и на [Wago Addons](https://addons.wago.io/developers): краткое описание (CurseForge: одно предложение, по-английски) — «Reads World of Warcraft chat aloud in Russian, each player in a voice matching their character's race and gender, with the free open-source Barrens Voice Launcher for Windows.», описание — Markdown из `docs/addon-sites-description.md` (по правилам CurseForge сначала английский, ссылки не на сам файл, а на страницу выпуска) (сайты его сами не обновляют: после правки файла — вставить заново), картинки, категория. CurseForge проверяет проект модератором. `test_addon_sites` следит, чтобы ссылки и картинки в описании были абсолютными, а картинки были в репозитории.
 2. В настройках репозитория на GitHub: переменные `CF_PROJECT_ID` (число из «About Project») и `WAGO_PROJECT_ID` (с панели разработчика Wago), секреты `CF_API_TOKEN` ([токены CurseForge](https://authors.curseforge.com/#/settings/api-tokens)) и `WAGO_API_TOKEN` ([ключи Wago](https://addons.wago.io/account/apikeys)). Можно только один сайт: задание идёт, если есть хотя бы одна переменная.
 
 ## Проверка на Windows
