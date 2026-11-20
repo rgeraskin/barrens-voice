@@ -1131,7 +1131,7 @@ class App:
             self.help_win.lift()
             return
         from ..links import LINKS
-        width, height = 760, 450
+        width, height = 760, 460
         win, c, p = self._child("Помощь", width, height)
         self.help_win = win
         win.icons = []
@@ -1162,7 +1162,11 @@ class App:
                               text="Ошибки, улучшения, предложения, или что-то прочитано неправильно — пиши в Discord, "
                                    "Telegram или в сообщество.")
         line = tkfont.Font(font=c.font(p.body)).metrics("linespace") / c.s
-        top = round(c.bbox(first)[3] / c.s + line)
+
+        def below(item) -> int:
+            """Where the next paragraph starts: under the item's real bottom (it may wrap) and one empty line."""
+            return round(c.bbox(item)[3] / c.s + line)
+        top = below(first)
         github = "А лучше сразу заведи issue на GitHub"
         c.create_text(30, top, anchor="nw", fill=PARCHMENT, font=p.body, text=github)
         smile = picture("smile", 16)
@@ -1187,9 +1191,10 @@ class App:
             p.button(x + 540, y - 14, x + 630, y + 14, "Копировать", f"copy{key}", copy, font=p.small)
             p.button(x + 638, y - 14, x + 700, y + 14, "Открыть", f"open{key}",
                      lambda url=LINKS[key]: webbrowser.open(url), font=p.small)
-        c.create_text(30, rows + 166, anchor="nw", width=width - 60, fill=PARCHMENT, font=p.body,
-                      text="Что прислать: что прозвучало и как надо, а лучше — строку из журнала (кнопка «Журнал»). "
-                           "Неверное ударение можно сразу поправить себе на вкладке «Словарь» в настройках аддона.")
+        send = c.create_text(30, rows + 166, anchor="nw", width=width - 60, fill=PARCHMENT, font=p.body,
+                             text="Что прислать: что прозвучало и как надо, а лучше — строку из журнала (кнопка «Журнал»).")
+        c.create_text(30, below(send), anchor="nw", width=width - 60, fill=PARCHMENT, font=p.body,
+                      text="Неверное ударение можно сразу поправить себе на вкладке «Словарь» в настройках аддона.")
         p.button(width - 150, height - 50, width - 30, height - 18, "Закрыть", "close", win.destroy)
 
 

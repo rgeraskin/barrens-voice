@@ -391,9 +391,10 @@ class Layout(unittest.TestCase):
             c = a.help_win.winfo_children()[0]
             box = {c.itemcget(i, "text")[:6]: c.bbox(i) for i in c.find_all() if c.type(i) == "text"}
             line = tkfont.Font(font=c.font(a.p.body)).metrics("linespace")
-            gap = box["А лучш"][1] - box["Ошибки"][3]
-            self.assertGreaterEqual(gap, line - 2, f"×{scale}: an empty line between the paragraphs ({gap} px)")
-            self.assertLessEqual(gap, line + 4, f"×{scale}: one empty line, not more ({gap} px)")
+            for upper, lower in (("Ошибки", "А лучш"), ("Что пр", "Неверн")):
+                gap = box[lower][1] - box[upper][3]
+                self.assertGreaterEqual(gap, line - 2, f"×{scale}: an empty line above «{lower}…» ({gap} px)")
+                self.assertLessEqual(gap, line + 4, f"×{scale}: one empty line, not more ({gap} px)")
             a.help_win.destroy()
 
     def test_settings_and_help(self):
