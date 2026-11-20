@@ -1,6 +1,10 @@
 # Barrens Voice
 
-Barrens Voice reads World of Warcraft chat aloud in Russian, each player in a voice matching their character's race and gender. It needs the Russian game client and Barrens Voice Launcher, a free open-source Windows program ([source code on GitHub](https://github.com/rgeraskin/barrens-voice)) that does the speaking: without it the addon stays silent. Get the launcher from the [latest release](https://github.com/rgeraskin/barrens-voice/releases/latest).
+Barrens Voice reads World of Warcraft chat aloud in Russian, each player in a voice matching their character's race and gender.
+
+It needs the Russian game client and Barrens Voice Launcher, a free open-source Windows program ([source code on GitHub](https://github.com/rgeraskin/barrens-voice)) that does the speaking: without it the addon stays silent. Get the launcher from the [latest release](https://github.com/rgeraskin/barrens-voice/releases/latest).
+
+Russian is the only language so far: if you would like it in yours, help is welcome, [open an issue](https://github.com/rgeraskin/barrens-voice/issues).
 
 ---
 
