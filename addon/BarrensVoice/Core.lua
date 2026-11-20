@@ -868,11 +868,6 @@ function ns.Stop()
     ns.Strip.PushNow(ns.ServiceFrame("stop", options, "-"))
 end
 
-local function Version()
-    local meta = C_AddOns and C_AddOns.GetAddOnMetadata or GetAddOnMetadata
-    return meta and meta(ADDON, "Version") or "?"
-end
-
 --- The word at login: every time whether the reading works (Companion.lua), the welcome on the first run, and
 --- what is new after an update, out of combat (News.lua) - by the program's version, which the companion wrote
 --- with the news (NewsData.lua), not the addon's.
@@ -899,9 +894,8 @@ end
 --- The first run's word (as CatQuest does it): what this is, that it needs the companion app, where
 --- the settings are.
 function ns.Welcome()
-    local version = Version()
-    print(SAY .. ("|cffffd100добро пожаловать!|r Barrens Voice %s озвучивает чат: у каждого игрока свой голос, "
-        .. "под его расу и пол."):format(version))
+    print(SAY .. "|cffffd100добро пожаловать!|r Barrens Voice озвучивает чат: у каждого игрока свой голос, "
+        .. "под его расу и пол.")
     print(SAY .. "за озвучивание отвечает программа Barrens Voice Launcher для Windows, без неё аддон молчит. Проще "
         .. "всего запускать игру прямо из лаунчера: он сам откроет её и включит озвучку.")
     print(SAY .. "загляни в настройки: значок у миникарты или /bv. Там голоса, скорость, громкость и какие каналы "
