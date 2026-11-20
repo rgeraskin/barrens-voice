@@ -168,7 +168,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - The launcher's «Помощь» as the addon's
 
-  The window had Discord, Telegram and GitHub under words of its own. Now it has the addon's «Помощь» tab's words and Barrens Voice's community in Battle.net first: the Battle.net logo (Simple Icons, CC0: the addon's Blizzard logo is the game's own texture), the invite address, «Копировать» and «Открыть» (in the browser). The hint of «Копировать для отчёта» in «Журнал» points to it, the nearer one, instead of the addon's tab.
+  The window had Discord, Telegram and GitHub under words of its own. Now it has the addon's «Помощь» tab's words, its paragraphs an empty line apart as there, and Barrens Voice's community in Battle.net first: the Battle.net logo (Simple Icons, CC0: the addon's Blizzard logo is the game's own texture), the invite address, «Копировать» and «Открыть» (in the browser). The hint of «Копировать для отчёта» in «Журнал» points to it, the nearer one, instead of the addon's tab.
 
 ### Removed
 

@@ -383,6 +383,18 @@ class Layout(unittest.TestCase):
         self.assertEqual(boxes, [LINKS[k] for k in ("community", "discord", "telegram", "github")])
         self.assertTrue((HERE / "battlenet.png").is_file())
         a.help_win.destroy()
+        # its paragraphs an empty line apart, as the addon's «\n\n», whether the first wraps or not
+        import tkinter.font as tkfont
+        for scale in (1.0, 1.25, 1.5):
+            a = self.make(scale)
+            a.open_help()
+            c = a.help_win.winfo_children()[0]
+            box = {c.itemcget(i, "text")[:6]: c.bbox(i) for i in c.find_all() if c.type(i) == "text"}
+            line = tkfont.Font(font=c.font(a.p.body)).metrics("linespace")
+            gap = box["А лучш"][1] - box["Ошибки"][3]
+            self.assertGreaterEqual(gap, line - 2, f"×{scale}: an empty line between the paragraphs ({gap} px)")
+            self.assertLessEqual(gap, line + 4, f"×{scale}: one empty line, not more ({gap} px)")
+            a.help_win.destroy()
 
     def test_settings_and_help(self):
         found: list[tuple[str, str]] = []
