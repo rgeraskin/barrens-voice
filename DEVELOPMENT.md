@@ -158,7 +158,7 @@
 
 - `mise run test` — все тесты: Python (с numpy, pymorphy3, num2words — ни один не пропускается) и Lua;
 - `mise run test-py`, `mise run test-lua` — по отдельности;
-- `mise run icon` — перерисовать значок аддона `Icon.tga`, значок программы `icon.ico`, смайлик `Media/smile.tga` и `tools/icon_preview.png`;
+- `mise run icon` — перерисовать значок аддона `Icon.tga`, значок программы `icon.ico`, смайлик `Media/smile.tga`, `tools/icon_preview.png` и логотип проектов на CurseForge и Wago `docs/images/logo.png` (400 × 400, PNG);
 - `mise run voices-table` — пересобрать `companion/bv/game_voices.json` из общего списка файлов игры (`tools/game_voices.py`; список скачивается в `tools/.cache/`);
 - `mise run build`, `mise run sign`, `mise run installer` — архив выпуска с `manifest.json`, подпись, установщик (Windows) — так их запускает CI (docs/update-strategy.md);
 - `mise run dictionary` — `dist/dictionary.json` с подписью для словаря онлайн;

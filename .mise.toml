@@ -31,7 +31,7 @@ run = [
 ]
 
 [tasks.icon]
-description = "Redraw the addon icon (Icon.tga), the launcher icon (icon.ico) and tools/icon_preview.png"
+description = "Redraw the addon icon (Icon.tga), the launcher icon (icon.ico), tools/icon_preview.png and the sites' logo"
 run = "uv run --locked python tools/make_icon.py"
 
 [tasks.voices-table]

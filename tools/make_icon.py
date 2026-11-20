@@ -1,6 +1,7 @@
 """Draws the addon icon: a golden speech bubble with sound waves on a dark arcane background.
 Writes addon/BarrensVoice/Icon.tga (64x64, what the game reads), the launcher's window, tray and
-shortcut icon companion/bv/launcher/icon.ico (16-256 px), tools/icon_preview.png, the chat's icon
+shortcut icon companion/bv/launcher/icon.ico (16-256 px), tools/icon_preview.png, the CurseForge and Wago
+projects' logo docs/images/logo.png (CurseForge: 400x400, not webp), the chat's icon
 addon/BarrensVoice/Media/chat.tga (the bubble alone on a clear background: before «Barrens Voice:» in the chat,
 whose background shows through), and the smiley of the «Помощь» texts, addon/BarrensVoice/Media/smile.tga (the
 game's fonts have no emoji).
@@ -86,6 +87,7 @@ def finish(img):
     icon = img.resize((64, 64), Image.LANCZOS)
     icon.save(ROOT / "addon" / "BarrensVoice" / "Icon.tga")
     img.resize((256, 256), Image.LANCZOS).save(ROOT / "tools" / "icon_preview.png")
+    img.resize((400, 400), Image.LANCZOS).save(ROOT / "docs" / "images" / "logo.png")
     # each size scaled from the large drawing (Pillow would scale the 256 one down itself, less sharply)
     sizes = [16, 20, 24, 32, 40, 48, 64, 128, 256]
     frames = [img.resize((n, n), Image.LANCZOS) for n in sizes]
