@@ -1,0 +1,27 @@
+# CurseForge and Wago Addons (BigWigsMods/packager in the release workflow's addon-sites job): only the addon.
+# The repository's root is the program's; the addon is addon/BarrensVoice, moved to the zip's top as BarrensVoice.
+# Every other top-level entry is ignored here (the packager leaves dot files out itself): test_addon_sites checks
+# that a new one is not forgotten.
+package-as: BarrensVoice
+
+move-folders:
+  BarrensVoice/addon/BarrensVoice: BarrensVoice
+
+ignore:
+  - CHANGELOG.md
+  - CLAUDE.md
+  - DEVELOPMENT.md
+  - README.md
+  - companion
+  - docs
+  - installer
+  - news.toml
+  - pyproject.toml
+  - tools
+  - uv.lock
+  - addon/BarrensVoice/Media/README.md
+
+# the file's text: the release's «Что нового» and where to get the launcher (tools/addon_sites.py notes)
+manual-changelog:
+  filename: .addon-sites-notes.md
+  markup-type: markdown

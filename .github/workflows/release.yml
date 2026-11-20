@@ -46,3 +46,14 @@ jobs:
             while read -r tag; do
               echo "::warning::$tag still has manifest.json: test-channel clients up to beta 10 may take it instead of $GITHUB_REF_NAME"
             done
+  # CurseForge and Wago Addons (addon-sites.yml): a release only - test builds reach testers through the launcher's
+  # test channel - after the GitHub release its changelog points to. Skipped until the sites' projects exist: the
+  # repository's variables CF_PROJECT_ID and WAGO_PROJECT_ID name them. A failed upload goes again by hand:
+  # Actions → Addon sites → Run workflow with the tag. No signing key there.
+  addon-sites:
+    needs: release
+    if: ${{ !contains(github.ref_name, '-') && (vars.CF_PROJECT_ID != '' || vars.WAGO_PROJECT_ID != '') }}
+    uses: ./.github/workflows/addon-sites.yml
+    with:
+      tag: ${{ github.ref_name }}
+    secrets: inherit

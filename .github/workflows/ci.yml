@@ -16,6 +16,12 @@ jobs:
           fetch-depth: 0               # the release tags: the addon's version is checked against the last one
       - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d  # v5.2.9
       - run: mise run test
+  # The zip CurseForge and Wago Addons get at a release (addon-sites.yml), built here without uploading: the addon as
+  # git tracks it under BarrensVoice/, nothing of the program (the zip kept a week, to look at); the CurseForge token
+  # tried once it is set.
+  addon-zip:
+    uses: ./.github/workflows/addon-sites.yml
+    secrets: inherit
   # The dictionary online (bv/online_dictionary.py): after the tests pass on master, the addon's default
   # dictionary, signed, into the branch `dictionary` - only when it changed. Companions fetch it from there.
   dictionary:

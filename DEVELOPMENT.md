@@ -208,6 +208,15 @@ items = [
 
 Перед выпуском сверьте `## Interface` в `BarrensVoice.toc` с текущими клиентами: ритейл поднимает номер интерфейса почти с каждым патчем (12.1.5 — `120105`), и аддон со старым номером игра помечает устаревшим и по умолчанию не загружает; у Forever сейчас `16001`. Новый номер — изменение аддона, так что вместе с ним поднимается и `## Version`.
 
+### CurseForge и Wago Addons
+
+Выпуск (не тестовая сборка) после выпуска на GitHub выкладывает аддон на CurseForge и Wago Addons: задание `addon-sites` в `release.yml` — workflow `addon-sites.yml`, [BigWigsMods/packager](https://github.com/BigWigsMods/packager) по `.pkgmeta` (почему так — [ADR 0008](docs/adr/0008-addon-sites.md)). В zip попадает только `addon/BarrensVoice` (как `BarrensVoice/`) и `LICENSE`; новая папка в корне репозитория должна попасть в `ignore` в `.pkgmeta`, иначе `test_addon_sites` упадёт. Перед packager `mise run addon-sites vX.Y.Z` ставит ревизию в `Dictionary.lua` и пишет `.addon-sites-notes.md` — журнал изменений файла на сайтах: запись выпуска из `news.toml` и строка о лаунчере. CI на каждом пуше вызывает `addon-sites.yml` без тега: zip без выкладки, проверка состава (`mise run addon-sites --check <zip>`), сам zip — в артефактах запуска на неделю; с секретом `CF_API_TOKEN` — ещё и проверка токена списком версий игры CurseForge (там должна быть Forever, тип 88568). Выкладка выпуска не удалась (секрет, ID проекта) — исправить и запустить руками: Actions → Addon sites → Run workflow, тег `vX.Y.Z`; без тега — та же проверка, что в CI.
+
+Чтобы задание заработало (один раз, руками):
+
+1. Завести проект на [CurseForge](https://authors.curseforge.com/) и на [Wago Addons](https://addons.wago.io/developers): описание (аддону нужен Barrens Voice Launcher для Windows, ссылка на GitHub), картинки, категория. CurseForge проверяет проект модератором.
+2. В настройках репозитория на GitHub: переменные `CF_PROJECT_ID` (число из «About Project») и `WAGO_PROJECT_ID` (с панели разработчика Wago), секреты `CF_API_TOKEN` ([токены CurseForge](https://authors.curseforge.com/#/settings/api-tokens)) и `WAGO_API_TOKEN` ([ключи Wago](https://addons.wago.io/account/apikeys)). Можно только один сайт: задание идёт, если есть хотя бы одна переменная.
+
 ## Проверка на Windows
 
 Разработка шла на Mac, проверка — на Windows-машине с игрой по SSH. Раскладка: файлы `addon/BarrensVoice/` (кроме `VoiceList.lua`, `CompanionStatus.lua`, `DictionaryOnline.lua` и `NewsData.lua`, их пишет программа) — в `Interface\AddOns\BarrensVoice\` клиента, `companion/bv/*.py` — в папку программы. Аддон подхватывает изменения после `/reload`, программа — после перезапуска. PowerShell-команды — файлом через `-File` (Defender блокирует `-EncodedCommand`).

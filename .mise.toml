@@ -58,6 +58,10 @@ run = "uv run --locked python tools/installer.py"
 description = "Is a release tag ready to push: its version, news.toml, CHANGELOG.md at the tagged commit (tools/check_tag.py <tag> [<commit>])"
 run = "uv run --locked python tools/check_tag.py"
 
+[tasks.addon-sites]
+description = "A release's checkout for CurseForge and Wago: Dictionary.lua stamped, the sites' changelog (`mise run addon-sites v0.4.0`)"
+run = "uv run --locked python tools/addon_sites.py"
+
 [tasks.hooks]
 description = "Use the repository's git hooks (.githooks: pre-push checks release tags with tools/check_tag.py)"
 run = "git config core.hooksPath .githooks"

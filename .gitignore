@@ -19,3 +19,7 @@ tools/.cache/
 
 # release builds (mise run build)
 dist/
+
+# CurseForge's and Wago's changelog of a release (tools/addon_sites.py, the release workflow)
+.addon-sites-notes.md
+.release/

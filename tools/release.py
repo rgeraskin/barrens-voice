@@ -93,7 +93,8 @@ def released_tags() -> set[str] | None:
 # bugs.md, README, CHANGELOG), the tests, CI and the hooks, the release tools, notes for the developers
 NOT_LISTED = tuple(f":(exclude){path}" for path in (
     "docs", "companion/tests", ".github", ".githooks", "tools", ".claude",
-    "README.md", "CHANGELOG.md", "CLAUDE.md", "DEVELOPMENT.md", ".mise.toml", ".gitignore", ".gitattributes"))
+    "README.md", "CHANGELOG.md", "CLAUDE.md", "DEVELOPMENT.md", ".mise.toml", ".gitignore", ".gitattributes",
+    ".pkgmeta"))
 # the addon's test-build version raised («Addon 0.4.0b11: the addon changes after beta 24 (0.4.0b10)»): the TOC's
 # number alone, the changes it covers are listed by their own commits
 VERSION_RAISE = re.compile(r"Addon \d+\.\d+\.\d+b\d+: the addon changes after ")
