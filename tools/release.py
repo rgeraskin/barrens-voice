@@ -94,6 +94,9 @@ def released_tags() -> set[str] | None:
 NOT_LISTED = tuple(f":(exclude){path}" for path in (
     "docs", "companion/tests", ".github", ".githooks", "tools", ".claude",
     "README.md", "CHANGELOG.md", "CLAUDE.md", "DEVELOPMENT.md", ".mise.toml", ".gitignore", ".gitattributes"))
+# the addon's test-build version raised («Addon 0.4.0b11: the addon changes after beta 24 (0.4.0b10)»): the TOC's
+# number alone, the changes it covers are listed by their own commits
+VERSION_RAISE = re.compile(r"Addon \d+\.\d+\.\d+b\d+: the addon changes after ")
 
 
 def _git(root: Path, *args: str) -> str:
@@ -105,7 +108,7 @@ def build_subjects(tag: str, released: set[str] | None = None, root: Path = ROOT
     """The subjects of the commits a test build brings, oldest first, up to the tag (HEAD when the tag is not there
     yet: a local build): since the last tag that has a release (`released`, released_tags) - a tag whose build failed
     reached no tester, so its commits are listed with the next - or the nearest tag when that is not known. No
-    merges, none that touch docs/ only."""
+    merges, none that touch only what no tester runs (NOT_LISTED), no raise of the addon's version (VERSION_RAISE)."""
     def git(*args: str) -> str:
         return _git(root, *args)
     ref = tag if git("rev-parse", "-q", "--verify", f"refs/tags/{tag}") else "HEAD"
@@ -116,7 +119,7 @@ def build_subjects(tag: str, released: set[str] | None = None, root: Path = ROOT
         previous = seen or nearest                                     # none released before it: the nearest
     span = f"{previous}..{ref}" if previous else ref
     out = git("log", "--no-merges", "--reverse", "--format=%s", span, "--", ".", *NOT_LISTED)
-    return [s for s in out.splitlines() if s.strip()]
+    return [s for s in out.splitlines() if s.strip() and not VERSION_RAISE.match(s)]
 
 
 def build_history(tag: str, released: set[str] | None = None, root: Path = ROOT) -> list[tuple[str, list[str]]]:

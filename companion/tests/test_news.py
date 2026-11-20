@@ -216,8 +216,8 @@ class Release(unittest.TestCase):
 
     def test_build_subjects_from_the_last_released_tag(self):
         # the commits since the last tag with a release (a tag whose build failed reached no tester), oldest first, no
-        # merges, none that touch only what no tester runs (docs, tests, CI, tools, notes); the nearest tag when GitHub
-        # is not asked or does not answer
+        # merges, none that touch only what no tester runs (docs, tests, CI, tools, notes), no raise of the addon's
+        # version (its changes have their own); the nearest tag when GitHub is not asked or does not answer
         import os
         from unittest import mock
 
@@ -248,6 +248,7 @@ class Release(unittest.TestCase):
             commit("Release tools", "tools/release.py", "DEVELOPMENT.md")
             commit("Notes", "CLAUDE.md", "README.md", "CHANGELOG.md")
             commit("Code two", "c.txt", "companion/tests/test_c.py", "CHANGELOG.md")     # code with its test: listed
+            commit("Addon 0.1.1b2: the addon changes after beta 1 (0.1.1b1)", "addon/BarrensVoice/BarrensVoice.toc")
             git("tag", "v0.1.1-beta.2")
             subjects = self.release.build_subjects
             self.assertEqual(subjects("v0.1.1-beta.2", {"v0.1.0"}, repo), ["Code one", "Code two"])
