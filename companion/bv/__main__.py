@@ -357,6 +357,20 @@ def offline_models() -> bool:
 _restart = threading.Event()   # set by restart_online off the main thread: the main loop restarts
 
 
+def load_accentor(accentor, offline: bool, log, restart=None) -> None:
+    """RUAccent loaded; offline, any failure starts the companion again online (restart_online) - a model missing
+    from the cache, its own cut download cleared (text.Accentor). Its error is a DEBUG line then: the restart's
+    WARN says what happens, and a red English «RUAccent: Cannot reach … offline mode» in the launcher's window
+    was alarm for a start that mends itself. Online the error goes up, an ERROR where main() ends."""
+    try:
+        accentor.load()
+    except Exception as e:  # noqa: BLE001 - offline with a model missing: go online once
+        if offline:
+            log(f"RUAccent: {e}", "DEBUG")
+            (restart or restart_online)(log)
+        raise
+
+
 def restart_online(log) -> None:
     """A model missing from the cache in offline mode: forget the mark and start again online (under
     the launcher: exit with RESTART, it starts the companion again - so it keeps its process). In the
@@ -657,13 +671,7 @@ def main() -> int:
         log(f"словарь «ё»: {sum(1 for k in yo.table() if k[:1].islower())} форм слов")
     accentor = Accentor(log, config.get("ruaccent", True))
     log("загружаю RUAccent ..." + (" (модели из кэша, без сети)" if offline else ""))
-    try:
-        accentor.load()
-    except Exception as e:  # noqa: BLE001 - offline with a model missing: go online once
-        if offline:
-            log(f"RUAccent: {e}")
-            restart_online(log)
-        raise
+    load_accentor(accentor, offline, log)
     from .morph import Inflector
     inflector = Inflector(log, config.get("declension", True))
     inflector.load()

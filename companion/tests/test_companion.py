@@ -377,6 +377,28 @@ class RestartOnline(unittest.TestCase):
             companion._restart.clear()
 
 
+    def test_ruaccent_offline_error_is_a_detail(self):
+        # beta 21: a cut RUAccent download cleared offline, then «RUAccent: Cannot reach … offline mode» in red
+        # in the launcher's window for a start that mends itself online: DEBUG offline, the error up online
+        from bv.logs import level_of
+
+        class Failing:
+            def load(self):
+                raise OSError("Cannot reach https://huggingface.co/api/models/ruaccent/accentuator: offline mode is enabled")
+        for offline in (True, False):
+            logged, restarts = [], []
+            with self.subTest(offline=offline), self.assertRaises(OSError):
+                companion.load_accentor(Failing(), offline, lambda m, level=None: logged.append((m, level)),
+                                        restart=restarts.append)
+            if offline:
+                self.assertEqual([lvl for _, lvl in logged], ["DEBUG"])
+                self.assertTrue(logged[0][0].startswith("RUAccent: Cannot reach"))
+                self.assertEqual(len(restarts), 1)
+                self.assertEqual(level_of(logged[0][0]), "ERROR")      # what it was without the level
+            else:
+                self.assertEqual((logged, restarts), ([], []))         # main() ends on it: an ERROR there
+
+
 class AddonFiles(unittest.TestCase):
     """VoiceList.lua, CompanionStatus.lua, DictionaryOnline.lua and NewsData.lua: written whole or not at all."""
 
