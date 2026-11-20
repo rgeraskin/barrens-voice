@@ -11,6 +11,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parent))      # gitenv, however the tests are started
 from bv import news  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -217,7 +218,12 @@ class Release(unittest.TestCase):
         # the commits since the last tag with a release (a tag whose build failed reached no tester), oldest first, no
         # merges, none that touch only what no tester runs (docs, tests, CI, tools, notes); the nearest tag when GitHub
         # is not asked or does not answer
-        with tempfile.TemporaryDirectory() as d:
+        import os
+        from unittest import mock
+
+        from gitenv import own_repository_env
+        # the repository's own git, release.py's too: not the one a calling git (a hook, a rebase) points to
+        with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, own_repository_env(), clear=True):
             repo = Path(d)
 
             def git(*args):
@@ -262,6 +268,17 @@ class Release(unittest.TestCase):
             self.assertEqual([v for v, _ in history("v0.1.1-beta.3", None, repo)], ["0.1.1b1", "0.1.1b2", "0.1.1b3"],
                              "a later tag is not this build's")
             self.assertEqual(history("v0.1.1", None, repo), [], "a release: none")
+
+    def test_a_calling_gits_repository_is_left_alone(self):
+        # run under `git rebase --exec` (GIT_DIR, GIT_INDEX_FILE set) the temporary repository is still its own
+        import os
+        from unittest import mock
+        nowhere = str(ROOT / "no-such-git-dir")
+        with mock.patch.dict(os.environ, {"GIT_DIR": nowhere, "GIT_INDEX_FILE": nowhere + "/index",
+                                          "GIT_WORK_TREE": str(ROOT)}):
+            self.test_build_subjects_from_the_last_released_tag()
+            self.assertEqual(os.environ["GIT_DIR"], nowhere, "the caller's environment back as it was")
+        self.assertFalse(Path(nowhere).exists())
 
     def test_no_build_entry_for_a_release_and_none_with_control_characters(self):
         release = self.release
