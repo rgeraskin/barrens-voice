@@ -174,6 +174,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Lines under another addon's strip are no longer lost without a word
+
+  With another addon's strip (wow-ai) over a part of ours, every chat line went unread and the log said nothing: the addon holds a line half a second and then its empty frame, which the open part still carries, so no cover lasted the second «полоска видна, но не читается» waits for. The companion now tells the lines it skipped from the frame numbers — «строки с полоски не прочитаны (кадров: N)…», and sends the player to «Мост к лаунчеру…» to move the strip to a free place; under a lasting cover it is said in full once, then at most once a minute with the frames skipped since, and in full again for a cover after ten minutes without one. The lines under the cover are not read: that would take another cell order, a new protocol, and the warning is enough.
+
 - One friend, one voice: a Battle.net whisper and the character's own
 
   On Forever a friend whispering through Battle.net was «Имя Фамилия-CAMWOWEU5Realm3PvE» (the server's inner name from Battle.net), as the character «Имя Фамилия» (the chat writes no realm: names are unique in the region) - two senders, two voices. With RegionalUniqueNamesEnabled the Battle.net sender is the character's name alone, as Blizzard's friends list shows it; otherwise name and realm as before.

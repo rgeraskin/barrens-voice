@@ -141,6 +141,62 @@ class Bookkeeping(Base):
         self.at(5.7, failure="damaged")                            # the time counts from the last cover
         self.assertEqual(self.take(), ([], []))
 
+    def cover_a_line(self, t, seq):
+        """A line under a part cover (10 damaged grabs), then the empty frame `seq` read: the time after."""
+        for _ in range(10):
+            t += POLL
+            self.at(t, failure="damaged")
+        t += POLL
+        self.at(t, frame(seq))
+        return t
+
+    def test_lines_skipped_under_a_part_cover_are_told(self):
+        # another addon's strip over a part of ours: each line damaged for its half second, the empty frame after
+        # it read - no cover lasted a second, and the skipped numbers are what tells: in full the first time, then
+        # at most once a minute with the count since (a busy chat filled the log with the same advice)
+        from bv.logs import level_of
+        self.at(0, frame(10))
+        self.take()
+        t = self.cover_a_line(0.0, 12)               # 11: a line under the cover, 12: the empty frame
+        full = ("строки с полоски не прочитаны (кадров: 1): часть полоски перекрыта, окном другого аддона? "
+                "Перенеси её на свободное место: «Мост к лаунчеру…» в настройках аддона")
+        self.assertEqual(self.take(), ([full], []))
+        self.assertEqual(level_of(full), "WARN")
+        self.assertNotIn(";", full)
+        for seq in (14, 16, 18):                     # three more within the minute: nothing
+            t = self.cover_a_line(t, seq)
+        self.assertEqual(self.take(), ([], []))
+        t = self.cover_a_line(61.0, 20)               # a minute after the first: the four since
+        again = "строки с полоски не прочитаны (кадров: 4 с прошлого раза): полоска всё ещё перекрыта"
+        self.assertEqual(self.take(), ([again], []))
+        self.assertEqual(level_of(again), "WARN")
+        t = self.cover_a_line(t, 22)
+        self.assertEqual(self.take(), ([], []))      # the minute counts from that one
+        t = self.cover_a_line(t + 590, 24)           # under ten minutes since the last skip: the same cover
+        self.assertEqual(self.take()[0], ["строки с полоски не прочитаны (кадров: 2 с прошлого раза): полоска всё ещё перекрыта"])
+        self.cover_a_line(t + 601, 26)               # ten minutes without a skip: a new cover, told in full
+        self.assertEqual(self.take(), ([full], []))
+
+    def test_a_gap_alone_is_not_a_cover(self):
+        # numbers skipped with every grab read (a stop dropped the queue), a damaged grab or two (a frame caught
+        # while painted), a /reload's fresh random number after a damaged second: nothing said of lines unread
+        self.at(0, frame(10))
+        self.take()
+        self.at(0.05, frame(15))
+        self.at(0.1, failure="damaged")
+        self.at(0.15, failure="damaged")
+        self.at(0.2, frame(17))
+        for i in range(5):                          # damaged grabs, then the same frame read: they count no more
+            self.at(0.21 + i * 0.01, failure="damaged")
+        self.at(0.27, frame(17))
+        self.at(0.28, frame(19))
+        self.assertEqual(self.take(), ([], []))
+        for i in range(25):
+            self.at(0.25 + i * POLL, failure="damaged")
+        self.take()
+        self.at(2, frame(40000))
+        self.assertEqual(self.take()[0], ["полоска снова читается"])
+
     def test_another_protocol_after_three_seconds(self):
         newer = protocol.VERSION + 1
         self.at(0, failure="version", other=newer)

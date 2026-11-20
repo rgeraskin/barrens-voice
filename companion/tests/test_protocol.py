@@ -156,6 +156,49 @@ class RoundTrip(unittest.TestCase):
         self.assertEqual(protocol.last_failure, "damaged")
 
 
+@unittest.skipUnless(LUAJIT, "luajit not installed")
+class PartCover(unittest.TestCase):
+    """The walkthrough's bug: our strip at x 600, 500 px wide, drawn from the right, 4 rows of 2 px; another
+    addon's strip (wow-ai: 4 px cells from x 0 to 800) over its left 200 px. The empty frame fits the open
+    part and reads, a chat line needs more than the 150 open cells of a row and does not."""
+    WIDTH, CELL, ROWS, COVER = 500, 2, 4, 200
+    LINE = "\x1f".join(["say", "Громмаш-Степи", "Orc", "2", "WARRIOR", "",
+                        "rate=125;vol=120;voice=f5;decl=1;id=ab12-3;raw=1", "Громмаш говорит:\x04 qwe", "qwe"]).encode()
+
+    def grab(self, seq, payload):
+        img = render(encode(seq, payload, self.WIDTH // self.CELL * self.ROWS), self.WIDTH, self.CELL, self.ROWS,
+                     from_right=True)
+        raw, rnd = bytearray(img.raw), random.Random(seq)
+        for y in range(0, img.height, 4):               # the other strip's cells, 4 px, its own levels
+            for x in range(0, self.COVER, 4):
+                colour = bytes((rnd.choice(LEVELS), rnd.choice(LEVELS), rnd.choice(LEVELS)))
+                for dy in range(4):
+                    for dx in range(4):
+                        i = ((y + dy) * self.WIDTH + x + dx) * 4
+                        raw[i:i + 3] = colour
+        return bytes(raw), self.WIDTH, img.height
+
+    def test_the_empty_frame_reads_the_line_does_not(self):
+        from bv import protocol
+        self.assertEqual(decode(Image(*self.grab(10, b""))).seq, 10)
+        self.assertIsNone(decode(Image(*self.grab(11, self.LINE))))
+        self.assertEqual(protocol.last_failure, "damaged")
+
+    def test_the_reader_tells_the_line_unread(self):
+        from bv.bridge import StripReader, decode as grab_decode
+        logged, now = [], [0.0]
+        reader = StripReader(None, {"poll_interval": 0.05, "capture_height": 8}, logged.append, lambda **f: None,
+                             clock=lambda: now[0])
+        idle, line, after = self.grab(10, b""), self.grab(11, self.LINE), self.grab(12, b"")
+        for grabbed in [idle] * 5 + [line] * 10 + [after] * 5:   # the addon: a line 0.5 s, then its empty frame
+            now[0] += 0.05
+            reader.observe(*grab_decode(grabbed)[:2], now[0])
+        unread = [m for m in logged if m.startswith("строки с полоски не прочитаны")]
+        self.assertEqual(len(unread), 1)
+        self.assertTrue(unread[0].startswith("строки с полоски не прочитаны (кадров: 1): "), unread)
+        self.assertNotIn("полоска видна, но не читается: её что-то перекрывает?", logged)   # half a second: no cover
+
+
 def scene(width: int, height: int, seed: int = 3) -> bytearray:
     """A dark game picture: noise, with stray dark purple and green pixels that look like sync cells."""
     rnd = random.Random(seed)

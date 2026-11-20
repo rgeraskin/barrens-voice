@@ -40,6 +40,15 @@ class StripReader:
     DAMAGED_AFTER = 1.0     # a strip in view whose frames do not check out, told after this long
     FOREIGN_AFTER = 3.0     # a strip of another protocol held this long: not a damaged frame's chance
     LOST_AFTER = 5.0        # seconds of polls without a frame: the link with the addon is lost
+    # Frames skipped while the strip was in view but did not read: another addon's strip over a part of ours. The
+    # addon holds a line half a second, then its empty frame (14 cells) - which the open part still carries - so
+    # no cover lasted DAMAGED_AFTER and lines went unread without a word. Told when the next frame's number
+    # jumps over them after at least SKIP_GRABS damaged grabs; a jump of more than SKIP_MAX (a /reload's fresh
+    # random number) is not a gap.
+    SKIP_GRABS = 3
+    SKIP_MAX = 64           # the addon's queue holds 60
+    SKIP_EVERY = 60.0       # under a lasting cover every line skips: told in full once, then at most this often
+    SKIP_FORGET = 600.0     # no skip for this long: the cover is over, the next one is told in full again
 
     def __init__(self, capturer, config: dict, log, report, decode=decode, find=locate.find,
                  clock=time.monotonic):
@@ -53,6 +62,9 @@ class StripReader:
         self.absent_since, self.searched = None, 0.0
         self.damaged_since, self.damaged_told = None, False
         self.foreign_since, self.foreign_told = None, False
+        self.damaged_grabs = 0          # damaged grabs since the last frame read
+        self.skip_told, self.skipped = None, 0   # when skipped frames were last told, and those skipped since
+        self.skip_last = None           # when frames were last skipped
         self.found = None               # a place the search found, kept once a frame is read from it
 
     def poll(self, now: float) -> Step:
@@ -124,15 +136,37 @@ class StripReader:
             self.log(f"    ячейка полоски: {frame.cell} px")
             self.linked = True
             self.report(linked=True)
+        damaged, self.damaged_grabs = self.damaged_grabs, 0
         if frame.seq == self.seq:
             return Step(pause)
+        skipped = (frame.seq - self.seq - 1) % 65536 if self.seq is not None else 0
+        if 0 < skipped <= self.SKIP_MAX and damaged >= self.SKIP_GRABS:
+            self._skipped(skipped, now)
         first = self.seq is None                   # what was up before we started: not news
         self.seq = frame.seq
         return Step(pause, frame, first)
 
+    def _skipped(self, count: int, now: float) -> None:
+        """`count` frames skipped under a part cover: the first time in full (one line - the launcher's main window
+        shows the WARN line, not the indented details under it), then at most every SKIP_EVERY s with the frames
+        skipped since; a busy chat under a lasting cover filled the log with the same advice, a line each."""
+        if self.skip_last is not None and now - self.skip_last > self.SKIP_FORGET:
+            self.skip_told, self.skipped = None, 0    # a new cover, not the old one still: where to move the strip again
+        self.skip_last = now
+        self.skipped += count
+        if self.skip_told is None:
+            self.log(f"строки с полоски не прочитаны (кадров: {self.skipped}): часть полоски перекрыта, окном другого "
+                     "аддона? Перенеси её на свободное место: «Мост к лаунчеру…» в настройках аддона")
+        elif now - self.skip_told >= self.SKIP_EVERY:
+            self.log(f"строки с полоски не прочитаны (кадров: {self.skipped} с прошлого раза): полоска всё ещё перекрыта")
+        else:
+            return
+        self.skip_told, self.skipped = now, 0
+
     def _missed(self, failure: str, now: float) -> None:
         self.misses += 1
         if failure == "damaged":
+            self.damaged_grabs += 1
             self.damaged_since = self.damaged_since or now
             if not self.damaged_told and now - self.damaged_since > self.DAMAGED_AFTER:
                 self.log("полоска видна, но не читается: её что-то перекрывает?")
