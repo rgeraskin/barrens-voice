@@ -160,7 +160,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - The program is called Barrens Voice Launcher
 
-  The addon, the program on Windows and the mod all went by «Barrens Voice», and the program by three more names besides: «программа» in README, «приложение-компаньон» and «компаньон» in the game and the launcher. Now the program is «Barrens Voice Launcher» («лаунчер» for short) in README, the addon's messages and settings, the launcher's window, dialogs, tray and log, and what reads aloud inside it is «озвучка» («озвучка запускается», «озвучка остановилась»). «Barrens Voice» is the mod as a whole. The shortcuts, `Barrens Voice.exe` and the entry in Windows «Apps» keep their name.
+  The addon, the program on Windows and the mod all went by «Barrens Voice», and the program by three more names besides: «программа» in README, «приложение-компаньон» and «компаньон» in the game and the launcher. Now the program is «Barrens Voice Launcher» («лаунчер» for short) in README, the addon's messages and settings, the launcher's window, dialogs, tray and log, and what reads aloud inside it is «озвучка» («озвучка запускается», «озвучка остановилась»). «Barrens Voice» is the mod as a whole. The shortcuts, `Barrens Voice.exe` and the entry in Windows «Apps» keep their name. The default dictionary's header says the launcher applies the regexes («регулярки (Python, применяет лаунчер)»); a header the player changed stays theirs.
 
 - «Играть» is grey while the game starts
 
