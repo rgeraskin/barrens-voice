@@ -177,12 +177,19 @@ class Release(unittest.TestCase):
         self.assertIn("items must be 1 to 10", " ".join(news.entry_problems(dict(many, version="0.4.1"))))   # ...not a release
         # among news.toml's: after its release's (newest first: 0.4.1 is newer than 0.4.1b7), checked as a whole
         entries = [{k: v for k, v in entry("0.4.1").items() if k != "date"}, entry("0.4.0")]
-        out = release.with_build_entry("0.4.1b7", entries, ["one"])
+        out = release.with_build_entries("0.4.1b7", entries, [("0.4.1b7", ["one"])])
         self.assertEqual([e["version"] for e in out], ["0.4.1", "0.4.1b7", "0.4.0"])
         self.assertEqual(news.problems(out), [])
-        self.assertIs(release.with_build_entry("0.4.1", entries, ["one"]), entries)          # a release: none
+        self.assertIs(release.with_build_entries("0.4.1", entries, [("0.4.1b7", ["one"])]), entries)   # a release: none
         hand = entries[:1] + [entry("0.4.1b7", items=["Своими словами."])] + entries[1:]
-        self.assertEqual(release.with_build_entry("0.4.1b7", hand, ["one"]), hand)       # written by hand: kept
+        self.assertEqual(release.with_build_entries("0.4.1b7", hand, [("0.4.1b7", ["one"])]), hand)   # by hand: kept
+        # the release's earlier test builds too, newest first, under the release's entry: a tester who skipped one
+        builds = [("0.4.1b3", ["three"]), ("0.4.1b5", ["five"]), ("0.4.1b7", ["seven"])]
+        out = release.with_build_entries("0.4.1b7", entries, builds)
+        self.assertEqual([e["version"] for e in out], ["0.4.1", "0.4.1b7", "0.4.1b5", "0.4.1b3", "0.4.0"])
+        self.assertEqual([e["items"] for e in out[1:4]], [["seven"], ["five"], ["three"]])
+        self.assertEqual(news.problems(out), [])
+        self.assertEqual(news.parse(news.dumps(out)), out)
         self.assertEqual(news.parse(news.dumps(out)), out)                               # news.toml's text of them
         # the build itself: in the archive's news.toml, which the companion reads, and in the release's description
         import os
@@ -191,7 +198,8 @@ class Release(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d, \
                 mock.patch.object(release, "DIST", Path(d)), \
                 mock.patch.object(release, "uv_entry", return_value={"version": "x", "url": "u", "sha256": "0" * 64}), \
-                mock.patch.object(release, "build_subjects", return_value=["Chat: icon → clear", "Fix «скачки»"]), \
+                mock.patch.object(release, "build_history", return_value=[
+                    ("0.4.0b5", ["Five"]), ("0.4.0b7", ["Chat: icon → clear", "Fix «скачки»"])]), \
                 mock.patch.object(release, "released_tags", return_value=None), \
                 mock.patch.dict(os.environ, {"RELEASE_TAG": "v0.4.0-beta.7"}):
             archive = release.build()
@@ -199,8 +207,10 @@ class Release(unittest.TestCase):
             body = (Path(d) / "notes.md").read_text(encoding="utf-8")
         own = [e for e in shipped if e["version"] == "0.4.0b7"]
         self.assertEqual(own[0]["items"], ["Chat: icon -> clear", "Fix «скачки»"])
+        self.assertEqual([e["items"] for e in shipped if e["version"] == "0.4.0b5"], [["Five"]])   # the earlier one too
         self.assertEqual(news.problems(shipped), [])
         self.assertIn("### Тестовая сборка 7\n\n- Chat: icon -> clear\n- Fix «скачки»", body)
+        self.assertNotIn("Тестовая сборка 5", body)                    # the GitHub release: this build's only
         self.assertFalse((ROOT / news.SOURCE).read_text(encoding="utf-8").count("0.4.0b7"))   # news.toml as it was
 
     def test_build_subjects_from_the_last_released_tag(self):
@@ -240,12 +250,24 @@ class Release(unittest.TestCase):
             self.assertEqual(subjects("v0.1.1-beta.2", set(), repo), ["Code two"])       # none released: the nearest
             commit("Code three", "d.txt")
             self.assertEqual(subjects("v0.1.1-beta.3", {"v0.1.0"}, repo), ["Code one", "Code two", "Code three"])
+            # every test build of the release up to this one (not yet tagged: HEAD), those that reached testers
+            history = self.release.build_history
+            self.assertEqual(history("v0.1.1-beta.3", {"v0.1.0", "v0.1.1-beta.2"}, repo),
+                             [("0.1.1b2", ["Code one", "Code two"]), ("0.1.1b3", ["Code three"])])
+            self.assertEqual(history("v0.1.1-beta.3", None, repo),                 # GitHub silent: every tag
+                             [("0.1.1b1", ["Code one"]), ("0.1.1b2", ["Code two"]), ("0.1.1b3", ["Code three"])])
+            git("tag", "v0.1.1-beta.3")
+            commit("Code four", "e.txt")
+            git("tag", "v0.1.1-beta.4")
+            self.assertEqual([v for v, _ in history("v0.1.1-beta.3", None, repo)], ["0.1.1b1", "0.1.1b2", "0.1.1b3"],
+                             "a later tag is not this build's")
+            self.assertEqual(history("v0.1.1", None, repo), [], "a release: none")
 
     def test_no_build_entry_for_a_release_and_none_with_control_characters(self):
         release = self.release
         entries = [entry("0.4.1"), entry("0.4.0")]
-        self.assertIs(release.with_build_entry("0.4.1", entries, ["a commit"]), entries)    # a release: as it is,
-        self.assertIs(release.with_build_entry("0.4.2", entries, ["a commit"]), entries)    # with or without its entry
+        self.assertIs(release.with_build_entries("0.4.1", entries, [("0.4.1", ["a commit"])]), entries)   # a release:
+        self.assertIs(release.with_build_entries("0.4.2", entries, [("0.4.2", ["a commit"])]), entries)   # as it is
         made = release.build_entry("0.4.1b2", ["Tab\there", "DEL\x7f gone"])
         self.assertEqual(made["items"], ["Tabhere", "DEL gone"])           # TOML's strings may not hold them
         self.assertEqual(news.parse(news.dumps([made])), [made])

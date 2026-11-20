@@ -96,15 +96,18 @@ NOT_LISTED = tuple(f":(exclude){path}" for path in (
     "README.md", "CHANGELOG.md", "CLAUDE.md", "DEVELOPMENT.md", ".mise.toml", ".gitignore", ".gitattributes"))
 
 
+def _git(root: Path, *args: str) -> str:
+    import subprocess
+    return subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, encoding="utf-8").stdout.strip()
+
+
 def build_subjects(tag: str, released: set[str] | None = None, root: Path = ROOT) -> list[str]:
     """The subjects of the commits a test build brings, oldest first, up to the tag (HEAD when the tag is not there
     yet: a local build): since the last tag that has a release (`released`, released_tags) - a tag whose build failed
     reached no tester, so its commits are listed with the next - or the nearest tag when that is not known. No
     merges, none that touch docs/ only."""
-    import subprocess
-
     def git(*args: str) -> str:
-        return subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, encoding="utf-8").stdout.strip()
+        return _git(root, *args)
     ref = tag if git("rev-parse", "-q", "--verify", f"refs/tags/{tag}") else "HEAD"
     nearest = git("describe", "--tags", "--abbrev=0", "--match", "v*", f"{ref}^")
     previous, seen = nearest, nearest
@@ -114,6 +117,25 @@ def build_subjects(tag: str, released: set[str] | None = None, root: Path = ROOT
     span = f"{previous}..{ref}" if previous else ref
     out = git("log", "--no-merges", "--reverse", "--format=%s", span, "--", ".", *NOT_LISTED)
     return [s for s in out.splitlines() if s.strip()]
+
+
+def build_history(tag: str, released: set[str] | None = None, root: Path = ROOT) -> list[tuple[str, list[str]]]:
+    """(version, build_subjects) of every test build of the tag's release up to it, oldest first: a tester who skipped
+    a build (17 -> 19) sees what the one between brought too. Only those that reached testers - a tag with a release
+    (`released`); a tag whose build failed has none, and its commits are listed with the next. Every tag of the
+    release's test builds when GitHub does not answer (None)."""
+    m = TAG.fullmatch(tag)
+    if not m or not m.group(2):
+        return []
+    base, number = m.group(1), int(m.group(2))
+    ref = tag if _git(root, "rev-parse", "-q", "--verify", f"refs/tags/{tag}") else "HEAD"
+    earlier = []
+    for name in _git(root, "tag", "--list", f"v{base}-beta.*", "--merged", ref).split():
+        other = TAG.fullmatch(name)
+        if other and other.group(2) and int(other.group(2)) < number and (released is None or name in released):
+            earlier.append(int(other.group(2)))
+    return [(f"{base}b{n}", build_subjects(f"v{base}-beta.{n}", released, root)) for n in sorted(earlier)] \
+        + [(f"{base}b{number}", build_subjects(tag, released, root))]
 
 
 # what the game's font has not, in a commit's subject (news.FORBIDDEN): what it has instead; «|» is its markup
@@ -133,13 +155,17 @@ def build_entry(version: str, subjects: list[str]) -> dict:
             "items": items or ["Новых коммитов нет: та же сборка заново."]}
 
 
-def with_build_entry(version: str, entries: list[dict], subjects: list[str]) -> list[dict]:
-    """news.toml's entries with a test build's own (build_entry) where it is (newest first: a release before its test
-    builds); as they are for a release, or a test build whose entry news.toml has (written by hand)."""
-    if version == news.release_of(version) or any(e["version"] == version for e in entries):
+def with_build_entries(version: str, entries: list[dict], builds: list[tuple[str, list[str]]]) -> list[dict]:
+    """news.toml's entries with the test builds' (build_entry: this build's and its release's earlier ones,
+    build_history) where they are (newest first: a release before its test builds); as they are for a release. A
+    test build whose entry news.toml has (written by hand) keeps that one."""
+    if version == news.release_of(version):
         return entries
-    return sorted(entries + [build_entry(version, subjects)], key=lambda e: news.version_key(e["version"]),
-                  reverse=True)
+    have = {e["version"] for e in entries}
+    made = [build_entry(v, subjects) for v, subjects in builds if v not in have]
+    if not made:
+        return entries
+    return sorted(entries + made, key=lambda e: news.version_key(e["version"]), reverse=True)
 
 
 def notes(version: str, entries: list[dict], tag: str = "") -> str:
@@ -326,8 +352,8 @@ def build() -> Path:
         if problems:
             sys.exit("\n".join(problems))
         info["version"] = version_of(tag, base)
-        if info["version"] != news.release_of(info["version"]):          # a test build: its own entry (GitHub asked)
-            entries = with_build_entry(info["version"], entries, build_subjects(tag, released_tags()))
+        if info["version"] != news.release_of(info["version"]):          # a test build: its entries (GitHub asked)
+            entries = with_build_entries(info["version"], entries, build_history(tag, released_tags()))
         problems = news.problems(entries)
         if problems:
             sys.exit("the test build's «Что нового»: " + "; ".join(problems))
