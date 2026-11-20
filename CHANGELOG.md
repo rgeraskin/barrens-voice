@@ -88,7 +88,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - The chat waits for NPC lines CatQuest and Wayfarer voice, too
 
-  The server sends only the text of what NPCs say and cry in the world (a city's herald, a mob in a fight); CatQuest's «Голоса мира» and Wayfarer's barks voice them, each in a queue of its own, and a chat line was read over them. Now such a line pauses the chat as a quest does: the line being read is said again from its start, the next ones wait. CatQuest's line is seen in its world queue (`CatQuestCore.WorldQueue.Current`), Wayfarer's through a hook on its `Barks:Play` (the sound's length) checked against `Barks.recent` (it did play). The setting is now «Ждать озвучку CatQuest/Wayfarer» (`waitForCatQuest`, as before).
+  The server sends only the text of what NPCs say and cry in the world (a city's herald, a mob in a fight); CatQuest's «Голоса мира» and Wayfarer's barks voice them, each in a queue of its own, and a chat line was read over them. Now such a line pauses the chat as a quest does: the line being read is said again from its start, the next ones wait. CatQuest's line is seen in its world queue (`CatQuestCore.WorldQueue.Current`), Wayfarer's through a hook on its `Barks:Play` (the sound's length) checked against `Barks.recent` (it did play). The setting is now «Ждать озвучку CatQuest/Wayfarer» (`waitForCatQuest`, as before). With it off, the debug log no longer says «чат ждёт» of a quest voice-over or an NPC's line: «чат не ждёт: «Ждать озвучку CatQuest/Wayfarer» снята».
 
 - The dictionary window keeps a line where it was typed
 

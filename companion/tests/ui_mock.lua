@@ -743,6 +743,33 @@ assert(sent[#sent]:find("Wayfarer играет: лор места, 30 с — ч�
 WayfarerRU.Queue.items = {}
 ns.WatchCatQuest()
 assert(#first == 2 and first[2]:find("^resume\31"), "Wayfarer silent: the program goes on")
+-- «Ждать озвучку CatQuest/Wayfarer» off (2026-11-20: «чат ждёт» in the debug while the chat went on): the debug says
+-- the chat does not wait, for every kind; on again, it waits
+do
+    local OFF = " — чат не ждёт: «Ждать озвучку CatQuest/Wayfarer» снята"
+    local function noted() return sent[#sent] end
+    ns.db.waitForCatQuest = false
+    WayfarerRU.Queue.items[1] = { handle = 11, startedAt = 400, sound = { duration = 30 }, zone = "Элвиннский лес" }
+    ns.WatchCatQuest()
+    assert(noted():find("Wayfarer играет: лор места, 30 с" .. OFF, 1, true) and not noted():find("чат ждёт", 1, true),
+        noted())
+    assert(#first == 2, "no pause with the check off")
+    WayfarerRU.Queue.items = {}
+    CatQuestCore = { state = { playing = true, source = "pack", startedAt = 400, duration = 34 },
+                     WorldQueue = { Current = function() return { ends = 403 } end } }
+    ns.WatchCatQuest()
+    assert(noted():find("CatQuest играет: pack, 34 с" .. OFF, 1, true)
+        and noted():find("CatQuest: голос мира, ещё 3 с" .. OFF, 1, true) and not noted():find("чат ждёт", 1, true),
+        noted())
+    ns.db.waitForCatQuest = true
+    ns.WatchCatQuest()
+    assert(noted():find("CatQuest играет: pack, 34 с — чат ждёт;", 1, true)
+        and noted():find("голос мира, ещё 3 с — чат ждёт", 1, true), noted())
+    assert(#first == 3 and first[3]:find("^pause\31"), "the check on: the pause")
+    CatQuestCore = nil
+    ns.WatchCatQuest()
+    assert(#first == 4 and first[4]:find("^resume\31"))
+end
 ns.db.debug = false
 WayfarerRU = nil
 -- NPC lines (2026-11-19: Thrall's cry over a chat line): CatQuest's «Голоса мира» and Wayfarer's barks hold the chat too

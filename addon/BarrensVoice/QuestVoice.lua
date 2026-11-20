@@ -118,15 +118,18 @@ function ns.ReleaseHeld()
 end
 
 local voiceSeen
---- The quest voice-overs' state as the debug log tells it ("" when they are silent).
+--- The quest voice-overs' state as the debug log tells it ("" when they are silent). Whether the chat waits is
+--- the setting's too: with «Ждать озвучку CatQuest/Wayfarer» off it never does (ns.Deliver, ns.WatchCatQuest).
 local function QuestVoiceState()
     local parts = {}
+    local waits = ns.db.waitForCatQuest ~= false and " — чат ждёт"
+        or " — чат не ждёт: «Ждать озвучку CatQuest/Wayfarer» снята"
     local core = rawget(_G, "CatQuestCore")
     local st = type(core) == "table" and type(core.state) == "table" and core.state
     if st and (st.playing == true or st.pending ~= nil) then
         local what = st.playing == true and ("CatQuest играет: %s, %s с"):format(tostring(st.source),
             tostring(st.duration and math.floor(st.duration + 0.5))) or "CatQuest ждёт своей очереди (pending)"
-        parts[#parts + 1] = what .. (CatQuestSpeaking() and " — чат ждёт" or " — считаем зависшим, чат не ждёт")
+        parts[#parts + 1] = what .. (CatQuestSpeaking() and waits or " — считаем зависшим, чат не ждёт")
     end
     local wf = rawget(_G, "WayfarerRU")
     local q = type(wf) == "table" and type(wf.Queue) == "table" and wf.Queue
@@ -137,17 +140,17 @@ local function QuestVoiceState()
             or ("Wayfarer играет: %s, %s с"):format(item.questID and ("квест " .. tostring(item.questID))
                 or item.radio ~= nil and "путевая история" or item.zone ~= nil and "лор места" or "реплика",
                 tostring(length and math.floor(length + 0.5)))
-        parts[#parts + 1] = what .. (WayfarerSpeaking() and " — чат ждёт"
+        parts[#parts + 1] = what .. (WayfarerSpeaking() and waits
             or (q.paused == true and " — на паузе, чат не ждёт") or " — считаем зависшим, чат не ждёт")
     end
     local cur = CatQuestWorldSpeaking()
     if cur then
-        parts[#parts + 1] = ("CatQuest: голос мира, ещё %s с — чат ждёт"):format(
-            tostring(tonumber(cur.ends) and math.max(0, math.floor(cur.ends - GetTime() + 0.5))))
+        parts[#parts + 1] = ("CatQuest: голос мира, ещё %s с"):format(
+            tostring(tonumber(cur.ends) and math.max(0, math.floor(cur.ends - GetTime() + 0.5)))) .. waits
     end
     local bark = WayfarerBarkSpeaking()
     if bark then
-        parts[#parts + 1] = ("Wayfarer: фраза NPC, %d с — чат ждёт"):format(math.floor(bark + 0.5))
+        parts[#parts + 1] = ("Wayfarer: фраза NPC, %d с"):format(math.floor(bark + 0.5)) .. waits
     end
     return table.concat(parts, "; ")
 end
