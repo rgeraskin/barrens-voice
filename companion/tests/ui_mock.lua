@@ -127,15 +127,14 @@ end
 ns.Options.Open("dictionary"); assert(ns.Options.Current() == "dictionary"); print("dictionary ok")
 ns.Options.Open("voices"); assert(ns.Options.Current() == "voices"); print("voices ok")
 ns.Options.Open("help"); assert(ns.Options.Current() == "help"); print("help tab ok")
-do  -- the community's icon: the Blizzard logo as the chat shows it, its 24x16 part, not squashed
+do  -- the community's icon: the Battle.net logo, as in the launcher's «Помощь» window (Media/battlenet.tga), square
     local logo
     for _, w in ipairs(created) do
-        if rawget(w, "_texture") == "Interface\\ChatFrame\\UI-ChatIcon-Blizz" then logo = w end
+        if rawget(w, "_texture") == "Interface\\AddOns\\BarrensVoice\\Media\\battlenet" then logo = w end
+        assert(rawget(w, "_texture") ~= "Interface\\ChatFrame\\UI-ChatIcon-Blizz", "no Blizzard logo any more")
     end
-    assert(logo, "the community's row has the Blizzard logo")
-    local c = logo._coords
-    assert(c and c[1] == 4 / 32 and c[2] == 28 / 32 and c[3] == 0 and c[4] == 1, "its texcoords")
-    assert(logo._w / logo._h == 24 / 16, "its own proportions")
+    assert(logo, "the community's row has the Battle.net logo")
+    assert(rawget(logo, "_coords") == nil and logo._w == 20 and logo._h == 20, "the whole picture, square")
     print("community icon ok")
 end
 assert(ns.Retail() == false, "no GetBuildInfo: Forever")
