@@ -10,6 +10,12 @@ import time
 from ctypes import wintypes
 from pathlib import Path, PureWindowsPath
 
+# The launch's lines, as the launcher's window tells from them that the game is on its way («Игра запускается…»)
+# and that it is not coming after all
+LAUNCHING = "запускаю игру через Battle.net ..."
+NOT_LAUNCHED = ("игру не запускаю: ", "игра уже запущена — второй раз не запускаю", "Battle.net не найден",
+                "Battle.net не запустил игру")
+
 TH32CS_SNAPPROCESS = 0x2
 
 
@@ -68,7 +74,7 @@ def launch_allowed(log) -> bool:
     says which program closed the launch - else Play starting no game would look like a fault."""
     why = game_may_run()
     if why:
-        log(f"игру не запускаю: {why}")
+        log(f"{NOT_LAUNCHED[0]}{why}")
     return why is None
 
 
@@ -164,11 +170,11 @@ def launch(config: dict, log, game_running=None) -> bool:
     (`wow_may_run`: a Wow.exe whose path cannot be read counts)."""
     running = game_running or (wow_may_run if sys.platform == "win32" else (lambda: False))
     if running():
-        log("игра уже запущена — второй раз не запускаю")
+        log(NOT_LAUNCHED[1])
         return False
     exe = find_battlenet(config)
     if exe is None:
-        log("Battle.net не найден: укажи его в «Настройках»")
+        log(f"{NOT_LAUNCHED[2]}: укажи его в «Настройках»")
         return False
     from .dictionary import game_of
     product = (config.get("launch_product_retail", "WoW") if game_of(config) == "retail"
@@ -179,7 +185,7 @@ def launch(config: dict, log, game_running=None) -> bool:
     def send() -> None:
         subprocess.Popen(command, close_fds=True, creationflags=getattr(subprocess, "DETACHED_PROCESS", 0))
     send()
-    log("запускаю игру через Battle.net ...")
+    log(LAUNCHING)
     log(f"    Battle.net: --exec=launch {product}")
     if cold:          # Battle.net was not running: this first command only starts it (see follow_cold_start)
         threading.Thread(target=follow_cold_start, args=(send, log), daemon=True, name="battlenet-cold").start()
@@ -236,5 +242,5 @@ def follow_cold_start(send, log, game_running=None, ready=None, sleep=time.sleep
             log("Battle.net только что запустился и пропустил команду — прошу запустить игру ещё раз")
         sleep(1)
     if not game_running():
-        log("Battle.net не запустил игру — нажми «Играть» в нём")
+        log(f"{NOT_LAUNCHED[3]} — нажми «Играть» в нём")
     return game_running()

@@ -82,6 +82,9 @@ class FakeCompanion:
     def state(self):
         return self.st
 
+    def start(self, args):
+        self.running, self.args = True, args
+
     def poll(self):
         return self.code
 
@@ -220,6 +223,67 @@ class Layout(unittest.TestCase):
             self.assertEqual(a.p.tips["check1"], app.TIPS[tip])
             self.assertEqual(any(c.type(i) == "line" for i in c.find_withtag("check1")), not autostart)   # the tick
             self.assertEqual(problems(c), [])
+
+    def play_button(self, a):
+        a.drawn = None
+        a.redraw()
+        c = a.canvas
+        label = [c.itemcget(i, "text") for i in c.find_withtag("play") if c.type(i) == "text"]
+        return label[0], bool(c.tag_bind("play", "<Button-1>"))
+
+    def test_play_greyed_while_the_game_starts(self):
+        # from the launch until the game's process is seen: «Игра запускается…», greyed and deaf (a second click
+        # asked Battle.net again); the click of the enabled drawing before it does not outlive it
+        from bv import launch
+        from bv.launcher import app
+        a = self.make(1.0)
+        a.games, a.selected = [game("forever", "0.4.0b8")], "forever"
+        self.assertEqual(self.play_button(a), ("Играть", True))
+        a.start_companion(["--launch"])                       # «Играть», the shortcut, the window's start
+        self.assertEqual(a.launching[0], "asked")
+        self.assertEqual(self.play_button(a), ("Игра запускается…", False))
+        for scale in (1.0, 1.25, 1.5):                        # the longer label fits the button
+            b = self.make(scale)
+            b.launching = ("sent", 0.0)
+            self.play_button(b)
+            self.assertEqual(problems(b.canvas), [], scale)
+        with mock.patch.object(launch, "launch", side_effect=AssertionError("asked again")):
+            a.play()                                          # the click that slipped through: nothing
+        a.follow_launch([("12:00:00", "INFO", launch.LAUNCHING)], 100.0)
+        self.assertEqual(a.launching, ("sent", 100.0))
+        a.follow_launch([], 100.0 + app.LAUNCH_WAIT - 1)
+        self.assertEqual(self.play_button(a), ("Игра запускается…", False))
+        a.running_game = "forever"                            # the game came: _tick drops the wait too
+        a.companion.running = True
+        self.assertEqual(self.play_button(a), ("Игра запущена", False))
+        a.running_game = None                                 # closed again: back to «Играть»
+        a.launching = None
+        a.companion.running = False
+        self.assertEqual(self.play_button(a), ("Играть", True))
+
+    def test_play_comes_back_when_the_game_does_not(self):
+        # no game after all: the launch gave up (its own words, from the companion or the launcher's own launch),
+        # the companion ended before it launched, or LAUNCH_WAIT went by after Battle.net was asked
+        from bv import launch
+        from bv.launcher import app
+        a = self.make(1.0)
+        for line in (f"{launch.NOT_LAUNCHED[0]}Wow.exe запущен", f"[лаунчер] {launch.NOT_LAUNCHED[1]}",
+                     f"{launch.NOT_LAUNCHED[2]}: укажи его в «Настройках»", f"{launch.NOT_LAUNCHED[3]} — нажми «Играть» в нём"):
+            with self.subTest(line=line):
+                a.launching = ("sent", 0.0)
+                a.follow_launch([("12:00:00", "INFO", line)], 1.0)
+                self.assertIsNone(a.launching)
+        a.follow_launch([("12:00:00", "INFO", f"[лаунчер] {launch.LAUNCHING}")], 5.0)   # «Играть» with the voice-over on
+        self.assertEqual(a.launching, ("sent", 5.0))
+        a.follow_launch([], 5.0 + app.LAUNCH_WAIT + 1)
+        self.assertIsNone(a.launching)
+        a.launching, a.companion.running = ("asked", 0.0), True
+        a.follow_launch([], 1000.0)                            # the race voices built first: no time limit
+        self.assertEqual(a.launching, ("asked", 0.0))
+        a.companion.running = False
+        a.follow_launch([], 1001.0)
+        self.assertIsNone(a.launching)
+        self.assertEqual(self.play_button(a), ("Играть", True))
 
     def test_the_start_with_windows_takes_the_close_check_off(self):
         # turning the start with Windows on unchecks «Закрываться вместе с игрой» in config.json: off again, the

@@ -201,6 +201,10 @@ class Painter:
             self.hover(tag, lambda: self.lacquer(x0, y0, x1, y1, "#d23a2c", "#5c0f0b", tag),
                        lambda: self.lacquer(x0, y0, x1, y1, top, bottom, tag))
             self.click(tag, action)
+        else:       # a tag's bindings outlive its items (c.delete("all")): the enabled drawing's click is still there
+            for event in ("<Button-1>", "<Enter>", "<Leave>"):
+                c.tag_unbind(tag, event)
+            c.config(cursor="")
 
     def button(self, x0, y0, x1, y1, text, tag, action=None, font=None, tip=None) -> None:
         """A small dark button with a gold edge on hover."""

@@ -64,6 +64,9 @@ UPDATE_EVERY = 3600          # an hour; and at every start
 CONFIG_EVERY = 2.0           # seconds between looks at whether config.json reads (check_config)
 LOG_GUTTER = 12              # the log's text stops this short of the right edge: room for its scroll bar
 PRUNE_AFTER_MS = 5000        # old versions removed this long after the start (update.prune_unwatched)
+# «Игра запускается…» this long after Battle.net was asked, unless the game came or the launch said it gave up:
+# a cold Battle.net takes up to two minutes (launch.follow_cold_start), the game's process a few seconds more
+LAUNCH_WAIT = 130.0
 
 
 def rotate_log(path: Path, limit: int = 1_000_000) -> None:
@@ -146,6 +149,9 @@ class App:
         self.busy = ""                   # "stopping", "restarting": a stop is on its way
         self.last_code: int | None = None   # how the companion last ended
         self.running_game: str | None = None
+        # the game on its way: ("asked", t) - a companion started to launch it, its launch not logged yet (the race
+        # voices may be built first); ("sent", t) - Battle.net asked (launch.LAUNCHING); None - nothing on its way
+        self.launching: tuple[str, float] | None = None
         self.extra = args["companion"]   # the companion's own switches given to the launcher (--f5 ...)
         self.update: dict | None = None
         self.drawn = None
@@ -315,6 +321,8 @@ class App:
         if not launch_flags & set(extra + flags):
             flags.append("--launch" if self.config.get("launch_wow") else "--no-launch")
         self.companion.start([f"--{self.selected}", *extra, *flags])
+        if "--launch" in extra + flags:
+            self.launching = ("asked", time.monotonic())
         self.say(f"озвучка запускается ({GAME_NAMES[self.selected]})")
         return True
 
@@ -386,6 +394,25 @@ class App:
         always stays to wait for the next game in the tray (the check is grey)."""
         return bool(self.config.get("exit_with_wow")) and not self.autostart
 
+    def follow_launch(self, new: list[tuple[str, str, str]], now: float) -> None:
+        """«Игра запускается…» from the launch's own lines, whichever started it («Играть», the shortcut, the
+        window's start with «Запускать игру вместе с лаунчером»): on at Battle.net asked, off when the launch gave
+        up, when the companion that was to launch it ended first, or LAUNCH_WAIT after Battle.net was asked
+        with no game (the player closed its login window, say). The game seen ends it too (_tick)."""
+        from .. import launch
+        for _, _, message in new:
+            message = message.removeprefix("[лаунчер] ")      # the launcher's own launch (play) says them too
+            if message.startswith(launch.LAUNCHING):
+                self.launching = ("sent", now)
+            elif message.startswith(launch.NOT_LAUNCHED):
+                self.launching = None
+        if self.launching is None:
+            return
+        kind, since = self.launching
+        if (kind == "asked" and not self.companion.running and not self.busy) or \
+                (kind == "sent" and now - since > LAUNCH_WAIT):
+            self.launching = None
+
     def start_failed(self, code: int | None) -> bool | None:
         """How the companion's end counts for a freshly applied version (update.record_start): True - an error,
         the version's failed start; False - a good end (0); None - no verdict: 3 (started again online), 4
@@ -407,7 +434,7 @@ class App:
     # --- actions --------------------------------------------------------------------------------
 
     def play(self) -> None:
-        if self.busy:
+        if self.busy or (getattr(self, "launching", None) and not self.running_game):   # «Игра запускается…»
             return
         if self.running_game:                      # the game runs, the companion not (it stopped): voices back on
             if not self.companion.running and not self.start_companion(["--no-launch"]) \
@@ -422,7 +449,8 @@ class App:
             return
         if self.companion.running and self.companion_game == self.selected:
             from .. import launch
-            launch.launch(dict(self.config, game=self.selected), self.say_as_companion)
+            if launch.launch(dict(self.config, game=self.selected), self.say_as_companion):
+                self.launching = ("sent", time.monotonic())
         elif self.companion.running:
             self.restart_companion(["--launch"])
         elif not self.start_companion(["--launch"]) and getattr(self, "config_error", None) is not None:
@@ -577,6 +605,7 @@ class App:
         self.main.extend(item for item in new if item[1] in model.MAIN_LEVELS)
         if new and self.log_window is not None:
             self.log_window.append(new)
+        self.follow_launch(new, now)
         while not self.events.empty():
             event = self.events.get_nowait()
             if isinstance(event, tuple) and event[0] == "stopped":
@@ -603,6 +632,8 @@ class App:
                 self.games = model.find_games(self.config)
             if self.running_game and self.running_game != self.selected and not self.companion.running:
                 self.selected = self.running_game      # the game the player started: that one
+            if self.running_game:
+                self.launching = None                  # it came
         if now - self.checked["games"] > 15:
             self.checked["games"] = now
             self.games = model.find_games(self.config)
@@ -720,7 +751,8 @@ class App:
         return (tuple(lines), progress, games, self.selected, self.running_game, show_update,
                 self.updater.status if self.updater else "",
                 self.companion.running,
-                self.config.get("launch_wow"), self.config.get("exit_with_wow"), self.autostart, self.log_back)
+                self.config.get("launch_wow"), self.config.get("exit_with_wow"), self.autostart,
+                self.launching is not None, self.log_back)
 
     def draw_log_bar(self) -> None:
         """The log's scroll bar: a thin track, its thumb the rows shown - drawn only when the rows do not all fit,
@@ -805,7 +837,7 @@ class App:
         if snap == self.drawn:
             return
         self.drawn = snap
-        lines, log, _, _, _, show_update, _, _, launch_wow, exit_with_wow, autostart, _ = snap
+        lines, log, _, _, _, show_update, _, _, launch_wow, exit_with_wow, autostart, _, _ = snap
         c, p = self.canvas, self.p
         c.delete("all")
         n = max(1, len(self.games))
@@ -897,9 +929,11 @@ class App:
             x0 = LX0 + i * (bw + 10)
             p.button(x0, y3 + 8, x0 + bw, y3 + 44, text, f"small{i}", action)
         playing, voiced = bool(self.running_game), self.companion.running
-        label = "Играть" if not playing else "Игра запущена" if voiced else "Включить озвучку"
+        starting = not playing and self.launching is not None
+        label = ("Игра запускается…" if starting else "Играть" if not playing else "Игра запущена" if voiced
+                 else "Включить озвучку")
         p.big_button(RX0, y3, RX1, y3 + 52, label, "play", self.play,
-                     enabled=not self.busy and not (playing and voiced))
+                     enabled=not self.busy and not starting and not (playing and voiced))
 
         # the update, across the whole window
         if show_update:
