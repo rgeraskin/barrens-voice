@@ -212,13 +212,12 @@ do  -- the first run: the welcome, nothing of the news, every entry seen
     fresh()
     DATA.version, BarrensVoiceNewsData, ns.firstRun, said = "0.4.0b16", DATA, true, {}
     ns.LoginWord()
-    assert(#said == 1 and said[1]:find("Barrens Voice Launcher не запущен", 1, true), "at once only the companion's word")
-    local delays = {}
-    for _, t in ipairs(timers) do delays[#delays + 1] = t.seconds end
-    assert(#delays == 2 and delays[1] == 5, "the welcome a few seconds later")
+    assert(#said == 0, "nothing at once: the other addons' login lines first")
+    assert(#timers == 1 and timers[1].seconds == ns.LOGIN_DELAY and ns.LOGIN_DELAY >= 3, "one timer a few seconds later")
+    ns.firstRun = false                       -- the welcome is the login's, whatever happens meanwhile
     runTimers()
     local lines = said
-    assert(lines[2]:find("добро пожаловать", 1, true) and lines[#lines]:find("сообщество в Battle.net", 1, true)
+    assert(lines[1]:find("Barrens Voice Launcher не запущен", 1, true) and lines[2]:find("добро пожаловать", 1, true) and lines[#lines]:find("сообщество в Battle.net", 1, true)
         and #news(lines) == 0, "the companion's word, then the welcome only")
     assert(not W.IsShown(), "no window")
     for _, e in ipairs(REAL) do assert(ns.db.newsSeen[e.version], "seen: " .. e.version) end
@@ -238,10 +237,10 @@ do  -- an update with a big entry (an addon from before this list: only seenVers
     fresh({ seenVersion = "0.3.0" })
     DATA.version, ns.firstRun, said = "0.4.0b16", false, {}
     ns.LoginWord()
-    assert(#said == 1 and said[1]:find("Barrens Voice Launcher не запущен", 1, true) and not W.IsShown(),
-        "first the companion's word, nothing else yet")
-    assert(#timers == 1 and timers[1].seconds == N.DELAY and N.DELAY >= 3, "a few seconds after login")
+    assert(#said == 0 and not W.IsShown(), "nothing at once")
+    assert(#timers == 1 and timers[1].seconds == ns.LOGIN_DELAY, "a few seconds after login")
     runTimers()
+    assert(said[1]:find("Barrens Voice Launcher не запущен", 1, true), "first the companion's word")
     assert(W.IsShown() and #news(said) == 1 and news(said)[1]:find(LINK, 1, true),
         "the window, and the chat line to open it again")
     assert(ns.db.newsSeen["0.4.0"] and ns.db.newsSeen["0.3.0"] and ns.db.seenVersion == "0.4.0b16",

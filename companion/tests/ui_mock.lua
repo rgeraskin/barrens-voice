@@ -1281,8 +1281,8 @@ ns.ChatFade.Apply()
 print = realPrint
 print("companion ok")
 
--- the word at login: the welcome on the first run, then the companion's line; what is new after an update comes
--- later (News.lua: the stub's C_Timer.After runs at once; companion/tests/news.lua has the rest)
+-- the word at login, a few seconds after it: the companion's line, the welcome on the first run, what is new after an
+-- update (the stub's C_Timer.After runs at once; companion/tests/news.lua has the timer and the rest)
 local welcome, plainPrint = {}, print
 print = function(text) welcome[#welcome + 1] = text end
 -- the news and the program's version as the companion writes them into NewsData.lua (bv/news.py)

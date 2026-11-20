@@ -17,7 +17,6 @@ local _, ns = ...
 local N = {}
 ns.News = N
 
-N.DELAY = 5            -- seconds after login: after the companion's word (Companion.lua), the chat settled
 N.AFTER_COMBAT = 5     -- seconds after the combat ends: a pull right after another waits again
 
 --- A version's parts: "0.4.0" -> { 0, 4, 0, huge }, "0.4.0b5" -> { 0, 4, 0, 5 } (a test build is older than its
@@ -193,9 +192,4 @@ function N.Check(installed)
         return
     end
     N.Show(installed)
-end
-
---- After login (and /reload): the check, N.DELAY seconds later.
-function N.AtLogin(installed)
-    if C_Timer then C_Timer.After(N.DELAY, function() N.Check(installed) end) else N.Check(installed) end
 end

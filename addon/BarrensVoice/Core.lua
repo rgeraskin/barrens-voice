@@ -873,11 +873,12 @@ local function Version()
     return meta and meta(ADDON, "Version") or "?"
 end
 
---- The word at login: every time whether the reading works (Companion.lua), and the welcome on the first run;
---- what is new after an update comes a few seconds later, out of combat (News.lua) - by the program's version,
---- which the companion wrote with the news (NewsData.lua), not the addon's.
--- The welcome waits a few seconds: at login every addon speaks at once, and the first lines scroll out of sight.
-local WELCOME_DELAY = 5
+--- The word at login: every time whether the reading works (Companion.lua), the welcome on the first run, and
+--- what is new after an update, out of combat (News.lua) - by the program's version, which the companion wrote
+--- with the news (NewsData.lua), not the addon's.
+-- All of it a few seconds after login (and /reload), in this order: at login every addon speaks at once, and lines
+-- said then go up among theirs and out of sight. The companion's state is the one read at login (Companion.lua).
+ns.LOGIN_DELAY = 5
 -- Where to write about bugs and words read wrong: said at the first run, not at every login.
 local HELP_HINT = "если что-то прочиталось не так, нашлась ошибка или появилась идея — напиши! Куда писать, есть во "
     .. "вкладке «Помощь» в настройках: Discord, Telegram, GitHub и сообщество в Battle.net. Приятной игры!"
@@ -886,11 +887,13 @@ function ns.LoginWord()
     local installed = ns.News.Installed()      -- nil until the companion has written the news
     ns.News.Prepare(installed, ns.firstRun)    -- before the version last seen moves on
     if installed then ns.db.seenVersion = installed end
-    ns.Companion.SayAtLogin()
-    if ns.firstRun then
-        if C_Timer then C_Timer.After(WELCOME_DELAY, ns.Welcome) else ns.Welcome() end
+    local firstRun = ns.firstRun
+    local function speak()
+        ns.Companion.SayAtLogin()
+        if firstRun then ns.Welcome() end
+        ns.News.Check(installed)
     end
-    ns.News.AtLogin(installed)
+    if C_Timer then C_Timer.After(ns.LOGIN_DELAY, speak) else speak() end
 end
 
 --- The first run's word (as CatQuest does it): what this is, that it needs the companion app, where
