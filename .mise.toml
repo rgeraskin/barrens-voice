@@ -59,7 +59,7 @@ description = "Is a release tag ready to push: its version, news.toml, CHANGELOG
 run = "uv run --locked python tools/check_tag.py"
 
 [tasks.addon-sites]
-description = "A release's checkout for CurseForge and Wago: Dictionary.lua stamped, the sites' changelog (`mise run addon-sites v0.4.0`)"
+description = "A release's checkout for CurseForge and Wago: Dictionary.lua stamped, the sites' changelog (`mise run addon-sites v0.4.0`, `--dry`: the version in work's, CI)"
 run = "uv run --locked python tools/addon_sites.py"
 
 [tasks.hooks]

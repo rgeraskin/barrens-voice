@@ -6,6 +6,8 @@ Only a release goes there (vX.Y.Z): test builds reach testers through the launch
   addon on every site, and the dictionary online compared against the same revision;
 - writes .addon-sites-notes.md, the file's changelog on both sites (.pkgmeta manual-changelog): the release's
   «Что нового» and where to get the program the addon needs.
+`python tools/addon_sites.py --dry` (CI, no tag): the same for the version in work, as if it were released - without
+the notes the packager writes its own changelog into the addon's folder, and the zip would not be the release's.
 `python tools/addon_sites.py --check <zip>` (CI, after the packager without uploading): the zip holds the addon as
 git tracks it, under BarrensVoice/, and nothing else.
 """
@@ -73,13 +75,15 @@ def check(zip_path: Path) -> int:
     return 0
 
 
-def main(tag: str) -> int:
+def main(tag: str | None) -> int:
+    """Stamp and write the notes for `tag`, a release; None: for the version in work, as its release (--dry)."""
     base = release.versions()["version"]
     entries = release.news_entries()
-    found = problems(tag, base, entries)
+    found = problems(tag, base, entries) if tag else []
     if found:
         print("\n".join(found), file=sys.stderr)
         return 1
+    tag = tag or f"v{base}"
     path = ROOT / release.DICTIONARY
     path.write_bytes(release.stamp_dictionary(path.read_bytes(), release.dictionary_revision()))
     NOTES.write_text(notes(base, entries, tag), encoding="utf-8", newline="\n")
@@ -91,5 +95,5 @@ if __name__ == "__main__":
     if len(sys.argv) == 3 and sys.argv[1] == "--check":
         sys.exit(check(Path(sys.argv[2])))
     if len(sys.argv) != 2:
-        sys.exit("usage: addon_sites.py <tag> | --check <zip>")
-    sys.exit(main(sys.argv[1]))
+        sys.exit("usage: addon_sites.py <tag> | --dry | --check <zip>")
+    sys.exit(main(None if sys.argv[1] == "--dry" else sys.argv[1]))

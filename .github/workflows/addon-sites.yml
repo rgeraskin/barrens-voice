@@ -30,8 +30,9 @@ jobs:
           ref: ${{ inputs.tag }}       # empty: the commit the workflow runs for
           fetch-depth: 0               # the packager names the zip by the nearest tag; D.REVISION as the archive's
       - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d  # v5.2.9
-      - if: inputs.tag != ''
-        run: mise run addon-sites "$TAG"      # D.REVISION stamped, .addon-sites-notes.md; a test build stops here
+      # D.REVISION stamped, .addon-sites-notes.md (a test build stops here); no tag: the version in work's, as if
+      # released - without the notes the packager would write its own CHANGELOG.md into the zip
+      - run: mise run addon-sites "${TAG:---dry}"
         env:
           TAG: ${{ inputs.tag }}
       - uses: BigWigsMods/packager@01e8631a69c69d7654c788d152630d5fed9e3812  # v2.7.0
