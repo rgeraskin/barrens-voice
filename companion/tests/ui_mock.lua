@@ -390,6 +390,19 @@ do  -- the wheel over the button: the volume, a notch 10 %, within 0..200, the s
     ns.db.volume = 5
     wheel._scripts.OnMouseWheel(wheel, -1)
     assert(ns.db.volume == 0, "nor below silence")
+    -- a quick turn of several notches: one settings frame a moment later, then the next turn sends again
+    local after, later = C_Timer.After, {}
+    C_Timer.After = function(_, f) later[#later + 1] = f end
+    sends = 0
+    wheel._scripts.OnMouseWheel(wheel, 1)
+    wheel._scripts.OnMouseWheel(wheel, 1)
+    wheel._scripts.OnMouseWheel(wheel, 1)
+    assert(sends == 0 and #later == 1, "one frame waits for the turn")
+    later[1]()
+    assert(sends == 1, "sent once")
+    wheel._scripts.OnMouseWheel(wheel, -1)
+    assert(#later == 2, "the next turn sends again")
+    C_Timer.After = after
     ns.SendControl = control
     ns.db.volume = before
 end
@@ -425,7 +438,19 @@ do  -- smileys as words («и смайлики»): a line of them is an emote, a
     assert(spoken("есть ивенты <3") == "Вася говорит: есть ивенты. И показывает сердечко.", spoken("есть ивенты <3"))
     assert(spoken("<3") == "Вася показывает сердечко", spoken("<3"))
     assert(spoken("сложно качаться =\\") == "Вася говорит: сложно качаться. И в недоумении.", spoken("сложно качаться =\\"))
-    assert(spoken("перерос кмк 8)") == "Вася говорит: перерос кмк", "8) at the end: cut, no «восемь»: " .. spoken("перерос кмк 8)"))
+    assert(spoken("сбор в 8)") == "Вася говорит: сбор в 8.", "8) after a word may be a number: as typed")
+    assert(spoken("ору xD ))") == "Вася говорит: ору. И смеётся.", "two smileys at the end: both go")
+    assert(spoken("люблю <3 <3") == "Вася говорит: люблю. И показывает сердечко.", spoken("люблю <3 <3"))
+    assert(spoken("ну, :D") == "Вася говорит: ну. И смеётся.", spoken("ну, :D"))
+    assert(spoken("ладно :)") == "Вася говорит: ладно.", "a smile at the end: the pause, as before")
+    assert(spoken("{череп} xD") == "Вася смеётся", "nothing left but the feeling: as a line of smileys")
+    local n = #sent
+    ns.Send("say", "Вася-Степи", "Orc", 2, "WARRIOR", "", "{rt8} :)")
+    assert(#sent == n, "nothing to say but a full stop: not sent")
+    local brackets = ns.db.smileyBrackets
+    ns.db.smileyBrackets = 3                             -- the saved setting reaches ns.Feeling
+    assert(spoken("спасибо))") == "Вася говорит: спасибо.", spoken("спасибо))"))
+    ns.db.smileyBrackets = brackets
     -- a line of smileys names no place and leaves it to the next line of the run
     local where = ns.db.sayWhere
     ns.db.sayWhere = true

@@ -133,7 +133,10 @@ function ns.Send(kind, sender, race, sex, class, channel, text, spoken)
     end
     -- a letter smiley the feeling replaces is not read out first («ору хд» - «ору. И смеётся.»)
     text = ns.Clean(without or text or "")   -- the dictionary is the program's (it reads Dictionary.lua itself)
-    if text == "" then ns.Skip("пусто после очистки разметки", spoken or sender, raw) return end
+    if text:find("^[%p%s]*$") and feeling then alone = true end   -- «{череп} xD»: nothing but the feeling, as smileys
+    if text == "" and not alone then ns.Skip("пусто после очистки разметки", spoken or sender, raw) return end
+    -- the smiley cut and nothing left to say but punctuation («{rt8} :)» - a full stop): not sent either
+    if without and not alone and text:find("^[%p%s]*$") then ns.Skip("только смайлик", spoken or sender, raw) return end
     -- a line of smileys names no place, and leaves it to be said with the next line
     local place = not alone and Where(kind, channel) or nil
     if ns.db.sayNames and sender and sender ~= "" then
@@ -156,6 +159,7 @@ function ns.Send(kind, sender, race, sex, class, channel, text, spoken)
             text = name .. (place and ", " .. place or "") .. ":" .. NAME_MARK .. " " .. text   -- "Вася, в гильдии:"
         end
         if feeling and not alone then                     -- "…идём в рейд. И смеётся."
+            text = text:gsub("[,:;%-%s]+$", "")             -- «ну, :D» - «ну. И смеётся.», not «ну,.»
             local ends = text:find("[%.!%?]$") or text:sub(-3) == "…"
             text = text .. (ends and " И " or ". И ") .. feeling .. "."
         end

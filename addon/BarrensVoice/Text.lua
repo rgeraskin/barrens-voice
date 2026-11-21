@@ -130,17 +130,42 @@ function ns.Feeling(text, brackets)
     if all then
         for _, feeling in ipairs(ORDER) do if seen[feeling] then return feeling, true end end
     end
-    local last = line:match("(%S+)$")
-    -- how many brackets at the end are a laugh or sadness (`brackets`, 2 by default: the saved `smileyBrackets`)
-    local n = math.max(1, math.floor(tonumber(brackets) or 2))
-    if last:find(("%)"):rep(n) .. "$") and not line:find("%(") then return LAUGH, false end   -- «говорил))»
-    if last:find(("%("):rep(n) .. "$") and not line:find("%)") then return SAD, false end     -- «персональный((»
-    local feeling = TokenFeeling(last)
-    if feeling and not last:find("^[%(%)]") then                    -- «… :D», «… xD», «… :(», «… <3», «… 8)»
-        -- the smiley itself goes: the feeling says it, or (a smile) nothing does - «8)» is no «восемь», «<3» no «три»
-        return feeling ~= SMILE and feeling or nil, false, (line:sub(1, #line - #last):gsub("%s+$", ""))
+    -- how many brackets at the end are a laugh or sadness (`brackets`, 2 by default: the saved `smileyBrackets`; at most
+    -- 10, a /run typo must not build a huge pattern for every chat line)
+    local n = math.max(1, math.min(10, math.floor(tonumber(brackets) or 2)))
+    -- The smileys at the end, word by word from the last («ору xD ))», «люблю <3 <3»): each one goes from the text - the
+    -- feeling says it, or (a smile) nothing does: «<3» is no «три». The feeling is the last strong one of them.
+    local rest, feeling, cut = line, nil, false
+    -- as many "(" as ")" in the line: parentheses («( это шутка )»), not smileys - as Clean keeps them
+    local _, opens = line:gsub("%(", "")
+    local _, closes = line:gsub("%)", "")
+    local paired = opens > 0 and opens == closes
+    while true do
+        local last = rest:match("(%S+)$")
+        if not last or last == "8)" then break end            -- «нас 8)», «сбор в 8)»: maybe a number, left as typed
+        local brackets_ = last:match("^[%)]+$") or last:match("^[%(]+$")
+        if brackets_ and paired then break end
+        local f
+        if brackets_ then                                   -- spaced brackets: a laugh or sadness from n of them
+            f = #brackets_ >= n and (last:find("%)") and LAUGH or SAD) or nil
+        else
+            f = TokenFeeling(last)
+            if not f then break end
+            if f == SMILE then f = nil end
+        end
+        feeling = feeling or f
+        rest, cut = rest:sub(1, #rest - #last):gsub("%s+$", ""), true
     end
-    return nil
+    if not feeling and not cut then
+        -- brackets glued to the last word («говорил))», «персональный((»): Clean makes them a full stop
+        local last = rest:match("(%S+)$")
+        if last:find(("%)"):rep(n) .. "$") and not line:find("%(") then return LAUGH, false end
+        if last:find(("%("):rep(n) .. "$") and not line:find("%)") then return SAD, false end
+        return nil
+    end
+    -- smiles only: the pause they always were (Clean made them a full stop)
+    if not feeling and not rest:find("[%.!%?]$") and rest:sub(-3) ~= "…" then rest = rest:gsub("[,:;%-]+$", "") .. "." end
+    return feeling, false, cut and rest or nil
 end
 
 -- Addons that write into the chat for their player: party progress (Questie), boss timers (DBM,
