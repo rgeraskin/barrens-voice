@@ -54,6 +54,13 @@ class AddonSites(unittest.TestCase):
         nested = [n.replace("BarrensVoice/", "BarrensVoice/addon/BarrensVoice/", 1) for n in good]
         self.assertTrue(addon_sites.zip_problems(nested, tracked), "move-folders not done: wrong")
 
+    def test_the_toc_names_the_projects(self):
+        # the sites' apps match an addon installed elsewhere (by the launcher) by these; addon-sites.yml checks them
+        # against the repository's variables
+        toc = (ROOT / "addon" / "BarrensVoice" / "BarrensVoice.toc").read_text(encoding="utf-8")
+        self.assertRegex(toc, r"(?m)^## X-Curse-Project-ID: \d+$")
+        self.assertRegex(toc, r"(?m)^## X-Wago-ID: [A-Za-z0-9]{8}$")
+
     def test_only_a_release_goes_to_the_sites(self):
         entries = [{"version": "0.4.0"}, {"version": "0.3.0"}]
         self.assertEqual(addon_sites.problems("v0.4.0", "0.4.0", entries), [])

@@ -30,6 +30,16 @@ jobs:
           ref: ${{ inputs.tag }}       # empty: the commit the workflow runs for
           fetch-depth: 0               # the packager names the zip by the nearest tag; D.REVISION as the archive's
       - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d  # v5.2.9
+      # the TOC names the projects too (X-Curse-Project-ID, X-Wago-ID: the sites' apps match an addon the launcher
+      # installed by them); the packager takes the variables first, so the two must not part
+      - name: The TOC's project ids are the variables'
+        env:
+          CF: ${{ vars.CF_PROJECT_ID }}
+          WAGO: ${{ vars.WAGO_PROJECT_ID }}
+        run: |
+          toc=addon/BarrensVoice/BarrensVoice.toc
+          [ -z "$CF" ] || grep -qx "## X-Curse-Project-ID: $CF" "$toc" || { echo "::error::$toc: X-Curse-Project-ID is not $CF"; exit 1; }
+          [ -z "$WAGO" ] || grep -qx "## X-Wago-ID: $WAGO" "$toc" || { echo "::error::$toc: X-Wago-ID is not $WAGO"; exit 1; }
       # D.REVISION stamped, .addon-sites-notes.md (a test build stops here); no tag: the version in work's, as if
       # released - without the notes the packager would write its own CHANGELOG.md into the zip
       - run: mise run addon-sites "${TAG:---dry}"

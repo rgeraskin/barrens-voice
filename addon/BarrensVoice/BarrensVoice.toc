@@ -6,6 +6,8 @@
 ## Category: Accessibility
 ## IconTexture: Interface\AddOns\BarrensVoice\Icon
 ## AddonCompartmentFunc: BarrensVoice_OnCompartmentClick
+## X-Curse-Project-ID: 1819830
+## X-Wago-ID: ZKxOgv6k
 
 Protocol.lua
 Strip.lua
