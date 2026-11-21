@@ -84,6 +84,9 @@ def main(tag: str | None) -> int:
         print("\n".join(found), file=sys.stderr)
         return 1
     tag = tag or f"v{base}"
+    if not any(e["version"] == base for e in entries):
+        print(f"news.toml has no entry {base}", file=sys.stderr)
+        return 1
     path = ROOT / release.DICTIONARY
     path.write_bytes(release.stamp_dictionary(path.read_bytes(), release.dictionary_revision()))
     NOTES.write_text(notes(base, entries, tag), encoding="utf-8", newline="\n")
