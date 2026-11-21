@@ -583,6 +583,15 @@ assert(sent[#sent]:find("^test\31"), "then the line")
 sent = {}
 tryBox._scripts.OnEnterPressed(tryBox)
 assert(#sent == 1 and sent[1]:find("^test\31"), "the layer unchanged since: not sent again")
+-- the line's sender is the one the chat gave the player's own lines (Forever: with the surname; their voice),
+-- the character's name until there was one
+local function senderOf(p) return p:match("^test\31([^\31]*)") end
+assert(senderOf(sent[1]) == "Громмаш", tostring(sent[1]))
+ns.db.ownSender = { me = "Громмаш Адский Крик" }
+sent = {}
+tryBox._scripts.OnEnterPressed(tryBox)
+assert(senderOf(sent[#sent]) == "Громмаш Адский Крик", tostring(sent[#sent]))
+ns.db.ownSender = nil
 ns.Dictionary.Reset()
 UnitName, UnitClass, UnitRace, UnitSex = nil, nil, nil, nil
 print("try a line ok")

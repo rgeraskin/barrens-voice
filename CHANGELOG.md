@@ -28,6 +28,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- «Озвучить» in the dictionary window reads with the player's own name and voice
+
+  It sent the character's name alone (on Forever without the surname «и фамилии» adds), so the line got another voice than the player's own chat lines. It now goes as the sender the chat gives the player's own lines, the name alone until the character has written one.
+
 - A tester moving from the test builds to the release sees the release's «Что нового» once
 
   Every test build showed the release's entry and marked it seen, so the release, whose entry is rewritten for it, showed nothing. The first login on a release after its test builds shows its entry again, as the window for a big one; players from an earlier release and newcomers are unaffected.

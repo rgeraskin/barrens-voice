@@ -141,7 +141,9 @@ function W.Create(pane)
         -- an edit of the last 2 s is still waiting to be sent (Core.lua ns.DictionaryChanged): it goes
         -- first, so the line is read with the dictionary as it is now
         ns.SendDictionary(false)
-        ns.Send("test", UnitName("player"), race, UnitSex("player"), class, "", try:GetText())
+        -- the sender the chat gives the player's own lines (Forever: with the surname «и фамилии» says): their name
+        -- and voice; the name alone until the character has written a line the addon heard
+        ns.Send("test", ns.PlayerSender() or UnitName("player"), race, UnitSex("player"), class, "", try:GetText())
         try:ClearFocus()
     end
     try:SetScript("OnEnterPressed", Say)
