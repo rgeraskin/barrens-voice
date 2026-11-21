@@ -1,7 +1,7 @@
 ## Interface: 16001, 120105
 ## Title: Barrens Voice
 ## Notes: Озвучка чата: у каждого игрока свой голос — голоса рас (F5-TTS) или голоса Windows. Строки передаются приложению-компаньону тонкой тёмной полоской у края экрана.
-## Version: 0.4.0
+## Version: 0.4.1b1
 ## SavedVariables: BarrensVoiceDB
 ## Category: Accessibility
 ## IconTexture: Interface\AddOns\BarrensVoice\Icon
