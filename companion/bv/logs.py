@@ -33,6 +33,7 @@ WARN_STARTS = (
     "захват окна недоступен", "Whisper (ONNX) недоступен", "снимок не удался", "не удалось",
     "ссылка «", "аддон новее лаунчера", "аддон старше лаунчера", "загрузка RUAccent в прошлый раз оборвалась",
     "если окно чата не прячется",       # the /reload reminder (reloadhint): yellow in the launcher's main window
+    "звук не играет",                   # no sound device (audio.Player): the next line tries again
 )
 ERROR_STARTS = ("ОШИБКА", "F5-TTS:", "RUAccent:", "ошибка голоса", "голоса рас из клиента:")
 

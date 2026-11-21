@@ -286,6 +286,19 @@ class StableVoices(unittest.TestCase):
             self.assertEqual(sp.voice_for(f"BN:Друг{i}#1234", "2"), sp.voice_for(f"BN:Друг{i}", "2"))
 
 
+class SapiLoudness(unittest.TestCase):
+    def test_a_line_is_made_at_full_loudness_whatever_its_volume(self):
+        # the player applies the addon's volume as the line plays (the wheel); made at 50 % too it would be 25 %
+        from bv.protocol import Line
+        from bv.speech import Speaker
+        sp = Speaker({"players": {}, "exclude": [], "gender_overrides": {}, "kind_gain_db": {}, "volume": 100}, print)
+        pcm = b"".join(int(8000 * ((i % 40) - 20) / 20).to_bytes(2, "little", signed=True) for i in range(2000))
+        half = Line("say", "Орк", "Orc", "2", "", "", "текст", 100, "sapi", volume=50)
+        whole = Line("say", "Орк", "Orc", "2", "", "", "текст", 100, "sapi", volume=100)
+        self.assertEqual(sp._loud(pcm, half), sp._loud(pcm, whole))
+        self.assertEqual(sp._loud(pcm, half), sp._even(pcm, "say", 1.0))
+
+
 class ResetAssignments(unittest.TestCase):
     def test_reset_forgets(self):
         import tempfile
@@ -1479,7 +1492,7 @@ class SameSpeaker(unittest.TestCase):
         from bv.engines import Engines
         import queue
         import tempfile
-        player = Player(8, tempfile.mkdtemp())              # not started: no thread, no winsound
+        player = Player(8)                                  # not started: no thread, no stream
         player.playing_until = time.monotonic() + 2        # a line plays two more seconds
         self.assertEqual(player.quiet_for(), 0.0)
         player.playing_until = time.monotonic() - 3        # ended three seconds ago
@@ -1500,20 +1513,20 @@ class SameSpeaker(unittest.TestCase):
         self.assertEqual(engines.quiet_for(), 0.0)
 
 
-def fake_winsound(fail_first=False):
-    """(the lines played - each by its last byte, a fake winsound module): the real one is Windows only."""
+def fake_out(fail_first=False):
+    """(the lines played - each by its last byte, a fake output): the real one (StreamOut) needs a sound device."""
     import threading
-    import types
     played, lock, calls = [], threading.Lock(), []
 
-    def play_sound(path, flags):
-        if path:
-            calls.append(path)
+    class Out:
+        def play(self, data, level, stopped, length):
+            calls.append(data)
             if fail_first and len(calls) == 1:
                 raise RuntimeError("Failed to play sound")
             with lock:
-                played.append(Path(path).read_bytes()[-1:])     # a line's last byte names it
-    return played, types.SimpleNamespace(SND_FILENAME=1, SND_ASYNC=2, SND_NODEFAULT=4, PlaySound=play_sound)
+                played.append(data[-1:])                    # a line's last byte names it
+            stopped.wait(length)
+    return played, Out()
 
 
 def marked_line(mark: bytes, secs: float) -> bytes:
@@ -1524,15 +1537,15 @@ def marked_line(mark: bytes, secs: float) -> bytes:
 
 class PauseForCatQuest(unittest.TestCase):
     """While CatQuest speaks the player holds the lines; the line it cut is played again from its
-    start, then the queue (a fake winsound: the real one is Windows only)."""
+    start, then the queue (a fake output: the real one needs a sound device)."""
 
     def test_cut_line_again_then_queue(self):
         import tempfile
         import time
-        played, fake = fake_winsound()
+        played, fake = fake_out()
         from bv.audio import Player
         with tempfile.TemporaryDirectory() as d:
-            p = Player(8, d, sound=fake)
+            p = Player(8, out=fake)
             p.start()
             p.play(marked_line(b"A", 0.6))
             p.play(marked_line(b"B", 0.1))
@@ -1558,10 +1571,10 @@ class PauseForCatQuest(unittest.TestCase):
         import time
         from unittest import mock
         from bv import audio
-        played, fake = fake_winsound()
+        played, fake = fake_out()
         logged = []
         with tempfile.TemporaryDirectory() as d, mock.patch.object(audio, "PAUSE_MAX", 0.2):
-            p = audio.Player(8, d, log=logged.append, sound=fake)
+            p = audio.Player(8, log=logged.append, out=fake)
             p.start()
             p.pause()                                    # CatQuest's "resume" never comes
             p.play(marked_line(b"A", 0.1))
@@ -1572,6 +1585,407 @@ class PauseForCatQuest(unittest.TestCase):
             self.assertTrue(any(m.startswith("пауза для CatQuest дольше") for m in logged), logged)
 
 
+class LiveVolume(unittest.TestCase):
+    """The mouse wheel's volume reaches the line already playing: the stream reads the volume asked for every block, both
+    ways, 0..2 of the line (over full the peaks eased); a line is made at full loudness."""
+
+    class FakeSD:
+        """sounddevice's part StreamOut uses: a stream whose blocks run on a thread, as PortAudio's callback does."""
+        class CallbackStop(Exception):
+            pass
+
+        def __init__(self, blocks_wait=0.0, first_wait=0.0):
+            self.blocks, self.aborted, self.wait, self.first_wait = [], False, blocks_wait, first_wait
+
+        def OutputStream(self, samplerate, channels, dtype, blocksize, callback, finished_callback, device=None):
+            import numpy as np
+            import threading
+            sd = self
+
+            class Stream:
+                def start(self):
+                    def run():
+                        time.sleep(sd.first_wait)            # PortAudio: the first block a buffer after the start
+                        while not sd.aborted:
+                            out = np.zeros((blocksize, channels), dtype="float32")
+                            try:
+                                callback(out, blocksize, None, None)
+                            except sd.CallbackStop:
+                                sd.blocks.append(out[:, 0].copy())
+                                break
+                            sd.blocks.append(out[:, 0].copy())
+                            time.sleep(sd.wait)
+                        finished_callback()
+                    import time
+                    threading.Thread(target=run, daemon=True).start()
+
+                def abort(self):
+                    sd.aborted = True
+
+                def close(self):
+                    pass
+            return Stream()
+
+    def test_the_line_playing_follows_both_ways(self):
+        import threading
+        import numpy as np
+        from bv import audio
+        pcm = (np.full(8000, 0.25) * 32767).astype("<i2").tobytes()      # a steady 0.25 for a second at 8 kHz
+        data = audio.wav(pcm, 8000)
+        sd = self.FakeSD(blocks_wait=0.001)
+        gain = {"v": 1.0}
+        changed = threading.Event()
+
+        def level():
+            if len(sd.blocks) == 3 and not changed.is_set():   # the wheel, while the line plays
+                gain["v"] = 2.0
+                changed.set()
+            return gain["v"]
+        audio.StreamOut(sd).play(data, level, threading.Event(), audio.seconds(data))
+        first, later = sd.blocks[0], sd.blocks[4]
+        self.assertAlmostEqual(float(first[0]), 0.25, places=3)          # as made
+        self.assertAlmostEqual(float(later[0]), 0.5, places=3)           # twice as loud, at once
+        sd2 = self.FakeSD()
+        audio.StreamOut(sd2).play(data, lambda: 8.0, threading.Event(), 1.0)
+        self.assertLess(float(np.max(np.abs(sd2.blocks[0]))), 1.0)     # over full: eased, never reaching 1
+        sd3 = self.FakeSD()
+        audio.StreamOut(sd3).play(data, lambda: 0.0, threading.Event(), 1.0)
+        self.assertEqual(float(np.max(np.abs(sd3.blocks[0]))), 0.0)      # down to silence
+
+    def test_a_long_line_is_no_stall(self):
+        # a line longer than STALL plays through on one stream: the blocks keep the beat
+        import threading
+        import numpy as np
+        from unittest import mock
+        from bv import audio
+        data = audio.wav((np.ones(4000) * 1000).astype("<i2").tobytes(), 8000)      # half a second
+        sd = self.FakeSD(blocks_wait=0.05)                                          # 4 blocks, 0.2 s
+        sd.opened = 0
+        real = sd.OutputStream
+
+        def counting(**kw):
+            sd.opened += 1
+            return real(**kw)
+        sd.OutputStream = counting
+        with mock.patch.object(audio.StreamOut, "STALL", 0.15):
+            audio.StreamOut(sd).play(data, lambda: 1.0, threading.Event(), 0.5)
+        self.assertEqual(sd.opened, 1)
+
+    def test_a_slow_start_is_no_stall(self):
+        # opening and starting the stream take longer than STALL (a slow device): the line still plays, once
+        import threading
+        import numpy as np
+        from unittest import mock
+        from bv import audio
+        data = audio.wav((np.ones(800) * 1000).astype("<i2").tobytes(), 8000)
+        sd = self.FakeSD(first_wait=0.05)
+        real = sd.OutputStream
+        opened = []
+
+        def slow(**kw):
+            opened.append(1)
+            stream = real(**kw)
+            start = stream.start
+
+            def slow_start():
+                time.sleep(0.3)
+                start()
+            stream.start = slow_start
+            return stream
+        import time
+        sd.OutputStream = slow
+        with mock.patch.object(audio.StreamOut, "STALL", 0.2):
+            audio.StreamOut(sd).play(data, lambda: 1.0, threading.Event(), 0.1)
+        self.assertEqual(len(opened), 1)
+        self.assertTrue(sd.blocks)
+
+    def test_a_stream_ending_early_goes_on(self):
+        # the stream finished before the line's end (the device dropped it): the list read again, on from there
+        import threading
+        import numpy as np
+        from bv import audio
+        data = audio.wav((np.arange(8000) % 100).astype("<i2").tobytes(), 8000)
+        sd = self.FakeSD()
+        real = sd.OutputStream
+        opened = []
+
+        def early(**kw):
+            opened.append(1)
+            if len(opened) == 1:                     # two blocks, then «finished»
+                cb, fin = kw["callback"], kw["finished_callback"]
+                calls = {"n": 0}
+
+                def two(out, frames, t, st):
+                    calls["n"] += 1
+                    if calls["n"] > 2:
+                        raise sd.CallbackStop
+                    cb(out, frames, t, st)
+                kw = dict(kw, callback=two)
+            return real(**kw)
+        sd.OutputStream = early
+        sd._terminate = lambda: None
+        sd._initialize = lambda: setattr(sd, "aborted", False)
+        audio.StreamOut(sd).play(data, lambda: 1.0, threading.Event(), 1.0)
+        self.assertEqual(len(opened), 2)
+
+    def test_a_failed_start_of_portaudio_is_said_and_recovers(self):
+        # PortAudio does not start again once (reopen): said as StreamBroken; the next line starts it afresh, though
+        # stopping a PortAudio not started raises
+        import threading
+        from bv import audio
+
+        class SD(self.FakeSD):
+            def __init__(self):
+                super().__init__()
+                self.up, self.fail_start = True, 1
+
+            def OutputStream(self, **kw):
+                if not self.up:
+                    raise RuntimeError("PortAudio not initialized")
+                if self.fail_start:                      # the device gone: this stream fails
+                    raise RuntimeError("device unavailable")
+                return super().OutputStream(**kw)
+
+            def _terminate(self):
+                if not self.up:
+                    raise RuntimeError("Error terminating PortAudio: PortAudio not initialized")
+                self.up = False
+
+            def _initialize(self):
+                if self.fail_start:
+                    self.fail_start -= 1
+                    raise RuntimeError("Error initializing PortAudio")
+                self.up = True
+        sd = SD()
+        out = audio.StreamOut(sd)
+        data = audio.wav(b"\0\0" * 800, 8000)
+        with self.assertRaises(audio.StreamBroken):
+            out.play(data, lambda: 1.0, threading.Event(), 0.1)
+        out.play(data, lambda: 1.0, threading.Event(), 0.1)          # the next line: started afresh, heard
+        self.assertTrue(sd.blocks)
+
+    def test_the_list_read_again_finds_the_device_again(self):
+        from bv import audio
+        sd = self.FakeSD()
+        out = audio.StreamOut(sd)
+        sd.query_hostapis = lambda i=None: [{"name": "MME", "devices": [7]}] if i is None else {"name": "MME", "devices": [7]}
+        sd.query_devices = lambda i: {"max_output_channels": 2}
+        sd._terminate, sd._initialize = (lambda: None), (lambda: None)
+        out.reopen()
+        self.assertEqual(out.device, 7)
+
+    def test_a_turn_of_the_wheel_ramps_across_a_block(self):
+        import threading
+        import numpy as np
+        from bv import audio
+        data = audio.wav((np.full(4096, 0.25) * 32767).astype("<i2").tobytes(), 8000)
+        sd = self.FakeSD()
+        gains = iter([1.0] + [2.0] * 20)
+        audio.StreamOut(sd).play(data, lambda: next(gains), threading.Event(), 0.5)
+        second = sd.blocks[1]
+        self.assertAlmostEqual(float(second[0]), 0.25, places=3)        # from the old volume...
+        self.assertGreater(float(second[-1]), 0.49)                      # ...to the new one, no step at the edge
+        self.assertLess(float(second[-1]), float(sd.blocks[2][0]))        # (the new one itself from the next block)
+        self.assertTrue(np.all(np.diff(second) >= -1e-6))
+
+    def test_a_cut_line_raises_nothing(self):
+        # a stop while the stream failed: no StreamBroken, nothing said
+        import threading
+        from bv import audio
+
+        class SD(self.FakeSD):
+            def OutputStream(self, **kw):
+                raise RuntimeError("device unavailable")
+        stopped = threading.Event()
+        stopped.set()
+        audio.StreamOut(SD()).play(audio.wav(b"\0\0" * 800, 8000), lambda: 1.0, stopped, 0.1)
+
+    def test_an_outage_after_a_heard_line_is_said_again(self):
+        import time
+        from bv import audio
+        results = iter([audio.StreamBroken("gone"), None, audio.StreamBroken("gone again")])
+
+        class Out:
+            def play(self, data, level, stopped, length):
+                result = next(results)
+                if result is not None:
+                    raise result
+        logged = []
+        p = audio.Player(8, log=logged.append, out=Out())
+        p.start()
+        for mark in (b"A", b"B", b"C"):
+            p.play(marked_line(mark, 0.05))
+        time.sleep(0.5)
+        self.assertEqual([m.split(":")[1].strip().split(" —")[0] for m in logged], ["gone", "gone again"])
+
+    @unittest.skipUnless(sys.platform == "win32", "sounddevice is installed on Windows only")
+    def test_the_real_library(self):
+        # the wheel, its PortAudio DLL and the private names StreamOut needs, on CI's Windows
+        import sounddevice
+        self.assertTrue(callable(sounddevice._terminate) and callable(sounddevice._initialize))
+        self.assertIn("MME", [h["name"] for h in sounddevice.query_hostapis()])
+
+    def test_a_selfcheck_of_this_version_passes(self):
+        # an installed launcher refuses a new version whose selfcheck fails, and remembers the refusal: the real one
+        # must pass here (on Windows CI too, where it looks for sounddevice)
+        import subprocess
+        companion = Path(__file__).resolve().parents[1]
+        run = subprocess.run([sys.executable, "-m", "bv.selfcheck"], cwd=companion, capture_output=True, text=True,
+                             timeout=120)
+        self.assertEqual(run.returncode, 0, run.stderr[-500:])
+
+    def test_the_first_volume_is_config_jsons(self):
+        from bv import audio
+        self.assertEqual(audio.Player(8, gain=0.3).level(), 0.3)
+
+    def test_a_stop_cuts_the_stream(self):
+        import threading
+        import time
+        from bv import audio
+        data = audio.wav(b"\0\0" * 80000, 8000)                         # ten seconds
+        sd, stopped = self.FakeSD(blocks_wait=0.01), threading.Event()
+        threading.Timer(0.1, stopped.set).start()
+        started = time.monotonic()
+        audio.StreamOut(sd).play(data, lambda: 1.0, stopped, audio.seconds(data))
+        self.assertLess(time.monotonic() - started, 1.0)
+        self.assertTrue(sd.aborted)
+
+    def test_the_player_reads_the_volume_asked_now(self):
+        import tempfile
+        import time
+        from bv import audio
+        heard = []
+
+        class Out:
+            def play(self, data, level, stopped, length):
+                heard.append(level())
+        with tempfile.TemporaryDirectory() as d:
+            p = audio.Player(8, out=Out())
+            p.start()
+            p.set_gain(0.4)
+            p.play(marked_line(b"A", 0.1))
+            time.sleep(0.3)
+            p.set_gain(1.6)
+            p.play(marked_line(b"B", 0.1))
+            time.sleep(0.3)
+        self.assertEqual(heard, [0.4, 1.6])
+
+    def test_no_device_is_said_once_and_tried_again(self):
+        # no sound device at all: the line is not heard, the launcher's window says so in yellow once, and the next line
+        # tries the device again (plugged in meanwhile: it plays)
+        import time
+        from unittest import mock
+        from bv import audio, logs
+        logged, played, fake = [], *fake_out()
+        tries = {"n": 0}
+
+        def stream_out():
+            tries["n"] += 1
+            if tries["n"] <= 2:
+                raise OSError("PortAudio: no device")
+            return fake
+        with mock.patch.object(audio, "StreamOut", side_effect=stream_out):
+            p = audio.Player(8, log=logged.append)
+            p.start()
+            for mark in (b"A", b"B", b"C"):
+                p.play(marked_line(mark, 0.05))
+            time.sleep(0.6)
+        self.assertEqual(played, [b"C"])
+        self.assertEqual(len(logged), 1, logged)
+        self.assertTrue(logged[0].startswith("звук не играет: не открылось звуковое устройство"), logged)
+        self.assertEqual(logs.level_of(logged[0]), "WARN")
+
+    def test_the_sound_mapper_is_the_device(self):
+        # Windows' sound mapper (MME's first output) follows the default output, as winsound does
+        from bv import audio
+        sd = self.FakeSD()
+        sd.query_hostapis = lambda i=None: ([{"name": "MME", "devices": [0, 1, 2]}, {"name": "WASAPI", "devices": [3]}]
+                                           if i is None else [{"name": "MME", "devices": [0, 1, 2]}][i])
+        sd.query_devices = lambda i: {"max_output_channels": 0 if i == 0 else 2}      # 0 is an input
+        self.assertEqual(audio.StreamOut(sd).device, 1)
+        self.assertIsNone(audio.StreamOut(self.FakeSD()).device)                     # no MME: the default device
+
+    def test_a_device_gone_mid_line_is_found_again(self):
+        # the stream stalls (headphones pulled out): PortAudio's list read again, the line goes on from where it was
+        import threading
+        import numpy as np
+        from unittest import mock
+        from bv import audio
+        pcm = (np.arange(16000) % 100).astype("<i2").tobytes()          # 2 s at 8 kHz, every sample known
+        data = audio.wav(pcm, 8000)
+        test = self
+
+        class SD(self.FakeSD):
+            def __init__(self):
+                super().__init__()
+                self.opened, self.reopened = 0, 0
+
+            def OutputStream(self, **kw):
+                self.opened += 1
+                stream = test.FakeSD.OutputStream(self, **kw)
+                if self.opened == 1:                     # the first stream: three blocks, then nothing more
+                    real = kw["callback"]
+                    calls = {"n": 0}
+
+                    def stalling(out, frames, t, st):
+                        calls["n"] += 1
+                        if calls["n"] > 3:
+                            time.sleep(10)
+                        real(out, frames, t, st)
+                    kw = dict(kw, callback=stalling)
+                    stream = test.FakeSD.OutputStream(self, **kw)
+                return stream
+
+            def _terminate(self):
+                self.reopened += 1
+
+            def _initialize(self):
+                self.aborted = False
+        import time
+        sd = SD()
+        with mock.patch.object(audio.StreamOut, "STALL", 0.2):
+            out = audio.StreamOut(sd)
+            out.play(data, lambda: 1.0, threading.Event(), audio.seconds(data))
+        self.assertEqual((sd.opened, sd.reopened), (2, 1))
+        played = np.concatenate(sd.blocks)
+        resumed = round(float(played[3 * 1024]) * 32768)                  # the first sample after the stall
+        self.assertEqual(resumed, (3 * 1024) % 100, "on from where it stopped, not from the start")
+
+    def test_a_stream_that_breaks_is_said_and_the_next_line_tries(self):
+        # the device gone for good (twice for one line, the list read again between): said once, the line not heard,
+        # the next line tries the device again
+        import time
+        from bv import audio, logs
+
+        class Broken:
+            class PortAudioError(Exception):
+                pass
+
+            def __init__(self):
+                self.opened = 0
+
+            def OutputStream(self, **kwargs):
+                self.opened += 1
+                raise self.PortAudioError("device unavailable")
+
+            def _terminate(self):
+                pass
+
+            def _initialize(self):
+                pass
+        logged, sd = [], Broken()
+        p = audio.Player(8, log=logged.append, out=audio.StreamOut(sd))
+        p.start()
+        p.play(marked_line(b"A", 0.1))
+        p.play(marked_line(b"B", 0.1))
+        time.sleep(0.8)
+        self.assertEqual(sd.opened, 4)                              # each line: twice, the list read again between
+        self.assertEqual(len(logged), 1, logged)
+
+        self.assertTrue(logged[0].startswith("звук не играет: device unavailable"), logged)
+        self.assertEqual(logs.level_of(logged[0]), "WARN")
+
+
 class PlayerErrors(unittest.TestCase):
     """The player is the only one: a line that fails to play is logged and the next ones still play
     (it was the thread's end, and the companion went silent for good)."""
@@ -1579,12 +1993,12 @@ class PlayerErrors(unittest.TestCase):
     def test_goes_on_after_a_failed_line(self):
         import tempfile
         import time
-        played, fake = fake_winsound(fail_first=True)
+        played, fake = fake_out(fail_first=True)
         logged = []
         from bv.audio import Player
         from bv.logs import level_of
         with tempfile.TemporaryDirectory() as d:
-            p = Player(2, d, log=logged.append, sound=fake)
+            p = Player(2, log=logged.append, out=fake)
             p.start()
             for mark in (b"A", b"B", b"C"):
                 p.play(marked_line(mark, 0.05))
@@ -1594,25 +2008,6 @@ class PlayerErrors(unittest.TestCase):
             self.assertEqual(logged, ["не удалось проиграть строку: Failed to play sound"])
             self.assertEqual(level_of(logged[0]), "WARN")
             self.assertGreater(p.quiet_for(), 0)
-
-    def test_its_folder_removed_meanwhile(self):
-        # the folder was made only when the player was: removed (a temp cleaner) it failed every line from then on
-        import shutil
-        import tempfile
-        import time
-        played, fake = fake_winsound()
-        logged = []
-        from bv.audio import Player
-        with tempfile.TemporaryDirectory() as d:
-            folder = Path(d) / "tmp"
-            p = Player(2, folder, log=logged.append, sound=fake)
-            p.start()
-            p.play(marked_line(b"A", 0.05))
-            time.sleep(0.4)
-            shutil.rmtree(folder)
-            p.play(marked_line(b"B", 0.05))
-            time.sleep(0.4)
-        self.assertEqual((played, logged), ([b"A", b"B"], []))
 
 
 class CompanionStatus(unittest.TestCase):

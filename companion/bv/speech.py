@@ -178,6 +178,10 @@ class Speaker(threading.Thread):
         return wav_bytes(samples, RENDER_RATE, volume,
                          self.config["kind_gain_db"].get(kind, 0))
 
+    def _loud(self, pcm: bytes, line) -> bytes:
+        """`line`'s audio at full loudness, evened: the player applies the addon's volume as the line plays."""
+        return self._even(pcm, line.kind, 1.0)
+
     def _render(self, sapi, voice: Voice, text: str, rate: int = 100) -> bytes | None:
         """`text` spoken by `voice` as 22 kHz 16-bit PCM; None when the audio is missing or much
         shorter than the text needs (Edge sometimes drops the connection mid-line)."""
@@ -240,7 +244,7 @@ class Speaker(threading.Thread):
                     continue
                 if attempt is not voice:
                     self.log(f"  вместо него: {attempt.description}")
-                self.player.play(self._even(audio, line.kind, line.gain(self.config)), generation)
+                self.player.play(self._loud(audio, line), generation)
                 break
 
 

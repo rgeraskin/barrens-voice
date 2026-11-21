@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 
 from .assign import Assigner
-from .audio import Player, drain, wav
+from .audio import KNEE, Player, drain, limit, wav  # noqa: F401 - KNEE and limit: tests and tools take them here
 from . import gamevoices
 from .intonation import shape
 from .text import Accentor, numbers_to_words
@@ -73,23 +73,6 @@ def tidy(samples, rate: int, gain_db: float = 0.0):
     peak = float(np.max(np.abs(samples))) or 1e-6
     gain = min(gain, PEAK / peak)
     return samples * gain
-
-
-KNEE = 0.8   # peaks above this are bent smoothly toward full scale instead of clipped
-
-
-def limit(samples):
-    """Peaks over KNEE eased toward 1.0 (tanh) instead of cut off: a line played louder than 100 %
-    (the addon's volume goes to 200 %) stays clean; below KNEE nothing changes."""
-    import numpy as np
-
-    a = np.abs(samples)
-    over = a > KNEE
-    if not over.any():
-        return samples
-    out = np.array(samples, dtype="float32")
-    out[over] = np.sign(out[over]) * (KNEE + (1 - KNEE) * np.tanh((a[over] - KNEE) / (1 - KNEE)))
-    return out
 
 
 def wav_bytes(samples, rate: int, volume: float, gain_db: float = 0.0) -> bytes:
@@ -479,7 +462,8 @@ class F5Speaker:
                 if self.config.get("debug"):
                     self.log(f"  синтез {time.perf_counter() - started:.2f} с, {len(wav) / sr:.1f} с звука")
                 # in the try too: a gain typed wrong in config.json ("yell": null) costs the line, not the thread
-                data = wav_bytes(wav, sr, line.gain(self.config), self.config["kind_gain_db"].get(line.kind, 0))
+                # full loudness: the player applies the volume as the line plays (the mouse wheel reaches it)
+                data = wav_bytes(wav, sr, 1.0, self.config["kind_gain_db"].get(line.kind, 0))
             except Exception as e:  # noqa: BLE001 - one bad line must not stop the reader
                 self.log(f"F5-TTS: {e}")
                 continue

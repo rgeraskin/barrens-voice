@@ -425,6 +425,8 @@ def service(line, first: bool, engines, player, dictionary, capturer) -> None:
             log("полоска: " + describe_place(place))
         if place:                       # kept for a restart before the game saves it (/reload, logout)
             capturer.remember(place)
+        if line.volume is not None:     # the volume now (the mouse wheel): the line playing follows at once
+            player.set_gain(line.gain(engines.config))
     elif kind == "dict":
         dictionary.receive(line.options, line.text)
     elif kind == "pause":
@@ -472,6 +474,8 @@ class Lines:
         if line.off is not None:
             self.sapi.set_disabled({n for n in line.off.split("|") if n})
         self.engines.follow(line)
+        if line.volume is not None and line.kind in LABELS:   # a chat line's volume, in the order the frames come
+            self.player.set_gain(line.gain(self.config))
         if line.kind in SERVICE_KINDS:
             service(line, first, self.engines, self.player, self.dictionary, self.capturer)
         elif line.kind not in LABELS:
@@ -676,7 +680,7 @@ def main() -> int:
     inflector = Inflector(log, config.get("declension", True))
     inflector.load()
     from .audio import Player
-    player = Player(config["max_queue"], DATA_DIR / "tmp", log=log)
+    player = Player(config["max_queue"], log=log, gain=config["volume"] / 100)
     player.start()
     sapi = Speaker(config, log, accentor, player)
     sapi.start()

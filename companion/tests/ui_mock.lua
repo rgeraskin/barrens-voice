@@ -363,8 +363,9 @@ do  -- the wheel over the button: the volume, a notch 10 %, within 0..200, the s
         if f._scripts.OnMouseWheel and f._scripts.OnDragStart then wheel = f end   -- the one dragged round the map
     end
     assert(wheel, "the minimap button takes the wheel")
-    local before, refresh, tip = ns.db.volume, ns.Options.Refresh, GameTooltip
-    local refreshed, lines = 0, {}
+    local before, refresh, tip, control = ns.db.volume, ns.Options.Refresh, GameTooltip, ns.SendControl
+    local refreshed, lines, sends = 0, {}, 0
+    ns.SendControl = function() sends = sends + 1 end       -- the settings frame: the launcher follows at once
     ns.Options.Refresh = function() refreshed = refreshed + 1 end
     GameTooltip = setmetatable({}, { __index = function(_, k)
         if k == "AddLine" then return function(_, text) lines[#lines + 1] = text end end
@@ -373,21 +374,23 @@ do  -- the wheel over the button: the volume, a notch 10 %, within 0..200, the s
     wheel.IsMouseOver = function() return true end
     ns.db.volume = 100
     wheel._scripts.OnMouseWheel(wheel, 1)
-    assert(ns.db.volume == 110, "up: louder")
+    assert(ns.db.volume == 105, "up: louder, by 5 %")
     assert(refreshed == 1, "the settings' slider follows")
+    assert(sends == 1, "the volume goes to the launcher at once (a settings frame)")
     local shown = false
-    for _, l in ipairs(lines) do if tostring(l):find("Громкость: |cffffd100110%|r", 1, true) then shown = true end end
+    for _, l in ipairs(lines) do if tostring(l):find("Громкость: |cffffd100105%|r", 1, true) then shown = true end end
     assert(shown, "the tooltip shows the new volume")
     ns.Options.Refresh, GameTooltip, wheel.IsMouseOver = refresh, tip, nil
     wheel._scripts.OnMouseWheel(wheel, -1)
     wheel._scripts.OnMouseWheel(wheel, -1)
-    assert(ns.db.volume == 90, "down: quieter")
+    assert(ns.db.volume == 95, "down: quieter")
     ns.db.volume = 195
     wheel._scripts.OnMouseWheel(wheel, 1)
     assert(ns.db.volume == 200, "not past the slider's top")
     ns.db.volume = 5
     wheel._scripts.OnMouseWheel(wheel, -1)
     assert(ns.db.volume == 0, "nor below silence")
+    ns.SendControl = control
     ns.db.volume = before
 end
 print("minimap ok")

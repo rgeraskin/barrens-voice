@@ -18,7 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - The volume by the mouse wheel over the minimap button
 
-  A notch is 10 %, within the slider's 0–200 %; the button's tooltip shows the volume, and the slider on «Общее» follows.
+  A notch is 5 %, as the game's own volume sliders, within the slider's 0–200 %; the button's tooltip shows the volume, and the slider on «Общее» follows. The line already playing follows at once, louder and quieter: the launcher now plays a line as a stream (`sounddevice`, PortAudio) and applies the volume to every block of it, instead of a file through `winsound` at a volume fixed when it was made. The stream goes through Windows' sound mapper, as `winsound` did, so it follows the default output: headphones plugged in or out, a stream that fails or stalls is opened again on the list of devices read afresh and goes on from where it stopped. With no device at all the launcher's window says «звук не играет…» in yellow, and the next line tries again.
 
 - The CurseForge and Wago apps recognise the addon the launcher installed
 

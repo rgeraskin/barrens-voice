@@ -1,6 +1,8 @@
 # The versions the companion was tested with: an install months later gets the same libraries
 mss==10.2.0
 pywin32==312
+# the sound: a line played as a stream, its volume applied as it plays
+sounddevice==0.5.6
 numpy==2.5.4
 ruaccent==1.5.8.3
 num2words==0.5.14

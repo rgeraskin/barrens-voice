@@ -197,6 +197,23 @@ class ServiceFrames(unittest.TestCase):
         self.assertTrue(logged[0].startswith("полоска: верх"), logged)
 
 
+class LiveVolumeFrame(unittest.TestCase):
+    def test_a_settings_frame_sets_the_volume_at_once(self):
+        # the mouse wheel over the minimap button sends a settings frame: its volume reaches the line playing
+        import types
+        from unittest import mock
+        from bv import __main__ as companion
+        from bv.protocol import Line
+        gains = []
+        player = types.SimpleNamespace(set_gain=gains.append)
+        engines = types.SimpleNamespace(config={"volume": 100})
+        capturer = types.SimpleNamespace(place=None, set_place=lambda p: None, remember=lambda p: None)
+        with mock.patch.object(companion, "log", lambda *a: None):
+            companion.service(Line("control", "", "", "", "", "", "-", volume=60), True, engines, player, None, capturer)
+            companion.service(Line("control", "", "", "", "", "", "-"), True, engines, player, None, capturer)
+        self.assertEqual(gains, [0.6])                         # a frame without a volume changes nothing
+
+
 class ChatLines(unittest.TestCase):
     """`Lines`: what a new frame's line does - settings for the engines, service frames, chat lines
     spoken with the speaker's name or without it, repeats and unknown kinds left unread."""
@@ -266,6 +283,20 @@ class ChatLines(unittest.TestCase):
 
     def spoken(self):
         return [line.text for line in self.speaker.said]
+
+    def test_a_chat_lines_volume_in_the_order_frames_come(self):
+        # the volume asked is set as each frame comes, a chat line's too: a line made before a turn of the wheel does not
+        # take the volume back when it is queued later (the player reads the volume as it plays)
+        import types
+        from bv.protocol import Line
+        gains = []
+        self.lines.player = types.SimpleNamespace(set_gain=gains.append)
+        self.config["volume"] = 100
+        self.lines.handle(Line("party", "Тралл", "Orc", "2", "SHAMAN", "", "Тралл:\x04 раз", volume=120), False)
+        self.lines.handle(Line("party", "Тралл", "Orc", "2", "SHAMAN", "", "Тралл:\x04 два"), False)   # none sent
+        self.assertEqual(gains, [1.2])
+        self.lines.handle(Line("someday", "Тралл", "Orc", "2", "SHAMAN", "", "x", volume=50), False)   # a newer kind
+        self.assertEqual(gains, [1.2], "an unknown kind sets nothing")
 
     def test_a_chat_line(self):
         self.line("Тралл:\x04 привет", raw="привет!", decl="0")

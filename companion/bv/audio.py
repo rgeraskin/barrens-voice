@@ -1,6 +1,6 @@
-"""One player for every engine: lines play strictly one after another (winsound stops a sound when
-another starts, and two engines must never talk over or cut each other), each with a short silent
-tail so the sound device does not clip the last syllable. stop() cuts the line being played and
+"""One player for every engine: lines play strictly one after another (two engines must never talk over or cut each
+other), each with a short silent tail so the sound device does not clip the last syllable. The volume the addon asks
+is applied while a line plays (StreamOut), so the mouse wheel reaches the line already playing. stop() cuts the line being played and
 drops everything queued or still being made (the "generation" a line was asked for in)."""
 from __future__ import annotations
 
@@ -74,16 +74,142 @@ def queue_line(lines: queue.Queue, line, limit: int, log) -> None:
     lines.put(line)
 
 
-class Player(threading.Thread):
-    """winsound cannot play from memory asynchronously (RuntimeError), and only an asynchronous
-    sound can be cut: each line is written to a file first, a few names in turn."""
+KNEE = 0.8   # peaks above this are bent smoothly toward full scale instead of clipped
 
-    def __init__(self, max_queue: int = 8, folder=None, log=None, sound=None):
+
+def limit(samples):
+    """Peaks over KNEE eased toward 1.0 (tanh) instead of cut off: a line played louder than 100 %
+    (the addon's volume goes to 200 %) stays clean; below KNEE nothing changes."""
+    import numpy as np
+
+    a = np.abs(samples)
+    over = a > KNEE
+    if not over.any():
+        return samples
+    out = np.array(samples, dtype="float32")
+    out[over] = np.sign(out[over]) * (KNEE + (1 - KNEE) * np.tanh((a[over] - KNEE) / (1 - KNEE)))
+    return out
+
+
+def samples_of(data: bytes):
+    """A line's WAV (16-bit mono, as wav() makes it) as float32 samples -1..1, and its rate."""
+    import numpy as np
+    with wave.open(io.BytesIO(data)) as w:
+        rate, frames = w.getframerate(), w.readframes(w.getnframes())
+    return np.frombuffer(frames, dtype="<i2").astype("float32") / 32768, rate
+
+
+class StreamBroken(OSError):
+    """The stream failed twice for one line, the list of devices read again between: the device is gone for good."""
+
+
+class StreamOut:
+    """Plays a line as a stream (PortAudio, through sounddevice): the volume asked is read for every block, so the mouse
+    wheel reaches the line playing at once, louder and quieter, 0..2 of it (over 1 the peaks eased, `limit`). Nothing
+    is set in Windows: the line itself is multiplied.
+
+    The device is Windows' sound mapper (MME's first output, «Microsoft Sound Mapper» / «Переназначение звуковых
+    устройств»), the one winsound played through before the stream: it follows Windows' default output, headphones plugged in or out.
+    PortAudio reads its list of devices once, so when a stream fails or stalls (the device gone) the list is read
+    again and the line goes on from where it stopped; only a second failure is the caller's (Player: said, the next
+    line tries again)."""
+
+    BLOCK = 1024    # frames a block: ~46 ms at 22 kHz, a volume change heard within it
+    STALL = 2.0     # seconds without a block: the device is gone
+
+    def __init__(self, sd=None):
+        if sd is None:
+            import sounddevice as sd
+        self.sd = sd
+        self.device = self.mapper()
+
+    def mapper(self):
+        """Windows' sound mapper's index in PortAudio's list (None: the default device - not Windows, no MME)."""
+        try:
+            mme = next(i for i, h in enumerate(self.sd.query_hostapis()) if h["name"] == "MME")
+            return next(i for i in self.sd.query_hostapis(mme)["devices"]
+                        if self.sd.query_devices(i)["max_output_channels"] > 0)
+        except Exception:  # noqa: BLE001 - no MME (not Windows), a list that does not read: the default device
+            return None
+
+    def reopen(self) -> None:
+        """PortAudio's list of devices read again (a device plugged in or out since it started). A start that fails is
+        StreamBroken (said, the next line tries again), and a stop of a PortAudio not started (the start before
+        failed) is no reason not to start it again."""
+        terminate, initialize = getattr(self.sd, "_terminate", None), getattr(self.sd, "_initialize", None)
+        if terminate and initialize:
+            try:
+                terminate()
+            except Exception:  # noqa: BLE001 - not started (an earlier initialize failed): start it afresh
+                pass
+            try:
+                initialize()
+            except Exception as e:
+                raise StreamBroken(f"PortAudio не запустился: {e}") from e
+        self.device = self.mapper()
+
+    def play(self, data: bytes, level, stopped: threading.Event, length: float) -> None:
+        """Until the line ends or `stopped` is set (a stop or a pause cuts it). `length`: the outputs' interface (a fake
+        waits it out); the stream knows its own end."""
+        samples, rate = samples_of(data)
+        state = {"pos": 0}
+        for attempt in (1, 2):
+            try:
+                if self._stream(samples, rate, state, level, stopped):
+                    return
+                raise OSError("звук остановился: устройство пропало?")
+            except Exception as e:
+                if stopped.is_set():
+                    return
+                if attempt == 2:
+                    raise StreamBroken(str(e)) from e
+                self.reopen()                       # and on from where it stopped
+
+    def _stream(self, samples, rate, state, level, stopped) -> bool:
+        """One stream from state["pos"]: True when the line ended or was stopped, False when it stalled."""
+        import numpy as np
+        sd = self.sd
+        done = threading.Event()
+        beat = {"at": time.monotonic()}
+
+        def callback(out, frames, _time, _status):
+            pos = state["pos"]
+            chunk = samples[pos:pos + frames]
+            state["pos"] = pos + len(chunk)
+            beat["at"] = time.monotonic()
+            gain, before = max(0.0, level()), state.get("gain")
+            if before is None or before == gain:
+                scaled = chunk * gain
+            else:                                   # a turn of the wheel: a ramp across the block, no click at its edge
+                scaled = chunk * np.linspace(before, gain, len(chunk), endpoint=False, dtype="float32")
+            state["gain"] = gain
+            out[:len(chunk), 0] = limit(scaled)
+            out[len(chunk):, 0] = 0
+            if len(chunk) < frames:
+                raise sd.CallbackStop
+        stream = sd.OutputStream(device=self.device, samplerate=rate, channels=1, dtype="float32",
+                                 blocksize=self.BLOCK, callback=callback, finished_callback=done.set)
+        try:
+            stream.start()
+            beat["at"] = time.monotonic()          # the first block comes a buffer after the start: no stall before it
+            while not done.wait(0.02):
+                if stopped.is_set():
+                    stream.abort()
+                    return True
+                if time.monotonic() - beat["at"] > self.STALL:
+                    stream.abort()
+                    return False
+            return state["pos"] >= len(samples)     # finished before the end: the device went away
+        finally:
+            stream.close()
+
+
+class Player(threading.Thread):
+    """The lines in turn, through an output (`out`: the stream, StreamOut; the tests give a fake). The lines come made at
+    full loudness (the engines' own evening-out only); the volume the addon asks is applied as they play."""
+
+    def __init__(self, max_queue: int = 8, log=None, out=None, gain: float = 1.0):
         super().__init__(daemon=True, name="player")
-        import tempfile
-        from pathlib import Path
-        self.folder = Path(folder) if folder else Path(tempfile.gettempdir()) / "barrens-voice"
-        self.turn = 0
         self.items: queue.Queue = queue.Queue()
         self.max_queue = max_queue
         self.generation = 0
@@ -96,7 +222,19 @@ class Player(threading.Thread):
         self.current = None          # (generation, data) being played
         self.cut_by_pause = False
         self.again = None            # the line a pause cut: played again from its start
-        self.sound = sound           # winsound (Windows only; the tests give a fake)
+        self.out = out
+        self.silent = False          # the last line could not play: said once, until one plays again
+        # the volume the addon asks now, 0..2: set as the frames come (a chat line's, a settings frame's - the wheel),
+        # in their order, and read by the output for every block of the line playing; before the first frame,
+        # config.json's own (the program's notices at its start)
+        self.gain = gain
+
+    def set_gain(self, gain: float) -> None:
+        """The volume asked now: the line playing follows at once (the stream), the next ones are played so too."""
+        self.gain = max(0.0, float(gain))
+
+    def level(self) -> float:
+        return self.gain
 
     def quiet_for(self) -> float:
         """Seconds since the last line ended; 0 while one plays or waits to."""
@@ -150,16 +288,31 @@ class Player(threading.Thread):
         drain(self.items)
         self.stopped.set()
 
+    def _output(self):
+        """The stream, opened at the first line (and again after it could not be: no device then, one now)."""
+        if self.out is None:
+            try:
+                self.out = StreamOut()
+            except Exception as e:  # noqa: BLE001 - no PortAudio, no device: said, the next line tries again
+                self._silent(f"не открылось звуковое устройство: {e}")
+        return self.out
+
+    def _silent(self, why: str) -> None:
+        if not self.silent:
+            self.silent = True
+            self.log(f"звук не играет: {why} — пробую снова со следующей строкой")
+
     def run(self) -> None:
-        if self.sound is None:
-            import winsound
-            self.sound = winsound
         while True:
             item, self.again = self.again, None
             if item is None:
                 item = self.items.get()
             try:
                 self._play(item)
+            except StreamBroken as e:
+                self.current = None
+                self.playing_until = time.monotonic()
+                self._silent(str(e))
             except Exception as e:  # noqa: BLE001 - the only player: one line that fails must not silence the rest
                 self.current = None
                 self.playing_until = time.monotonic()
@@ -176,17 +329,15 @@ class Player(threading.Thread):
         if not self.running.is_set():         # paused just now: before it started
             self.current, self.again = None, item
             return
-        self.turn = (self.turn + 1) % 3
-        path = self.folder / f"line{self.turn}.wav"
-        self.folder.mkdir(parents=True, exist_ok=True)   # each time: a folder removed meanwhile is made again
-        path.write_bytes(data)
-        # asynchronous, so a stop can cut it
+        out = self._output()
+        if out is None:                       # no device: the line is not heard (said once)
+            self.current = None
+            return
         length = seconds(data)
         self.playing_until = time.monotonic() + length
-        sound = self.sound
-        sound.PlaySound(str(path), sound.SND_FILENAME | sound.SND_ASYNC | sound.SND_NODEFAULT)
-        if self.stopped.wait(length):
-            sound.PlaySound(None, 0)
+        out.play(data, self.level, self.stopped, length)
+        self.silent = False
+        if self.stopped.is_set():
             self.playing_until = time.monotonic()
             if self.cut_by_pause and generation == self.generation:
                 self.again = item

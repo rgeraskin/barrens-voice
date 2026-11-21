@@ -21,6 +21,13 @@ def main() -> int:
     import bv.update  # noqa: F401
     from cryptography.hazmat.primitives.asymmetric import ed25519  # noqa: F401
     tkinter.Tcl()
+    # the sound: one way only since 0.4.1 (a stream, audio.StreamOut), no winsound to fall back to. Found, not imported:
+    # importing it starts PortAudio
+    import importlib.util
+    import sys
+    if sys.platform == "win32" and importlib.util.find_spec("sounddevice") is None:
+        print("sounddevice не установлен: звуку не на чем играть", file=sys.stderr)
+        return 1
     return 0
 
 

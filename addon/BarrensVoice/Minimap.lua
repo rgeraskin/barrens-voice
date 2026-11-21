@@ -1,6 +1,7 @@
 -- The minimap button (as CatQuest's: on the minimap ring, dragged around it) and the entry in the
 -- client's addon compartment. Left click: the settings window; right click: reading on/off; the mouse wheel over
--- the button: the volume, as the slider on «Общее» (each line carries it to the launcher: the next one sounds so).
+-- the button: the volume, as the slider on «Общее»; a settings frame takes it to the launcher, so the line playing
+-- follows at once.
 local _, ns = ...
 
 local M = {}
@@ -9,7 +10,7 @@ ns.Minimap = M
 local ICON = "Interface\\AddOns\\BarrensVoice\\Icon"
 local button, icon
 
-M.VOLUME_STEP = 10          -- percent a notch of the wheel; the slider's range, 0..200
+M.VOLUME_STEP = 5           -- percent a notch of the wheel, as the game's own volume sliders; the slider's range 0..200
 M.VOLUME_MAX = 200
 
 --- One notch of the wheel (+1 up: louder, -1 down: quieter): the volume setting moved within its range, and the
@@ -19,7 +20,18 @@ function M.Wheel(delta)
     local value = math.max(0, math.min(M.VOLUME_MAX, now + (delta > 0 and 1 or -1) * M.VOLUME_STEP))
     ns.db.volume = value
     if ns.Options.Refresh then ns.Options.Refresh() end
+    M.SendSoon()
     return value
+end
+
+local pending
+--- The settings to the launcher a moment after the wheel stops (one frame for a quick turn of several notches): the
+--- line already playing gets the new volume at once, not only the next one.
+function M.SendSoon()
+    if pending then return end
+    pending = true
+    local function send() pending = false; ns.SendControl() end
+    if C_Timer then C_Timer.After(0.15, send) else send() end
 end
 
 local function Position()

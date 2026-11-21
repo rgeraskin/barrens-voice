@@ -294,13 +294,27 @@ class F5SpeakerLoad(unittest.TestCase):
 
             def play(self, data, generation):
                 played.append((data[:4], generation))
+        from unittest import mock
+        from bv import f5engine
+        made_at = []
+        real_wav_bytes = f5engine.wav_bytes
+
+        def wav_bytes(samples, rate, volume, gain_db=0.0):
+            made_at.append(volume)
+            return real_wav_bytes(samples, rate, volume, gain_db)
+        self.addCleanup(lambda: self.assertTrue(made_at and all(v == 1.0 for v in made_at),
+                                                f"lines made at full loudness, the player applies the volume: {made_at}"))
+        patcher = mock.patch.object(f5engine, "wav_bytes", wav_bytes)
+        patcher.start()
+        self.addCleanup(patcher.stop)
         with tempfile.TemporaryDirectory() as d:
             speaker, logged = self.speaker(Path(d), [self.voice(Path(d))], Onnx(), Player())
             loop = threading.Thread(target=speaker._synth_loop)
             loop.start()
             self.assertTrue(speaker.ready.wait(5))
             self.assertIsNone(speaker.error)
-            speaker.say(Line("say", "Громмаш", "Orc", "2", "", "", "Кто в рейд", 100, "f5"))
+            # the addon's volume at 50 %: the line is still made at full loudness, the player applies the 50 %
+            speaker.say(Line("say", "Громмаш", "Orc", "2", "", "", "Кто в рейд", 100, "f5", volume=50))
             speaker.lines.put(None)                  # the end, after that line
             loop.join(5)
             self.assertFalse(loop.is_alive())
