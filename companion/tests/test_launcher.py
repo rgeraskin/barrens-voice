@@ -2309,6 +2309,7 @@ class Changelog(unittest.TestCase):
             self.assertEqual(sections, [s for s in order if s in sections], f"{version}: sections {sections}")
             for entry in re.split(r"^- ", body, flags=re.M)[1:]:
                 title, _, rest = entry.partition("\n")
+                rest = rest.split("\n### ")[0]                  # a title-only last entry: the next section is not its text
                 self.assertFalse(title.endswith("."), f"{version}: a title ends with a full stop: {title}")
                 if rest.strip():
                     self.assertTrue(rest.startswith("\n  "), f"{version}: «{title}» - a blank line, then an indented paragraph")
