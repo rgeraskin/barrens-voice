@@ -1804,6 +1804,10 @@ class ReleaseBuild(unittest.TestCase):
         with zipfile.ZipFile(archive) as z:
             names = set(z.namelist())
             self.assertIn('version = "0.4.0b7"', z.read("pyproject.toml").decode())
+            toc = z.read("addon/BarrensVoice/BarrensVoice.toc").decode()
+            self.assertNotIn("X-Curse-Project-ID", toc)                    # the sites have releases only
+            self.assertNotIn("X-Wago-ID", toc)
+            self.assertIn("## Interface:", toc)
         for need in ("pyproject.toml", "uv.lock", "LICENSE", "news.toml", "Barrens Voice.exe", "companion/BarrensVoice.pyw",
                      "companion/bv/__main__.py", "companion/bv/update.py", "companion/bv/launcher/app.py",
                      "companion/bv/selfcheck.py",

@@ -203,6 +203,16 @@ def dictionary_revision() -> int:
 
 
 DICTIONARY = "addon/BarrensVoice/Dictionary.lua"
+# the CurseForge and Wago projects the TOC names (their apps match an addon installed elsewhere by them): the sites
+# have releases only, so a test build's addon goes without - an app would take it for the project's and «update»
+# it to the older release, and the launcher would put the test build back
+SITE_IDS = re.compile(rb"(?m)^## X-(?:Curse-Project-ID|Wago-ID):[^\n]*\n")
+
+
+def without_site_ids(toc: bytes) -> bytes:
+    """A test build's TOC: the sites' project ids taken out."""
+    return SITE_IDS.sub(b"", toc)
+
 
 
 def stamp_dictionary(data: bytes, revision: int) -> bytes:
@@ -394,6 +404,8 @@ def build() -> Path:
                 data = own_news.encode("utf-8")
             if name == DICTIONARY:                                         # which default this is (the dictionary online)
                 data = stamp_dictionary(data, dictionary_revision())
+            if name == TOC and info["version"] != news.release_of(info["version"]):   # a test build: not the sites'
+                data = without_site_ids(data)
             z.writestr(info_, data)
     data = archive.read_bytes()
     manifest = {**info, "archive": archive.name, "size": len(data), "sha256": hashlib.sha256(data).hexdigest(),

@@ -18,7 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - The CurseForge and Wago apps recognise the addon the launcher installed
 
-  The addon's TOC names its projects (`X-Curse-Project-ID`, `X-Wago-ID`); the release workflow checks they are the repository's variables.
+  The addon's TOC names its projects (`X-Curse-Project-ID`, `X-Wago-ID`); the release workflow checks they are the repository's variables. A test build's addon goes without them: the sites have releases only.
 
 ### Changed
 

@@ -61,6 +61,12 @@ class AddonSites(unittest.TestCase):
         self.assertRegex(toc, r"(?m)^## X-Curse-Project-ID: \d+$")
         self.assertRegex(toc, r"(?m)^## X-Wago-ID: [A-Za-z0-9]{8}$")
 
+    def test_a_test_builds_toc_goes_without_the_ids(self):
+        # the archive's TOC of a test build (release.build): the sites have releases only
+        toc = b"## Interface: 16001\r\n## X-Curse-Project-ID: 1\r\n## Version: 0.4.1b1\n## X-Wago-ID: abcdEFGH\nCore.lua\n"
+        self.assertEqual(addon_sites.release.without_site_ids(toc),
+                         b"## Interface: 16001\r\n## Version: 0.4.1b1\nCore.lua\n")
+
     def test_only_a_release_goes_to_the_sites(self):
         entries = [{"version": "0.4.0"}, {"version": "0.3.0"}]
         self.assertEqual(addon_sites.problems("v0.4.0", "0.4.0", entries), [])
