@@ -48,8 +48,16 @@ def main() -> int:
     token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
     if token:
         headers["Authorization"] = f"Bearer {token}"
-    with urllib.request.urlopen(urllib.request.Request(RELEASES, headers=headers), timeout=15) as response:  # noqa: S310
-        print(report(json.loads(response.read())))
+    releases, page = [], 1
+    while True:                                   # GitHub gives 100 a page at most
+        url = f"{RELEASES}&page={page}"
+        with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=15) as response:  # noqa: S310
+            got = json.loads(response.read())
+        releases += got
+        if len(got) < 100:
+            break
+        page += 1
+    print(report(releases))
     return 0
 
 
