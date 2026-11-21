@@ -324,13 +324,21 @@ class DictionaryInCompanion(unittest.TestCase):
         return d
 
     def test_rl(self):
-        # «РЛ»: the Ruins of Lordaeron, unless the words around it say it is the raid leader
+        # «РЛ» letter by letter, «эр-эл»: the raid leader or the Ruins of Lordaeron, the words around cannot tell
         from bv.morph import Inflector
         d, inf = self.book(), Inflector(print)
 
         def read(text):
             return inf.apply(d.apply(inf.apply(d.apply_words(text)), mark=True))
-        self.assertEqual(read("встречаемся в РЛ"), "встречаемся в ру+ины Лордер+она")
+        for text, said in {"встречаемся в РЛ": "встречаемся в эр-+эл", "у РЛ спроси": "у эр-+эл спроси",
+                           "к РЛ обратись": "к эр-+эл обратись", "из РЛ": "из эр-+эл",    # as written: not declined
+                           "РЛ кинул инвайт": "эр-+эл кинул инвайт", "РЛ есть в гильдии?": "эр-+эл есть в гильдии?",
+                           "РЛ есть: танк, хил": "эр-+эл есть: т+анк, х+ил", "нужен РЛ на МК": "нужен эр-+эл на МК",
+                           "пишите РЛу": "пишите эр-+элу", "с рлом договорились": "с эр-+элом договорились",
+                           "в РЛе": "в эр-+эле", "о рлах": "о эр-+элах", "РЛ-у": "эр-+элу", "РЛ.": "эр-+эл.",
+                           "с рлами": "с эр-+элами", "рлы": "эр-+элы",
+                           "орл": "орл"}.items():
+            self.assertEqual(read(text), said, text)
 
     def test_percent_and_kach(self):
         from bv.morph import Inflector
@@ -345,11 +353,6 @@ class DictionaryInCompanion(unittest.TestCase):
         self.assertEqual(read("из ЛИ лут"), "из Лабиринтов Иглошкурых л+ут")       # «ЛИ» in capitals only
         self.assertEqual(read("есть ли танк?"), "есть ли т+анк?")                     # the particle stays
         self.assertEqual(read("ну пздц"), "ну пиздец")
-        self.assertEqual(read("у РЛ стоим"), "у ру+ин Лордер+она стоим")
-        self.assertEqual(read("нужен РЛ на МК"), "нужен рейд-лидер на МК")
-        self.assertEqual(read("РЛ сказал ждать"), "рейд-лидер сказал ждать")
-        self.assertEqual(read("пишите РЛу"), "пишите рейд-лидеру")
-        self.assertEqual(read("с рлом договорились"), "с рейд-лидером договорились")
 
     def test_default_entries(self):
         d = self.book()
@@ -439,6 +442,23 @@ class DictionaryInCompanion(unittest.TestCase):
                          "за 5к и 2 к голды, продам за 3 к, за 5 к отдам")
         d.receive({"id": "old2", "part": "1", "of": "1"}, "~(\\d+)\\s*к\\b=\\g<1> тысяч")
         self.assertEqual(d.apply("за 5к и 2 к голды"), "за 5 тысяч и 2 тысяч голды")      # theirs alone
+
+    def test_renamed_rl_rules_keep_the_players_own(self):
+        # «РЛ»'s rules keep 0.4.0's keys: a player's own line for one replaces it in place; «бр» became two rules
+        # (D.RENAMED): who changed or deleted the word gets neither
+        for own, text, said in (("~\\bрл\\b=рейд-лидер", "РЛ кинул инвайт", "рейд-лидер кинул инвайт"),
+                                ("~\\bрл-?(а|у|ом|ы|ов|ам|ами|е)\\b=лидер\\1", "пишите РЛу", "пишите лидеру"),
+                                ("~\\b(\\d+)\\s*рл\\b=\\1 [лидер|лидера|лидеров]", "нужно 2 рл", "нужно 2 лидера"),
+                                ("~\\bрл\\b=рейд-лидер", "пишите РЛу", "пишите эр-+элу"),
+                                ("~\\bрл-?(а|у|ом|ы|ов|ам|ами|е)\\b=лидер\\1", "рл афк", "эр-+эл отошёл"),
+                                ("~\\bрл\\b=рейд-лидер", "нужно 2 рл", "нужно 2 эр-+эла"),
+                                ("!бр=боевое воскрешение", "есть 2 бр", "есть 2 бр"),
+                                ("!бр=боевое воскрешение", "бр на кд", "бр на кулд+аун"),
+                                ("!~\\bрл\\b", "РЛ кинул инвайт", "РЛ кинул инвайт"),
+                                ("бр=боевое воскрешение", "дай бр", "дай боевое воскрешение")):
+            d = self.book()
+            d.receive({"id": "own", "part": "1", "of": "1"}, own)
+            self.assertEqual(d.apply(d.apply_words(text)).replace("\x02", "").replace("\x03", ""), said, own)
 
     def test_names_kept_out(self):
         from bv.protocol import split_name
@@ -585,8 +605,8 @@ class Pipeline(unittest.TestCase):
                     "'лок', привет": "'чернокнижник', привет", "идём в ЗГ": "идём в Зул'Гур+уб"})
 
     def test_hyphenated_words_after_a_number(self):
-        # the default's «рл» entries make «рейд-лидер»: a count, not «второй рейд-лидера»
-        self.check({"2 рла": "два рейд-лидера", "5 рлов": "пять рейд-лидеров", "2 топ-гильдии": "две топ-гильдии"})
+        # the default's «рл» entries agree with the count: «два эр-эла», not «второй эр-эла»
+        self.check({"2 рла": "два эр-+эла", "5 рлов": "пять эр-+элов", "2 топ-гильдии": "две топ-гильдии"})
 
     def test_from_a_level_after_s(self):
         # "с" before the dictionary's ordinal is "from" (the genitive), not "with" (the instrumental)
@@ -800,6 +820,55 @@ class Pipeline(unittest.TestCase):
     def test_burger_stress(self):
         self.check({"бургеры": "б+ургеры", "бургер": "б+ургер", "без бургеров": "без б+ургеров"})
 
+    def test_summon_stress(self):
+        self.check({"суманем": "суман+ём", "щас суманем": "щас суман+ём", "суманешь": "суман+ёшь", "суманет": "суман+ёт",
+                    "суманете": "суман+ёте", "суманём": "суман+ём", "щас суману": "щас суман+у",
+                    "суманут": "суман+ут", "сумануть": "суман+уть", "суманул": "суман+ул", "суманули": "суман+ули",
+                    "суманула": "суман+ула"})
+
+    def test_the_addon_and_its_sites(self):
+        self.check({"barrens voice на curse forge": "Б+эрренс В+ойс на К+ёрс Ф+ордж", "есть на CurseForge": "есть на К+ёрс Ф+ордж",
+                    "и на wago": "и на В+аго", "Barrens Voice": "Б+эрренс В+ойс", "barrensvoice": "Б+эрренс В+ойс",
+                    # as written after any preposition: declining changed the first word only («с К+ёрсом Ф+ордж»)
+                    "скачай с curseforge": "скачай с К+ёрс Ф+ордж", "из curse forge": "из К+ёрс Ф+ордж",
+                    "о barrens voice": "о Б+эрренс В+ойс", "для barrens voice": "для Б+эрренс В+ойс",
+                    "к barrens voice": "к Б+эрренс В+ойс", "под barrensvoice": "под Б+эрренс В+ойс",
+                    "с wago": "с В+аго", "на wago.io": "на В+аго"})
+
+    def test_global_chat(self):
+        self.check({"пиши в глобал": "пиш+и в гл+обал", "из глобала": "из гл+обала", "в глобале тихо": "в гл+обале тихо",
+                    "в глобалах": "в гл+обалах", "глобальный": "глобальный", "глобалы": "гл+обалы",
+                    "нет глобалов": "нет гл+обалов", "по глобалам": "по гл+обалам", "с глобалами": "с гл+обалами"})
+
+    def test_leveling_verb(self):
+        self.check({"он качается": "он кач+ается", "где качаться": "где кач+аться", "мы качаемся": "мы кач+аемся",
+                    "качался долго": "кач+ался долго", "качалась": "кач+алась", "кача нет": "к+ача нет",
+                    "качалось": "кач+алось"})
+
+    def test_dimons(self):
+        self.check({"дарова": "дар+ова", "дарова всем!": "дар+ова всем!", "о, дарова!": "о, дар+ова!",
+                    "о дарова": "о дар+ова", "ну дарова": "ну дар+ова", "здарова": "здар+ова",
+                    "о, здарова!": "о, здар+ова!", "даров": "дар+ов", "дарово всем": "дар+ово всем",
+                    "о, даров!": "о, дар+ов!", "о, дарово!": "о, дар+ово!",
+                    "здаров": "здар+ов", "здарово всем": "здар+ово всем", "дароу": "дар+оу", "о, здароу!": "о, здар+оу!",
+                    "о, здаров!": "о, здар+ов!", "у здаров": "у здар+ов", "о, здарово!": "о, здар+ово!",
+                    "я новичек": "я новичёк", "о, новичек": "о, новичёк", "новичка": "новичка"})
+        self.check({"опять димоны": "опять д+имоны", "против димонов": "против д+имонов", "димон, привет": "димон, привет",
+                    "о димонах": "о д+имонах", "при димонах": "при д+имонах", "с димонами": "с д+имонами"})
+
+    def test_rostov_on_don(self):
+        self.check({"еду в Ростов-на-Дону": "еду в Ростов-на-Дон+у", "ростов-на-дону": "Ростов-на-Дон+у",
+                    "из Ростова-на-Дону": "из Ростова-на-Дон+у", "в Ростове-на-Дону": "в Ростове-на-Дон+у",
+                    "к Ростову-на-Дону": "к Ростову-на-Дон+у"})
+
+    def test_stack_verb_stress(self):
+        self.check({"не стакается": "не ст+акается", "стакаются": "ст+акаются", "стакаться": "ст+акаться",
+                    "стакалось": "ст+акалось", "стакалась": "ст+акалась", "стакались": "ст+акались",
+                    "стакаем": "ст+акаем", "стакаю": "ст+акаю", "застакаются": "заст+акаются",
+                    "стакался": "ст+акался", "стакает": "ст+акает", "стакать": "ст+акать", "застакается": "заст+акается",
+                    "стакала": "ст+акала", "стакаете": "ст+акаете", "застакалось": "заст+акалось",
+                    "застакался": "заст+акался", "стакан": "стакан"})
+
     def test_buff_verb_stress(self):
         self.check({"он бафает": "он б+афает", "бафать": "б+афать", "я бафаю": "я б+афаю", "баффает": "б+аффает",
                     "баф": "б+аф", "бафни": "б+афни", "бафнул": "б+афнул", "бафы": "б+афы", "нет бафов": "нет б+афов",
@@ -938,11 +1007,25 @@ class Pipeline(unittest.TestCase):
         self.check({"плюс -5 минут": "плюс-минус пять минут", "плюс -5%": "плюс-минус пять процентов",
                     "плюс - норм": "плюс-минус норм", "плюс 5 урона": "плюс пять урона"})
 
-    def test_raid_leader_after_a_number(self):
-        # «рл» after a number is the raid leader, not the ruins of Lordaeron
-        self.check({"нужен 1 рл": "нужен один рейд-лидер", "нужно 2 рл": "нужно два рейд-лидера",
-                    "нужно 5 рл": "нужно пять рейд-лидеров", "у 2 рл": "у двух рейд-лидеров",
-                    "идём в рл": "идём в ру+ины Лордер+она"})
+    def test_rl_after_a_number(self):
+        # «рл» after a number agrees with it
+        self.check({"нужен 1 рл": "нужен один эр-+эл", "нужно 2 рл": "нужно два эр-+эла",
+                    "нужно 5 рл": "нужно пять эр-+элов", "у 2 рл": "у двух эр-+элов", "21 рл": "двадцать один эр-+эл",
+                    "идём в рл": "идём в эр-+эл", "2рл": "два эр-+эла",
+                    # an ending of the player's own after a hyphen: the plain rule's, not «пять эр-эла-ам»
+                    "5 РЛ-ам": "пять эр-+элам", "2 РЛ-у": "два эр-+элу", "3 РЛ-ом": "три эр-+элом"})
+
+    def test_onyxia(self):
+        self.check({"Ониксия": "он+иксия", "идём на Ониксию": "идём на он+иксию", "у Ониксии": "у он+иксии",
+                    "с Ониксией": "с он+иксией", "оня в 8": "Он+иксия в восемь", "онька": "Он+иксия",
+                    "идём на оню": "идём на Он+иксию", "на оньку": "на Он+иксию", "о, оня!": "о, Он+иксия!", "о, онька!": "о, Он+иксия!",
+                    "я на оне": "я на Он+иксии", "кд по оне": "кулд+аун по Он+иксии",
+                    "они идут": "они идут", "без они": "без они", "ониксовый": "ониксовый"})
+
+    def test_br_after_a_number(self):
+        self.check({"есть 2 бр": "есть два бэ+эра", "нужен 1 бр": "нужен один бэ+эр", "5 бр": "пять бэ+эров",
+                    "бр, холодно": "бэ+эр, холодно", "без бр": "без бэ+эр", "кинь БР на хила": "кинь бэ+эр на хила",
+                    "у 2 бр": "у двух бэ+эров", "бр-р": "бр-р"})
 
 
 class PlayerStop(unittest.TestCase):
@@ -1301,6 +1384,18 @@ class Unmasking(unittest.TestCase):
         self.assertEqual(plain("в ГИБДД"), "в ги-бэ-дэ-д+э")                 # a syllable, then letters
         self.assertEqual(plain("ОМОН и ВУЗ"), "омон и ВУЗ")                  # said as words
         self.assertEqual(plain("ВСЁ, СТОЙ!"), "всё, стой!")                   # shouted words, not abbreviations
+
+    def test_the_default_s_stress_is_before_a_vowel(self):
+        # a «+» before a consonant reaches the Windows voices as a plain «+» (apply_stress takes it before a vowel)
+        from bv.dictionary import default_text
+        from bv.text import apply_stress
+        lua = (Path(__file__).resolve().parents[2] / "addon" / "BarrensVoice" / "Dictionary.lua").read_text(encoding="utf-8")
+        for line in default_text(lua).splitlines():
+            if not line.strip() or line.startswith("#") or "=" not in line:
+                continue
+            value = line.rsplit("=", 1)[1] if not line.startswith("~") else line.split(")=", 1)[-1].split("\\b=", 1)[-1]
+            value = value.lstrip("!")
+            self.assertNotIn("+", apply_stress(value.split("=")[-1], "strip").replace("\\+", ""), line)
 
     def test_spelt_stress_is_before_a_vowel(self):
         from bv.text import apply_stress, spell

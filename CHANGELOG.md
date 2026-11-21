@@ -36,7 +36,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Dictionary
 
-  «форевер» (WoW Forever) as «фор+евер», «Гномреган» as «гномрег+ан», «бургер» as «б+ургер» in every form, and «баф» («бафает», «бафнул», «бафы», «дебаф», «ребаф», «ребафни») with the stress on «а» («Бафомет» on «е»).
+  «форевер» (WoW Forever) as «фор+евер», «Гномреган» as «гномрег+ан», «бургер» as «б+ургер» in every form, «суманем» (summon) as «суман+ём», «стакается» (stacks) as «ст+акается», «качается» (levels up) as «кач+ается», «глобал» (the global channel) as «гл+обал», «barrens voice», «curse forge», «wago» typed in Latin as «Б+эрренс В+ойс», «К+ёрс Ф+ордж», «В+аго», «Ростов-на-Дону» as «Ростов-на-Дон+у», «дарова», «здарова», «даров», «дарово», «здаров», «здарово», «дароу», «здароу» (hi) with the stress on the «о» after «р» («дар+ова», «здар+ово»), «новичек» as «новичёк», «димоны» as «д+имоны» (the plural only: «Димон» is a name), «РЛ» letter by letter, «эр-эл», wherever it stands, «РЛу» «эр-элу» (it was the Ruins of Lordaeron or the raid leader by the words around it, and often the wrong one: «у РЛ спроси», «РЛ кинул инвайт»), «БР» letter by letter, «бэ-эр» (was «боевое воскрешение»: «бр, холодно»), and «баф» («бафает», «бафнул», «бафы», «дебаф», «ребаф», «ребафни») with the stress on «а» («Бафомет» on «е»).
 
 ### Fixed
 
