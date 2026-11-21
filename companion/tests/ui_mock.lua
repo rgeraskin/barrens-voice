@@ -443,12 +443,13 @@ do  -- smileys as words («и смайлики»): a line of them is an emote, a
     assert(spoken("люблю <3 <3") == "Вася говорит: люблю. И показывает сердечко.", spoken("люблю <3 <3"))
     assert(spoken("ну, :D") == "Вася говорит: ну. И смеётся.", spoken("ну, :D"))
     assert(spoken("ладно :)") == "Вася говорит: ладно.", "a smile at the end: the pause, as before")
+    assert(spoken("спасибо ^_^") == "Вася говорит: спасибо. И улыбается.", spoken("спасибо ^_^"))
     assert(spoken("{череп} xD") == "Вася смеётся", "nothing left but the feeling: as a line of smileys")
     assert(spoken("??? xD") == "Вася смеётся", "nothing but marks and the feeling: as a line of smileys")
     assert(spoken("T_T.") == "Вася плачет", "a face with a full stop: the feeling")
     -- a question with the smiley glued after its mark is still a question (round 23, G1)
     for _, case in ipairs({ { "ты тут )?", "Вася спрашивает: ты тут?" }, { "ты тут :)?", "Вася спрашивает: ты тут?" },
-                            { "ты тут ^_^?", "Вася спрашивает: ты тут?" },
+                            { "ты тут ^_^?", "Вася спрашивает: ты тут? И улыбается." },
                             { "как дела ))?", "Вася спрашивает: как дела? И улыбается." },
                             { "как дела )))?", "Вася спрашивает: как дела? И смеётся." },
                             { "серьёзно O_o?", "Вася спрашивает: серьёзно? И удивляется." },
@@ -457,7 +458,7 @@ do  -- smileys as words («и смайлики»): a line of them is an emote, a
                             -- faces glued to brackets or in them: the feeling, not the letters (G2)
                             { "О_о))", "Вася удивляется" }, { "О_о)))", "Вася смеётся" }, { "T_T((", "Вася грустит" }, { "(T_T)", "Вася плачет" },
                             { "(^_^)", "Вася улыбается" }, { "ну (^_^) ладно", "Вася говорит: ну. ладно" },
-                            { "ну ^^)", "Вася говорит: ну." },
+                            { "ну ^^)", "Вася говорит: ну." }, { "ну ^_^)", "Вася говорит: ну. И улыбается." },
                             -- a face with one bracket glued: its feeling (round 24, L1)
                             { "O_o)", "Вася удивляется" }, { "привет O_o)", "Вася говорит: привет. И удивляется." } }) do
         assert(spoken(case[1]) == case[2], case[1] .. " -> " .. tostring(spoken(case[1])))

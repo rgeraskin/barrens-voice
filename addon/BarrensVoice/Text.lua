@@ -170,6 +170,12 @@ local function Smiles(count, n)
     return nil
 end
 
+--- «^^» (with brackets or marks round it: «^^)»): a smile as quick to type as a bracket, so at a line's end a pause, as
+--- one; «^_^» is typed with care and said.
+local function QuickSmile(word)
+    return Core((Core(word):gsub("^%(+", ""):gsub("[%(%)]+$", ""))) == "^^"   -- «^^)», «^^!», «^^…», «(^^)!»
+end
+
 --- What one word of a line feels, if it is a smiley: LAUGH (")))", ":D", "xD", "хД", ":)))"; brackets by Smiles), SMILE (")",
 --- "))", ":)", "=)", "8)", ":3"), SAD ("(((", "(", ":(", "=(", "</3"), HEART ("<3", "<333"), PUZZLED ("=\\", ":/"), the faces (FaceFeeling);
 --- nil for anything else.
@@ -193,11 +199,11 @@ local function TokenFeeling(token, n)
     return nil
 end
 
---- A line's smiley read as a feeling: «смеётся», «улыбается» or «грустит» with `alone` true for a line that is nothing
---- but smileys («)))», «:D :D», «(((»); the feeling with `alone` false for a line that ends in one - two ")" a smile,
---- three a laugh (Smiles), two "(", ":D", "xD", ":(", "<3", "=\\" («идём в рейд)))», «персональный((»); nil otherwise. One bracket or ":)" after
---- a phrase is the pause it always was. For a letter smiley at the end ("xD", "хд": Clean
---- keeps letters) the third value is the line without it, so it is not read out before the feeling.
+--- A line's smiley read as a feeling («смеётся», «улыбается», «грустит»…) with `alone` true for a line that is nothing
+--- but smileys («)))», «:D :D», «(((»); the feeling with `alone` false for a line that ends in one: two ")" a smile,
+--- three a laugh (Smiles), two "(", ":D", "xD", ":(", "<3", "=\\", a typed smile («^_^», «:3», «8-)», not «^^») («идём в рейд)))»,
+--- «персональный((»); nil otherwise. One bracket or ":)" after a phrase is the pause it always was. For a smiley at the
+--- end the third value is the line without it, so it is not read out before the feeling ("xD", "хд": Clean keeps letters).
 function ns.Feeling(text, brackets)
     if type(text) ~= "string" then return nil end
     local line = text:gsub("^%s+", ""):gsub("%s+$", "")
@@ -233,9 +239,9 @@ function ns.Feeling(text, brackets)
         elseif sad then                                     -- spaced «((»: sadness from n of them
             f = #sad >= n and SAD or nil
         else
-            f = TokenFeeling(last, n)
-            if not f then break end
-            if f == SMILE then f = nil end
+            f = TokenFeeling(last, n)                       -- «^_^» «:3» «8-)»: a smile someone took the trouble to type,
+            if not f then break end                         -- said («И улыбается.»), unlike a bracket typed in passing
+            if f == SMILE and QuickSmile(last) then f = nil end   -- or «^^»
         end
         if f and (not feeling or feeling == SMILE) then feeling = f end   -- a smile yields: «ору xD ))» laughs
         -- the marks glued to the last smiley stay with the line: «ты тут )?» is still a question
@@ -252,13 +258,14 @@ function ns.Feeling(text, brackets)
         local smiles = run and Smiles(#run, n)
         if smiles == LAUGH then return LAUGH, false end
         if Core(last):find(("%("):rep(n) .. "$") and not line:find("%)") then return SAD, false end
-        -- a face with a bracket glued («O_o)», «привет T_T(»): the face's feeling; a smile only alone, as ever
+        -- a face with a bracket glued («O_o)», «привет T_T(», «спасибо ^_^)»): the face's feeling; «^^)» after a phrase
+        -- is the pause
         local face = GluedFace(last)
-        if face and (face ~= SMILE or last == line) then return face, false end
+        if face and not (face == SMILE and last ~= line and QuickSmile(last)) then return face, false end
         if smiles then return smiles, false end             -- «спасибо))»: «И улыбается.»
         return nil
     end
-    -- smiles only: the pause they always were (Clean made them a full stop)
+    -- a bracket or «:)» only: the pause it always was (Clean made it a full stop)
     if not feeling and not rest:find("[%.!%?]$") and rest:sub(-3) ~= "…" then rest = rest:gsub("[,:;%-]+$", "") .. "." end
     return feeling, false, cut and rest or nil
 end
