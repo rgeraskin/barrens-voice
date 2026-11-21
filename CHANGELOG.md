@@ -14,7 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Smileys as words
 
-  «и смайлики» under «Озвучивать имена» (on by default): a line of nothing but smileys is read as an emote — «)))», «:D», «xD» «Громмаш смеётся», «)», «:)», «8)», «:3» «улыбается», «(((», «:(» «грустит», «<3» «показывает сердечко», «=\», «:/» «в недоумении» — and at the end of a line the same feeling follows it (two brackets or more for a laugh or sadness: «И смеётся.»), the smileys at the end themselves not read out («<3» at the end is no longer «три»). One bracket or a smile («:)», «8-)») after a phrase stays the pause it was, «8)» after a word is left as typed (it may be «в 8»), spaced brackets that pair up («( это шутка )») stay parentheses, and a line of smileys names no place. Chosen from the chat's own logs: brackets and letters, no picture emoji.
+  «и смайлики» under «Озвучивать имена» (on by default): a line of nothing but smileys is read as an emote — «)))», «:D», «xD» «Громмаш смеётся», «)», «:)», «8)», «:3», «^_^» «улыбается», «(((», «:(» «грустит», «T_T» «плачет», «O_o» «удивляется», «-_-» «хмурится», «>_<» «морщится», «<3» «показывает сердечко», «=\», «:/» «в недоумении» — and at the end of a line the same feeling follows it (two brackets or more for a laugh or sadness: «И смеётся.»), the smileys at the end themselves not read out («<3» at the end is no longer «три»). One bracket or a smile («:)», «8-)») after a phrase stays the pause it was, «8)» after a word is left as typed (it may be «в 8»), spaced brackets that pair up («( это шутка )») stay parentheses, faces («^_^», «T_T», «O_o», «-_-», «>_<») mid-line are a pause, as whole words only («leo_orc», «10_000» stay), and a line of smileys names no place. Chosen from the chat's own logs: brackets and letters, no picture emoji.
 
 - The volume by the mouse wheel over the minimap button
 
@@ -25,6 +25,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   The addon's TOC names its projects (`X-Curse-Project-ID`, `X-Wago-ID`); the release workflow checks they are the repository's variables. A test build's addon goes without them: the sites have releases only.
 
 ### Changed
+
+- Parentheses are read with a short pause either side
+
+  «танк (опытный) нужен» is said «танк, опытный, нужен»; a line in parentheses has no pause at its ends. A lone bracket is still a smiley's pause, brackets inside a word («бл(и)н») go and the word is read, and a quest's number in its link («(3513)]») is still dropped.
 
 - The addon's description in the game's addon list names Barrens Voice Launcher
 
