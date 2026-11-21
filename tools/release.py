@@ -158,7 +158,7 @@ def build_entry(version: str, subjects: list[str]) -> dict:
     # control characters (a DEL, say) TOML's strings may not hold: news.toml would not read, no news at all
     items = [re.sub(r"[\x00-\x1f\x7f]", "", item) for item in items]
     return {"version": version, "kind": "big", "title": f"Тестовая сборка {number}",
-            "summary": f"тестовая сборка {number}: что в неё вошло",
+            "summary": f"тестовая сборка {number}",
             "items": items or ["Новых коммитов нет: та же сборка заново."]}
 
 

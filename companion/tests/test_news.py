@@ -171,6 +171,7 @@ class Release(unittest.TestCase):
         release = self.release
         made = release.build_entry("0.4.1b7", ["Update 17 → 18 checked", "a | b – c", "Плюс «вы» в цитате"])
         self.assertEqual((made["version"], made["kind"], made["title"]), ("0.4.1b7", "big", "Тестовая сборка 7"))
+        self.assertEqual(made["summary"], "тестовая сборка 7")     # the chat: «обновление 0.4.1b7 — тестовая сборка 7. [Что нового]»
         self.assertEqual(made["items"], ["Update 17 -> 18 checked", "a / b — c", "Плюс «вы» в цитате"])   # the font's own
         self.assertEqual(news.entry_problems(made), [])               # «вы» quoted from a commit: no style rule here
         self.assertEqual(release.build_entry("0.4.1b8", [])["items"], ["Новых коммитов нет: та же сборка заново."])
