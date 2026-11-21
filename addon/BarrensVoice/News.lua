@@ -96,13 +96,26 @@ function N.Visible(installed)
     return out
 end
 
+--- A tester's first login on a release after its test builds (the version last seen is one of them): the release's
+--- entry was seen only as those builds showed it, before the release rewrote it, so it counts as not seen - once,
+--- since the version last seen moves on to the release right after this login.
+local function FromItsBuilds(db, installed)
+    local before = db.seenVersion
+    return Parts(installed) ~= nil and N.Release(installed) == installed and Parts(before) ~= nil
+        and before ~= installed and N.Release(before) == installed
+end
+
 --- Set up the seen entries once (before the version last seen moves on): the first run sees everything; an addon
 --- from before this list (only `seenVersion`) has seen what is not newer than that version - so a test build's
 --- player sees the release's entry once. Until the companion has written the news it waits (a first run is kept
---- as `newsFresh`): a newcomer whose first login came before the companion still gets no history.
+--- as `newsFresh`): a newcomer whose first login came before the companion still gets no history. A tester coming
+--- from the release's test builds sees its entry again on the release (FromItsBuilds).
 function N.Prepare(installed, firstRun)
     local db = ns.db
-    if type(db.newsSeen) == "table" then return end
+    if type(db.newsSeen) == "table" then
+        if FromItsBuilds(db, installed) then db.newsSeen[installed] = nil end
+        return
+    end
     if not Parts(installed) then
         if firstRun then db.newsFresh = true end
         return

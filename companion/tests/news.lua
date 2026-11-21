@@ -262,6 +262,26 @@ do  -- an update with a big entry (an addon from before this list: only seenVers
     out("big update ok")
 end
 
+do  -- a tester from the release's test builds: the release's entry once more on the release, as the window
+    local function allSeen()
+        local t = {}
+        for _, e in ipairs(REAL) do t[e.version] = true end
+        return t
+    end
+    fresh({ seenVersion = "0.4.0b25", newsSeen = allSeen() })
+    assert(#news(login("0.4.0b26")) == 0 and not W.IsShown(), "another test build: seen stays seen")
+    fresh({ seenVersion = "0.4.0b25", newsSeen = allSeen() })
+    local lines = news(login("0.4.0"))
+    assert(W.IsShown() and #lines == 1 and lines[1]:find("обновление 0.4.0 —", 1, true), tostring(lines[1]))
+    assert(ns.db.newsSeen["0.4.0"] and ns.db.seenVersion == "0.4.0", "seen again, on the release now")
+    W.Hide()
+    assert(#news(login("0.4.0")) == 0 and not W.IsShown(), "once: not after a /reload")
+    -- a player already on the release, and a later release's player, are left alone
+    fresh({ seenVersion = "0.4.0", newsSeen = allSeen() })
+    assert(#news(login("0.4.0")) == 0 and not W.IsShown(), "on the release before: nothing")
+    out("tester to release ok")
+end
+
 local function entry(version, kind, summary, date)
     return { version = version, date = date or "20.11.2026", kind = kind, title = "Проверка " .. version,
              summary = summary, items = { "Пункт " .. version .. "." } }
@@ -389,7 +409,11 @@ do  -- a test build: its release's entry from the first build on, its own entry 
     assert(titles()[1] == "Проверка 0.9.0b4" and titles()[2] == "Проверка 0.9.0b2" and titles()[3] == "Проверка 0.9.0",
         "the builds' entries newest first, then the release's")
     W.Hide()
-    assert(#news(login("0.9.0")) == 0 and not W.IsShown(), "the release itself: nothing new")
+    lines = news(login("0.9.0"))
+    assert(#lines == 1 and lines[1]:find("обновление 0.9.0 —", 1, true),
+        "the release itself: its entry once more, rewritten since the builds showed it")
+    W.Hide()
+    assert(#news(login("0.9.0")) == 0 and not W.IsShown(), "then nothing")
     W.Show()
     assert(titles()[1] == "Проверка 0.9.0" and titles()[2] == "Проверка 0.9.0b4", "a release: its own entry on top")
     W.Hide()
