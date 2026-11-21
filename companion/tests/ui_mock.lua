@@ -356,7 +356,29 @@ end
 for _, name in ipairs({ "reading", "general", "no such tab" }) do ns.Options.Open(name) end
 assert(ns.Options.Current() == "general", "an unknown tab: the first one")
 print("tabs ok")
-ns.Minimap.Update(); print("minimap ok")
+ns.Minimap.Update()
+do  -- the wheel over the button: the volume, a notch 10 %, within 0..200, the settings' slider following
+    local wheel
+    for _, f in ipairs(frames) do
+        if f._scripts.OnMouseWheel and f._scripts.OnDragStart then wheel = f end   -- the one dragged round the map
+    end
+    assert(wheel, "the minimap button takes the wheel")
+    local before = ns.db.volume
+    ns.db.volume = 100
+    wheel._scripts.OnMouseWheel(wheel, 1)
+    assert(ns.db.volume == 110, "up: louder")
+    wheel._scripts.OnMouseWheel(wheel, -1)
+    wheel._scripts.OnMouseWheel(wheel, -1)
+    assert(ns.db.volume == 90, "down: quieter")
+    ns.db.volume = 195
+    wheel._scripts.OnMouseWheel(wheel, 1)
+    assert(ns.db.volume == 200, "not past the slider's top")
+    ns.db.volume = 5
+    wheel._scripts.OnMouseWheel(wheel, -1)
+    assert(ns.db.volume == 0, "nor below silence")
+    ns.db.volume = before
+end
+print("minimap ok")
 ns.Send("say", "Ивар Седой-Степи", "Orc", 3, "WARRIOR", "", "всем привет")
 ns.db.sayLastNames = true
 ns.Send("say", "Ивар Седой-Степи", "Orc", 3, "WARRIOR", "", "и фамилия")

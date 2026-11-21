@@ -219,7 +219,7 @@ local function BuildGeneral(tab, description)
     y = y - 30
     local get, set = Setting("minimapIcon", function() ns.Minimap.Update() end)
     checks[#checks + 1] = UI.Check(tab, LEFT, y, "Значок у миникарты",
-        "ЛКМ — эти настройки, ПКМ — включить или выключить озвучку.", get, set)
+        "ЛКМ — эти настройки, ПКМ — включить или выключить озвучку, колёсико — тише или громче.", get, set)
     get, set = Setting("newsWindow")
     checks[#checks + 1] = UI.Check(tab, RIGHT_COL, y, "Окно «Что нового» после обновлений", "Когда в обновлении "
         .. "есть что-то новое и заметное, через несколько секунд после входа в игру (не в бою) открывается окно с "

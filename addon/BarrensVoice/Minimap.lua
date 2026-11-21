@@ -1,5 +1,6 @@
 -- The minimap button (as CatQuest's: on the minimap ring, dragged around it) and the entry in the
--- client's addon compartment. Left click: the settings window; right click: reading on/off.
+-- client's addon compartment. Left click: the settings window; right click: reading on/off; the mouse wheel over
+-- the button: the volume, as the slider on «Общее» (each line carries it to the launcher: the next one sounds so).
 local _, ns = ...
 
 local M = {}
@@ -7,6 +8,19 @@ ns.Minimap = M
 
 local ICON = "Interface\\AddOns\\BarrensVoice\\Icon"
 local button, icon
+
+M.VOLUME_STEP = 10          -- percent a notch of the wheel; the slider's range, 0..200
+M.VOLUME_MAX = 200
+
+--- One notch of the wheel (+1 up: louder, -1 down: quieter): the volume setting moved within its range, and the
+--- slider in the settings follows. The new volume.
+function M.Wheel(delta)
+    local now = tonumber(ns.db.volume) or 100
+    local value = math.max(0, math.min(M.VOLUME_MAX, now + (delta > 0 and 1 or -1) * M.VOLUME_STEP))
+    ns.db.volume = value
+    if ns.Options.Refresh then ns.Options.Refresh() end
+    return value
+end
 
 local function Position()
     local angle = math.rad(ns.db.minimapAngle or 160)
@@ -19,8 +33,10 @@ local function ShowTooltip(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     GameTooltip:AddLine("Barrens Voice")
     GameTooltip:AddLine(ns.db.enabled and "|cff40ff40Озвучка чата включена|r" or "|cffff4040Озвучка чата выключена|r")
+    GameTooltip:AddLine(("Громкость: |cffffd100%d%%|r"):format(tonumber(ns.db.volume) or 100))
     GameTooltip:AddLine("ЛКМ — настройки", 1, 1, 1)
     GameTooltip:AddLine("ПКМ — включить или выключить (выключение сразу обрывает фразу)", 1, 1, 1)
+    GameTooltip:AddLine("Колёсико — тише или громче", 1, 1, 1)
     GameTooltip:AddLine("Перетащи, чтобы передвинуть", 0.6, 0.6, 0.6)
     GameTooltip:Show()
 end
@@ -62,6 +78,11 @@ local function Create()
             ns.Options.Toggle()
         end
         if self:IsMouseOver() then ShowTooltip(self) end
+    end)
+    button:EnableMouseWheel(true)
+    button:SetScript("OnMouseWheel", function(self, delta)
+        M.Wheel(delta)
+        if self:IsMouseOver() then ShowTooltip(self) end    -- the new volume in the tooltip at once
     end)
     button:SetScript("OnEnter", ShowTooltip)
     button:SetScript("OnLeave", GameTooltip_Hide)

@@ -12,6 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- The volume by the mouse wheel over the minimap button
+
+  A notch is 10 %, within the slider's 0–200 %; the button's tooltip shows the volume, and the slider on «Общее» follows.
+
 - The CurseForge and Wago apps recognise the addon the launcher installed
 
   The addon's TOC names its projects (`X-Curse-Project-ID`, `X-Wago-ID`); the release workflow checks they are the repository's variables.
