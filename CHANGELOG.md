@@ -14,7 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Smileys as words
 
-  «и смайлики» under «Озвучивать имена» (on by default): a line of nothing but smileys is read as an emote — «)))», «:D», «xD» «Громмаш смеётся», «)», «:)» «улыбается», «(((», «:(» «грустит» — and a strong laugh at the end of a line adds «И смеётся.». One bracket after a phrase stays the pause it was. Chosen from the chat's own logs: brackets and letters, no picture emoji.
+  «и смайлики» under «Озвучивать имена» (on by default): a line of nothing but smileys is read as an emote — «)))», «:D», «xD» «Громмаш смеётся», «)», «:)» «улыбается», «(((», «:(» «грустит» — and a strong laugh or sadness at the end of a line (three brackets or more, «:D», «xD», «:(») adds «И смеётся.» or «И грустит.», a letter smiley not read out before it. One or two brackets after a phrase stay the pause they were, and a line of smileys names no place. Chosen from the chat's own logs: brackets and letters, no picture emoji.
 
 - The volume by the mouse wheel over the minimap button
 

@@ -414,11 +414,35 @@ do  -- smileys as words («и смайлики»): a line of them is an emote, a
     assert(spoken("идём в рейд)))") == "Вася говорит: идём в рейд. И смеётся.", spoken("идём в рейд)))"))
     assert(spoken("спасибо)") == "Вася говорит: спасибо.", spoken("спасибо)"))
     assert(spoken("xD", "emote") == "Вася xD", "an emote is as typed")
+    assert(spoken("смеётся до слёз)))", "emote") == "Вася смеётся до слёз.", "an emote gets no feeling added")
+    assert(spoken("ору хд") == "Вася говорит: ору. И смеётся.", spoken("ору хд"))
+    assert(spoken("ахах XDDD") == "Вася говорит: ахах. И смеётся.", "the letters not read before the feeling")
+    assert(spoken("персональный((((") == "Вася говорит: персональный. И грустит.", spoken("персональный(((("))
+    assert(spoken("опять вайп (") == "Вася говорит: опять вайп.", "one bracket of sadness: the pause")
+    -- a line of smileys names no place and leaves it to the next line of the run
+    local where = ns.db.sayWhere
+    ns.db.sayWhere = true
+    spoken("инвайт", "party")
+    assert(spoken(")))", "guild") == "Вася смеётся", "no place for a line of smileys")
+    assert(spoken("го", "guild"):find("в гильдии", 1, true), "the place comes with the next line: " .. spoken("го", "guild"))
+    ns.db.sayWhere = where
     ns.db.saySmileys = false
     assert(spoken(")))") == "Вася говорит: .", spoken(")))"))
     ns.db.saySmileys, ns.db.sayNames = true, false
     assert(spoken(")))") == ".", "no names: no feeling either, the pause as before: " .. spoken(")))"))
     ns.db.sayNames, ns.db.sayVerb = true, false
+    -- «и смайлики» greyed without the names, as «с глаголом» is
+    local set, state = ns.UI.SetCheckEnabled, {}
+    ns.UI.SetCheckEnabled = function(c, enabled)
+        if c.label and tostring(c.label._text):find("^и смайлики") then state[#state + 1] = enabled end
+        return set(c, enabled)
+    end
+    ns.db.sayNames = false
+    ns.Options.Refresh()
+    ns.db.sayNames = true
+    ns.Options.Refresh()
+    ns.UI.SetCheckEnabled = set
+    assert(state[1] == false and state[2] == true, "greyed without names: " .. tostring(state[1]) .. tostring(state[2]))
     print("smileys as words ok")
 end
 do  -- the realm: never said (the client's "short"; "none" keeps another realm's, as the chat shows it), kept in the payload

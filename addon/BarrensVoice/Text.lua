@@ -106,9 +106,10 @@ local function TokenFeeling(token)
 end
 
 --- A line's smiley read as a feeling: «смеётся», «улыбается» or «грустит» with `alone` true for a line that is nothing
---- but smileys («)))», «:D :D», «(((»); «смеётся» with `alone` false for a line that ends in a strong laugh - three or
---- more ")", ":D", "xD" («идём в рейд)))»); nil otherwise. One ")" or ":)" after a phrase is a smile the ear does not
---- need: nil, the pause it always was.
+--- but smileys («)))», «:D :D», «(((»); «смеётся» or «грустит» with `alone` false for a line that ends in a strong one -
+--- three or more ")" or "(", ":D", "xD", ":(" («идём в рейд)))», «персональный((((»); nil otherwise. One or two
+--- brackets or ":)" after a phrase are the pause they always were. For a letter smiley at the end ("xD", "хд": Clean
+--- keeps letters) the third value is the line without it, so it is not read out before the feeling.
 function ns.Feeling(text)
     if type(text) ~= "string" then return nil end
     local line = text:gsub("^%s+", ""):gsub("%s+$", "")
@@ -122,7 +123,12 @@ function ns.Feeling(text)
     if all then return seen[LAUGH] and LAUGH or seen[SAD] and SAD or SMILE, true end
     local last = line:match("(%S+)$")
     if last:find("%)%)%)+$") and not line:find("%(") then return LAUGH, false end      -- «говорил)))», no "(" to close
-    if TokenFeeling(last) == LAUGH and not last:find("^%)") then return LAUGH, false end   -- «… :D», «… xD»
+    if last:find("%(%(%(+$") and not line:find("%)") then return SAD, false end        -- «персональный((((»
+    local feeling = TokenFeeling(last)
+    if (feeling == LAUGH or feeling == SAD) and not last:find("^[%(%)]") then         -- «… :D», «… xD», «… :(»
+        local letters = not last:find("^[:;=]")
+        return feeling, false, letters and (line:sub(1, #line - #last):gsub("%s+$", "")) or nil
+    end
     return nil
 end
 

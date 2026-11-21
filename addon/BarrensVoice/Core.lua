@@ -125,13 +125,15 @@ local lineCount = 0
 --- `spoken`: the name to say when it is not the sender's own (a Battle.net friend's: ns.BNetFriend).
 function ns.Send(kind, sender, race, sex, class, channel, text, spoken)
     local raw = (text or ""):gsub(SEP, " ")
-    text = ns.Clean(text or "")          -- the dictionary is the program's (it reads Dictionary.lua itself)
-    if text == "" then ns.Skip("пусто после очистки разметки", spoken or sender, raw) return end
-    local place = Where(kind, channel)
-    local feeling, alone
+    local feeling, alone, without
     if ns.db.sayNames and ns.db.saySmileys ~= false and kind ~= "emote" and sender and sender ~= "" then
-        feeling, alone = ns.Feeling(raw)
+        feeling, alone, without = ns.Feeling(raw)
     end
+    -- a letter smiley the feeling replaces is not read out first («ору хд» - «ору. И смеётся.»)
+    text = ns.Clean(without or text or "")   -- the dictionary is the program's (it reads Dictionary.lua itself)
+    if text == "" then ns.Skip("пусто после очистки разметки", spoken or sender, raw) return end
+    -- a line of smileys names no place, and leaves it to be said with the next line
+    local place = not alone and Where(kind, channel) or nil
     if ns.db.sayNames and sender and sender ~= "" then
         -- the spoken name never has the realm ("short": «Вася», not the «Вася-Степи» the chat shows for
         -- another realm); the payload keeps the whole sender: a voice per character
@@ -151,7 +153,10 @@ function ns.Send(kind, sender, race, sex, class, channel, text, spoken)
             if place then place = ns.Place(kind, channel, "name") end                  -- «Вася, общий:»
             text = name .. (place and ", " .. place or "") .. ":" .. NAME_MARK .. " " .. text   -- "Вася, в гильдии:"
         end
-        if feeling and not alone then text = text .. " И " .. feeling .. "." end   -- "…идём в рейд. И смеётся."
+        if feeling and not alone then                     -- "…идём в рейд. И смеётся."
+            local ends = text:find("[%.!%?]$") or text:sub(-3) == "…"
+            text = text .. (ends and " И " or ". И ") .. feeling .. "."
+        end
     end
     lineCount = lineCount + 1
     -- an id the companion knows a line by: a line sent again is read once; the session tag keeps ids
