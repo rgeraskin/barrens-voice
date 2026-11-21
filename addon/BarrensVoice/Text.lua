@@ -74,6 +74,9 @@ end
 -- Smileys as words («и смайлики» under the names): the feelings the chat's own smileys carry. Players type them in
 -- brackets and letters, not pictures (none in 3835 lines of Forever's chat, 11-21.11.2026).
 local LAUGH, SMILE, SAD = "смеётся", "улыбается", "грустит"
+local HEART, PUZZLED = "показывает сердечко", "в недоумении"
+-- a line of several: the first of these it has
+local ORDER = { LAUGH, SAD, HEART, PUZZLED, SMILE }
 -- "x" "X" "х" "Х" (Cyrillic, two bytes each in UTF-8) and "D" "d" "Д" "д": the letters of "xD" and "хД"
 local X_LETTERS = { "x", "X", "\209\133", "\208\165" }
 local D_LETTERS = { "D", "d", "\208\148", "\208\180" }
@@ -91,8 +94,12 @@ local function StripLetters(token, letters, once)
 end
 
 --- What one word of a line feels, if it is a smiley: LAUGH (")))", "))", ":D", "xD", "хД", ":))"), SMILE (")", ":)",
---- "=)"), SAD ("(((", "(", ":(", "=("); nil for anything else.
+--- "=)", "8)", ":3"), SAD ("(((", "(", ":(", "=(", "</3"), HEART ("<3", "<333"), PUZZLED ("=\\", ":/"); nil for anything else.
 local function TokenFeeling(token)
+    if token:match("^8%-?%)$") or token:match("^:3+$") then return SMILE end
+    if token == "</3" then return SAD end
+    if token:find("^<3") and token:gsub("<3+", "") == "" then return HEART end
+    if token:match("^[:;=]%-?[\\/]+$") then return PUZZLED end
     local closes = token:match("^[:;=]?%-?(%)+)$")
     if closes then return (#closes >= 2) and LAUGH or SMILE end
     if token:match("^[:;=]?%-?%(+$") then return SAD end
@@ -106,11 +113,11 @@ local function TokenFeeling(token)
 end
 
 --- A line's smiley read as a feeling: «смеётся», «улыбается» or «грустит» with `alone` true for a line that is nothing
---- but smileys («)))», «:D :D», «(((»); «смеётся» or «грустит» with `alone` false for a line that ends in a strong one -
---- three or more ")" or "(", ":D", "xD", ":(" («идём в рейд)))», «персональный((((»); nil otherwise. One or two
---- brackets or ":)" after a phrase are the pause they always were. For a letter smiley at the end ("xD", "хд": Clean
+--- but smileys («)))», «:D :D», «(((»); the feeling with `alone` false for a line that ends in one - two or more ")"
+--- or "(", ":D", "xD", ":(", "<3", "=\\" («идём в рейд))», «персональный((»); nil otherwise. One bracket or ":)" after
+--- a phrase is the pause it always was. For a letter smiley at the end ("xD", "хд": Clean
 --- keeps letters) the third value is the line without it, so it is not read out before the feeling.
-function ns.Feeling(text)
+function ns.Feeling(text, brackets)
     if type(text) ~= "string" then return nil end
     local line = text:gsub("^%s+", ""):gsub("%s+$", "")
     if line == "" then return nil end
@@ -120,14 +127,18 @@ function ns.Feeling(text)
         if not feeling then all = false break end
         seen[feeling] = true
     end
-    if all then return seen[LAUGH] and LAUGH or seen[SAD] and SAD or SMILE, true end
+    if all then
+        for _, feeling in ipairs(ORDER) do if seen[feeling] then return feeling, true end end
+    end
     local last = line:match("(%S+)$")
-    if last:find("%)%)%)+$") and not line:find("%(") then return LAUGH, false end      -- «говорил)))», no "(" to close
-    if last:find("%(%(%(+$") and not line:find("%)") then return SAD, false end        -- «персональный((((»
+    -- how many brackets at the end are a laugh or sadness (`brackets`, 2 by default: the saved `smileyBrackets`)
+    local n = math.max(1, math.floor(tonumber(brackets) or 2))
+    if last:find(("%)"):rep(n) .. "$") and not line:find("%(") then return LAUGH, false end   -- «говорил))»
+    if last:find(("%("):rep(n) .. "$") and not line:find("%)") then return SAD, false end     -- «персональный((»
     local feeling = TokenFeeling(last)
-    if (feeling == LAUGH or feeling == SAD) and not last:find("^[%(%)]") then         -- «… :D», «… xD», «… :(»
-        local letters = not last:find("^[:;=]")
-        return feeling, false, letters and (line:sub(1, #line - #last):gsub("%s+$", "")) or nil
+    if feeling and not last:find("^[%(%)]") then                    -- «… :D», «… xD», «… :(», «… <3», «… 8)»
+        -- the smiley itself goes: the feeling says it, or (a smile) nothing does - «8)» is no «восемь», «<3» no «три»
+        return feeling ~= SMILE and feeling or nil, false, (line:sub(1, #line - #last):gsub("%s+$", ""))
     end
     return nil
 end

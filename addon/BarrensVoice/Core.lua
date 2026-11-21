@@ -53,6 +53,8 @@ ns.DEFAULTS = {
     sayLastNames = true,  -- the whole name ("Ивар Седой"); off: up to the first space ("Ивар")
     sayWhere = true,   -- "Name writes in the guild: text" when the place changes (Core.lua Where)
     saySmileys = true, -- a line of smileys as «Name смеётся», a strong laugh at its end «… И смеётся.» (Text.lua ns.Feeling)
+    smileyBrackets = 2, -- brackets at a line's end that make it a laugh or sadness; no setting in the window: tried
+                        -- out in the game with /run BarrensVoiceDB.smileyBrackets = 3 (at once, no /reload)
     declension = true, -- the program declines dictionary replacements after prepositions (pymorphy3)
     voices = "f5",     -- "f5": race voices (F5-TTS, from the client's own voice-over); "sapi": Windows voices
     -- voiceOff: [Windows voice name] = true for voices switched off; nil until changed here (the
@@ -127,7 +129,7 @@ function ns.Send(kind, sender, race, sex, class, channel, text, spoken)
     local raw = (text or ""):gsub(SEP, " ")
     local feeling, alone, without
     if ns.db.sayNames and ns.db.saySmileys ~= false and kind ~= "emote" and sender and sender ~= "" then
-        feeling, alone, without = ns.Feeling(raw)
+        feeling, alone, without = ns.Feeling(raw, ns.db.smileyBrackets)
     end
     -- a letter smiley the feeling replaces is not read out first («ору хд» - «ору. И смеётся.»)
     text = ns.Clean(without or text or "")   -- the dictionary is the program's (it reads Dictionary.lua itself)

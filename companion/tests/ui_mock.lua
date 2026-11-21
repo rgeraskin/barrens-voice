@@ -419,6 +419,10 @@ do  -- smileys as words («и смайлики»): a line of them is an emote, a
     assert(spoken("ахах XDDD") == "Вася говорит: ахах. И смеётся.", "the letters not read before the feeling")
     assert(spoken("персональный((((") == "Вася говорит: персональный. И грустит.", spoken("персональный(((("))
     assert(spoken("опять вайп (") == "Вася говорит: опять вайп.", "one bracket of sadness: the pause")
+    assert(spoken("есть ивенты <3") == "Вася говорит: есть ивенты. И показывает сердечко.", spoken("есть ивенты <3"))
+    assert(spoken("<3") == "Вася показывает сердечко", spoken("<3"))
+    assert(spoken("сложно качаться =\\") == "Вася говорит: сложно качаться. И в недоумении.", spoken("сложно качаться =\\"))
+    assert(spoken("перерос кмк 8)") == "Вася говорит: перерос кмк", "8) at the end: cut, no «восемь»: " .. spoken("перерос кмк 8)"))
     -- a line of smileys names no place and leaves it to the next line of the run
     local where = ns.db.sayWhere
     ns.db.sayWhere = true
