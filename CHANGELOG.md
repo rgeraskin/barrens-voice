@@ -12,6 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Smileys as words
+
+  «и смайлики» under «Озвучивать имена» (on by default): a line of nothing but smileys is read as an emote — «)))», «:D», «xD» «Громмаш смеётся», «)», «:)» «улыбается», «(((», «:(» «грустит» — and a strong laugh at the end of a line adds «И смеётся.». One bracket after a phrase stays the pause it was. Chosen from the chat's own logs: brackets and letters, no picture emoji.
+
 - The volume by the mouse wheel over the minimap button
 
   A notch is 10 %, within the slider's 0–200 %; the button's tooltip shows the volume, and the slider on «Общее» follows.

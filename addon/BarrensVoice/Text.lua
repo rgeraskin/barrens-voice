@@ -71,6 +71,61 @@ function ns.Emoticons(text)
     return text
 end
 
+-- Smileys as words («и смайлики» under the names): the feelings the chat's own smileys carry. Players type them in
+-- brackets and letters, not pictures (none in 3835 lines of Forever's chat, 11-21.11.2026).
+local LAUGH, SMILE, SAD = "смеётся", "улыбается", "грустит"
+-- "x" "X" "х" "Х" (Cyrillic, two bytes each in UTF-8) and "D" "d" "Д" "д": the letters of "xD" and "хД"
+local X_LETTERS = { "x", "X", "\209\133", "\208\165" }
+local D_LETTERS = { "D", "d", "\208\148", "\208\180" }
+
+--- `token` with every leading `letters` (sequences of bytes) taken off once or more: what is left, and how many.
+local function StripLetters(token, letters, once)
+    local n = 0
+    repeat
+        local found = false
+        for _, l in ipairs(letters) do
+            if token:sub(1, #l) == l then token, n, found = token:sub(#l + 1), n + 1, true break end
+        end
+    until not found or (once and n > 0)
+    return token, n
+end
+
+--- What one word of a line feels, if it is a smiley: LAUGH (")))", "))", ":D", "xD", "хД", ":))"), SMILE (")", ":)",
+--- "=)"), SAD ("(((", "(", ":(", "=("); nil for anything else.
+local function TokenFeeling(token)
+    local closes = token:match("^[:;=]?%-?(%)+)$")
+    if closes then return (#closes >= 2) and LAUGH or SMILE end
+    if token:match("^[:;=]?%-?%(+$") then return SAD end
+    if token:match("^[:;=]%-?[Dd]+$") then return LAUGH end
+    local rest, x = StripLetters(token, X_LETTERS, true)
+    if x == 1 then
+        local tail, d = StripLetters(rest, D_LETTERS)
+        if d > 0 and tail == "" then return LAUGH end
+    end
+    return nil
+end
+
+--- A line's smiley read as a feeling: «смеётся», «улыбается» or «грустит» with `alone` true for a line that is nothing
+--- but smileys («)))», «:D :D», «(((»); «смеётся» with `alone` false for a line that ends in a strong laugh - three or
+--- more ")", ":D", "xD" («идём в рейд)))»); nil otherwise. One ")" or ":)" after a phrase is a smile the ear does not
+--- need: nil, the pause it always was.
+function ns.Feeling(text)
+    if type(text) ~= "string" then return nil end
+    local line = text:gsub("^%s+", ""):gsub("%s+$", "")
+    if line == "" then return nil end
+    local seen, all = {}, true
+    for token in line:gmatch("%S+") do
+        local feeling = TokenFeeling(token)
+        if not feeling then all = false break end
+        seen[feeling] = true
+    end
+    if all then return seen[LAUGH] and LAUGH or seen[SAD] and SAD or SMILE, true end
+    local last = line:match("(%S+)$")
+    if last:find("%)%)%)+$") and not line:find("%(") then return LAUGH, false end      -- «говорил)))», no "(" to close
+    if TokenFeeling(last) == LAUGH and not last:find("^%)") then return LAUGH, false end   -- «… :D», «… xD»
+    return nil
+end
+
 -- Addons that write into the chat for their player: party progress (Questie), boss timers (DBM,
 -- BigWigs), meters (Details!, Skada, Recount), announcers (RSA)... A line is taken for one when it
 -- starts with a raid target icon and a Latin word with a colon ("{звезда} Questie: ... 1/1"; players

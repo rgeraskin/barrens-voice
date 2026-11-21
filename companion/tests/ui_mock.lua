@@ -400,6 +400,27 @@ ns.Send("emote", "Вася-Степи", "Orc", 2, "WARRIOR", "", "смеётся
 ns.db.sayVerb = false
 ns.Send("party", "Вася-Степи", "Orc", 2, "WARRIOR", "", "го")
 for _, p in ipairs(sent) do print((p:gsub("\31", " | "):gsub("[\2\3]", ""))) end
+do  -- smileys as words («и смайлики»): a line of them is an emote, a strong laugh at the end follows the line
+    ns.db.sayVerb = true
+    local function spoken(text, kind)
+        local n = #sent
+        ns.Send(kind or "say", "Вася-Степи", "Orc", 2, "WARRIOR", "", text)
+        local fields = {}
+        for f in (sent[n + 1] .. "\31"):gmatch("(.-)\31") do fields[#fields + 1] = f end
+        return (fields[8]:gsub("[\4\5]", ""))
+    end
+    assert(spoken(")))") == "Вася смеётся", spoken(")))"))
+    assert(spoken("(((") == "Вася грустит", spoken("((("))
+    assert(spoken("идём в рейд)))") == "Вася говорит: идём в рейд. И смеётся.", spoken("идём в рейд)))"))
+    assert(spoken("спасибо)") == "Вася говорит: спасибо.", spoken("спасибо)"))
+    assert(spoken("xD", "emote") == "Вася xD", "an emote is as typed")
+    ns.db.saySmileys = false
+    assert(spoken(")))") == "Вася говорит: .", spoken(")))"))
+    ns.db.saySmileys, ns.db.sayNames = true, false
+    assert(spoken(")))") == ".", "no names: no feeling either, the pause as before: " .. spoken(")))"))
+    ns.db.sayNames, ns.db.sayVerb = true, false
+    print("smileys as words ok")
+end
 do  -- the realm: never said (the client's "short"; "none" keeps another realm's, as the chat shows it), kept in the payload
     local asked
     Ambiguate = function(name, context)

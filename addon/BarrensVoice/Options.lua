@@ -83,7 +83,7 @@ local CHROME = 40                             -- the window's height beyond a ta
 local TOP, GAP = -14, 14                      -- the first text under the title bar; between a tab's blocks
 local TEXT_W = 580 - 2 * LEFT - 8             -- the width of a tab's texts
 
-local window, toggle, verb, where, lastNames, programState
+local window, toggle, verb, where, smileys, lastNames, programState
 -- the companion's status line may wrap (a longer text, another font): what is under it moves down (StatusFits)
 local statusRest, statusTop, statusBase, statusExtra = nil, 0, 0, 0
 local StatusFits
@@ -138,6 +138,7 @@ local function Refresh()
     for _, c in ipairs(fadeSubs) do UI.SetCheckEnabled(c, ns.db.fadeChat) end
     UI.SetCheckEnabled(verb, ns.db.sayNames)
     UI.SetCheckEnabled(where, ns.db.sayNames)
+    UI.SetCheckEnabled(smileys, ns.db.sayNames)
     for value, r in pairs(reads) do r:SetChecked(ReadsNow() == value) end
     if lastNames then UI.SetCheckEnabled(lastNames, ns.db.sayNames) end
     for value, r in pairs(radios) do r:SetChecked((ns.db.voices or "f5") == value) end
@@ -370,6 +371,12 @@ local function BuildReading(tab, description)
         .. "30 секунд тишины: подряд идущие строки гильдии назовут гильдию один раз.\n\nУ «сказать», крика, шёпота и эмоций "
         .. "места нет: оно и так понятно.", get, set)
     checks[#checks + 1] = where
+    row = row + 1
+    get, set = Setting("saySmileys")
+    smileys = UI.Check(tab, LEFT + SUB, y - 24 * row, "и смайлики: «Громмаш смеётся»", "Строка из одних смайликов "
+        .. "звучит как эмоция:\n\nсмеётся — «)))», «:D», «xD»\nулыбается — «)», «:)»\nгрустит — «(((», «:(»\n\nСмех в "
+        .. "конце строки — «…идём в рейд. И смеётся.»\n\nОдна скобка после фразы — просто улыбка: её не слышно.", get, set)
+    checks[#checks + 1] = smileys
     row = row + 1
     get, set = Setting("skipAddons")
     checks[#checks + 1] = UI.Check(tab, LEFT, y - 24 * row, "Не читать сообщения аддонов", "Аддоны других игроков пишут "

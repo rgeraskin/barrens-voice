@@ -52,6 +52,7 @@ ns.DEFAULTS = {
     sayVerb = true,    -- "Name says: text" (says / yells / whispers / writes, by chat kind)
     sayLastNames = true,  -- the whole name ("Ивар Седой"); off: up to the first space ("Ивар")
     sayWhere = true,   -- "Name writes in the guild: text" when the place changes (Core.lua Where)
+    saySmileys = true, -- a line of smileys as «Name смеётся», a strong laugh at its end «… И смеётся.» (Text.lua ns.Feeling)
     declension = true, -- the program declines dictionary replacements after prepositions (pymorphy3)
     voices = "f5",     -- "f5": race voices (F5-TTS, from the client's own voice-over); "sapi": Windows voices
     -- voiceOff: [Windows voice name] = true for voices switched off; nil until changed here (the
@@ -127,6 +128,10 @@ function ns.Send(kind, sender, race, sex, class, channel, text, spoken)
     text = ns.Clean(text or "")          -- the dictionary is the program's (it reads Dictionary.lua itself)
     if text == "" then ns.Skip("пусто после очистки разметки", spoken or sender, raw) return end
     local place = Where(kind, channel)
+    local feeling, alone
+    if ns.db.sayNames and ns.db.saySmileys ~= false and kind ~= "emote" and sender and sender ~= "" then
+        feeling, alone = ns.Feeling(raw)
+    end
     if ns.db.sayNames and sender and sender ~= "" then
         -- the spoken name never has the realm ("short": «Вася», not the «Вася-Степи» the chat shows for
         -- another realm); the payload keeps the whole sender: a voice per character
@@ -134,6 +139,8 @@ function ns.Send(kind, sender, race, sex, class, channel, text, spoken)
         if not ns.db.sayLastNames then name = name:match("^%S+") or name end
         if kind == "emote" then
             text = name .. KEPT_NAME_MARK .. " " .. text   -- "Вася смеётся"
+        elseif alone then
+            text = name .. KEPT_NAME_MARK .. " " .. feeling   -- a line of smileys, as an emote: "Вася смеётся"
         elseif ns.db.sayVerb then
             local verb = VERBS[kind] or "пишет"
             if not NOT_ASKED[kind] and ns.IsQuestion(text) then verb = "спрашивает" end
@@ -144,6 +151,7 @@ function ns.Send(kind, sender, race, sex, class, channel, text, spoken)
             if place then place = ns.Place(kind, channel, "name") end                  -- «Вася, общий:»
             text = name .. (place and ", " .. place or "") .. ":" .. NAME_MARK .. " " .. text   -- "Вася, в гильдии:"
         end
+        if feeling and not alone then text = text .. " И " .. feeling .. "." end   -- "…идём в рейд. И смеётся."
     end
     lineCount = lineCount + 1
     -- an id the companion knows a line by: a line sent again is read once; the session tag keeps ids
