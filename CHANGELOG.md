@@ -10,6 +10,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [0.4.1] - Unreleased
 
+### Changed
+
+- Dictionary
+
+  «форевер» (WoW Forever) as «фор+евер», «Гномреган» as «гномрег+ан», «бургер» as «б+ургер» in every form, and «баф» («бафает», «бафнул», «бафы», «дебаф», «ребаф», «ребафни») with the stress on «а» («Бафомет» on «е»).
+
 ### Fixed
 
 - A tester moving from the test builds to the release sees the release's «Что нового» once
