@@ -162,10 +162,18 @@ local function StripLetters(token, letters, once)
     return token, n
 end
 
---- What one word of a line feels, if it is a smiley: LAUGH (")))", "))", ":D", "xD", "хД", ":))"), SMILE (")", ":)",
---- "=)", "8)", ":3"), SAD ("(((", "(", ":(", "=(", "</3"), HEART ("<3", "<333"), PUZZLED ("=\\", ":/"), the faces (FaceFeeling);
+--- How `count` brackets «)» in a row are read, `n` the setting (smileyBrackets, 2): fewer than n - nil (a pause), n - a
+--- smile, more - a laugh: «спасибо)» nothing, «спасибо))» «И улыбается.», «спасибо)))» «И смеётся.»
+local function Smiles(count, n)
+    if count > n then return LAUGH end
+    if count == n then return SMILE end
+    return nil
+end
+
+--- What one word of a line feels, if it is a smiley: LAUGH (")))", ":D", "xD", "хД", ":)))"; brackets by Smiles), SMILE (")",
+--- "))", ":)", "=)", "8)", ":3"), SAD ("(((", "(", ":(", "=(", "</3"), HEART ("<3", "<333"), PUZZLED ("=\\", ":/"), the faces (FaceFeeling);
 --- nil for anything else.
-local function TokenFeeling(token)
+local function TokenFeeling(token, n)
     local face, head, tail = GluedFace(token)                -- «O_o!», «T_T.», «(^_^)»: the face
     if face and #head == #(tail:match("^%)*")) and not tail:find("%(") then return face end
     token = Core(token)
@@ -174,7 +182,7 @@ local function TokenFeeling(token)
     if token:find("^<3") and token:gsub("<3+", "") == "" then return HEART end
     if token:match("^[:;=]%-?[\\/]+$") then return PUZZLED end
     local closes = token:match("^[:;=]?%-?(%)+)$")
-    if closes then return (#closes >= 2) and LAUGH or SMILE end
+    if closes then return Smiles(#closes, n or 2) or SMILE end
     if token:match("^[:;=]?%-?%(+$") then return SAD end
     if token:match("^[:;=]%-?[Dd]+$") then return LAUGH end
     local rest, x = StripLetters(token, X_LETTERS, true)
@@ -186,26 +194,26 @@ local function TokenFeeling(token)
 end
 
 --- A line's smiley read as a feeling: «смеётся», «улыбается» or «грустит» with `alone` true for a line that is nothing
---- but smileys («)))», «:D :D», «(((»); the feeling with `alone` false for a line that ends in one - two or more ")"
---- or "(", ":D", "xD", ":(", "<3", "=\\" («идём в рейд))», «персональный((»); nil otherwise. One bracket or ":)" after
+--- but smileys («)))», «:D :D», «(((»); the feeling with `alone` false for a line that ends in one - two ")" a smile,
+--- three a laugh (Smiles), two "(", ":D", "xD", ":(", "<3", "=\\" («идём в рейд)))», «персональный((»); nil otherwise. One bracket or ":)" after
 --- a phrase is the pause it always was. For a letter smiley at the end ("xD", "хд": Clean
 --- keeps letters) the third value is the line without it, so it is not read out before the feeling.
 function ns.Feeling(text, brackets)
     if type(text) ~= "string" then return nil end
     local line = text:gsub("^%s+", ""):gsub("%s+$", "")
     if line == "" then return nil end
+    -- how many brackets in a row are a smile and a laugh, sadness (`brackets`, 2 by default: the saved `smileyBrackets`;
+    -- at most 10, a /run typo must not build a huge pattern for every chat line)
+    local n = math.max(1, math.min(10, math.floor(tonumber(brackets) or 2)))
     local seen, all = {}, true
     for token in line:gmatch("%S+") do
-        local feeling = TokenFeeling(token)
+        local feeling = TokenFeeling(token, n)
         if not feeling then all = false break end
         seen[feeling] = true
     end
     if all then
         for _, feeling in ipairs(ORDER) do if seen[feeling] then return feeling, true end end
     end
-    -- how many brackets at the end are a laugh or sadness (`brackets`, 2 by default: the saved `smileyBrackets`; at most
-    -- 10, a /run typo must not build a huge pattern for every chat line)
-    local n = math.max(1, math.min(10, math.floor(tonumber(brackets) or 2)))
     -- The smileys at the end, word by word from the last («ору xD ))», «люблю <3 <3»): each one goes from the text - the
     -- feeling says it, or (a smile) nothing does: «<3» is no «три». The feeling is the last strong one of them.
     local rest, feeling, cut, marks = line, nil, false, nil
@@ -216,17 +224,20 @@ function ns.Feeling(text, brackets)
     while true do
         local last = rest:match("(%S+)$")
         if not last or Core(last) == "8)" then break end      -- «нас 8)», «сбор в 8)»: maybe a number, left as typed
-        local brackets_ = Core(last):match("^[%)]+$") or Core(last):match("^[%(]+$")
-        if brackets_ and paired then break end
+        local core = Core(last)
+        local sad, happy = core:match("^[%(]+$"), core:match("^[:;=]?%-?(%)+)$")
+        if (sad or core:match("^[%)]+$")) and paired then break end
         local f
-        if brackets_ then                                   -- spaced brackets: a laugh or sadness from n of them
-            f = #brackets_ >= n and (last:find("%)") and LAUGH or SAD) or nil
+        if happy then                                       -- «)» «:)» a pause, «))» a smile, «)))» a laugh (Smiles)
+            f = Smiles(#happy, n)
+        elseif sad then                                     -- spaced «((»: sadness from n of them
+            f = #sad >= n and SAD or nil
         else
-            f = TokenFeeling(last)
+            f = TokenFeeling(last, n)
             if not f then break end
             if f == SMILE then f = nil end
         end
-        feeling = feeling or f
+        if f and (not feeling or feeling == SMILE) then feeling = f end   -- a smile yields: «ору xD ))» laughs
         -- the marks glued to the last smiley stay with the line: «ты тут )?» is still a question
         marks = marks or (last:sub(#Core(last) + 1):gsub(",", ""))
         rest, cut = rest:sub(1, #rest - #last):gsub("%s+$", ""), true
@@ -237,11 +248,14 @@ function ns.Feeling(text, brackets)
     if not feeling and not cut then
         -- brackets glued to the last word («говорил))», «персональный((»): Clean makes them a full stop
         local last = rest:match("(%S+)$")
-        if last:find(("%)"):rep(n) .. "$") and not line:find("%(") then return LAUGH, false end
-        if last:find(("%("):rep(n) .. "$") and not line:find("%)") then return SAD, false end
+        local run = not line:find("%(") and Core(last):match("(%)+)$")   -- «спасибо)))!» too
+        local smiles = run and Smiles(#run, n)
+        if smiles == LAUGH then return LAUGH, false end
+        if Core(last):find(("%("):rep(n) .. "$") and not line:find("%)") then return SAD, false end
         -- a face with a bracket glued («O_o)», «привет T_T(»): the face's feeling; a smile only alone, as ever
         local face = GluedFace(last)
         if face and (face ~= SMILE or last == line) then return face, false end
+        if smiles then return smiles, false end             -- «спасибо))»: «И улыбается.»
         return nil
     end
     -- smiles only: the pause they always were (Clean made them a full stop)
