@@ -112,6 +112,15 @@ class AddonSites(unittest.TestCase):
         real = addon_sites.release.news_entries()             # the version in work's entry reads
         addon_sites.notes(real[0]["version"], real, "v" + real[0]["version"])
 
+    def test_the_addon_lists_description(self):
+        # the TOC's Notes, the game's addon list (and the sites' apps): what the addon does and that it needs the
+        # Windows program; how lines reach it (the strip) is for the README and the welcome, not the list
+        toc = (ROOT / "addon" / "BarrensVoice" / "BarrensVoice.toc").read_text(encoding="utf-8")
+        notes = re.search(r"^## Notes: (.+)$", toc, re.M).group(1)
+        self.assertIn("Barrens Voice Launcher для Windows", notes)
+        for detail in ("полоск", "компаньон", "F5"):
+            self.assertNotIn(detail, notes)
+
     def test_the_sites_description(self):
         # pasted by hand into both sites (no API takes it): links and pictures work only absolute, the pictures are
         # the repository's own, the launcher is said first

@@ -30,9 +30,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   «танк (опытный) нужен» is said «танк, опытный, нужен»; a line in parentheses has no pause at its ends. A lone bracket is still a smiley's pause, brackets inside a word («бл(и)н») go and the word is read, and a quest's number in its link («(3513)]») is still dropped.
 
-- The addon's description in the game's addon list names Barrens Voice Launcher
+- The addon's description in the game's addon list says what it does and that it needs Barrens Voice Launcher for Windows
 
-  Not «приложение-компаньон», and without «F5-TTS».
+  «Озвучка чата: у каждого игрока свой голос — голоса рас или голоса Windows. Нужна программа Barrens Voice Launcher для Windows.» Not «приложение-компаньон», without «F5-TTS» and without the strip, which the README and the welcome explain.
 
 - Dictionary
 
