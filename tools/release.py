@@ -101,8 +101,11 @@ VERSION_RAISE = re.compile(r"Addon \d+\.\d+\.\d+b\d+: the addon changes after ")
 
 
 def _git(root: Path, *args: str) -> str:
+    """git in `root`; another repository than this one (a test's) without a calling git's GIT_* (a hook sets them)."""
     import subprocess
-    return subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, encoding="utf-8").stdout.strip()
+    env = None if Path(root) == ROOT else {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    return subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, encoding="utf-8",
+                          env=env).stdout.strip()
 
 
 def build_subjects(tag: str, released: set[str] | None = None, root: Path = ROOT) -> list[str]:
