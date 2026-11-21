@@ -1143,7 +1143,7 @@ class App:
 
         def picture(name: str, size: int):
             """A picture from the addon's Media (the same as in the game), or the launcher's own (the community's
-            Battle.net logo: the addon's is the game's own texture), or None."""
+            Battle.net logo, battlenet.png: the same picture as the addon's Media/battlenet.tga), or None."""
             path = HERE / f"{name}.png" if name == "battlenet" else media / "Media" / f"{name}.tga" if media else None
             if Image is None or path is None:
                 return None
