@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))      # gitenv, however 
 from bv import news  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
+WORKING = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]   # in work
 LUAJIT = shutil.which("luajit")
 
 
@@ -37,7 +38,7 @@ class Source(unittest.TestCase):
         self.assertEqual(news.problems(entries), [])
         self.assertGreaterEqual(len(entries), 5)
         newest = entries[0]
-        self.assertEqual((newest["version"], newest["kind"]), ("0.4.0", "big"))
+        self.assertEqual(newest["version"], WORKING)                  # the version in work on top
         self.assertTrue(newest["items"])
 
     def test_every_release_has_its_news(self):
@@ -200,19 +201,19 @@ class Release(unittest.TestCase):
                 mock.patch.object(release, "DIST", Path(d)), \
                 mock.patch.object(release, "uv_entry", return_value={"version": "x", "url": "u", "sha256": "0" * 64}), \
                 mock.patch.object(release, "build_history", return_value=[
-                    ("0.4.0b5", ["Five"]), ("0.4.0b7", ["Chat: icon → clear", "Fix «скачки»"])]), \
+                    (f"{WORKING}b5", ["Five"]), (f"{WORKING}b7", ["Chat: icon → clear", "Fix «скачки»"])]), \
                 mock.patch.object(release, "released_tags", return_value=None), \
-                mock.patch.dict(os.environ, {"RELEASE_TAG": "v0.4.0-beta.7"}):
+                mock.patch.dict(os.environ, {"RELEASE_TAG": f"v{WORKING}-beta.7"}):
             archive = release.build()
             shipped = news.parse(zipfile.ZipFile(archive).read(news.SOURCE).decode("utf-8"))
             body = (Path(d) / "notes.md").read_text(encoding="utf-8")
-        own = [e for e in shipped if e["version"] == "0.4.0b7"]
+        own = [e for e in shipped if e["version"] == f"{WORKING}b7"]
         self.assertEqual(own[0]["items"], ["Chat: icon -> clear", "Fix «скачки»"])
-        self.assertEqual([e["items"] for e in shipped if e["version"] == "0.4.0b5"], [["Five"]])   # the earlier one too
+        self.assertEqual([e["items"] for e in shipped if e["version"] == f"{WORKING}b5"], [["Five"]])   # the earlier one too
         self.assertEqual(news.problems(shipped), [])
         self.assertIn("### Тестовая сборка 7\n\n- Chat: icon -> clear\n- Fix «скачки»", body)
         self.assertNotIn("Тестовая сборка 5", body)                    # the GitHub release: this build's only
-        self.assertFalse((ROOT / news.SOURCE).read_text(encoding="utf-8").count("0.4.0b7"))   # news.toml as it was
+        self.assertFalse((ROOT / news.SOURCE).read_text(encoding="utf-8").count(f"{WORKING}b7"))   # news.toml as it was
 
     def test_build_subjects_from_the_last_released_tag(self):
         # the commits since the last tag with a release (a tag whose build failed reached no tester), oldest first, no

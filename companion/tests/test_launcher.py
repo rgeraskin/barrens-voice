@@ -5,6 +5,11 @@ import tempfile
 import unittest
 from types import SimpleNamespace
 from pathlib import Path
+import tomllib
+
+# the version in work (pyproject.toml's): a release build's tag must name it
+WORKING = tomllib.loads((Path(__file__).resolve().parents[2] / "pyproject.toml").read_text(encoding="utf-8"))[
+    "project"]["version"]
 
 
 def make_game(root: Path, addon_version: str | None = None) -> Path:
@@ -1796,14 +1801,14 @@ class ReleaseBuild(unittest.TestCase):
         import zipfile
         from unittest import mock
         from bv import install, paths
-        archive, manifest = self.build("v0.4.0-beta.7", exe=b"starter")
-        self.assertEqual((archive.name, manifest["version"]), ("barrens-voice-0.4.0b7.zip", "0.4.0b7"))
+        archive, manifest = self.build(f"v{WORKING}-beta.7", exe=b"starter")
+        self.assertEqual((archive.name, manifest["version"]), (f"barrens-voice-{WORKING}b7.zip", f"{WORKING}b7"))
         data = archive.read_bytes()
         self.assertEqual((manifest["size"], manifest["sha256"]), (len(data), hashlib.sha256(data).hexdigest()))
         self.assertIn("uv", manifest)
         with zipfile.ZipFile(archive) as z:
             names = set(z.namelist())
-            self.assertIn('version = "0.4.0b7"', z.read("pyproject.toml").decode())
+            self.assertIn(f'version = "{WORKING}b7"', z.read("pyproject.toml").decode())
             toc = z.read("addon/BarrensVoice/BarrensVoice.toc").decode()
             self.assertNotIn("X-Curse-Project-ID", toc)                    # the sites have releases only
             self.assertNotIn("X-Wago-ID", toc)
@@ -1816,7 +1821,7 @@ class ReleaseBuild(unittest.TestCase):
         self.assertFalse(any(n.startswith("companion/tests/") or "__pycache__" in n for n in names))
         with tempfile.TemporaryDirectory() as d, mock.patch("bv.install.build", side_effect=built):
             root = Path(d) / "BarrensVoice"
-            self.assertEqual(install.install(root, archive, "cuda", Path(d) / "uv.exe", log=lambda *a: None), "0.4.0b7")
+            self.assertEqual(install.install(root, archive, "cuda", Path(d) / "uv.exe", log=lambda *a: None), f"{WORKING}b7")
             self.assertEqual((root / "Barrens Voice.exe").read_bytes(), b"starter")
             code = Path(os.path.realpath(root / "app" / "current" / "companion"))
             self.assertEqual(paths.layout(code, {})["root"], root.resolve())
@@ -1917,7 +1922,7 @@ class OldClients(unittest.TestCase):
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
         from compat.v0_4_0b5 import install as old_install, update as old_update
         from bv import install
-        archive, manifest = ReleaseBuild.build(self, "v0.4.0-beta.7", exe=b"starter")
+        archive, manifest = ReleaseBuild.build(self, f"v{WORKING}-beta.7", exe=b"starter")
         base = "https://example/download/"
         raw = json.dumps(manifest).encode()
         key = Ed25519PrivateKey.generate()
@@ -1947,9 +1952,9 @@ class OldClients(unittest.TestCase):
                     version = old_update.prepare(root, got)
                     build.assert_called_once()
                 old_update.apply(root, version)
-            self.assertEqual(install.current_version(root), "0.4.0b7")                 # the old client switched
+            self.assertEqual(install.current_version(root), f"{WORKING}b7")                 # the old client switched
             from bv.paths import CODE_DIR  # noqa: F401 - the new launcher's start puts its starter in place
-            install.place_starter(root, root / "app" / "0.4.0b7")
+            install.place_starter(root, root / "app" / f"{WORKING}b7")
             self.assertEqual((root / "Barrens Voice.exe").read_bytes(), b"starter")
 
     def test_beta6_client_updates_through_its_updater(self):
@@ -1981,7 +1986,7 @@ class OldClients(unittest.TestCase):
         # still installs
         self.updater_client("v0_4_0b19", "0.4.0b19", release=None)
 
-    def updater_client(self, client: str, current: str, release: str | None = "v0.4.0-beta.99"):
+    def updater_client(self, client: str, current: str, release: str | None = f"v{WORKING}-beta.99"):
         import base64
         import io
         import json
