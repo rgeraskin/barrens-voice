@@ -276,6 +276,9 @@ do  -- a tester from the release's test builds: the release's entry once more on
     assert(ns.db.newsSeen["0.4.0"] and ns.db.seenVersion == "0.4.0", "seen again, on the release now")
     W.Hide()
     assert(#news(login("0.4.0")) == 0 and not W.IsShown(), "once: not after a /reload")
+    -- back from a newer release's test build to an older release: not that release's builds, nothing
+    fresh({ seenVersion = "0.4.1b1", newsSeen = allSeen() })
+    assert(#news(login("0.4.0")) == 0 and not W.IsShown(), "from 0.4.1b1 to 0.4.0: nothing")
     -- a player already on the release, and a later release's player, are left alone
     fresh({ seenVersion = "0.4.0", newsSeen = allSeen() })
     assert(#news(login("0.4.0")) == 0 and not W.IsShown(), "on the release before: nothing")

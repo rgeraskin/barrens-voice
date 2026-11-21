@@ -363,10 +363,22 @@ do  -- the wheel over the button: the volume, a notch 10 %, within 0..200, the s
         if f._scripts.OnMouseWheel and f._scripts.OnDragStart then wheel = f end   -- the one dragged round the map
     end
     assert(wheel, "the minimap button takes the wheel")
-    local before = ns.db.volume
+    local before, refresh, tip = ns.db.volume, ns.Options.Refresh, GameTooltip
+    local refreshed, lines = 0, {}
+    ns.Options.Refresh = function() refreshed = refreshed + 1 end
+    GameTooltip = setmetatable({}, { __index = function(_, k)
+        if k == "AddLine" then return function(_, text) lines[#lines + 1] = text end end
+        return function() end
+    end })
+    wheel.IsMouseOver = function() return true end
     ns.db.volume = 100
     wheel._scripts.OnMouseWheel(wheel, 1)
     assert(ns.db.volume == 110, "up: louder")
+    assert(refreshed == 1, "the settings' slider follows")
+    local shown = false
+    for _, l in ipairs(lines) do if tostring(l):find("Громкость: |cffffd100110%|r", 1, true) then shown = true end end
+    assert(shown, "the tooltip shows the new volume")
+    ns.Options.Refresh, GameTooltip, wheel.IsMouseOver = refresh, tip, nil
     wheel._scripts.OnMouseWheel(wheel, -1)
     wheel._scripts.OnMouseWheel(wheel, -1)
     assert(ns.db.volume == 90, "down: quieter")
