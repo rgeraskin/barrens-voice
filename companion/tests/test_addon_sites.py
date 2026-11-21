@@ -67,6 +67,33 @@ class AddonSites(unittest.TestCase):
         self.assertEqual(addon_sites.release.without_site_ids(toc),
                          b"## Interface: 16001\r\n## Version: 0.4.1b1\nCore.lua\n")
 
+    def test_a_release_keeps_the_ids(self):
+        toc = (ROOT / "addon" / "BarrensVoice" / "BarrensVoice.toc").read_bytes()
+        self.assertEqual(addon_sites.release.toc_for("0.4.1", toc), toc)
+        self.assertNotIn(b"X-Wago-ID", addon_sites.release.toc_for("0.4.1b1", toc))
+
+    def test_dry_without_the_news_entry(self):
+        from unittest import mock
+        with mock.patch.object(addon_sites.release, "versions", return_value={"version": "9.9.9"}), \
+                mock.patch.object(addon_sites.release, "news_entries", return_value=[{"version": "0.4.0"}]), \
+                mock.patch.object(addon_sites.release, "stamp_dictionary") as stamp, \
+                mock.patch("sys.stderr") as err:
+            self.assertEqual(addon_sites.main(None), 1)
+        stamp.assert_not_called()                              # said before anything is written
+        self.assertIn("no entry 9.9.9", "".join(c.args[0] for c in err.write.call_args_list))
+
+    def test_git_of_another_repository_ignores_a_calling_gits(self):
+        # a hook or `git rebase --exec` sets GIT_DIR: release._git in a test's repository must not follow it
+        import os
+        import tempfile
+        from unittest import mock
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from gitenv import own_repository_env
+        with tempfile.TemporaryDirectory() as d:
+            subprocess.run(["git", "init", "-q", d], check=True, env=own_repository_env())
+            with mock.patch.dict(os.environ, {"GIT_DIR": str(Path(d) / "no-such-dir")}):
+                self.assertEqual(addon_sites.release._git(Path(d), "rev-parse", "--is-inside-work-tree"), "true")
+
     def test_only_a_release_goes_to_the_sites(self):
         entries = [{"version": "0.4.0"}, {"version": "0.3.0"}]
         self.assertEqual(addon_sites.problems("v0.4.0", "0.4.0", entries), [])

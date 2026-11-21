@@ -217,6 +217,11 @@ def without_site_ids(toc: bytes) -> bytes:
     return SITE_IDS.sub(b"", toc)
 
 
+def toc_for(version: str, toc: bytes) -> bytes:
+    """The archive's TOC: a release's as it is (the apps match it by the ids), a test build's without them."""
+    return toc if version == news.release_of(version) else without_site_ids(toc)
+
+
 
 def stamp_dictionary(data: bytes, revision: int) -> bytes:
     """Dictionary.lua with its D.REVISION: which default dictionary this is, against the dictionary online's (the
@@ -407,8 +412,8 @@ def build() -> Path:
                 data = own_news.encode("utf-8")
             if name == DICTIONARY:                                         # which default this is (the dictionary online)
                 data = stamp_dictionary(data, dictionary_revision())
-            if name == TOC and info["version"] != news.release_of(info["version"]):   # a test build: not the sites'
-                data = without_site_ids(data)
+            if name == TOC:                                                # a test build's: not the sites'
+                data = toc_for(info["version"], data)
             z.writestr(info_, data)
     data = archive.read_bytes()
     manifest = {**info, "archive": archive.name, "size": len(data), "sha256": hashlib.sha256(data).hexdigest(),

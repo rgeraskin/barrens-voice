@@ -32,5 +32,23 @@ class Stats(unittest.TestCase):
         self.assertEqual(lines[-1].split()[-3:], ["10", "20", "30"])
 
 
+class Paging(unittest.TestCase):
+    def test_every_page(self):
+        import io
+        import json
+        from unittest import mock
+        pages = {1: [release(f"v0.0.{i}", False, 1, 1, 1) for i in range(100)], 2: [release("v1.0.0", False, 2, 2, 2)]}
+        asked = []
+
+        def urlopen(request, timeout):
+            page = int(request.full_url.rsplit("page=", 1)[1])
+            asked.append(page)
+            return io.BytesIO(json.dumps(pages[page]).encode())
+        with mock.patch.object(stats.urllib.request, "urlopen", urlopen), mock.patch("builtins.print") as out:
+            stats.main()
+        self.assertEqual(asked, [1, 2])
+        self.assertEqual(out.call_args.args[0].splitlines()[-2].split()[-3:], ["102", "102", "102"])   # both pages
+
+
 if __name__ == "__main__":
     unittest.main()
