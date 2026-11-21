@@ -18,6 +18,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- The addon's description in the game's addon list names Barrens Voice Launcher
+
+  Not «приложение-компаньон», and without «F5-TTS».
+
 - Dictionary
 
   «форевер» (WoW Forever) as «фор+евер», «Гномреган» as «гномрег+ан», «бургер» as «б+ургер» in every form, and «баф» («бафает», «бафнул», «бафы», «дебаф», «ребаф», «ребафни») with the stress on «а» («Бафомет» on «е»).
