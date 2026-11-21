@@ -57,13 +57,18 @@ jobs:
           retention-days: 7
       - name: CurseForge token
         if: inputs.tag == ''
+        continue-on-error: true        # only a warning: CurseForge down must not fail a commit that is not about it
         env:
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
         run: |
           if [ -z "$CF_API_TOKEN" ]; then echo "no CF_API_TOKEN: not checked"; exit 0; fi
-          curl -fsS -H "x-api-token: $CF_API_TOKEN" https://wow.curseforge.com/api/game/wow/versions |
-            jq -e 'map(select(.gameVersionTypeID == 88568)) | length > 0' > /dev/null   # 88568: Forever
-          echo "CurseForge: the token works, Forever's versions are there"
+          if curl -fsS -H "x-api-token: $CF_API_TOKEN" https://wow.curseforge.com/api/game/wow/versions |
+              jq -e 'map(select(.gameVersionTypeID == 88568)) | length > 0' > /dev/null; then   # 88568: Forever
+            echo "CurseForge: the token works, Forever's versions are there"
+          else
+            echo "::warning::CurseForge: the token or Forever's versions did not check out (or CurseForge did not answer)"
+            exit 1
+          fi
       - if: inputs.tag != '' && (vars.CF_PROJECT_ID != '' || vars.WAGO_PROJECT_ID != '')
         uses: BigWigsMods/packager@01e8631a69c69d7654c788d152630d5fed9e3812  # v2.7.0
         with:
