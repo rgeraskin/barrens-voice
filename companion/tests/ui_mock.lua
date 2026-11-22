@@ -1370,6 +1370,75 @@ for _, event in ipairs(GROUP) do
     settle(0.3)
     assert(ChatFrame1:GetAlpha() == 0, event .. " with the option off: read, out of sight")
 end
+-- a line held while CatQuest spoke: shown when it came, and again when it goes to be read (it faded meanwhile)
+ns.db.fadeGuild, ns.db.guild, ns.db.waitForCatQuest, ns.db.enabled = true, true, true, true
+local pushed = ns.Strip.Push
+ns.Strip.Push = function() end
+CatQuestCore = { state = { playing = true } }
+now = now + 20
+settle(2)
+ns.Send("guild", "Вася-Степи", "Orc", 2, "WARRIOR", "", "кто на рейд?")      -- held: CatQuest speaks
+line("CHAT_MSG_GUILD", "кто на рейд?", "Player-1-7")
+settle(0.3)
+assert(ChatFrame1:GetAlpha() == 1, "the guild line shows the window as it comes")
+now = now + 30
+settle(2)
+assert(ChatFrame1:GetAlpha() == 0, "faded while it waits for CatQuest")
+CatQuestCore.state.playing = false
+ns.ReleaseHeld()
+settle(0.3)
+assert(ChatFrame1:GetAlpha() == 1, "shown again when it goes to be read")
+-- a held line the player did not ask to see (say): no window again
+now = now + 20
+settle(2)
+CatQuestCore.state.playing = true
+ns.db.say = true
+ns.Send("say", "Вася-Степи", "Orc", 2, "WARRIOR", "", "привет")
+now = now + 20
+settle(2)
+CatQuestCore.state.playing = false
+ns.ReleaseHeld()
+settle(0.3)
+assert(ChatFrame1:GetAlpha() == 0, "a say line held and released: the window stays out of sight")
+-- the option off when it is released: no window again
+ns.Send("guild", "Вася-Степи", "Orc", 2, "WARRIOR", "", "ещё")
+CatQuestCore.state.playing = true
+ns.Send("guild", "Вася-Степи", "Orc", 2, "WARRIOR", "", "и ещё")
+line("CHAT_MSG_GUILD", "и ещё", "Player-1-7")
+now = now + 20
+settle(2)
+ns.db.fadeGuild = false
+CatQuestCore.state.playing = false
+ns.ReleaseHeld()
+settle(0.3)
+assert(ChatFrame1:GetAlpha() == 0, "«при строке гильдии» off by then: no window again")
+-- a held line whose own window did not show (no AddMessage: a window that does not show guild) shows none of the
+-- older ones - a window shown long before for another asked line, or just now for an unread line
+ns.db.fadeGuild = true
+line("CHAT_MSG_GUILD", "давнее", "Player-1-7")                          -- an asked line: its window, long ago
+now = now + 20
+settle(2)
+ChatFrame1:AddMessage("Вы получили 5 серебра", 1, 1, 0, 1)            -- an unread line: shows the window now
+CatQuestCore.state.playing = true
+ns.Send("guild", "Вася-Степи", "Orc", 2, "WARRIOR", "", "без окна")       -- held, its window never added it
+now = now + 20
+settle(2)
+CatQuestCore.state.playing = false
+ns.ReleaseHeld()
+settle(0.3)
+assert(ChatFrame1:GetAlpha() == 0, "no window of its own: none shown again")
+-- a held line dropped (waited longer than HOLD_MAX): no window
+CatQuestCore.state.playing = true
+ns.Send("guild", "Вася-Степи", "Orc", 2, "WARRIOR", "", "слишком долго")
+line("CHAT_MSG_GUILD", "слишком долго", "Player-1-7")
+now = now + 60
+settle(2)
+CatQuestCore.state.playing = false
+ns.ReleaseHeld()
+settle(0.3)
+assert(ChatFrame1:GetAlpha() == 0, "a line dropped after waiting too long: no window")
+ns.Strip.Push, CatQuestCore = pushed, nil
+print("held lines' windows ok")
 -- a line in a tab that is not the one shown, and the combat log: no flash
 local log = widget()
 log._shown, log.isDocked, log.buttonFrame, log.editBox, log.ResizeButton = false, true, false, false, false

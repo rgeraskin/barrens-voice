@@ -110,7 +110,12 @@ function ns.ReleaseHeld()
     end
     local now, dropped = GetTime(), 0
     for _, h in ipairs(held) do
-        if now - h.at <= HOLD_MAX then ns.Strip.Push(h.payload) else dropped = dropped + 1 end
+        if now - h.at <= HOLD_MAX then
+            ns.Strip.Push(h.payload)
+            if ns.ChatFade then ns.ChatFade.Released(h.payload, h.at) end   -- its window again, for its reading
+        else
+            dropped = dropped + 1
+        end
     end
     held = {}
     if dropped > 0 then ns.Diag(("пропущено строк: %d — ждали озвучку CatQuest/Wayfarer дольше %d с"):format(dropped, HOLD_MAX)) end

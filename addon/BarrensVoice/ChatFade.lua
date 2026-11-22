@@ -153,6 +153,29 @@ local ALWAYS_SHOW = { CHAT_MSG_WHISPER = "fadeWhisper", CHAT_MSG_BN_WHISPER = "f
     CHAT_MSG_INSTANCE_CHAT_LEADER = "fadeGroup" }
 F.ALWAYS_SHOW = ALWAYS_SHOW   -- for the tests
 
+-- When a window was last shown for a line the player asked to see (ALWAYS_SHOW): a line held while CatQuest or
+-- Wayfarer spoke (QuestVoice.lua) is read long after its REVEAL seconds, and shows these windows again then.
+local askedAt = {}
+
+--- A held line goes to be read now (`payload` as Core.lua made it, `at` when it came): if it is a line the player
+--- asked to see (its kind's setting on), the windows shown for such a line since it came show again - for its reading,
+--- not only the 10 s after it came. Returns whether one did.
+function F.Released(payload, at)
+    if not (ns.db and ns.db.fadeChat) or type(payload) ~= "string" then return false end
+    local kind = payload:match("^([^\31]*)\31")
+    local setting
+    for event, wanted in pairs(ALWAYS_SHOW) do
+        if ns.EVENTS and ns.EVENTS[event] == kind then setting = wanted end
+    end
+    if not (setting and ns.db[setting]) then return false end
+    local again = false
+    for frame, shown in pairs(askedAt) do
+        if shown >= (at or 0) - 1 and F.Reveal(frame) then again = true end
+    end
+    if again and ns.db.debug then ns.Diag("окно чата показано снова: строка дождалась CatQuest/Wayfarer") end
+    return again
+end
+
 --- What becomes of a line a chat window shows: "read" (the companion reads it), "skipped" (a chat
 --- event's line it does not read), "closed" (retail's closed chat, secret), "other" (no chat event's:
 --- an addon's print, a system message) or "unknown" (its arguments could not be looked at).
@@ -189,7 +212,9 @@ local function OnAddMessage(self, text, _, _, _, _, _, _, event, args)
     local verdict = Verdict(text, event, args)
     local asked = verdict == "read" and ALWAYS_SHOW[event] and ns.db[ALWAYS_SHOW[event]]
     if verdict == "read" and not asked then return end
-    if F.Reveal(self) and ns.db.debug then        -- /bv debug: which line showed the window, and why
+    local shown = F.Reveal(self)
+    if shown and asked then askedAt[self] = GetTime() end
+    if shown and ns.db.debug then        -- /bv debug: which line showed the window, and why
         local line = "(закрытый текст)"            -- a secret one (retail) cannot be looked at
         if not ns.Secret(text) then
             -- (a Battle.net friend's |K…|k, which the chat shows as their real name, is left out - and with no

@@ -44,6 +44,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- A whisper, guild or group line held while CatQuest or Wayfarer speaks shows its chat window again when it is read
+
+  With «Показывать при шёпоте / строке гильдии / группы» on, the window showed as the line came and faded 10 s later, while the line waited for the quest voice-over (up to 40 s; longer, it is dropped) and was read with no window in sight. The addon holds such lines itself, so it knows when one goes to be read: the window that showed it shows again then. A line the program was already reading when the quest voice-over cut it in is read again after it without a second window.
+
 - «Озвучить» in the dictionary window reads with the player's own name and voice
 
   It sent the character's name alone (on Forever without the surname «и фамилии» adds), so the line got another voice than the player's own chat lines. It now goes as the sender the chat gives the player's own lines, the name alone until the character has written one.
