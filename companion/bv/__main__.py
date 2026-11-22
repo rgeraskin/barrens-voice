@@ -605,6 +605,14 @@ def main() -> int:
         return f5_selftest(config, log, DATA_DIR)
     if "--fetch-models" in sys.argv:
         return fetch_models(config)
+    if "--voicelab" in sys.argv:                   # the race voices' clips, to hear and choose by ear (voicelab.py)
+        from .voicelab import parse_args, run as voicelab
+        parsed = parse_args(sys.argv[sys.argv.index("--voicelab") + 1:])
+        if isinstance(parsed, str):
+            log(parsed)
+            return 2
+        out, only, f5 = parsed
+        return voicelab(config, DATA_DIR, out, log, only=only, f5=f5)
     log("=" * 60)
     if not single_instance():
         log("озвучка уже запущена — вторая не нужна, выхожу")

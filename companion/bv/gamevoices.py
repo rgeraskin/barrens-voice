@@ -25,6 +25,11 @@ from .dictionary import wow_roots
 BANK_VERSION = 6
 SAMPLE_RATE = 24000
 TABLE = Path(__file__).with_name("game_voices.json")
+# the lines a voice's reference clip is made of, chosen by ear (`python -m bv --voicelab`): a voice listed takes
+# exactly these files, in this order (an empty list: no such voice); one not listed is chosen as below (`choose`).
+# A line is a file id ("- 562828": Whisper hears its text) or an id with its text ("- 562828: "Пусть духи хранят
+# тебя."": the same text on every machine, correctable by hand, no Whisper for it).
+PICKS = Path(__file__).with_name("voice_picks.yaml")
 GAP = 0.15            # seconds of silence between the lines of a reference clip
 TARGET = (5.5, 9.5)   # seconds of speech wanted in a reference clip
 MAX_LINES = 4
@@ -114,6 +119,53 @@ def voices_for(config: dict) -> dict:
     return table
 
 
+def load_lines(path: Path | None = None) -> dict[str, list[tuple[int, str | None]]]:
+    """voice_picks.yaml's (or `path`'s) `voices`: {voice: [(file id, its text or None), ...]}; {} without the file."""
+    try:
+        text = (path or PICKS).read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return {}
+    return lines_of(text)
+
+
+def file_id(voice: str, item) -> int:
+    """A line's file id as the file gives it: a whole number («- true» or «- 1.5» is no file of the game)."""
+    if isinstance(item, bool) or not isinstance(item, int):
+        raise ValueError(f"{voice}: «{item}» — не номер файла игры")
+    return item
+
+
+def lines_of(text: str) -> dict[str, list[tuple[int, str | None]]]:
+    """A picks (or voice lab) file's `voices`, read as YAML: each line a file id, or {file id: its text}."""
+    import yaml
+    voices = (yaml.safe_load(text) or {}).get("voices") or {}
+    out: dict[str, list[tuple[int, str | None]]] = {}
+    for voice, items in voices.items():
+        lines = []
+        for item in items or []:
+            if isinstance(item, dict):
+                if len(item) != 1:
+                    raise ValueError(f"{voice}: одна реплика — один номер и её текст: {item}")
+                ((fdid, said),) = item.items()
+                if said is not None and not isinstance(said, str):   # «- 5: yes» is True to YAML, «1.50» is 1.5
+                    raise ValueError(f"{voice}: текст фразы {fdid} — в кавычках, иначе YAML читает его по-своему")
+                lines.append((file_id(voice, fdid), (str(said).strip() or None) if said is not None else None))
+            else:
+                lines.append((file_id(voice, item), None))
+        out[str(voice)] = lines
+    return out
+
+
+def picks_of(text: str) -> dict[str, list[int]]:
+    """A picks (or voice lab) file's voices with their file ids only."""
+    return {voice: [fdid for fdid, _ in lines] for voice, lines in lines_of(text).items()}
+
+
+def load_picks(path: Path | None = None) -> dict[str, list[int]]:
+    """voice_picks.yaml's (or `path`'s) voices with their file ids: {voice: [file id, ...]}."""
+    return {voice: [fdid for fdid, _ in lines] for voice, lines in load_lines(path).items()}
+
+
 def _stamp(config: dict, shifts) -> dict | None:
     """What the bank depends on; None when no game is found."""
     from .casc import build_info, product_of
@@ -126,9 +178,15 @@ def _stamp(config: dict, shifts) -> dict | None:
         build = build_info(install, product)["Build Key"]
     except (LookupError, KeyError, OSError):
         return None
-    return {"version": BANK_VERSION, "install": str(install), "product": product, "build": build,
-            "shifts": list(shifts),
-            "table": zlib.crc32(json.dumps(voices_for(config), sort_keys=True).encode("utf-8"))}
+    table = voices_for(config)
+    stamp = {"version": BANK_VERSION, "install": str(install), "product": product, "build": build,
+             "shifts": list(shifts), "table": zlib.crc32(json.dumps(table, sort_keys=True).encode("utf-8"))}
+    # the lines chosen by ear for this game's voices: only when there are any, so an empty voice_picks.yaml (or
+    # one for the other game's voices) does not make the bank again
+    picks = {voice: lines for voice, lines in load_lines().items() if voice in table}
+    if picks:
+        stamp["picks"] = zlib.crc32(json.dumps(picks, sort_keys=True).encode("utf-8"))
+    return stamp
 
 
 GROWN = 100 * 1024 * 1024   # bytes the game's storage must grow by before an incomplete bank is made again
@@ -264,6 +322,87 @@ def _shift(samples, semitones: float):
     return np.interp(np.linspace(0, len(samples) - 1, n), np.arange(len(samples)), samples).astype("float32")
 
 
+# --- one voice's reference clip --------------------------------------------------------------------
+
+def listen(candidates, files: dict, checker, enough: bool = True, known: dict | None = None):
+    """The voice's files heard by Whisper, calmest first: ([{"fdid", "tag", "text", "seconds", "priority",
+    "usable"}], {fdid: samples}). `usable`: a calm length and a transcript worth trusting (`plausible`).
+    `enough`: stop once the calmest kind the voice has is heard with room to spare (the bank), else hear them
+    all (the voice lab). `known`: transcripts already heard ({fdid: text}), not asked of Whisper again."""
+    heard: list[dict] = []
+    audio: dict[int, object] = {}
+    candidates = sorted((f for f in candidates if f[0] in files), key=lambda f: f[2])
+    for fdid, tag, priority in candidates:
+        try:
+            x = _decode(files[fdid])
+        except Exception:  # noqa: BLE001 - one unreadable file does not matter
+            continue
+        seconds = len(x) / SAMPLE_RATE
+        long_enough = 0.9 <= seconds <= 7.5
+        if not long_enough and enough:
+            continue
+        if known is not None and fdid in known:
+            text = known[fdid]
+        else:
+            text = checker.transcribe(x, SAMPLE_RATE).strip()
+            if known is not None:
+                known[fdid] = text
+        if tag == "line" and not text.endswith("."):
+            # a numbered line (retail's allied races: what it is, is not known): a battle cry ("!")
+            # or a joke ("?") makes the whole voice shout or flirt - the calm ones first
+            priority = 3
+        usable = long_enough and plausible(text, seconds)
+        if usable or not enough:
+            heard.append({"fdid": fdid, "tag": tag, "text": text, "seconds": seconds, "priority": priority,
+                          "usable": usable})
+            audio[fdid] = x
+        if enough and heard_enough(heard, candidates[0][2]):
+            break
+    return heard, audio
+
+
+def heard_enough(heard: list[dict], calmest: int) -> bool:
+    """Enough usable lines of the calmest kind the voice has (`calmest`: its first candidate's priority): the bank
+    stops listening there, and chooses among the lines heard so far."""
+    return sum(h["seconds"] for h in heard if h["usable"] and h["priority"] == calmest) >= TARGET[1] * 1.5
+
+
+def bank_pool(heard: list[dict], calmest: int) -> list[dict]:
+    """The lines the bank would have heard before it stopped (`listen` with `enough`), of all heard in its order:
+    what it chooses from - so the voice lab shows the very clip the players get."""
+    pool: list[dict] = []
+    for h in heard:
+        if h["usable"]:
+            pool.append(h)
+            if heard_enough(pool, calmest):
+                break
+    return pool
+
+
+def reference(heard: list[dict], audio: dict, checker, picked: list[int] | None = None):
+    """(clip, its text, seconds of speech, its files) for the voice, or None with too little speech. Chosen (`choose`)
+    from the usable lines and heard back by Whisper - the shortest line dropped while it does not match its
+    text (up to three tries); or `picked`, the files chosen by ear, as they are, in their order."""
+    if picked is not None:
+        by_id = {h["fdid"]: h for h in heard}
+        lines = [by_id[f] for f in picked if f in by_id and by_id[f]["text"]]
+        if sum(x["seconds"] for x in lines) < MIN_SPEECH:
+            return None
+        return (_join([audio[x["fdid"]] for x in lines]), joined_text(lines), sum(x["seconds"] for x in lines),
+                [x["fdid"] for x in lines])
+    pool = [h for h in heard if h["usable"]]
+    for _ in range(3):
+        lines = choose(pool)
+        if sum(x["seconds"] for x in lines) < MIN_SPEECH:
+            return None
+        wav, text = _join([audio[x["fdid"]] for x in lines]), joined_text(lines)
+        score, _ = checker.score(wav, SAMPLE_RATE, text)
+        if score >= GOOD:
+            return wav, text, sum(x["seconds"] for x in lines), [x["fdid"] for x in lines]
+        pool.remove(min(lines, key=lambda x: x["seconds"]))   # the shortest line is the likeliest wrong
+    return None
+
+
 # --- the bank -----------------------------------------------------------------------------------
 
 def took(seconds: float) -> str:
@@ -292,6 +431,10 @@ def build(config: dict, out: Path, log, checker, clock=time.monotonic) -> list[S
     log("собираю голоса рас из игры — несколько минут ...")
     log(f"    {stamp['install']}, {stamp['product']}: один раз после каждого обновления игры")
     table = voices_for(config)
+    lines = load_lines()
+    picks = {voice: [fdid for fdid, _ in chosen] for voice, chosen in lines.items()}
+    # the texts the file gives (the same on every machine): those lines are not asked of Whisper
+    texts = {fdid: said for chosen in lines.values() for fdid, said in chosen if said}
     storage = Storage(Path(stamp["install"]), stamp["product"])
     others = other_storages(config, log)
     files = storage.read_files({f[0] for v in table.values() for f in v["files"]}, "ruRU", others)
@@ -307,46 +450,20 @@ def build(config: dict, out: Path, log, checker, clock=time.monotonic) -> list[S
         if clock() - told >= PROGRESS_EVERY:
             told = clock()
             log(f"собираю голоса рас: {done} из {len(table)}")
-        heard: list[dict] = []
-        audio: dict[int, object] = {}
-        candidates = [f for f in entry["files"] if f[0] in files]
-        # the calmest first, then lines of about 3 s; heard one by one only until there are enough
-        candidates.sort(key=lambda f: f[2])
-        for fdid, _tag, priority in candidates:
-            try:
-                x = _decode(files[fdid])
-            except Exception:  # noqa: BLE001 - one unreadable file does not matter
-                continue
-            seconds = len(x) / SAMPLE_RATE
-            if not 0.9 <= seconds <= 7.5:
-                continue
-            text = checker.transcribe(x, SAMPLE_RATE).strip()
-            if _tag == "line" and not text.endswith("."):
-                # a numbered line (retail's allied races: what it is, is not known): a battle cry ("!")
-                # or a joke ("?") makes the whole voice shout or flirt - the calm ones first
-                priority = 3
-            if plausible(text, seconds):
-                heard.append({"fdid": fdid, "text": text, "seconds": seconds, "priority": priority})
-                audio[fdid] = x
-            # enough of the calmest kind the voice has: stop listening (else on to the end)
-            if sum(h["seconds"] for h in heard if h["priority"] == candidates[0][2]) >= TARGET[1] * 1.5:
-                break
-        made = None
-        pool = list(heard)
-        for _ in range(3):
-            lines = choose(pool)
-            if sum(x["seconds"] for x in lines) < MIN_SPEECH:
-                break
-            wav, text = _join([audio[x["fdid"]] for x in lines]), joined_text(lines)
-            score, _ = checker.score(wav, SAMPLE_RATE, text)
-            if score >= GOOD:
-                made = (wav, text, sum(x["seconds"] for x in lines))
-                break
-            pool.remove(min(lines, key=lambda x: x["seconds"]))   # the shortest line is the likeliest wrong
+        picked = picks.get(voice)
+        if picked == []:                                   # left out by ear (voice_picks.yaml)
+            continue
+        if picked is not None:                             # chosen by ear: only those are heard
+            chosen = set(picked)
+            heard, audio = listen([f for f in entry["files"] if f[0] in chosen], files, checker, enough=False,
+                                  known=dict(texts))
+        else:
+            heard, audio = listen(entry["files"], files, checker)
+        made = reference(heard, audio, checker, picked)
         if made is None:
             skipped.append(voice)
             continue
-        wav, text, speech = made
+        wav, text, speech, _ = made
         safe = voice.replace("/", "_")
         for shift in [0.0] + list(shifts):
             slot_id = voice if shift == 0 else f"{voice}^{shift:+g}"

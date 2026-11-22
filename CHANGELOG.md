@@ -20,6 +20,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   A notch is 5 %, as the game's own volume sliders, within the slider's 0–200 %; the button's tooltip shows the volume, and the slider on «Общее» follows. The line already playing follows at once, louder and quieter: the launcher now plays a line as a stream (`sounddevice`, PortAudio) and applies the volume to every block of it, instead of a file through `winsound` at a volume fixed when it was made. The stream goes through Windows' sound mapper, as `winsound` did, so it follows the default output: headphones plugged in or out, a stream that fails or stalls is opened again on the list of devices read afresh and goes on from where it stopped. With no device at all the launcher's window says «звук не играет…» in yellow, and the next line tries again.
 
+- The race voices' clips chosen by ear: a voice lab and `voice_picks.yaml`
+
+  `python -m bv --voicelab <folder>` puts every line of every race voice from the client into its folder (`all/`), the lines its reference clip is made of (`used/`), the clip and a test line F5 speaks with it, and `voices.yaml` listing them all, the used ones uncommented: edit it and run again to hear the result. Carried to `companion/bv/voice_picks.yaml` (`-- --pick`: only the voices chosen otherwise than automatically, or with a text corrected), a voice listed there takes exactly those lines (an empty list drops the voice), each with its text from the file - the same on every machine, correctable by hand, no Whisper for it; the others are chosen as before. The picks of the game's own voices are part of the bank's stamp: once there are any, the race voices are collected again once, after the update that brings them; an empty file changes nothing.
+
 - The CurseForge and Wago apps recognise the addon the launcher installed
 
   The addon's TOC names its projects (`X-Curse-Project-ID`, `X-Wago-ID`); the release workflow checks they are the repository's variables. A test build's addon goes without them: the sites have releases only.

@@ -23,3 +23,7 @@ dist/
 # CurseForge's and Wago's changelog of a release (tools/addon_sites.py, the release workflow)
 .addon-sites-notes.md
 .release/
+
+# this machine's own settings for mise tasks (the test machine's address for `mise run voicelab`)
+.mise.local.toml
+mise.local.toml

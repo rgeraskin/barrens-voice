@@ -29,6 +29,8 @@ dependencies = [
     "transformers==5.22.2",
     "tokenizers==0.23.3",
     "huggingface_hub==1.33.0",
+    # the race voices' lines chosen by ear (bv/voice_picks.yaml); huggingface_hub needs it anyway
+    "pyyaml==6.0.3",
     # updates: the release manifest's ed25519 signature (bv/update.py, tools/sign.py)
     "cryptography==50.0.2",
     # the launcher's tray icon; tools/make_icon.py

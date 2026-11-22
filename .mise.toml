@@ -66,6 +66,10 @@ run = "uv run --locked python tools/addon_sites.py"
 description = "How many use it: each release's installer, archive and manifest downloads on GitHub (tools/stats.py)"
 run = "uv run --locked python tools/stats.py"
 
+[tasks.voicelab]
+description = "The race voices' lines on the Windows test machine, to choose by ear (tools/voicelab_remote.py; `-- --only <voice>`, `-- --no-f5`, `-- --pick`: the lab's choice into companion/bv/voice_picks.yaml); BV_LAB_* in .mise.local.toml"
+run = "uv run --locked python tools/voicelab_remote.py"
+
 [tasks.hooks]
 description = "Use the repository's git hooks (.githooks: pre-push checks release tags with tools/check_tag.py)"
 run = "git config core.hooksPath .githooks"
