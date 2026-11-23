@@ -49,8 +49,11 @@ class Source(unittest.TestCase):
         tags = release_tags()
         if not tags:
             self.skipTest("no release tags here (a shallow clone)")
+        number = lambda v: tuple(int(x) for x in v.split("."))  # noqa: E731
         for tag in tags:
             version = tag[1:].split("-")[0]
+            if "-beta." in tag and f"v{version}" not in tags and number(version) < number(working):
+                continue   # test builds of a number that was renamed before its release (0.4.1 became 0.5.0)
             self.assertIn(version, entries, f"{tag}: news.toml needs an entry for {version}")
             if "-beta." not in tag:
                 self.assertIn("date", entries[version], f"{tag}: its «Что нового» entry needs the release's date")

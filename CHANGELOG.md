@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 >
 > Release dates are the GitHub release's publication date (UTC). Versions before 0.4.0 had no GitHub release: their date is the release commit's, and their tags were set later on those commits.
 
-## [0.4.1] - Unreleased
+## [0.5.0] - Unreleased
 
 ### Added
 
@@ -401,7 +401,7 @@ The first public release, and the first on GitHub: an installer, updates by them
 
   The addon sends the chat to a companion program on Windows, which reads it aloud with a voice of its own for every player — race voices (F5-TTS) or Windows voices — and a slang dictionary («WTS» — «продам», «дд» — «дамагер»).
 
-[0.4.1]: https://github.com/rgeraskin/barrens-voice/compare/v0.4.0...HEAD
+[0.5.0]: https://github.com/rgeraskin/barrens-voice/compare/v0.4.0...HEAD
 [0.4.0]: https://github.com/rgeraskin/barrens-voice/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/rgeraskin/barrens-voice/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/rgeraskin/barrens-voice/compare/v0.2.0...v0.2.1

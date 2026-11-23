@@ -21,7 +21,7 @@ def main() -> int:
     import bv.update  # noqa: F401
     from cryptography.hazmat.primitives.asymmetric import ed25519  # noqa: F401
     tkinter.Tcl()
-    # the sound: one way only since 0.4.1 (a stream, audio.StreamOut), no winsound to fall back to. Found, not imported:
+    # the sound: one way only since 0.5.0 (a stream, audio.StreamOut), no winsound to fall back to. Found, not imported:
     # importing it starts PortAudio
     import importlib.util
     import sys
