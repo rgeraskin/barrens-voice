@@ -14,7 +14,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Smileys as words
 
-  «и смайлики» under «Озвучивать имена» (on by default): a line of nothing but smileys is read as an emote — «)))», «:D», «xD» «Громмаш смеётся», «)», «))», «:)», «8)», «:3», «^_^» «улыбается», «(((», «:(» «грустит», «T_T» «плачет», «O_o» «удивляется», «-_-» «хмурится», «>_<» «морщится», «<3» «показывает сердечко», «=\», «:/» «в недоумении» — and at the end of a line the same feeling follows it (two brackets for a smile or sadness, three for a laugh: «И улыбается.», «И смеётся.»), the smileys at the end themselves not read out («<3» at the end is no longer «три»). One bracket or «:)» after a phrase stays the pause it was, a smile someone took the trouble to type («^_^», «:3», «8-)», not a quick «^^») is said («И улыбается.»), «8)» after a word is left as typed (it may be «в 8»), spaced brackets that pair up («( это шутка )») stay parentheses, faces («^_^», «T_T», «O_o», «-_-», «>_<») mid-line are a pause, as whole words only («leo_orc», «10_000» stay), and a line of smileys names no place. Chosen from the chat's own logs: brackets and letters, no picture emoji.
+  «и смайлики» under «Озвучивать имена» (on by default): a line of nothing but smileys is read as an emote — «)))», «:D», «xD» «Громмаш смеётся»; «)», «))», «:)», «8)», «:3», «^_^» «улыбается»; «(((», «:(» «грустит»; «T_T» «плачет»; «O_o» «удивляется»; «-_-» «хмурится»; «>_<» «морщится»; «<3» «показывает сердечко»; «=\», «:/» «в недоумении».
+
+  At the end of a line the same feeling follows it, the smileys themselves not read out («<3» at the end is no longer «три»): two brackets for a smile or sadness, three for a laugh («И улыбается.», «И смеётся.»). One bracket or «:)» after a phrase stays the pause it was; a smile someone took the trouble to type («^_^», «:3», «8-)», not a quick «^^») is said («И улыбается.»).
+
+  Not smileys: «8)» after a word is left as typed (it may be «в 8»), spaced brackets that pair up («( это шутка )») stay parentheses, faces mid-line («^_^», «T_T», «O_o», «-_-», «>_<») are a pause and count as whole words only («leo_orc», «10_000» stay), and a line of smileys names no place. Chosen from the chat's own logs: brackets and letters, no picture emoji.
 
 - The volume by the mouse wheel over the minimap button
 
@@ -38,9 +42,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   «Озвучка чата: у каждого игрока свой голос — голоса рас или голоса Windows. Нужна программа Barrens Voice Launcher для Windows.» Not «приложение-компаньон», without «F5-TTS» and without the strip, which the README and the welcome explain.
 
+- «РЛ» and «БР» are read letter by letter
+
+  «РЛ» is «эр-эл» wherever it stands, its ending as typed («РЛу» «эр-элу»), in agreement with a number («2 РЛ» «два эр-эла»), not declined after a preposition («к РЛ» «к эр-эл»): it was the Ruins of Lordaeron or the raid leader by the words around it, and often the wrong one («у РЛ спроси», «РЛ кинул инвайт»). «БР» is «бэ-эр» («есть 2 бр» «два бэ-эра»), not «боевое воскрешение» («бр, холодно»). A player's own edits of the plain, the endings' and the number's «РЛ» rules and of the word «бр» keep working; the two rules that read «РЛ» by the words around it are gone.
+
 - Dictionary
 
-  «форевер» (WoW Forever) as «фор+евер», «Гномреган» as «гномрег+ан», «бургер» as «б+ургер» in every form, «суманем» (summon) as «суман+ём», «стакается» (stacks) as «ст+акается», «качается» (levels up) as «кач+ается», «глобал» (the global channel) as «гл+обал», «barrens voice», «curse forge», «wago» typed in Latin as «Б+эрренс В+ойс», «К+ёрс Ф+ордж», «В+аго», «Ростов-на-Дону» as «Ростов-на-Дон+у», «дарова», «здарова», «даров», «дарово», «здаров», «здарово», «дароу», «здароу» (hi) with the stress on the «о» after «р» («дар+ова», «здар+ово»), «новичек» as «новичёк», «димоны» as «д+имоны» (the plural only: «Димон» is a name), «РЛ» letter by letter, «эр-эл», wherever it stands, «РЛу» «эр-элу» (it was the Ruins of Lordaeron or the raid leader by the words around it, and often the wrong one: «у РЛ спроси», «РЛ кинул инвайт»), «БР» letter by letter, «бэ-эр» (was «боевое воскрешение»: «бр, холодно»), and «баф» («бафает», «бафнул», «бафы», «дебаф», «ребаф», «ребафни») with the stress on «а» («Бафомет» on «е»).
+  «форевер» (WoW Forever) as «фор+евер», «Гномреган» as «гномрег+ан», «бургер» as «б+ургер» in every form, «суманем» (summon) as «суман+ём», «стакается» (stacks) as «ст+акается», «качается» (levels up) as «кач+ается», «глобал» (the global channel) as «гл+обал», «димоны» as «д+имоны» (the plural only: «Димон» is a name), «новичек» as «новичёк», «Ониксия» as «он+иксия» in every form, «оня», «онька» as «Он+иксия» instead of «Логово Ониксии», «оню», «оньку» as «Он+иксию», «оне» («на оне») as «Он+иксии», «Ростов-на-Дону» as «Ростов-на-Дон+у».
+
+  The greetings «дарова», «здарова», «даров», «дарово», «здаров», «здарово», «дароу», «здароу» with the stress on the «о» after «р» («дар+ова», «здар+ово»), not declined after «о,».
+
+  The addon and its sites typed in Latin: «barrens voice», «curse forge», «wago» as «Б+эрренс В+ойс», «К+ёрс Ф+ордж», «В+аго», not declined.
+
+  «баф» («бафает», «бафнул», «бафы», «дебаф», «ребаф», «ребафни») with the stress on «а» («Бафомет» on «е»).
 
 ### Fixed
 
