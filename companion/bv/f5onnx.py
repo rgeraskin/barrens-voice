@@ -58,8 +58,11 @@ DEVICES = {"DmlExecutionProvider": "dml", "CUDAExecutionProvider": "cuda"}
 
 
 class F5Onnx:
-    def __init__(self, model_dir: Path, vocab_path: Path, provider: str = "DmlExecutionProvider", log=print):
+    def __init__(self, model_dir: Path, vocab_path: Path, provider: str = "DmlExecutionProvider", log=print,
+                 transformer: tuple[Path, int] | None = None):
+        """`transformer`: another Transformer file and its number of steps (f5_schedule, the voice lab's --steps)."""
         self.model_dir, self.vocab_path, self.provider, self.log = Path(model_dir), Path(vocab_path), provider, log
+        self.transformer = transformer
         self.lock = threading.Lock()
         self.loaded = False
 
@@ -73,13 +76,15 @@ class F5Onnx:
         self.in_rate = int(meta["in_sample_rate"])
         self.out_rate = int(meta["out_sample_rate"])
         self.hop = int(meta["hop_length"])
-        self.steps = int(meta["nfe_step"])
+        self.steps = self.transformer[1] if self.transformer else int(meta["nfe_step"])
         self.max_frames = int(meta["max_signal_length"])
         from .f5engine import card_session, on_card
         options, card = card_session(self.provider)
         cpu = ["CPUExecutionProvider"]
         self.pre = ort.InferenceSession(str(self.model_dir / meta["model_file_name_preprocess"]), options, providers=card)
-        self.net = ort.InferenceSession(str(self.model_dir / meta["model_file_name_transformer"]), options, providers=card)
+        net = self.transformer[0] if self.transformer else self.model_dir / meta["model_file_name_transformer"]
+        self.net = ort.InferenceSession(str(net), options, providers=card)
+        self.net_file = Path(net)
         on_card(self.net, self.provider)
         self.dec = ort.InferenceSession(str(self.model_dir / meta["model_file_name_decode"]), providers=cpu)
         types = {"tensor(float)": np.float32, "tensor(float16)": np.float16, "tensor(int16)": np.int16}
