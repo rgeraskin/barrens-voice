@@ -97,7 +97,7 @@ Russian is the only language so far: if you would like it in yours, help is welc
 
 ### Каналы и чтение
 
-<p align="center"><img src="https://raw.githubusercontent.com/rgeraskin/barrens-voice/master/docs/images/addon-channels.webp" alt="Вкладка «Каналы и чтение»: имена, каналы и что читать"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/rgeraskin/barrens-voice/master/docs/images/addon-channels.webp" alt="Вкладка «Каналы и чтение»: имена и смайлики, каналы и что читать"></p>
 
 - **Озвучивать имена** — описание опций говорит само за себя.
 
