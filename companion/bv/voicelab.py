@@ -1,12 +1,13 @@
 """The voice lab: what each race voice's reference clip is made of, to hear and choose by ear.
 
-`python -m bv --voicelab <folder> [--only <voice>] [--no-f5]` (with the game and the voice-over closed: Whisper
+`python -m bv --voicelab <folder> [--only <voice>] [--no-f5] [--steps 6[,8]]` (with the game and the voice-over closed: Whisper
 and F5 take the video card). For every voice of the chosen game, a folder (`troll-female/old`):
 - `all/`: every line of the voice in the client, "<file id> <kind> <text>.wav" (a line the bank would never take -
   too short or long, or a transcript not worth trusting - with «(не годится)»);
 - `used/`: the lines its reference clip is made of, in order;
 - `sample.wav`: the clip itself (`sample.txt` its text) - what F5 imitates;
-- `test.wav`: `test_text` spoken by F5 with that clip.
+- `test.wav`: `test_text` spoken by F5 with that clip; with `--steps 6`, `test-6.wav` too: the same line in 6 steps
+  instead of 10 (f5_schedule), to hear whether the faster F5 is as good.
 And `voices.yaml` beside them: every voice with all its lines, the used ones as list items, the rest commented out.
 Edit it (comment a line out, take one in, reorder) and run again: the clips and test lines are made from it,
 the transcripts are not heard again (`transcripts.json`). Copied to companion/bv/voice_picks.yaml, it is what
@@ -32,16 +33,25 @@ KINDS = {"error": "ошибка", "greeting": "приветствие", "farewel
 
 
 def parse_args(args: list[str]):
-    """`--voicelab`'s switches after it: (the folder, --only's voice or "", whether F5 speaks), or the usage line."""
+    """`--voicelab`'s switches after it: (the folder, --only's voice or "", whether F5 speaks, --steps' numbers of
+    steps), or the usage line."""
+    from .f5_schedule import STEPS
     if not args or args[0].startswith("--"):
-        return "--voicelab <папка> [--only <голос>] [--no-f5]"
+        return "--voicelab <папка> [--only <голос>] [--no-f5] [--steps 6[,8]]"
     only = ""
     if "--only" in args:
         at = args.index("--only") + 1
         if at >= len(args) or args[at].startswith("--"):
             return "--only <голос>: например --only troll-female/old"
         only = args[at]
-    return Path(args[0]), only, "--no-f5" not in args
+    steps: tuple[int, ...] = ()
+    if "--steps" in args:
+        at = args.index("--steps") + 1
+        given = args[at].split(",") if at < len(args) else []
+        if not given or not all(n.strip().isdigit() and int(n) in STEPS for n in given):
+            return f"--steps <шаги>: {', '.join(map(str, STEPS))} или несколько через запятую — например --steps 6,8"
+        steps = tuple(sorted({int(n) for n in given}))
+    return Path(args[0]), only, "--no-f5" not in args, steps
 
 
 def kind_of(tag: str) -> str:
@@ -203,7 +213,7 @@ def _write_voice(folder: Path, heard: list[dict], audio: dict, made) -> None:
     import soundfile as sf
     for old in ("all", "used"):
         shutil.rmtree(folder / old, ignore_errors=True)
-    for old in ("sample.wav", "sample.txt", "test.wav"):
+    for old in ("sample.wav", "sample.txt", "test.wav", *(f.name for f in folder.glob("test-*.wav"))):
         try:
             (folder / old).unlink(missing_ok=True)
         except PermissionError as e:                         # Windows: open in a player
@@ -225,8 +235,9 @@ def _write_voice(folder: Path, heard: list[dict], audio: dict, made) -> None:
     (folder / "sample.txt").write_text(text + "\n", encoding="utf-8")
 
 
-def run(config: dict, home: Path, out: Path, log, only: str = "", f5: bool = True) -> int:
-    """The lab in `out` for the chosen game's voices (`only`: those whose id has it)."""
+def run(config: dict, home: Path, out: Path, log, only: str = "", f5: bool = True, steps: tuple[int, ...] = ()) -> int:
+    """The lab in `out` for the chosen game's voices (`only`: those whose id has it; `steps`: the test line also in
+    these numbers of steps)."""
     from .casc import Storage
     from .f5engine import preload, provider
     from .whisper_onnx import OnnxChecker
@@ -316,7 +327,11 @@ def run(config: dict, home: Path, out: Path, log, only: str = "", f5: bool = Tru
     checker.encoder = checker.decoder = None
     if f5 and clips:
         saved = json.loads(paces_path.read_text(encoding="utf-8")).get("target") if paces_path.exists() else None
-        target = speak(config, home, out, clips, test_text, log, saved if only else None)
+        try:
+            target = speak(config, home, out, clips, test_text, log, saved if only else None, steps)
+        except ValueError as e:                             # --steps: a model it does not know, no onnx package
+            log(f"сокращённое расписание F5: {e}")
+            return 1
         if not only:
             paces_path.write_text(json.dumps({"target": target}), encoding="utf-8")
     log(f"готово: {out}")
@@ -370,19 +385,23 @@ def tell_picked(voice: str, picked: list[int], heard: list[dict], made, log) -> 
         log(f"{voice}: речи в образце {speech:.1f} с — F5 лучше {gamevoices.TARGET[0]:g}–{gamevoices.TARGET[1]:g} с")
 
 
-def speak(config: dict, home: Path, out: Path, clips: dict, test_text: str, log, target: float | None = None) -> float:
-    """`test_text` spoken by F5 with each voice's clip: test.wav in its folder. `target`: the bank's target pace
-    (a full run's, for --only), else of these clips; the one used is returned."""
+def speak(config: dict, home: Path, out: Path, clips: dict, test_text: str, log, target: float | None = None,
+          steps: tuple[int, ...] = ()) -> float:
+    """`test_text` spoken by F5 with each voice's clip: test.wav in its folder, and test-<n>.wav in each of `steps`
+    numbers of steps (f5_schedule: the Transformer rewritten once into the lab's f5-steps folder). `target`: the
+    bank's target pace (a full run's, for --only), else of these clips; the one used is returned."""
     import soundfile as sf
     from huggingface_hub import hf_hub_download
 
     from .f5engine import MODEL_REPO, VOCAB_FILE, fetch_models, line_seconds, model_dir, provider
+    from .f5_schedule import transformer
     from .f5onnx import F5Onnx
     from .text import Accentor, numbers_to_words
     from .whisper_onnx import resample
 
     models = model_dir(config, home) or fetch_models(config, log)
-    onnx = F5Onnx(models, Path(hf_hub_download(MODEL_REPO, VOCAB_FILE)), provider(config), log)
+    vocab = Path(hf_hub_download(MODEL_REPO, VOCAB_FILE))
+    onnx = F5Onnx(models, vocab, provider(config), log)
     onnx.load()
     accentor = Accentor(log, config.get("ruaccent", True))
     accentor.load()
@@ -393,11 +412,20 @@ def speak(config: dict, home: Path, out: Path, clips: dict, test_text: str, log,
     if target is None:
         ordered = sorted(paces.values())
         target = ordered[min(len(ordered) - 1, int(len(ordered) * config.get("voice_pace_quantile", 0.25)))]
-    for voice, (wav, _text, _speech, _used) in sorted(clips.items()):
-        ref_text = refs[voice]
-        ref_seconds = len(wav) / gamevoices.SAMPLE_RATE
-        total = ref_seconds + line_seconds(paces[voice], target, len(text.encode("utf-8")), 100, "", config)
-        spoken, rate = onnx.synth(resample(wav, gamevoices.SAMPLE_RATE, onnx.in_rate), ref_text, text, total)
-        sf.write(str(out / voice / "test.wav"), spoken, rate)
-        log(f"F5: {voice}")
+    try:                                                    # before any test line: a refusal writes none
+        fewer = {n: transformer(onnx.net_file, out / "f5-steps", n) for n in steps}
+    except ImportError as e:
+        raise ValueError("нет пакета onnx: его ставит в папку лаборатории mise run voicelab -- --steps …") from e
+    for n in (None, *steps):
+        if n:
+            onnx = None                                     # one model on the card at a time
+            onnx = F5Onnx(models, vocab, provider(config), log, (fewer[n], n))
+            onnx.load()
+        for voice, (wav, _text, _speech, _used) in sorted(clips.items()):
+            ref_text = refs[voice]
+            ref_seconds = len(wav) / gamevoices.SAMPLE_RATE
+            total = ref_seconds + line_seconds(paces[voice], target, len(text.encode("utf-8")), 100, "", config)
+            spoken, rate = onnx.synth(resample(wav, gamevoices.SAMPLE_RATE, onnx.in_rate), ref_text, text, total)
+            sf.write(str(out / voice / (f"test-{n}.wav" if n else "test.wav")), spoken, rate)
+            log(f"F5{f' ({n} из 10 шагов)' if n else ''}: {voice}")
     return target

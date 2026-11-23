@@ -611,8 +611,8 @@ def main() -> int:
         if isinstance(parsed, str):
             log(parsed)
             return 2
-        out, only, f5 = parsed
-        return voicelab(config, DATA_DIR, out, log, only=only, f5=f5)
+        out, only, f5, steps = parsed
+        return voicelab(config, DATA_DIR, out, log, only=only, f5=f5, steps=steps)
     log("=" * 60)
     if not single_instance():
         log("озвучка уже запущена — вторая не нужна, выхожу")

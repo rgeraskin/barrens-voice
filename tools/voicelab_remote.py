@@ -1,9 +1,11 @@
 """The voice lab (companion/bv/voicelab.py) on the Windows test machine, run from here: `mise run voicelab`.
 
-- `mise run voicelab [-- --only troll-female/old] [-- --no-f5]`: the working tree's companion/bv is copied to
-  BV_LAB_DIR\\src and run there with the installed program's Python on its data (BV_DATA, BV_CACHE: its
+- `mise run voicelab [-- --only troll-female/old] [-- --no-f5] [-- --steps 6,8]`: the working tree's companion/bv is
+  copied to BV_LAB_DIR\\src and run there with the installed program's Python on its data (BV_DATA, BV_CACHE: its
   config.json, models and logs); the lab is BV_LAB_DIR\\lab. Refused while the game or the voice-over runs
-  (Whisper and F5 take the video card; the game's files are read).
+  (Whisper and F5 take the video card; the game's files are read). `--steps` (the test line in fewer F5 steps too,
+  bv/f5_schedule.py) needs the `onnx` package: installed once into BV_LAB_DIR\\pkgs, the lab's own, not the
+  program's.
 - `mise run voicelab -- --pick`: the lab's voices.yaml (edited there by ear) becomes companion/bv/voice_picks.yaml,
   what the players' banks are made of; check it with `git diff` before a commit.
 
@@ -42,9 +44,16 @@ def powershell(host: str, script: str, check: bool = True, capture: bool = False
                           check=check, capture_output=capture, text=capture, encoding="utf-8" if capture else None)
 
 
+# the lab's own packages (BV_LAB_DIR\\pkgs) for --steps: onnx rewrites the F5 model; without its dependencies, which
+# the program has (numpy, protobuf, typing_extensions) - the program's own versions stay in use
+LAB_PACKAGES = ["onnx==1.23.2", "ml_dtypes==0.6.0"]
+
 # python labrun.py <the venv's site-packages> <bv's switches>: bv run by a Python outside the venv, with its packages
-RUNNER = b"""import runpy, site, sys
+# (and the lab's own after them, BV_LAB_PKGS)
+RUNNER = b"""import os, runpy, site, sys
 site.addsitedir(sys.argv.pop(1))
+if os.path.isdir(os.environ.get("BV_LAB_PKGS", "")):
+    site.addsitedir(os.environ["BV_LAB_PKGS"])
 try:   # ONNX Runtime's own warnings, in UTF-16 through ssh: noise in the task's output
     import onnxruntime
     onnxruntime.set_default_logger_severity(3)
@@ -112,6 +121,13 @@ def main(args: list[str]) -> int:
         powershell(host, f"New-Item -ItemType Directory -Force '{lab_dir}\\src\\companion' | Out-Null")
         subprocess.run(["scp", "-q", str(archive), f"{host}:{lab_dir.replace(chr(92), '/')}/src.tgz"], check=True)
     passed = " ".join(f"'{a}'" for a in args)
+    pkgs = f"{lab_dir}\\pkgs"
+    marks = " -and ".join(f"(Test-Path '{pkgs}\\{p.replace('==', '-')}.dist-info')" for p in LAB_PACKAGES)
+    get_onnx = "" if "--steps" not in args else f"""
+if (-not ({marks})) {{
+    & "$base\\python.exe" -m pip install --quiet --disable-pip-version-check --no-deps --only-binary ':all:' --upgrade --target '{pkgs}' {' '.join(LAB_PACKAGES)}
+    if ($LASTEXITCODE) {{ exit $LASTEXITCODE }}
+}}"""
     run = powershell(host, f"""
 Remove-Item -Recurse -Force '{lab_dir}\\src\\companion\\bv' -ErrorAction SilentlyContinue
 tar -xzf '{lab_dir}\\src.tgz' -C '{lab_dir}\\src\\companion'
@@ -122,7 +138,8 @@ Set-Location '{lab_dir}\\src\\companion'
 $current = @((Get-Item '{install}\\app\\current').Target)[0]
 $base = ((Get-Content "$current\\.venv\\pyvenv.cfg" | Select-String '^home').Line -split '=', 2)[1].Trim()
 $link = Get-Item $base
-if ($link.LinkType) {{ $base = @($link.Target)[0] }}
+if ($link.LinkType) {{ $base = @($link.Target)[0] }}{get_onnx}
+$env:BV_LAB_PKGS = '{pkgs}'
 & "$base\\python.exe" labrun.py "$current\\.venv\\Lib\\site-packages" --voicelab '{lab_dir}\\lab' {passed}
 exit $LASTEXITCODE
 """, check=False)

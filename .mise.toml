@@ -67,7 +67,7 @@ description = "How many use it: each release's installer, archive and manifest d
 run = "uv run --locked python tools/stats.py"
 
 [tasks.voicelab]
-description = "The race voices' lines on the Windows test machine, to choose by ear (tools/voicelab_remote.py; `-- --only <voice>`, `-- --no-f5`, `-- --pick`: the lab's choice into companion/bv/voice_picks.yaml); BV_LAB_* in .mise.local.toml"
+description = "The race voices' lines on the Windows test machine, to choose by ear (tools/voicelab_remote.py; `-- --only <voice>`, `-- --no-f5`, `-- --steps 6,8` (the test line in fewer F5 steps too), `-- --pick`: the lab's choice into companion/bv/voice_picks.yaml); BV_LAB_* in .mise.local.toml"
 run = "uv run --locked python tools/voicelab_remote.py"
 
 [tasks.hooks]

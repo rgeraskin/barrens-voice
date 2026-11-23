@@ -522,8 +522,12 @@ class Picks(unittest.TestCase):
 
     def test_the_switches(self):
         from bv import voicelab
-        self.assertEqual(voicelab.parse_args(["E:/lab"]), (Path("E:/lab"), "", True))
-        self.assertEqual(voicelab.parse_args(["E:/lab", "--only", "troll", "--no-f5"]), (Path("E:/lab"), "troll", False))
+        self.assertEqual(voicelab.parse_args(["E:/lab"]), (Path("E:/lab"), "", True, ()))
+        self.assertEqual(voicelab.parse_args(["E:/lab", "--only", "troll", "--no-f5"]),
+                         (Path("E:/lab"), "troll", False, ()))
+        self.assertEqual(voicelab.parse_args(["E:/lab", "--steps", "8,6,6"]), (Path("E:/lab"), "", True, (6, 8)))
+        for wrong in (["--steps"], ["--steps", "7"], ["--steps", "6,x"], ["--steps", "--only", "troll"], ["--steps", ""]):
+            self.assertIn("--steps <шаги>", voicelab.parse_args(["E:/lab", *wrong]), wrong)
         self.assertIn("--only <голос>", voicelab.parse_args(["E:/lab", "--only"]))                  # no voice after it
         self.assertIn("--only <голос>", voicelab.parse_args(["E:/lab", "--only", "--no-f5"]))       # a switch, not a voice
         self.assertIn("<папка>", voicelab.parse_args([]))
@@ -545,6 +549,34 @@ class Picks(unittest.TestCase):
                         mock.patch.object(voicelab_remote, "powershell", return_value=SimpleNamespace(stdout=remote)):
                     self.assertEqual(voicelab_remote.main(["--pick"]), 1, remote)
                 self.assertEqual(picks.read_text(encoding="utf-8"), "voices: {}\n")
+
+    def test_the_remote_run_gets_onnx_only_for_steps(self):
+        # --steps: onnx and ml_dtypes into the lab's own folder, without dependencies (the program's numpy stays),
+        # seen by labrun.py after the program's packages
+        from unittest import mock
+        from types import SimpleNamespace
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
+        import voicelab_remote
+        env = {"BV_LAB_HOST": "h", "BV_LAB_INSTALL": "E:\\I", "BV_LAB_DIR": "E:\\L"}
+        for args, pip in ((["--only", "troll"], False), (["--steps", "6"], True)):
+            sent = []
+
+            def powershell(host, script, check=True, capture=False):
+                sent.append(script)
+                return SimpleNamespace(stdout="0 0", returncode=0)
+            with mock.patch.dict("os.environ", env), mock.patch.object(voicelab_remote, "powershell", powershell), \
+                    mock.patch.object(voicelab_remote.subprocess, "run"):
+                self.assertEqual(voicelab_remote.main(args), 0)
+            run = sent[-1]
+            self.assertEqual("pip install" in run, pip, args)
+            self.assertIn("$env:BV_LAB_PKGS = 'E:\\L\\pkgs'", run)
+            self.assertIn("(Get-Item 'E:\\I\\app\\current')", run)               # the install's own folder
+            if pip:
+                self.assertIn("--no-deps", run)
+                self.assertIn("--target 'E:\\L\\pkgs' onnx==", run)
+                self.assertIn("Test-Path 'E:\\L\\pkgs\\onnx-", run)                 # once, not every run
+        self.assertIn(b'site.addsitedir(os.environ["BV_LAB_PKGS"])', voicelab_remote.RUNNER)
+        self.assertLess(voicelab_remote.RUNNER.index(b"sys.argv.pop(1)"), voicelab_remote.RUNNER.index(b"BV_LAB_PKGS"))
 
     def test_file_names(self):
         from bv import voicelab
@@ -881,7 +913,7 @@ class LabRuns(unittest.TestCase):
         from bv import voicelab
         targets = []
 
-        def speak(config, home, out, clips, text, log, target=None):
+        def speak(config, home, out, clips, text, log, target=None, steps=()):
             targets.append(target)
             return 0.123
         with mock.patch.object(voicelab, "speak", speak):
@@ -889,6 +921,33 @@ class LabRuns(unittest.TestCase):
             voicelab.run({}, self.dir, self.dir / "lab", self.logged.append, only="troll")
         self.assertEqual(targets, [None, 0.123])
         self.assertEqual(json.loads((self.dir / "lab" / "paces.json").read_text(encoding="utf-8")), {"target": 0.123})
+
+    def test_steps_reach_the_test_lines_and_a_refusal_is_said(self):
+        from unittest import mock
+        from bv import voicelab
+        asked = []
+
+        def speak(config, home, out, clips, text, log, target=None, steps=()):
+            asked.append(steps)
+            raise ValueError("нет пакета onnx")
+        with mock.patch.object(voicelab, "speak", speak):
+            self.assertEqual(voicelab.run({}, self.dir, self.dir / "lab", self.logged.append, steps=(6, 8)), 1)
+        self.assertEqual(asked, [(6, 8)])
+        self.assertIn("сокращённое расписание F5: нет пакета onnx", self.logged)
+        self.assertFalse((self.dir / "lab" / "paces.json").exists())       # no test lines, no pace of them
+
+    def test_a_voice_made_again_loses_its_old_test_lines(self):
+        # test-6.wav beside a new sample would be a line of the old one
+        from unittest import mock
+        from bv import voicelab
+        with mock.patch.object(voicelab, "speak", lambda *a, **k: 0.1):
+            voicelab.run({}, self.dir, self.dir / "lab", self.logged.append)
+            for name in ("test-6.wav", "test-8.wav"):
+                (self.dir / "lab" / "orc-male" / name).write_bytes(b"old")
+                (self.dir / "lab" / "troll-female" / "old" / name).write_bytes(b"old")
+            voicelab.run({}, self.dir, self.dir / "lab", self.logged.append, only="orc")
+        self.assertEqual(sorted((self.dir / "lab" / "orc-male").glob("test-*.wav")), [])
+        self.assertTrue((self.dir / "lab" / "troll-female" / "old" / "test-6.wav").exists())   # not made again
 
     def test_the_bank_never_asks_whisper_of_a_wrong_length(self):
         self.seconds[1] = 0.5
