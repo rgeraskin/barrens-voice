@@ -299,9 +299,9 @@ class F5SpeakerLoad(unittest.TestCase):
         made_at = []
         real_wav_bytes = f5engine.wav_bytes
 
-        def wav_bytes(samples, rate, volume, gain_db=0.0):
+        def wav_bytes(samples, rate, volume, gain_db=0.0, tail=f5engine.TAIL):
             made_at.append(volume)
-            return real_wav_bytes(samples, rate, volume, gain_db)
+            return real_wav_bytes(samples, rate, volume, gain_db, tail)
         self.addCleanup(lambda: self.assertTrue(made_at and all(v == 1.0 for v in made_at),
                                                 f"lines made at full loudness, the player applies the volume: {made_at}"))
         patcher = mock.patch.object(f5engine, "wav_bytes", wav_bytes)
@@ -321,6 +321,76 @@ class F5SpeakerLoad(unittest.TestCase):
         self.assertEqual(made, ["Проверка.", "Кт+о в рейд."])   # the warm-up; the line stressed, a full stop
         self.assertIsNone(speaker.onnx)              # the model freed at the end
         self.assertEqual(played, [(b"RIFF", 0)])
+
+    def test_the_first_sentence_plays_while_the_rest_is_made(self):
+        # f5_first_sentence (on by default): the first sentence goes to the player made on its own, with the short gap
+        # for its tail, the rest after it as one; its arrival goes with it for the log's «до звука». Off: one piece
+        import tempfile
+        import time
+
+        import numpy as np
+        from bv import f5engine
+        made, played, tails = [], [], []
+
+        class Onnx:
+            in_rate = 24000
+
+            def synth(self, ref_audio, ref_text, text, total):
+                made.append(text)
+                tone = np.sin(np.arange(2400) / 24000 * 2 * np.pi * 200).astype("float32") * 0.3
+                return np.concatenate([tone, np.zeros(4800, dtype="float32")]), 24000
+
+        class Player:
+            generation = 0
+
+            def play(self, data, generation, received=None):
+                played.append(received)
+        real_wav_bytes = f5engine.wav_bytes
+
+        def wav_bytes(samples, rate, volume, gain_db=0.0, tail=f5engine.TAIL):
+            tails.append(tail)
+            return real_wav_bytes(samples, rate, volume, gain_db, tail)
+        patcher = unittest.mock.patch.object(f5engine, "wav_bytes", wav_bytes)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        for first in (True, False):
+            tails.clear()
+            made.clear()
+            played.clear()
+            with tempfile.TemporaryDirectory() as d:
+                speaker, _ = self.speaker(Path(d), [self.voice(Path(d))], Onnx(), Player())
+                speaker.config["f5_first_sentence"] = first
+                loop = threading.Thread(target=speaker._synth_loop)
+                loop.start()
+                self.assertTrue(speaker.ready.wait(5))
+                line = Line("say", "Громмаш", "Orc", "2", "", "", "Привет. Кто в рейд? Идём", 100, "f5")
+                speaker.say(line)
+                speaker.lines.put(None)
+                loop.join(5)
+            self.assertLess(line.received, time.monotonic())
+            self.assertEqual(made[1:], ["Привет.", "Кт+о в рейд?", "Идём."])           # each group made once
+            if first:
+                self.assertEqual(played, [line.received, None])
+                self.assertEqual(tails, [f5engine.GAP, f5engine.TAIL])                  # the part's tail: the gap
+            else:
+                self.assertEqual(played, [line.received])
+                self.assertEqual(tails, [f5engine.TAIL])
+        cut = f5engine.first_and_rest
+        self.assertEqual(cut("Один."), ["Один."])
+        self.assertEqual(cut("Раз! Два. Три?"), ["Раз! Два.", "Три?"])             # where the groups part anyway
+        self.assertEqual(cut("привет. го в данж."), ["привет. го в данж."])       # a word ahead: not worth a call
+        self.assertEqual(cut("ну. не знаю."), ["ну. не знаю."])
+        self.assertEqual(cut("Собираемся у входа в Мёртвые копи. Танк уже там, ждём хила."),
+                         ["Собираемся у входа в Мёртвые копи.", "Танк уже там, ждём хила."])
+        self.assertEqual(cut("Собираемся у входа в копи. Ждём."), ["Собираемся у входа в копи. Ждём."])
+        # the first sentence end with four words on each side, not only the first one
+        self.assertEqual(cut("ладно… пойду я спать наверное. завтра рано вставать на работу."),
+                         ["ладно… пойду я спать наверное.", "завтра рано вставать на работу."])
+        self.assertEqual(cut("Собираемся у входа в Мёртвые копи. Танк уже там, ждём хила. Хил будет через пять минут."),
+                         ["Собираемся у входа в Мёртвые копи.", "Танк уже там, ждём хила. Хил будет через пять минут."])
+        self.assertEqual(cut(""), [])                                              # nothing to say: no F5 call
+        self.assertEqual(cut("   "), [])
+        self.assertEqual(cut(")."), [])
 
     def test_a_bad_gain_costs_the_line_not_the_thread(self):
         # "kind_gain_db": {"yell": null} raised outside the loop's try: the f5-synth thread died, F5 still "ready"

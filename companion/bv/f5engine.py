@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 
 from .assign import Assigner
-from .audio import KNEE, Player, drain, limit, wav  # noqa: F401 - KNEE and limit: tests and tools take them here
+from .audio import KNEE, TAIL, Player, drain, limit, wav  # noqa: F401 - KNEE and limit: tests and tools take them here
 from . import gamevoices
 from .intonation import shape
 from .text import Accentor, numbers_to_words
@@ -24,6 +24,28 @@ from .text import Accentor, numbers_to_words
 SENTENCE_END = re.compile(r"(?<=[.!?…])\s+")
 GAP = 0.15   # seconds between sentence groups made separately
 WAKE_AFTER = 5.0   # seconds of silence after which the output is woken before a line is made (audio_wasapi)
+
+
+FIRST_WORDS = 4   # a first sentence made on its own only with this many words on each side (first_and_rest)
+
+
+def first_and_rest(text: str) -> list[str]:
+    """`text` as its first part and the rest (config.json `f5_first_sentence`: the first plays while the rest is made),
+    cut where it pays: where the line's groups part anyway (a question after statements, sentence_groups - no extra F5
+    call), else after its first sentence when it and the rest have FIRST_WORDS words each. Each F5 call carries the
+    reference's seconds, so «привет. го в данж» (the addon's full stop for a smiley) or «ну. не знаю» cut in two
+    would cost nearly twice the work for a word's head start; such a line stays whole."""
+    if not any(ch.isalnum() for ch in text):
+        return []                                   # nothing to say (empty, a lone bracket): no F5 call
+    groups = sentence_groups(text)
+    if len(groups) > 1:
+        return [groups[0], " ".join(groups[1:])]
+    sentences = [part for part in SENTENCE_END.split(text.strip()) if part]
+    for end in range(1, len(sentences)):            # the first sentence end with FIRST_WORDS on each side
+        first, rest = " ".join(sentences[:end]), " ".join(sentences[end:])
+        if len(first.split()) >= FIRST_WORDS and len(rest.split()) >= FIRST_WORDS:
+            return [first, rest]
+    return [text]
 
 
 def sentence_groups(text: str) -> list[str]:
@@ -76,11 +98,11 @@ def tidy(samples, rate: int, gain_db: float = 0.0):
     return samples * gain
 
 
-def wav_bytes(samples, rate: int, volume: float, gain_db: float = 0.0) -> bytes:
+def wav_bytes(samples, rate: int, volume: float, gain_db: float = 0.0, tail: float = TAIL) -> bytes:
     import numpy as np
 
     samples = limit(tidy(samples, rate, gain_db) * volume)
-    return wav((np.clip(samples, -1, 1) * 32767).astype("<i2").tobytes(), rate)
+    return wav((np.clip(samples, -1, 1) * 32767).astype("<i2").tobytes(), rate, tail=tail)
 
 
 def provider(config: dict, available: list[str] | None = None) -> str:
@@ -450,27 +472,37 @@ class F5Speaker:
             if self.config.get("audio_wasapi") and self.player.quiet_for() >= WAKE_AFTER:
                 self.player.wake(getattr(self.onnx, "out_rate", 24000))
             started = time.perf_counter()
+            # `f5_first_sentence` (on by default): the first sentence is made and played on its own while the rest is
+            # made - the line starts sooner, a pause between them
+            parts = first_and_rest(text) if self.config.get("f5_first_sentence", True) else [text]
+            received = line.received if self.config.get("log_details") else None
             try:
                 import numpy as np
-                pieces, sr = [], 24000
-                for group in sentence_groups(text):
-                    piece, sr = self._synth(slot, group, line.rate, line.sender)
-                    piece = shape(piece, sr, group, self.config.get("question_intonation"))
-                    if pieces:
-                        pieces.append(np.zeros(int(sr * GAP), dtype=piece.dtype))
-                    pieces.append(piece)
+                for index, part in enumerate(parts):
+                    pieces, sr = [], 24000
+                    for group in sentence_groups(part):
+                        piece, sr = self._synth(slot, group, line.rate, line.sender)
+                        piece = shape(piece, sr, group, self.config.get("question_intonation"))
+                        if pieces:
+                            pieces.append(np.zeros(int(sr * GAP), dtype=piece.dtype))
+                        pieces.append(piece)
+                        if generation != self.player.generation:
+                            break                   # stopped meanwhile: no need to finish
                     if generation != self.player.generation:
-                        break                       # stopped meanwhile: no need to finish
-                wav = np.concatenate(pieces)
-                if self.config.get("debug"):
-                    self.log(f"  синтез {time.perf_counter() - started:.2f} с, {len(wav) / sr:.1f} с звука")
-                # in the try too: a gain typed wrong in config.json ("yell": null) costs the line, not the thread
-                # full loudness: the player applies the volume as the line plays (the mouse wheel reaches it)
-                data = wav_bytes(wav, sr, 1.0, self.config["kind_gain_db"].get(line.kind, 0))
+                        break
+                    wav = np.concatenate(pieces)
+                    if self.config.get("debug"):
+                        self.log(f"  синтез {time.perf_counter() - started:.2f} с, {len(wav) / sr:.1f} с звука"
+                                 + (f" (часть {index + 1} из {len(parts)})" if len(parts) > 1 else ""))
+                    # in the try too: a gain typed wrong in config.json ("yell": null) costs the line, not the thread
+                    # full loudness: the player applies the volume as the line plays (the mouse wheel reaches it)
+                    last = index == len(parts) - 1
+                    data = wav_bytes(wav, sr, 1.0, self.config["kind_gain_db"].get(line.kind, 0),
+                                     tail=TAIL if last else GAP)
+                    self.player.play(data, generation, received if index == 0 else None)
             except Exception as e:  # noqa: BLE001 - one bad line must not stop the reader
                 self.log(f"F5-TTS: {e}")
                 continue
-            self.player.play(data, generation, line.received if self.config.get("log_details") else None)
 
     # --- the reader's side ------------------------------------------------------------------
 

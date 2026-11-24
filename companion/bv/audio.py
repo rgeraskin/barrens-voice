@@ -17,16 +17,17 @@ TAIL = 0.25   # seconds of silence after each line
 PAUSE_MAX = 90.0   # a pause whose "resume" never came ends by itself
 
 
-def wav(pcm: bytes, rate: int, volume: float = 1.0) -> bytes:
+def wav(pcm: bytes, rate: int, volume: float = 1.0, tail: float = TAIL) -> bytes:
     """16-bit mono PCM as a WAV file in memory, scaled by `volume` (0..2; over 1 clipped - the
-    engines go through f5engine.wav_bytes, which limits softly), with the silent tail."""
+    engines go through f5engine.wav_bytes, which limits softly), with the silent tail (`tail` seconds: shorter for a
+    part of a line the rest of it follows)."""
     if abs(volume - 1) > 0.001:
         import array
         samples = array.array("h", pcm)
         for i, s in enumerate(samples):
             samples[i] = max(-32768, min(32767, int(s * volume)))
         pcm = samples.tobytes()
-    pcm += b"\0\0" * int(rate * TAIL)
+    pcm += b"\0\0" * int(rate * tail)
     out = io.BytesIO()
     with wave.open(out, "wb") as w:
         w.setnchannels(1)

@@ -2037,6 +2037,7 @@ class LiveVolume(unittest.TestCase):
         from bv import audio
         from bv.__main__ import DEFAULT_CONFIG
         self.assertIs(DEFAULT_CONFIG["audio_wasapi"], False)
+        self.assertIs(DEFAULT_CONFIG["f5_first_sentence"], True)
         base = self.FakeSD
 
         class SD(base):

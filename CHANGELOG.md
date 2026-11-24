@@ -22,6 +22,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- A race voice's line of several sentences starts sooner: its first part plays while the rest is made
+
+  `f5_first_sentence` in config.json (on; not in the launcher's settings). The line is cut where it is made in parts anyway (a question after statements), else after its first sentence only when it and the rest have four words each: every extra piece costs F5 nearly a short line's work, so «привет) го в данж» stays whole. A short pause after the first part. `false`: the line made whole and played as one, as in 0.5.0.
+
 - Dictionary
 
   «хуево» as «хуёво» in every form («хуевый», «хуёвина», «до хуев»): the «ё» list the program restores from has no swear words. «хуева туча» (a lot) stays «х+уева т+уча» in its forms, «хуевато» is «хуев+ато».
