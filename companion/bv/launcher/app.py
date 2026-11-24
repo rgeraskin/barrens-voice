@@ -56,6 +56,46 @@ TIPS = {
     "update": "Заменить аддон в игре версией, которая пришла с лаунчером. Твои настройки аддона сохранятся.\n\n"
               "Если игра запущена — потом /reload.",
 }
+# the settings' «Голоса рас»: F5's steps a line (config.json f5_steps, bv/f5_schedule.py), each with what it brings
+STEP_CHOICES = ((10, "10 шагов"), (8, "8"), (6, "6 — быстрее"))
+STEP_TIPS = {
+    10: "Как F5 сделана: 10 шагов на строку. Лучшее качество.\n\n"
+        "Строка готовится дольше всего, и видеокарта занята дольше — на видеокартах не NVIDIA игра может "
+        "подтормаживать, пока готовится строка.",
+    8: "8 шагов вместо 10: строка готовится примерно на пятую часть быстрее, видеокарта освобождается раньше.\n\n"
+       "На слух почти без разницы. При первом выборе — пара секунд на подготовку и около 660 МБ на диске.",
+    6: "6 шагов вместо 10: строка готовится примерно в полтора раза быстрее, видеокарта освобождается раньше — игре "
+       "легче, особенно на видеокартах не NVIDIA.\n\nНа слух почти без разницы, изредка смазывается слог или конец "
+       "фразы. При первом выборе — пара секунд на подготовку и около 660 МБ на диске.",
+}
+def work_area(root, x: int, y: int) -> tuple[int, int, int, int]:
+    """The work area (without the taskbar) of the monitor the point x, y is on - the launcher's, not the primary one:
+    left, top, right, bottom in pixels; elsewhere the whole screen."""
+    if sys.platform == "win32":
+        import ctypes
+        import ctypes.wintypes
+
+        class MonitorInfo(ctypes.Structure):
+            _fields_ = [("cbSize", ctypes.wintypes.DWORD), ("rcMonitor", ctypes.wintypes.RECT),
+                        ("rcWork", ctypes.wintypes.RECT), ("dwFlags", ctypes.wintypes.DWORD)]
+        user32 = ctypes.windll.user32
+        user32.MonitorFromPoint.restype = ctypes.c_void_p
+        monitor = user32.MonitorFromPoint(ctypes.wintypes.POINT(x, y), 2)       # MONITOR_DEFAULTTONEAREST
+        info = MonitorInfo()
+        info.cbSize = ctypes.sizeof(MonitorInfo)
+        if monitor and user32.GetMonitorInfoW(ctypes.c_void_p(monitor), ctypes.byref(info)):
+            work = info.rcWork
+            return work.left, work.top, work.right, work.bottom
+    return 0, 0, root.winfo_screenwidth(), root.winfo_screenheight()
+
+
+def placed(x: int, y: int, width: int, height: int, area: tuple[int, int, int, int]) -> tuple[int, int]:
+    """A window of width × height (pixels, its frame included) wanted at x, y, moved to lie whole in `area` (left, top,
+    right, bottom) - its top-left corner kept inside when it is bigger than the area."""
+    left, top, right, bottom = area
+    return max(left, min(x, right - width)), max(top, min(y, bottom - height))
+
+
 SHOW_FILE = DATA_DIR / "tmp" / "launcher.show"   # a second launcher asks the first to show itself ("play" in it: and to
                                                  # launch the game, as a start by hand would)
 LAUNCHER_LOG = DATA_DIR / "logs" / "launcher.log"
@@ -969,7 +1009,11 @@ class App:
         win.resizable(False, False)
         win.transient(self.root)
         if self.root.winfo_viewable():           # over the main window, not in the screen's corner
-            win.geometry(f"+{self.root.winfo_rootx() + 60}+{self.root.winfo_rooty() + 40}")
+            # and whole on the screen: no lower than the taskbar lets its buttons be (the settings are tall)
+            x, y = self.root.winfo_rootx(), self.root.winfo_rooty()
+            x, y = placed(x + 60, y + 40, int((width + 16) * self.scale), int((height + 40) * self.scale),
+                          work_area(self.root, x, y))
+            win.geometry(f"+{x}+{y}")
         canvas = ScaledCanvas(win, self.scale, width=width, height=height, highlightthickness=0, bg="#0b0705")
         canvas.pack()
         p = Painter(canvas, self.title_font)
@@ -981,8 +1025,15 @@ class App:
         if self.settings_win is not None and self.settings_win.winfo_exists():
             self.settings_win.lift()
             return
-        width, height = 600, 736
+        # two panels side by side - the folders, the voice and the updates - so the window is wide, not tall (a laptop's
+        # screen at 125-150 % has the height to spare least)
+        width, height = 1080, 494
         win, c, p = self._child("Настройки", width, height)
+        LEFT, MID, TOP, BOTTOM = 22, 536, 70, 400
+        p.panel(LEFT, TOP, MID - 8, BOTTOM, "Папки и журналы")
+        p.panel(MID + 8, TOP, width - 22, BOTTOM, "Озвучка и обновления")
+        x0, x1 = LEFT + 18, MID - 26           # the left panel's inside
+        rx = MID + 26                          # the right one's
         self.settings_win = win
         cfg = model.read_config()
         boxes = {}
@@ -997,45 +1048,58 @@ class App:
                 ("log_keep_days", "Сколько дней хранить журналы (0 — всегда)", ""))
         initial = {"dir_forever": dirs.get("forever") or found.get("forever", ""),
                    "dir_retail": dirs.get("retail") or found.get("retail", "")}
-        y = 80
+        y = TOP + 46
         for key, label, pick in rows:
-            c.create_text(30, y, text=label, anchor="w", fill=PARCHMENT, font=p.body)
-            boxes[key] = p.entry(30, y + 26, width - 60 - (100 if pick else 0), str(initial.get(key, cfg.get(key, ""))))
+            c.create_text(x0, y, text=label, anchor="w", fill=PARCHMENT, font=p.body)
+            wide = x1 - x0 - 100 if pick else 90          # a folder with «Выбрать…» beside it; the days: a number
+            boxes[key] = p.entry(x0, y + 26, wide, str(initial.get(key, cfg.get(key, ""))))
             if pick:
                 def choose(k=key, kind=pick):
                     got = (filedialog.askdirectory(parent=win) if kind == "dir"
                            else filedialog.askopenfilename(parent=win, filetypes=[("Battle.net", "Battle.net.exe")]))
                     if got:
                         boxes[k].var.set(os.path.normpath(got))
-                p.button(width - 120, y + 13, width - 30, y + 39, "Выбрать…", f"pick{key}", choose)
-            y += 66
+                p.button(x1 - 90, y + 13, x1, y + 39, "Выбрать…", f"pick{key}", choose)
+            y += 58
+        y = TOP + 52
         flags = {"details": bool(cfg.get("log_details")), "whisper": cfg.get("f5_end_check") == "whisper",
-                 "auto": cfg.get("auto_update", True) is not False, "beta": cfg.get("update_channel") == "beta"}
+                 "auto": cfg.get("auto_update", True) is not False, "beta": cfg.get("update_channel") == "beta",
+                 "steps": cfg.get("f5_steps", 10)}
 
         def draw_check(key, y, label):
             c.delete(key)
-            p.check(30, y, label, flags[key], key,
+            p.check(rx, y, label, flags[key], key,
                     lambda: (flags.__setitem__(key, not flags[key]), draw_check(key, y, label)))
-        draw_check("details", y + 6, "Подробный журнал: как строка написана и как прочитана")
-        draw_check("whisper", y + 44, "Проверять концовки фраз распознаванием речи (Whisper)")
-        c.create_text(56, y + 64, anchor="nw", fill=DIM, font=p.small, width=width - 86,
-                      text="Изредка голос расы не успевает договорить последний слог. Выключено: фраза, "
-                           "договорённая впритык (примерно каждая восьмая), синтезируется ещё раз — на секунду "
-                           "дольше. Включено: Whisper сначала слушает её конец и переделывает только при обрыве, "
-                           "но занимает около 1,5 ГБ видеопамяти и пару секунд при загрузке голосов.")
-        draw_check("auto", y + 150, "Обновлять автоматически")
+        draw_check("details", y, "Подробный журнал: как строка написана и как прочитана")
+        draw_check("whisper", y + 38, "Проверять концовки фраз распознаванием речи (Whisper)")
+        p.tips["whisper"] = ("Изредка голос расы не успевает договорить последний слог. Выключено: фраза, договорённая "
+                             "впритык (примерно каждая восьмая), синтезируется ещё раз — на секунду дольше.\n\n"
+                             "Включено: Whisper сначала слушает её конец и переделывает только при обрыве, но занимает "
+                             "около 1,5 ГБ видеопамяти и пару секунд при загрузке голосов.")
+        # F5's steps a line (f5_steps): one of three, as a row of checks - what each costs and gives, in its hint
+        c.create_text(rx, y + 76, anchor="w", fill=PARCHMENT, font=p.body, text="Голоса рас:")
+
+        def draw_steps():
+            x = rx + p.measure("Голоса рас:", p.body) + 16
+            for n, label in STEP_CHOICES:
+                c.delete(f"steps{n}")
+                p.check(x, y + 76, label, flags["steps"] == n, f"steps{n}",
+                        lambda n=n: (flags.__setitem__("steps", n), draw_steps()), tip=STEP_TIPS[n])
+                x += 26 + p.measure(label, p.body) + 22
+        draw_steps()
+        draw_check("auto", y + 124, "Обновлять автоматически")
         p.tips["auto"] = ("Новая версия скачивается и готовится сама и включается, когда игра и озвучка не запущены.\n\n"
                           "Выключено — внизу окна появится «Вышла версия…» с кнопкой «Обновить».")
-        draw_check("beta", y + 178, "Получать тестовые версии")
+        draw_check("beta", y + 162, "Получать тестовые версии")
         p.tips["beta"] = ("Тестовые версии выходят раньше и могут быть с ошибками — для тех, кто готов проверять "
                           "сборки и писать о найденном.\n\nВыключишь — останешься на тестовой, пока не выйдет "
                           "стабильная новее.")
         lead = "Остальное — в config.json:"
-        c.create_text(30, y + 216, anchor="w", fill=DIM, font=p.small, text=lead)
+        c.create_text(rx, y + 222, anchor="w", fill=DIM, font=p.small, text=lead)
         doc_tag = release_tag(self.version) if INSTALL_DIR is not None and self.version != "?" else "master"
-        p.link(30 + p.measure(lead, p.small) + 6, y + 216, "описание настроек", "configdoc",
+        p.link(rx + p.measure(lead, p.small) + 6, y + 222, "описание настроек", "configdoc",
                lambda: webbrowser.open(f"https://github.com/{model.REPO}/blob/{doc_tag}/docs/config.md"))
-        c.create_text(30, y + 236, anchor="w", fill=DIM, font=p.small,
+        c.create_text(rx, y + 244, anchor="w", fill=DIM, font=p.small,
                       text="Если озвучка работает, после сохранения она перезапустится.")
 
         def edited():
@@ -1056,7 +1120,7 @@ class App:
                     game_dirs.pop(game, None)
             changes["game_dirs"] = game_dirs
             changes.update(log_keep_days=days, log_details=flags["details"],
-                           f5_end_check="whisper" if flags["whisper"] else "silence",
+                           f5_end_check="whisper" if flags["whisper"] else "silence", f5_steps=flags["steps"],
                            auto_update=flags["auto"], update_channel="beta" if flags["beta"] else "stable")
             return changes
 

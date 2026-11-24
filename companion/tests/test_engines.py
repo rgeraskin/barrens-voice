@@ -392,6 +392,59 @@ class F5SpeakerLoad(unittest.TestCase):
         self.assertEqual(cut("   "), [])
         self.assertEqual(cut(")."), [])
 
+    def test_f5_steps_from_the_settings(self):
+        # f5_steps (the launcher's «Голоса рас»): 10 the shipped model (the cache's other files gone); 8 or 6 the
+        # Transformer rewritten (f5_schedule, into the cache), another number's file removed; a number it does not
+        # know, or any failure of the rewrite: said, and 10
+        import tempfile
+        from bv import f5_schedule, f5onnx, paths
+        with tempfile.TemporaryDirectory() as d:
+            speaker, logged = self.speaker(Path(d), [self.voice(Path(d))])
+            models, cache = Path(d) / "models", Path(d) / "cache"
+            made = []
+
+            def transformer(source, folder, steps):
+                made.append((source, folder.name, steps))
+                folder.mkdir(parents=True, exist_ok=True)
+                target = folder / f"F5_Transformer-{steps}.onnx"
+                target.write_bytes(b"model")
+                (folder / f"F5_Transformer-{steps}.onnx.source").write_text("note")
+                return target
+            with unittest.mock.patch.object(paths, "CACHE_DIR", cache), \
+                    unittest.mock.patch.object(f5onnx, "transformer_file", lambda m: m / "F5_Transformer.onnx"), \
+                    unittest.mock.patch.object(f5_schedule, "transformer", transformer):
+                speaker.config["f5_steps"] = 8
+                speaker.fewer_steps(models)
+                speaker.config["f5_steps"] = 6
+                path, steps = speaker.fewer_steps(models)
+                self.assertEqual((path.name, steps), ("F5_Transformer-6.onnx", 6))
+                self.assertEqual(made[-1], (models / "F5_Transformer.onnx", "f5-steps", 6))
+                self.assertEqual(sorted(p.name for p in (cache / "f5-steps").iterdir()),
+                                 ["F5_Transformer-6.onnx", "F5_Transformer-6.onnx.source"])   # 8's 660 MB gone
+                (cache / "f5-steps" / "F5_Transformer-8.onnx").write_bytes(b"held")    # an antivirus holds it
+                real_unlink = Path.unlink
+
+                def held(path, missing_ok=False):
+                    if path.name == "F5_Transformer-8.onnx":
+                        raise PermissionError("held")
+                    return real_unlink(path, missing_ok=missing_ok)
+                with unittest.mock.patch.object(Path, "unlink", held):
+                    self.assertEqual(speaker.fewer_steps(models)[1], 6)         # the voices load all the same
+                speaker.config["f5_steps"] = 7
+                self.assertIsNone(speaker.fewer_steps(models))
+                self.assertIn("не удалось взять f5_steps = 7 из config.json: бывает 10, 8, 6, 5 или 4 — беру 10", logged)
+                speaker.config["f5_steps"] = 10
+                self.assertIsNone(speaker.fewer_steps(models))                       # as shipped, the cache cleared
+                self.assertFalse((cache / "f5-steps").exists())
+                self.assertEqual(len(made), 3)                                       # 10 asks no rewrite
+            for failure in (ValueError("не та модель F5"), MemoryError("onnx.load")):
+                with unittest.mock.patch.object(paths, "CACHE_DIR", cache), \
+                        unittest.mock.patch.object(f5onnx, "transformer_file", lambda m: m / "F5_Transformer.onnx"), \
+                        unittest.mock.patch.object(f5_schedule, "transformer", side_effect=failure):
+                    speaker.config["f5_steps"] = 8
+                    self.assertIsNone(speaker.fewer_steps(models))
+                    self.assertIn(f"не удалось подготовить F5 в 8 шагов: {failure} — беру 10", logged)
+
     def test_a_bad_gain_costs_the_line_not_the_thread(self):
         # "kind_gain_db": {"yell": null} raised outside the loop's try: the f5-synth thread died, F5 still "ready"
         import tempfile

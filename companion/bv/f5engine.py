@@ -374,7 +374,8 @@ class F5Speaker:
         from huggingface_hub import hf_hub_download
 
         from .f5onnx import F5Onnx
-        self.onnx = F5Onnx(models, Path(hf_hub_download(MODEL_REPO, VOCAB_FILE)), engine, self.log)
+        self.onnx = F5Onnx(models, Path(hf_hub_download(MODEL_REPO, VOCAB_FILE)), engine, self.log,
+                           self.fewer_steps(models))
         self.onnx.load()
         if self.config.get("f5_end_check") == "whisper":
             from .whisper_onnx import OnnxChecker
@@ -384,6 +385,37 @@ class F5Speaker:
         self.card = (gpu_name() if engine in ("DmlExecutionProvider", "CUDAExecutionProvider") else "") or engine
         self.provider = engine
         self.device = f"{self.card} (ONNX Runtime, {self.onnx.steps} шагов)"
+
+    def fewer_steps(self, models: Path):
+        """config.json `f5_steps` (the launcher's «Голоса рас: 10 / 8 / 6 шагов»): the Transformer rewritten for that
+        many steps (f5_schedule: made once into the cache's f5-steps, then reused; another number's file there is
+        removed - 660 MB each) and the number; None for the shipped 10 (the folder removed) - and for a number or a
+        model f5_schedule does not know, or a rewrite that fails at all (memory, a broken file), said in the log."""
+        import shutil
+
+        from .paths import CACHE_DIR
+        folder = CACHE_DIR / "f5-steps"
+        steps = self.config.get("f5_steps", 10)
+        if steps == 10:
+            shutil.rmtree(folder, ignore_errors=True)
+            return None
+        from .f5_schedule import STEPS, transformer
+        if steps not in STEPS:
+            self.log(f"не удалось взять f5_steps = {steps} из config.json: бывает 10, 8, 6, 5 или 4 — беру 10")
+            return None
+        from .f5onnx import transformer_file
+        try:
+            made = transformer(transformer_file(models), folder, steps)
+        except Exception as e:  # noqa: BLE001 - the shipped 10 steps rather than no race voices
+            self.log(f"не удалось подготовить F5 в {steps} шагов: {e} — беру 10")
+            return None
+        for other in folder.glob("F5_Transformer-*"):
+            if not other.name.startswith(made.name):
+                try:
+                    other.unlink(missing_ok=True)
+                except OSError:                     # held a moment (an antivirus, the indexer): the next start
+                    pass
+        return made, steps
 
     def pace(self, slot) -> float:
         """The voice's seconds of speech per byte of its reference's text as F5 gets it - stressed, as

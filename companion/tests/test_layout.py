@@ -338,11 +338,11 @@ class Layout(unittest.TestCase):
         with mock.patch.object(app, "Painter", keep):
             a = self.make(1.0)
             a.open_settings()
-        settings_tips = {k: v for k, v in painters[-1].tips.items() if k in ("auto", "beta")}
+        settings_tips = {k: v for k, v in painters[-1].tips.items() if k in ("auto", "beta", "whisper", "steps10", "steps8", "steps6")}
         a.settings_win.destroy()
         tips = {**app.TIPS, **{f"настройки: {k}": v for k, v in settings_tips.items()},
                 **{f"журнал: {k}": v for k, v in logwindow.TIPS.items()}}
-        self.assertEqual(len(settings_tips), 2)
+        self.assertEqual(len(settings_tips), 6)
         one_thought = {"журнал: Копировать", "журнал: Открыть файл за сегодня", "журнал: Папка журналов", "журнал: В конец ↓"}
         for name, text in tips.items():
             self.assertNotIn(";", text, name)
@@ -447,6 +447,55 @@ class Layout(unittest.TestCase):
             actions["save"]()
         self.assertEqual(written[0]["game"], "retail")
         self.assertEqual((a.pending, a.config_told), ({}, set()))
+
+    def test_a_child_window_lies_on_the_launcher_s_monitor(self):
+        # Settings and Help over the launcher, moved only as far as needed to lie whole in that monitor's work area
+        from bv.launcher.app import placed
+        second = (1920, 0, 3840, 1040)                       # a monitor right of the primary one, its taskbar 40 px
+        self.assertEqual(placed(2000, 100, 1096, 534, second), (2000, 100))        # fits: where it was asked
+        self.assertEqual(placed(3000, 700, 1096, 534, second), (2744, 506))        # pushed back inside its monitor
+        self.assertEqual(placed(100, 100, 1096, 534, (0, 0, 1366, 728)), (100, 100))
+        self.assertEqual(placed(400, 300, 1096, 534, (0, 0, 1366, 728)), (270, 194))
+        self.assertEqual(placed(50, 50, 1700, 900, (0, 0, 1366, 728)), (0, 0))     # bigger: its corner inside
+        # _child: over the launcher (60, 40 off), the frame counted, the work area of the launcher's own monitor
+        from bv.launcher import app
+        a = self.make(1.25)
+        a.root.winfo_viewable = lambda: True
+        a.root.winfo_rootx, a.root.winfo_rooty = (lambda: 3000), (lambda: 700)
+        asked = []
+        with mock.patch.object(app, "work_area", lambda root, x, y: asked.append((x, y)) or second), \
+                mock.patch.object(app, "placed", wraps=app.placed) as place:
+            a.open_settings()
+        self.assertEqual(asked, [(3000, 700)])
+        place.assert_called_once_with(3060, 740, int((1080 + 16) * 1.25), int((494 + 40) * 1.25), second)
+        a.settings_win.update_idletasks()
+        where = placed(3060, 740, int((1080 + 16) * 1.25), int((494 + 40) * 1.25), second)
+        self.assertEqual(where, (2470, 373))                                        # pushed back inside
+        self.assertTrue(a.settings_win.wm_geometry().endswith("+%d+%d" % where), a.settings_win.wm_geometry())
+        a.settings_win.destroy()
+
+    def test_the_steps_choice_is_saved(self):
+        # «Голоса рас: 10 шагов / 8 / 6 — быстрее»: one of three, the one clicked saved as f5_steps
+        from bv.launcher import model, paint
+        a = self.make(config={"f5_steps": 10})
+        actions, checks, written = {}, {}, []
+        real_button, real_check = paint.Painter.button, paint.Painter.check
+
+        def button(p, x0, y0, x1, y1, text, tag, action=None, **k):
+            actions[tag] = action
+            return real_button(p, x0, y0, x1, y1, text, tag, action, **k)
+
+        def check(p, x, y, text, on, tag, action, **k):
+            checks[tag] = (on, action)
+            return real_check(p, x, y, text, on, tag, action, **k)
+        with mock.patch.object(paint.Painter, "button", button), mock.patch.object(paint.Painter, "check", check), \
+                mock.patch.object(model, "update_config", lambda **kw: written.append(kw) or kw):
+            a.open_settings()
+            self.assertEqual([checks[f"steps{n}"][0] for n in (10, 8, 6)], [True, False, False])
+            checks["steps6"][1]()
+            self.assertEqual([checks[f"steps{n}"][0] for n in (10, 8, 6)], [False, False, True])
+            actions["save"]()
+        self.assertEqual(written[0]["f5_steps"], 6)
 
     def test_an_installs_start(self):
         # what the window's start does in an install: app\\current made again after a switch cut short, the old

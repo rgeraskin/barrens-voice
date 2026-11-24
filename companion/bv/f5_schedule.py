@@ -1,11 +1,12 @@
-"""F5 in fewer steps from the shipped 10-step Transformer: the voice lab's `--steps`, to hear before anything else.
+"""F5 in fewer steps from the shipped 10-step Transformer: config.json `f5_steps` (the launcher's «Голоса рас»: 10, 8 or
+6) and the voice lab's `--steps`.
 
 After sokol-rc/barrens-voice (its f5schedule.py and ADR 0009, MIT). Our export keeps two tables indexed by `time_step`:
 the time embedding at each step's start (11 rows, 0..10) and each step's Euler increment (10 rows). A coarser grid
 takes the embeddings at its boundaries and sums the increments between them, so the last step still ends where the
 10th did; the weights, CFG and the duration stay. The grids are F5-TTS's EPSS ones put on the 10-step grid
-(github.com/SWivid/F5-TTS, src/f5_tts/model/utils.py). The `onnx` package rewrites the file: the lab's own
-(tools/voicelab_remote.py installs it beside the lab), not the program's.
+(github.com/SWivid/F5-TTS, src/f5_tts/model/utils.py). The `onnx` package rewrites the file (the program's since
+0.6.0; the lab's own beside the lab for an installed program older than that, tools/voicelab_remote.py).
 """
 from __future__ import annotations
 

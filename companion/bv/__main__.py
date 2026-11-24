@@ -42,6 +42,8 @@ DEFAULT_CONFIG = {
     # a take whose speech reaches its very end (about one in eight): "silence" - made again, a second
     # longer; "whisper" - made again only if Whisper does not hear the last word (1.5 GB of video memory)
     "f5_end_check": "silence",
+    # F5's steps a line (the launcher's settings): 10 as exported; 8 or 6 - sooner, the card freed sooner (f5_schedule)
+    "f5_steps": 10,
     # the first sentence of a line plays while the rest is made (f5engine.first_and_rest); a test, out of the launcher
     "f5_first_sentence": True,
     # slow voices drawn toward the bank's faster quarter (quantile) by this share, at most this many

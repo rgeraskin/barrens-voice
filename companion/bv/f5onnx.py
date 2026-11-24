@@ -57,6 +57,14 @@ def clean_tail(samples: np.ndarray, hop: int, rate: int) -> np.ndarray:
 DEVICES = {"DmlExecutionProvider": "dml", "CUDAExecutionProvider": "cuda"}
 
 
+def transformer_file(model_dir: Path) -> Path:
+    """The shipped Transformer's file in `model_dir`, as its metadata names it."""
+    import onnxruntime as ort
+    meta = ort.InferenceSession(str(Path(model_dir) / "F5_Metadata.onnx"),
+                                providers=["CPUExecutionProvider"]).get_modelmeta().custom_metadata_map
+    return Path(model_dir) / meta["model_file_name_transformer"]
+
+
 class F5Onnx:
     def __init__(self, model_dir: Path, vocab_path: Path, provider: str = "DmlExecutionProvider", log=print,
                  transformer: tuple[Path, int] | None = None):

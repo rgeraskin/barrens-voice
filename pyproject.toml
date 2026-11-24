@@ -26,6 +26,8 @@ dependencies = [
     "soundfile==0.14.0",
     "scipy==1.18.1",
     "praat-parselmouth==0.4.7",
+    # F5 in fewer steps (bv/f5_schedule.py: its two step tables rewritten in the shipped Transformer, `f5_steps`)
+    "onnx==1.23.2",
     "transformers==5.22.2",
     "tokenizers==0.23.3",
     "huggingface_hub==1.33.0",
