@@ -718,6 +718,7 @@ def main() -> int:
     player = Player(config["max_queue"], log=log, gain=config["volume"] / 100,
                     wasapi=bool(config.get("audio_wasapi", False)))
     player.start()
+    player.check()                                  # the sound device: said now if it does not open
     sapi = Speaker(config, log, accentor, player)
     sapi.start()
     sapi.ready.wait(120)

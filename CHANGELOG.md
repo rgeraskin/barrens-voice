@@ -28,6 +28,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   «Скачиваю Python и библиотеки…» and «Скачиваю модели голосов…» each with the line it is at below (uv's, the program's), all of it in Setup's log. A step that fails asks to go again (what is downloaded is not downloaded again); a program not installed gets no addon page and no launcher, models not downloaded are fetched at the first start. Before, a failure left a console window paused.
 
+- The sound device is checked at the start
+
+  A tenth of a second of silence through the output when the program starts: a device that does not open is said then (the log, the launcher's yellow line), not at the first chat line.
+
 ### Changed
 
 - A race voice's line of several sentences starts sooner: its first part plays while the rest is made

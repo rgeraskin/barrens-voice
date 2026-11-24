@@ -392,6 +392,11 @@ class Player(threading.Thread):
                 self._silent(f"не открылось звуковое устройство: {e}")
         return self.out
 
+    def check(self) -> None:
+        """At the start: a tenth of a second of silence through the output, so a device that does not open is said now
+        (the log; the launcher's yellow line), before the voices are ready, not at the first line."""
+        self.play(wav(b"\0\0" * 2400, 24000, tail=0))
+
     def wake(self, rate: int = 24000) -> None:
         """Before a line is made after a silence: the output's wake() (StreamOut: WASAPI's, when asked for), done by the
         player's thread in its turn - PortAudio stays on one thread, and the synthesis goes on at once."""

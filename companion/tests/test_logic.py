@@ -2009,16 +2009,88 @@ class LiveVolume(unittest.TestCase):
         from unittest import mock
         from bv import audio
         data = audio.wav(b"\0\1" * 800, 8000)
-        with mock.patch.object(audio.StreamOut, "STALL", 0.1), mock.patch.object(audio.StreamOut, "FIRST_STALL", 0.6):
-            sd = self.FakeSD(first_wait=0.3)                  # later than STALL, sooner than FIRST_STALL: plays
+        # margins wide enough for a loaded machine (the whole suite at once): STALL 0.3, FIRST_STALL 1.5, late 0.8
+        with mock.patch.object(audio.StreamOut, "STALL", 0.3), mock.patch.object(audio.StreamOut, "FIRST_STALL", 1.5):
+            sd = self.FakeSD(first_wait=0.8)                  # later than STALL, sooner than FIRST_STALL: plays
             audio.StreamOut(sd).play(data, lambda: 1.0, threading.Event(), 0.2)
             self.assertTrue(sd.blocks)
-        with mock.patch.object(audio.StreamOut, "STALL", 0.1), mock.patch.object(audio.StreamOut, "FIRST_STALL", 0.15):
-            sd = self.FakeSD(first_wait=0.3)                  # later than FIRST_STALL: stalled twice, given up
+        with mock.patch.object(audio.StreamOut, "STALL", 0.2), mock.patch.object(audio.StreamOut, "FIRST_STALL", 0.3):
+            sd = self.FakeSD(first_wait=0.9)                  # later than FIRST_STALL: stalled twice, given up
             out = audio.StreamOut(sd)
             out.reopen = lambda: setattr(sd, "aborted", False)
             with self.assertRaises(audio.StreamBroken):
                 out.play(data, lambda: 1.0, threading.Event(), 0.2)
+
+        class Stalls:
+            """The first stream gives two blocks and then nothing for 0.8 s (past STALL: a stall in mid-line, the device
+            gone); the one after reopen() gives its first block 0.8 s late (a headset switched on: within its own
+            FIRST_STALL), then the rest."""
+            CallbackStop = self.FakeSD.CallbackStop
+
+            def __init__(self):
+                self.streams, self.blocks = 0, []
+
+            def OutputStream(self, samplerate, channels, dtype, blocksize, callback, finished_callback, device=None):
+                import numpy as np
+                sd, number = self, self.streams + 1
+                self.streams = number
+                stop = threading.Event()
+
+                class Stream:
+                    def start(self):
+                        def run():
+                            time.sleep(0.8 if number > 1 else 0)
+                            given = 0
+                            while not stop.is_set():
+                                if number == 1 and given == 2 and stop.wait(0.8):
+                                    break                   # a 0.8 s hole in mid-line: past STALL, a stall
+                                out = np.zeros((blocksize, channels), dtype="float32")
+                                try:
+                                    callback(out, blocksize, None, None)
+                                except sd.CallbackStop:
+                                    sd.blocks.append(number)
+                                    break
+                                sd.blocks.append(number)
+                                given += 1
+                            finished_callback()
+                        threading.Thread(target=run, daemon=True).start()
+
+                    def abort(self):
+                        stop.set()
+
+                    def close(self):
+                        pass
+                return Stream()
+        import time
+        long = audio.wav(b"\0\1" * 8000, 8000)
+        with mock.patch.object(audio.StreamOut, "STALL", 0.3), mock.patch.object(audio.StreamOut, "FIRST_STALL", 1.5):
+            sd = Stalls()
+            out = audio.StreamOut(sd)
+            out.reopen = lambda: None
+            out.play(long, lambda: 1.0, threading.Event(), 1.0)  # the second stream's own first block: FIRST_STALL
+        self.assertEqual(sd.streams, 2)
+        self.assertEqual(sd.blocks[:2], [1, 1])
+        self.assertEqual(sd.blocks[-1], 2)
+
+    def test_the_device_is_checked_at_the_start(self):
+        # a moment of silence through the output at the start: a device that does not open is said before any line
+        import time
+        from unittest import mock
+        from bv import audio
+        logged, (played, fake) = [], fake_out()
+        p = audio.Player(8, log=logged.append, out=fake)
+        p.start()
+        p.check()
+        time.sleep(0.3)
+        self.assertEqual(played, [b"\0"])
+        self.assertEqual(logged, [])
+        with mock.patch.object(audio, "StreamOut", side_effect=OSError("PortAudio: no device")):
+            p = audio.Player(8, log=logged.append)
+            p.start()
+            p.check()
+            time.sleep(0.3)
+        self.assertEqual(len(logged), 1, logged)
+        self.assertTrue(logged[0].startswith("звук не играет: не открылось звуковое устройство"), logged)
 
     def test_the_sound_mapper_is_the_device(self):
         # Windows' sound mapper (MME's first output) follows the default output, as winsound does
