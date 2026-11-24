@@ -1,6 +1,7 @@
 ; Barrens Voice's installer (Inno Setup 6): `mise run installer` builds it on Windows (tools/installer.py).
 ; Small by design: uv.exe, bv/install.py and the release archive. What is large comes from the network
-; while installing: Python and the libraries through uv (from uv.lock), the models (bv --fetch-models).
+; while installing: Python and the libraries through uv (from uv.lock), the models (bv --fetch-models). Then the
+; addon into the games found, those the player ticks (the page «Аддон в игры», [Code]).
 ; Layout and updates: docs/update-strategy.md.
 
 #ifndef AppVersion
@@ -85,6 +86,92 @@ Type: filesandordirs; Name: "{app}\setup"
 Type: files; Name: "{app}\barrens-voice.install"
 
 [Code]
+{ The page «Аддон в игры», after installing: the games the program just installed finds (bv --find-games, as the
+  launcher finds them: launcher.model.setup_games), a box each, all ticked; Next puts the addon into the ticked ones
+  (bv --install-addon <game>). Nothing found, or a silent install: no page (the launcher offers the addon too). }
+var
+  GamesPage: TInputOptionWizardPage;
+  GameKeys: TArrayOfString;
+  GamesLooked: Boolean;
+
+procedure InitializeWizard;
+begin
+  GamesPage := CreateInputOptionPage(wpInfoAfter, 'Аддон в игры', 'Куда поставить аддон Barrens Voice',
+    'Отметь игры, в которые поставить аддон. Можно и потом: «установить аддон» в лаунчере.', False, False);
+end;
+
+function AppPython: String;
+begin
+  Result := ExpandConstant('{app}\app\current\.venv\Scripts\python.exe');
+end;
+
+function AppCompanion: String;
+begin
+  Result := ExpandConstant('{app}\app\current\companion');
+end;
+
+{ the lines of bv --find-games: key, tab, what the box says }
+procedure FindGames;
+var
+  List, Line, Key: String;
+  Lines: TArrayOfString;
+  I, Tab, ResultCode: Integer;
+begin
+  GamesLooked := True;
+  List := ExpandConstant('{tmp}\bv-games.txt');
+  if not Exec(AppPython, '-m bv --find-games "' + List + '"', AppCompanion, SW_HIDE, ewWaitUntilTerminated,
+              ResultCode) or (ResultCode <> 0) or not LoadStringsFromFile(List, Lines) then
+    Exit;
+  for I := 0 to GetArrayLength(Lines) - 1 do
+  begin
+    Line := Lines[I];
+    Tab := Pos(#9, Line);
+    if Tab = 0 then
+      Continue;
+    Key := Copy(Line, 1, Tab - 1);
+    Delete(Line, 1, Tab);
+    SetArrayLength(GameKeys, GetArrayLength(GameKeys) + 1);
+    GameKeys[GetArrayLength(GameKeys) - 1] := Key;
+    GamesPage.Values[GamesPage.Add(Line)] := True;
+  end;
+end;
+
+function ShouldSkipPage(PageID: Integer): Boolean;
+begin
+  Result := False;
+  if PageID = GamesPage.ID then
+  begin
+    if WizardSilent then
+    begin
+      Result := True;
+      Exit;
+    end;
+    if not GamesLooked then
+      FindGames;
+    Result := GetArrayLength(GameKeys) = 0;
+  end;
+end;
+
+function NextButtonClick(CurPageID: Integer): Boolean;
+var
+  Failed: String;
+  I, ResultCode: Integer;
+begin
+  Result := True;
+  if CurPageID <> GamesPage.ID then
+    Exit;
+  Failed := '';
+  for I := 0 to GetArrayLength(GameKeys) - 1 do
+    if GamesPage.Values[I] then
+      if not Exec(AppPython, '-m bv --install-addon ' + GameKeys[I], AppCompanion, SW_HIDE, ewWaitUntilTerminated,
+                  ResultCode) or (ResultCode <> 0) then
+        Failed := Failed + #13#10 + GamesPage.CheckListBox.ItemCaption[I];
+  if Failed <> '' then
+    MsgBox('Аддон не поставился:' + Failed + #13#10#13#10 +
+           'Поставь его из лаунчера: «установить аддон». Почему не вышло — в журнале программы (data\logs).',
+           mbError, MB_OK);
+end;
+
 { the install folder inside PowerShell's single quotes: a ' in it doubled }
 function AppForPowerShell(Param: String): String;
 begin

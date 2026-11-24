@@ -10,6 +10,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [0.6.0] - Unreleased
 
+### Added
+
+- The installer puts the addon into the games
+
+  After installing, a page «Аддон в игры» lists the World of Warcraft clients found (Forever and retail, found as the launcher finds them), each with its folder and the addon there, every box ticked (retail's marked «ритейл мало тестировался»). Next installs the addon into the ticked ones; one that fails is said, with the launcher's «установить аддон» to try again. No game found, or a silent install: no page.
+
 ### Changed
 
 - Dictionary

@@ -77,6 +77,45 @@ class Games(unittest.TestCase):
             (Path(d) / "_retail_").mkdir()
             self.assertEqual(find_games({}, extra=[Path(d)]), [])
 
+    def test_the_installers_page_lists_the_games_found(self):
+        # the page «Аддон в игры» (installer/BarrensVoice.iss): key, tab, what the box says; every box ticked
+        from bv.launcher.model import setup_games
+        with tempfile.TemporaryDirectory() as d:
+            forever = make_game(Path(d) / "WoW" / "_forever_", "0.4.0")
+            retail = make_game(Path(d) / "WoW" / "_retail_")
+            lines = setup_games({"game_dirs": {"forever": str(forever), "retail": str(retail)}}, "0.6.0")
+            self.assertEqual(lines, [f"forever\tWoW Forever — {forever} (аддон 0.4.0 станет 0.6.0)",
+                                     f"retail\tWoW Retail — {retail} (аддона нет, ритейл мало тестировался)"])
+            make_game(Path(d) / "Same" / "_forever_", "0.6.0")
+            lines = setup_games({"game_dirs": {"forever": str(Path(d) / "Same" / "_forever_")}}, "0.6.0")
+            self.assertTrue(lines[0].endswith("(аддон 0.6.0 уже стоит)"), lines)
+
+    def test_the_installer_puts_the_addon_into_a_ticked_game(self):
+        from unittest import mock
+        from bv import __main__ as main
+        from bv.launcher import model
+        with tempfile.TemporaryDirectory() as d:
+            forever = make_game(Path(d) / "_forever_")
+            config = {"game_dirs": {"forever": str(forever)}}
+            listed = Path(d) / "games.txt"
+            said = []
+            with mock.patch.object(main, "log", said.append):
+                self.assertEqual(main.setup_addon(config, ["bv", "--find-games", str(listed)]), 0)
+                text = listed.read_bytes()
+                self.assertTrue(text.startswith(b"\xef\xbb\xbf"))                   # the BOM: Inno reads UTF-8 so
+                self.assertTrue(text.decode("utf-8-sig").startswith("forever\tWoW Forever"), text)
+                self.assertNotIn(b"\r\r", text)                                     # no empty lines
+                self.assertEqual(main.setup_addon(config, ["bv", "--install-addon", "forever"]), 0)
+                self.assertEqual(model.toc_version(forever / "Interface" / "AddOns" / model.ADDON), model.addon_version())
+                self.assertEqual(main.setup_addon(config, ["bv", "--install-addon", "retail"]), 1)
+                self.assertIn("установщик: аддон в retail — не установлен: игра retail не найдена", said)
+                with mock.patch.object(model, "install_addon", side_effect=PermissionError("занято")):
+                    self.assertEqual(main.setup_addon(config, ["bv", "--install-addon", "forever"]), 1)
+                self.assertEqual(main.setup_addon(config, ["bv", "--find-games"]), 1)
+        iss = (Path(__file__).resolve().parents[2] / "installer" / "BarrensVoice.iss").read_text(encoding="utf-8")
+        self.assertIn("-m bv --find-games", iss)                                    # what the page runs
+        self.assertIn("-m bv --install-addon", iss)
+
     def test_install_addon(self):
         from bv.launcher.model import ADDON, install_addon, toc_version
         with tempfile.TemporaryDirectory() as d:

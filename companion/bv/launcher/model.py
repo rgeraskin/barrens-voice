@@ -175,6 +175,39 @@ def game_folder(text: str, game: str) -> str:
     return os.path.normpath(str(folder))
 
 
+def setup_games(config: dict, version: str | None = None) -> list[str]:
+    """The installer's page «Аддон в игры» (installer/BarrensVoice.iss, `bv --find-games`): a line per game found, its
+    key, a tab and what its box says (the folder and the addon there; every box starts ticked)."""
+    version = version or addon_version()
+    lines = []
+    for g in find_games(config):
+        if g.addon is None:
+            state = "аддона нет"
+        elif g.addon == version:
+            state = f"аддон {g.addon} уже стоит"
+        else:
+            state = f"аддон {g.addon} станет {version}"
+        if g.key == "retail":
+            state += ", ритейл мало тестировался"
+        lines.append(f"{g.key}\t{g.name} — {g.root} ({state})")
+    return lines
+
+
+def setup_install(config: dict, key: str) -> str | None:
+    """The addon into the game `key` (`bv --install-addon`, the installer's ticked boxes): None when done, else why not."""
+    source = addon_source()
+    if source is None:
+        return "аддона нет рядом с программой"
+    game = next((g for g in find_games(config) if g.key == key), None)
+    if game is None:
+        return f"игра {key} не найдена"
+    try:
+        install_addon(source, game.root)
+    except OSError as e:
+        return str(e)
+    return None
+
+
 def remember(config: dict, game: str, folder: Path) -> dict | None:
     """The changes to save when a game ran from `folder`: its folder under `game_dirs` (None if known)."""
     dirs = dict(config.get("game_dirs") or {})

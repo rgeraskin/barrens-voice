@@ -513,6 +513,27 @@ class Lines:
         speaker.say(line)
 
 
+def setup_addon(config: dict, argv: list[str]) -> int:
+    """The installer's page «Аддон в игры» (installer/BarrensVoice.iss): `--find-games <file>` writes the games found
+    into the file (launcher.model.setup_games; UTF-8 with a BOM, which Inno Setup reads as UTF-8), `--install-addon
+    <key>` puts the addon into that game. 0 when done; 1 with the reason in the log."""
+    from .launcher import model
+    flag = "--find-games" if "--find-games" in argv else "--install-addon"
+    at = argv.index(flag) + 1
+    if at >= len(argv):
+        log(f"{flag}: нужен {'файл' if flag == '--find-games' else 'ключ игры'}")
+        return 1
+    if flag == "--find-games":
+        lines = model.setup_games(config)
+        # "\n": Windows writes it "\r\n" (text mode); "\r\n" written so was "\r\r\n", an empty line between
+        Path(argv[at]).write_text("".join(line + "\n" for line in lines), encoding="utf-8-sig")
+        log(f"установщик: игр найдено {len(lines)}")
+        return 0
+    problem = model.setup_install(config, argv[at])
+    log(f"установщик: аддон в {argv[at]} — " + (f"не установлен: {problem}" if problem else "установлен"))
+    return 1 if problem else 0
+
+
 def fetch_models(config: dict) -> int:
     """Everything the race voices need from the network, downloaded now - BarrensVoice.cmd runs this
     right after installing, so the first start neither waits for ~3 GB nor needs the network: F5 in
@@ -605,6 +626,8 @@ def main() -> int:
         return f5_selftest(config, log, DATA_DIR)
     if "--fetch-models" in sys.argv:
         return fetch_models(config)
+    if "--find-games" in sys.argv or "--install-addon" in sys.argv:   # the installer's page «Аддон в игры»
+        return setup_addon(config, sys.argv)
     if "--voicelab" in sys.argv:                   # the race voices' clips, to hear and choose by ear (voicelab.py)
         from .voicelab import parse_args, run as voicelab
         parsed = parse_args(sys.argv[sys.argv.index("--voicelab") + 1:])
