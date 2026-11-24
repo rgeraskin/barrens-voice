@@ -929,12 +929,84 @@ class LabRuns(unittest.TestCase):
 
         def speak(config, home, out, clips, text, log, target=None, steps=()):
             asked.append(steps)
-            raise ValueError("нет пакета onnx")
+            raise voicelab.StepsRefused("нет пакета onnx")
         with mock.patch.object(voicelab, "speak", speak):
             self.assertEqual(voicelab.run({}, self.dir, self.dir / "lab", self.logged.append, steps=(6, 8)), 1)
         self.assertEqual(asked, [(6, 8)])
         self.assertIn("сокращённое расписание F5: нет пакета onnx", self.logged)
         self.assertFalse((self.dir / "lab" / "paces.json").exists())       # no test lines, no pace of them
+
+    def test_the_test_line_goes_the_game_s_way(self):
+        # the lab's test line as a chat line: the dictionary («дд»), «ё», numbers, then F5Speaker's own way - the first
+        # sentence apart, the question apart (render); test.wav is the parts in a row
+        import tempfile
+        from unittest import mock
+        import numpy as np
+        import soundfile as sf
+        try:
+            import pymorphy3  # noqa: F401
+        except ImportError:
+            self.skipTest("pymorphy3")
+        from bv import f5engine, f5onnx, voicelab
+        made = []
+
+        class Onnx:
+            in_rate, net_file = 24000, None
+
+            def __init__(self, *a, **k):
+                pass
+
+            def load(self):
+                pass
+
+            def synth(self, ref_audio, ref_text, text, total):
+                made.append(text)
+                tone = np.sin(np.arange(2400) / 24000 * 2 * np.pi * 200).astype("float32") * 0.3
+                return np.concatenate([tone, np.zeros(4800, dtype="float32")]), 24000
+
+        class Accent:
+            def __init__(self, *a, **k):
+                pass
+
+            def load(self):
+                pass
+
+            def accent(self, text):
+                return text
+        with tempfile.TemporaryDirectory() as d:
+            out = Path(d)
+            (out / "orc-male").mkdir()
+            clip = np.zeros(24000 * 3, dtype="float32")
+            sf.write(str(out / "orc-male" / "sample.wav"), clip, 24000)
+            with mock.patch.object(f5engine, "model_dir", lambda *a: out), \
+                    mock.patch("huggingface_hub.hf_hub_download", lambda *a, **k: str(out / "vocab.txt")), \
+                    mock.patch.object(f5onnx, "F5Onnx", Onnx), mock.patch("bv.text.Accentor", Accent):
+                from bv.__main__ import DEFAULT_CONFIG
+                voicelab.speak(dict(DEFAULT_CONFIG), out, out,
+                               {"orc-male": (clip, "Мне это не по силам.", 2.0, [])},
+                               "Нужен дд в Мертвые копи, продам сумки за 5000. Кто со мной?", self.logged.append)
+            self.assertTrue((out / "orc-male" / "test.wav").is_file())
+        self.assertEqual(made, ["Нужен дам+агер в Мёртвые копи, продам сумки за пять тысяч.", "Кто со мной?"])
+        # nothing left to say (the dictionary took every word): said, no F5 call, no test.wav
+        with tempfile.TemporaryDirectory() as d:
+            out = Path(d)
+            (out / "orc-male").mkdir()
+            sf.write(str(out / "orc-male" / "sample.wav"), clip, 24000)
+            made.clear()
+            with mock.patch.object(f5engine, "model_dir", lambda *a: out), \
+                    mock.patch("huggingface_hub.hf_hub_download", lambda *a, **k: str(out / "vocab.txt")), \
+                    mock.patch.object(f5onnx, "F5Onnx", Onnx), mock.patch("bv.text.Accentor", Accent):
+                # with the first sentence apart off too: nothing to say is render()'s own check
+                voicelab.speak(dict(DEFAULT_CONFIG, f5_first_sentence=False), out, out,
+                               {"orc-male": (clip, "Мне это не по силам.", 2.0, [])}, ")", self.logged.append)
+            self.assertEqual(made, [])
+            self.assertFalse((out / "orc-male" / "test.wav").exists())
+        self.assertIn("пробная строка пуста после словаря: )", self.logged)
+        # a blank test_text in voices.yaml: the default one
+        lab = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: __import__("shutil").rmtree(lab, ignore_errors=True))
+        (lab / "voices.yaml").write_text('test_text: "   "\nvoices: {}\n', encoding="utf-8")
+        self.assertEqual(voicelab.read_lab(lab / "voices.yaml")[1], voicelab.TEST_TEXT)
 
     def test_a_voice_made_again_loses_its_old_test_lines(self):
         # test-6.wav beside a new sample would be a line of the old one

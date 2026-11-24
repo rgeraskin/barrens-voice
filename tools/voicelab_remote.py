@@ -65,11 +65,13 @@ runpy.run_module("bv", run_name="__main__", alter_sys=True)
 
 
 def packed() -> bytes:
-    """companion/bv as a .tgz, without caches, and labrun.py beside it."""
+    """companion/bv as a .tgz, without caches, the working tree's addon beside it (addon/BarrensVoice: the lab's test
+    line goes through its dictionary, launcher.model.addon_source finds it there) and labrun.py."""
     data = io.BytesIO()
     with tarfile.open(fileobj=data, mode="w:gz") as tar:
         tar.add(ROOT / "companion" / "bv", arcname="bv",
                 filter=lambda info: None if "__pycache__" in info.name else info)
+        tar.add(ROOT / "addon" / "BarrensVoice", arcname="addon/BarrensVoice")
         info = tarfile.TarInfo("labrun.py")
         info.size = len(RUNNER)
         tar.addfile(info, io.BytesIO(RUNNER))
@@ -129,7 +131,7 @@ if (-not ({marks})) {{
     if ($LASTEXITCODE) {{ exit $LASTEXITCODE }}
 }}"""
     run = powershell(host, f"""
-Remove-Item -Recurse -Force '{lab_dir}\\src\\companion\\bv' -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force '{lab_dir}\\src\\companion\\bv', '{lab_dir}\\src\\companion\\addon' -ErrorAction SilentlyContinue
 tar -xzf '{lab_dir}\\src.tgz' -C '{lab_dir}\\src\\companion'
 $env:BV_DATA = '{install}\\data'; $env:BV_CACHE = '{install}\\cache'
 Set-Location '{lab_dir}\\src\\companion'
