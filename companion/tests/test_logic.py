@@ -1726,6 +1726,9 @@ class LiveVolume(unittest.TestCase):
                 def abort(self):
                     sd.aborted = True
 
+                def stop(self):
+                    sd.aborted = True
+
                 def close(self):
                     pass
             return Stream()
@@ -1983,7 +1986,7 @@ class LiveVolume(unittest.TestCase):
         logged, played, fake = [], *fake_out()
         tries = {"n": 0}
 
-        def stream_out():
+        def stream_out(**_options):
             tries["n"] += 1
             if tries["n"] <= 2:
                 raise OSError("PortAudio: no device")
@@ -1999,6 +2002,24 @@ class LiveVolume(unittest.TestCase):
         self.assertTrue(logged[0].startswith("звук не играет: не открылось звуковое устройство"), logged)
         self.assertEqual(logs.level_of(logged[0]), "WARN")
 
+    def test_a_stream_waits_longer_for_its_first_block(self):
+        # a device waking up (a headset switched on) gives its first block late: FIRST_STALL for a stream's first
+        # block, STALL after it - each stream its own, the one after a reopen() too
+        import threading
+        from unittest import mock
+        from bv import audio
+        data = audio.wav(b"\0\1" * 800, 8000)
+        with mock.patch.object(audio.StreamOut, "STALL", 0.1), mock.patch.object(audio.StreamOut, "FIRST_STALL", 0.6):
+            sd = self.FakeSD(first_wait=0.3)                  # later than STALL, sooner than FIRST_STALL: plays
+            audio.StreamOut(sd).play(data, lambda: 1.0, threading.Event(), 0.2)
+            self.assertTrue(sd.blocks)
+        with mock.patch.object(audio.StreamOut, "STALL", 0.1), mock.patch.object(audio.StreamOut, "FIRST_STALL", 0.15):
+            sd = self.FakeSD(first_wait=0.3)                  # later than FIRST_STALL: stalled twice, given up
+            out = audio.StreamOut(sd)
+            out.reopen = lambda: setattr(sd, "aborted", False)
+            with self.assertRaises(audio.StreamBroken):
+                out.play(data, lambda: 1.0, threading.Event(), 0.2)
+
     def test_the_sound_mapper_is_the_device(self):
         # Windows' sound mapper (MME's first output) follows the default output, as winsound does
         from bv import audio
@@ -2008,6 +2029,151 @@ class LiveVolume(unittest.TestCase):
         sd.query_devices = lambda i: {"max_output_channels": 0 if i == 0 else 2}      # 0 is an input
         self.assertEqual(audio.StreamOut(sd).device, 1)
         self.assertIsNone(audio.StreamOut(self.FakeSD()).device)                     # no MME: the default device
+
+    def test_wasapi_when_asked_and_mme_when_it_refuses(self):
+        # config.json audio_wasapi (off by default): WASAPI's default output, shared, Windows converting the rate; a
+        # stream it refuses plays through MME; wake() opens and stops it silently. The log names what played
+        import threading
+        from bv import audio
+        from bv.__main__ import DEFAULT_CONFIG
+        self.assertIs(DEFAULT_CONFIG["audio_wasapi"], False)
+        base = self.FakeSD
+
+        class SD(base):
+            def __init__(self, refuse=False):
+                super().__init__()
+                self.opened, self.refuse = [], refuse
+
+            def query_hostapis(self, i=None):
+                apis = [{"name": "MME", "devices": [0, 1]}, {"name": "Windows WASAPI", "devices": [5],
+                                                              "default_output_device": 5}]
+                return apis if i is None else apis[i]
+
+            def query_devices(self, i):
+                return {"max_output_channels": 2}
+
+            def WasapiSettings(self, auto_convert):
+                return ("wasapi", auto_convert)
+
+            def OutputStream(self, samplerate, channels, dtype, blocksize, callback, finished_callback=None,
+                             device=None, extra_settings=None):
+                self.opened.append((device, extra_settings))
+                if extra_settings and self.refuse:
+                    raise OSError("format refused")
+                return base.OutputStream(self, samplerate, channels, dtype, blocksize or 256, callback,
+                                         finished_callback or (lambda: None), device)
+        data = audio.wav(b"\0\1" * 800, 8000)
+        sd = SD()
+        out = audio.StreamOut(sd, wasapi=True)
+        out.play(data, lambda: 1.0, threading.Event(), 0.1)
+        self.assertEqual(sd.opened, [(5, ("wasapi", True))])
+        self.assertEqual(out.api, "WASAPI")
+        self.assertIsNotNone(out.first_block)
+        sd.aborted = False
+        out.wake()
+        self.assertEqual(sd.opened[-1], (5, ("wasapi", True)))
+        sd = SD(refuse=True)
+        out = audio.StreamOut(sd, wasapi=True)
+        out.play(data, lambda: 1.0, threading.Event(), 0.1)
+        self.assertEqual(sd.opened, [(5, ("wasapi", True)), (0, None)])
+        self.assertEqual(out.api, "MME")
+        sd = SD()
+        audio.StreamOut(sd).play(data, lambda: 1.0, threading.Event(), 0.1)    # not asked: MME, as before
+        self.assertEqual(sd.opened, [(0, None)])
+
+        class Unstarted(SD):                    # WASAPI opens the stream but will not start it: MME plays the line
+            def OutputStream(self, *a, **k):
+                stream = SD.OutputStream(self, *a, **k)
+                if k.get("extra_settings"):
+                    def refuse():
+                        raise OSError("AUDCLNT_E_DEVICE_INVALIDATED")
+                    stream.start = refuse
+                return stream
+        sd = Unstarted()
+        out = audio.StreamOut(sd, wasapi=True)
+        out.play(data, lambda: 1.0, threading.Event(), 0.1)
+        self.assertEqual(sd.opened, [(5, ("wasapi", True)), (0, None)])
+        self.assertEqual(out.api, "MME")
+        self.assertTrue(sd.blocks)
+
+    def test_the_player_wakes_the_output_on_its_own_thread(self):
+        # Player.wake(): the player's thread calls the output's wake() in its turn (PortAudio on one thread); a wake
+        # that fails is said once, the lines go on
+        import threading
+        import time
+        from bv import audio
+        logged, threads = [], []
+
+        class Out:
+            first_block = None
+
+            def wake(self, rate):
+                threads.append(threading.current_thread().name)
+                raise OSError("CO_E_NOTINITIALIZED")
+
+            def play(self, data, level, stopped, length):
+                pass
+        p = audio.Player(8, log=logged.append, out=Out())
+        p.start()
+        p.wake()
+        p.wake()
+        p.play(marked_line(b"A", 0.01))
+        time.sleep(0.3)
+        self.assertEqual(threads, ["player", "player"])
+        self.assertEqual(logged, ["    WASAPI перед строкой не открылся: CO_E_NOTINITIALIZED"])
+
+    def test_the_first_sound_is_logged_from_the_lines_arrival(self):
+        import time
+        from bv import audio, logs
+        logged = []
+
+        class Out:
+            api, latency, first_block = "MME", 0.12, None
+
+            def play(self, data, level, stopped, length):
+                self.first_block = time.monotonic()
+        p = audio.Player(8, log=logged.append, out=Out())
+        p.start()
+        p.play(marked_line(b"A", 0.01), received=time.monotonic() - 0.5)
+        p.play(marked_line(b"B", 0.01))                                        # no arrival: no line in the log
+        time.sleep(0.3)
+        p.play(marked_line(b"C", 0.01), received=time.monotonic() - 1.5)      # each line its own first block
+        time.sleep(0.3)
+        self.assertEqual(len(logged), 2, logged)
+        self.assertRegex(logged[0], r"^    до звука 0\.5\d с \(MME, задержка выхода 120 мс\)$")
+        self.assertRegex(logged[1], r"^    до звука 1\.5\d с ")
+        self.assertEqual(logs.level_of(logged[0]), "DEBUG")
+        # the stream's own: a new line forgets the last one's first block
+        import threading
+        sd = self.FakeSD()
+        out = audio.StreamOut(sd)
+        out.play(audio.wav(b"\0\1" * 800, 8000), lambda: 1.0, threading.Event(), 0.1)
+        first = out.first_block
+        time.sleep(0.05)
+        out.play(audio.wav(b"\0\1" * 800, 8000), lambda: 1.0, threading.Event(), 0.1)
+        self.assertGreater(out.first_block, first)
+
+    def test_a_line_played_again_says_no_first_sound(self):
+        # cut by CatQuest and played again from its start: «до звука» was said the first time, not again
+        import time
+        from bv import audio
+        logged = []
+
+        class Out:
+            api, latency, first_block = "MME", 0.0, None
+
+            def play(self, data, level, stopped, length):
+                self.first_block = time.monotonic()
+                stopped.wait(length)
+        p = audio.Player(8, log=logged.append, out=Out())
+        p.start()
+        p.play(marked_line(b"A", 0.4), received=time.monotonic())
+        time.sleep(0.1)
+        p.pause()
+        time.sleep(0.1)
+        p.resume()
+        time.sleep(0.8)
+        self.assertEqual(len([m for m in logged if "до звука" in m]), 1, logged)
 
     def test_a_device_gone_mid_line_is_found_again(self):
         # the stream stalls (headphones pulled out): PortAudio's list read again, the line goes on from where it was

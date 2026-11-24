@@ -5,6 +5,7 @@ Standard library only, so the round-trip test runs anywhere.
 from __future__ import annotations
 
 import re
+import time
 from dataclasses import dataclass, field
 
 VERSION = 1
@@ -187,6 +188,8 @@ class Line:
     options: dict = field(default_factory=dict)   # all the line's options, as sent
     raw: str = ""            # the line as typed in chat, before any rule (for the log)
     volume: int | None = None  # the addon's volume slider, percent 0..240; None: config.json alone
+    # when the companion got it (monotonic): the log's «до звука» counts from here
+    received: float = field(default_factory=time.monotonic, compare=False, repr=False)
 
     def gain(self, config: dict) -> float:
         """The loudness to play this line at (0..1): config.json's `volume` times the addon's."""

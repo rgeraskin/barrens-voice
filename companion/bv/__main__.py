@@ -66,6 +66,8 @@ DEFAULT_CONFIG = {
     # it still is) goes on without their name: one speech
     "same_speaker_gap": 5.0,
     "log_details": True,
+    # WASAPI instead of MME, and a moment of it before a line after a silence (audio.StreamOut): to compare
+    "audio_wasapi": False,
     "log_keep_days": 90,
     # updates of an installed Barrens Voice (bv/update.py): prepared and applied by themselves; "beta" -
     # pre-releases too
@@ -711,7 +713,8 @@ def main() -> int:
     inflector = Inflector(log, config.get("declension", True))
     inflector.load()
     from .audio import Player
-    player = Player(config["max_queue"], log=log, gain=config["volume"] / 100)
+    player = Player(config["max_queue"], log=log, gain=config["volume"] / 100,
+                    wasapi=bool(config.get("audio_wasapi", False)))
     player.start()
     sapi = Speaker(config, log, accentor, player)
     sapi.start()

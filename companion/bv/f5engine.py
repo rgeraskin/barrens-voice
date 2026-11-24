@@ -23,6 +23,7 @@ from .text import Accentor, numbers_to_words
 
 SENTENCE_END = re.compile(r"(?<=[.!?…])\s+")
 GAP = 0.15   # seconds between sentence groups made separately
+WAKE_AFTER = 5.0   # seconds of silence after which the output is woken before a line is made (audio_wasapi)
 
 
 def sentence_groups(text: str) -> list[str]:
@@ -446,6 +447,8 @@ class F5Speaker:
             if self.config.get("log_details") and text != line.text:
                 groups = sentence_groups(text)
                 self.log(f"    к синтезу: {text}" + (f"  ({len(groups)} части)" if len(groups) > 1 else ""))
+            if self.config.get("audio_wasapi") and self.player.quiet_for() >= WAKE_AFTER:
+                self.player.wake(getattr(self.onnx, "out_rate", 24000))
             started = time.perf_counter()
             try:
                 import numpy as np
@@ -467,7 +470,7 @@ class F5Speaker:
             except Exception as e:  # noqa: BLE001 - one bad line must not stop the reader
                 self.log(f"F5-TTS: {e}")
                 continue
-            self.player.play(data, generation)
+            self.player.play(data, generation, line.received if self.config.get("log_details") else None)
 
     # --- the reader's side ------------------------------------------------------------------
 

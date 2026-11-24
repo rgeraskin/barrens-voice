@@ -292,7 +292,7 @@ class F5SpeakerLoad(unittest.TestCase):
         class Player:
             generation = 0
 
-            def play(self, data, generation):
+            def play(self, data, generation, received=None):
                 played.append((data[:4], generation))
         from unittest import mock
         from bv import f5engine
@@ -338,7 +338,7 @@ class F5SpeakerLoad(unittest.TestCase):
         class Player:
             generation = 0
 
-            def play(self, data, generation):
+            def play(self, data, generation, received=None):
                 played.append(data[:4])
         with tempfile.TemporaryDirectory() as d:
             speaker, logged = self.speaker(Path(d), [self.voice(Path(d))], Onnx(), Player())
