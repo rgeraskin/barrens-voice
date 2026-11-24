@@ -404,14 +404,15 @@ class Dictionary:
             for words, star, entry in self.phrases.get(word, []):
                 suffix = self._match(words, star, tokens, i)
                 if suffix is not None:
-                    value, span, took_ending = entry.replace("*", suffix), len(words), star
+                    value, span, took_ending = entry.replace("*", suffix.lower()), len(words), star
                     break
             if value is None and word in self.exact:
                 value, span = self.exact[word], 1
             if value is None:
                 for stem, entry in self.stems:
                     if word.startswith(stem):
-                        value, span, took_ending = entry.replace("*", t.group()[len(stem):]), 1, True
+                        # the ending in lower case, as the replacement is: «ХУЕВО» is «хуёво», not «хуёвО»
+                        value, span, took_ending = entry.replace("*", t.group()[len(stem):].lower()), 1, True
                         break
             if value is None or self._glued(text, t.start(), tokens[i + span - 1].end()):
                 i += 1

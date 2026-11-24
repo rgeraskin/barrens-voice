@@ -323,6 +323,12 @@ class DictionaryInCompanion(unittest.TestCase):
         d.refresh()
         return d
 
+    def test_a_phrase_s_ending_in_lower_case(self):
+        # a player's «*» phrase takes the ending as typed - in lower case, as the replacement is
+        d = self.book()
+        d.receive({"id": "p1", "part": "1", "of": "1"}, "мертвые копи*=мёртвые к+опи*")
+        self.assertEqual(d.apply_words("в МЕРТВЫЕ КОПИЯХ"), "в мёртвые к+опиях")
+
     def test_rl(self):
         # «РЛ» letter by letter, «эр-эл»: the raid leader or the Ruins of Lordaeron, the words around cannot tell
         from bv.morph import Inflector
@@ -860,6 +866,8 @@ class Pipeline(unittest.TestCase):
         self.check({"хуево": "хуёво", "все хуево": "все хуёво", "Хуево": "хуёво", "хуевый танк": "хуёвый т+анк",
                     "хуевая игра": "хуёвая игра", "хуевенько": "хуёвенько", "до хуев": "до хуёв", "хуёво": "хуёво",
                     "хуета": "хуета", "охуевать": "охуевать"})
+        # a word in capitals taken by a stem: its ending in lower case too (was «хуёвО», «б+ургерЫ»)
+        self.check({"ХУЕВО": "хуёво", "БУРГЕРЫ взял": "б+ургеры взял", "ВЕНДОРУ": "в+ендору"})
         # «хуева туча» (много) - х+уева, not «хуёва»; «хуевато» - хуев+ато
         self.check({"хуева туча мобов": "х+уева т+уча мобов", "из хуевой тучи": "из х+уевой т+учи",
                     "с хуевой тучей": "с х+уевой т+учей", "в хуевой туче": "в х+уевой т+уче",
