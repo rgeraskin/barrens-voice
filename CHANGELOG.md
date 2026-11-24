@@ -24,6 +24,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   The CUDA build's libraries are CUDA 13: they need a driver for CUDA 13 (R580 or newer) and a GeForce 16, 20 or newer. The installer reads both from nvidia-smi (the CUDA version in its header; the driver's number when the header has none) right after Python is downloaded, before the libraries. A driver too old: it asks «Обновить драйвер NVIDIA?» - yes (the default) opens NVIDIA's driver page and stops, to be run again after the update; no installs the DirectML build (the game may stutter while a line is made). A card too old for CUDA 13: the DirectML build, said why. Before, any NVIDIA driver got the CUDA build, and an old one left the race voices off. A driver too old to know the card's compute capability is asked again without it. Updates keep the build an install was made with: an install that got CUDA on an old driver gets DirectML by running the installer again.
 
+- The installer's steps on its own page, not in a console window
+
+  «Скачиваю Python и библиотеки…» and «Скачиваю модели голосов…» each with the line it is at below (uv's, the program's), all of it in Setup's log. A step that fails asks to go again (what is downloaded is not downloaded again); a program not installed gets no addon page and no launcher, models not downloaded are fetched at the first start. Before, a failure left a console window paused.
+
 ### Changed
 
 - A race voice's line of several sentences starts sooner: its first part plays while the rest is made

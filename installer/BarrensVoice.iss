@@ -38,6 +38,8 @@ ExtraDiskSpaceRequired=6442450944
 ; Setup and Uninstall wait while the launcher or the companion runs (their named mutexes, bv/launcher/app.py
 ; and bv/__main__.py, "Local\": this session's): installing over a running version fails in uv sync or the switch
 AppMutex=BarrensVoiceLauncher,BarrensVoiceCompanion
+; the steps' output (uv's, the program's) goes into Setup's log (%TEMP%\Setup Log <date> #NNN.txt), named on a failure
+SetupLogging=yes
 
 [Languages]
 Name: "ru"; MessagesFile: "compiler:Languages\Russian.isl"
@@ -56,12 +58,9 @@ Source: "..\dist\Barrens Voice.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\dist\barrens-voice-{#AppVersion}.zip"; DestDir: "{app}\setup"; Flags: ignoreversion
 
 [Run]
-; Python and the libraries: uv's own Python runs install.py, which builds app\{#AppVersion} from its uv.lock.
-; set "VAR=value": the folder quoted, so a "&" in it does not end the command
-Filename: "{cmd}"; Parameters: "/c ""set ""UV_PYTHON_INSTALL_DIR={app}\python""&& set ""UV_CACHE_DIR={app}\cache\uv""&& set ""UV_PYTHON_PREFERENCE=only-managed""&& ""{app}\uv.exe"" run --no-project --python 3.13 ""{app}\setup\install.py"" --root ""{app}"" --archive ""{app}\setup\barrens-voice-{#AppVersion}.zip"" || pause"""; StatusMsg: "Скачиваю Python и библиотеки (0,6–2,5 ГБ, несколько минут)…"; Flags: waituntilterminated
-; the models now, not at the first start (~3 GB once)
-Filename: "{app}\app\current\.venv\Scripts\python.exe"; Parameters: "-m bv --fetch-models"; WorkingDir: "{app}\app\current\companion"; StatusMsg: "Скачиваю модели голосов (около 3 ГБ)…"; Flags: waituntilterminated
-Filename: "{app}\Barrens Voice.exe"; WorkingDir: "{app}"; Description: "Запустить Barrens Voice Launcher"; Flags: postinstall nowait skipifsilent
+; Python, the libraries and the models are the steps in [Code] (CurStepChanged): each under its name on the page,
+; the line it is at below it, again on a failure. The launcher: when the program's step went through
+Filename: "{app}\Barrens Voice.exe"; WorkingDir: "{app}"; Description: "Запустить Barrens Voice Launcher"; Flags: postinstall nowait skipifsilent; Check: SetupDone
 
 [Icons]
 Name: "{userprograms}\Barrens Voice"; Filename: "{app}\Barrens Voice.exe"; WorkingDir: "{app}"
@@ -110,6 +109,131 @@ begin
   Result := ExpandConstant('{app}\app\current\companion');
 end;
 
+{ The steps after the files: Python and the libraries (uv's Python runs install.py, which builds app\<version> from
+  its uv.lock), then the models (bv --fetch-models: now, not at the first start). Each one's name on the page, the
+  last line of its output below it (uv's and the program's; all of it in Setup's log); a step that fails asks to go
+  again (what is downloaded stays in the cache). The program's step not done: no addon page, no launcher; the models'
+  not done: the program downloads them at its first start. A «BV_NOTICE: » line (install.py: why DirectML on an
+  NVIDIA card) is shown after the steps. }
+var
+  SetupFailed, DriverToUpdate: Boolean;
+  Notices, LastLine, OldDriver: String;
+  LastCode: Integer;
+
+function SetEnvironmentVariable(Name, Value: String): Boolean;
+  external 'SetEnvironmentVariableW@kernel32.dll stdcall';
+
+function SetupDone: Boolean;
+begin
+  Result := not SetupFailed;
+end;
+
+procedure StepOutput(const S: String; const Error, FirstLine: Boolean);
+begin
+  Log(S);
+  if Pos('BV_NOTICE: ', S) = 1 then
+    Notices := Notices + Copy(S, 12, Length(S)) + #13#10#13#10
+  else if Pos('BV_DRIVER: ', S) = 1 then
+    OldDriver := Copy(S, 12, Length(S))
+  else if Trim(S) <> '' then
+  begin
+    LastLine := Trim(S);
+    WizardForm.FilenameLabel.Caption := LastLine;
+  end;
+end;
+
+function RunStep(const Name, Filename, Params, Dir: String): Boolean;
+var
+  ResultCode: Integer;
+  Before: String;
+begin
+  Before := Notices;
+  repeat
+    Notices := Before;                  { the step's notices once, however many times it is run }
+    OldDriver := '';
+    WizardForm.StatusLabel.Caption := Name;
+    WizardForm.FilenameLabel.Caption := '';
+    LastLine := '';
+    if ExecAndLogOutput(Filename, Params, Dir, SW_HIDE, ewWaitUntilTerminated, ResultCode, @StepOutput) then
+      Result := ResultCode = 0
+    else
+    begin
+      Result := False;                  { did not start at all: Windows' reason }
+      LastLine := SysErrorMessage(ResultCode);
+    end;
+    LastCode := ResultCode;
+  { install.py's 3 with its BV_DRIVER line: the NVIDIA driver is too old for CUDA - asked about by the caller, not
+    «again» (3 alone is also Windows' «path not found» for a program that did not start) }
+  until Result or WizardSilent or ((LastCode = 3) and (OldDriver <> '')) or
+        (SuppressibleMsgBox(Name + #13#10#13#10 + 'Не получилось: ' + LastLine + #13#10#13#10 +
+                            'Повторить? Скачанное заново не скачивается.' + #13#10 + 'Журнал установки: ' +
+                            ExpandConstant('{log}'), mbError, MB_RETRYCANCEL, IDCANCEL) <> IDRETRY);
+end;
+
+{ the last page after the program's step failed: not Inno's «установлена» }
+function FailedText: String;
+begin
+  if DriverToUpdate then
+    Result := 'Barrens Voice не установлен: сначала обнови драйвер NVIDIA (страница драйверов открыта в браузере), ' +
+              'потом запусти установщик ещё раз — скачанное возьмётся из кэша.'
+  else
+    Result := 'Barrens Voice установлен не до конца: Python и библиотеки не скачались. Запусти установщик ещё раз — ' +
+              'скачанное возьмётся из кэша.';
+end;
+
+procedure CurPageChanged(CurPageID: Integer);
+begin
+  if (CurPageID = wpFinished) and SetupFailed then
+  begin
+    WizardForm.FinishedLabel.Caption := FailedText;
+    WizardForm.FinishedLabel.AdjustHeight;    { as Inno does for its own text: the label as tall as the text }
+  end;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  App, Name, Params: String;
+  Code: Integer;
+begin
+  if CurStep <> ssPostInstall then
+    Exit;
+  App := ExpandConstant('{app}');
+  SetEnvironmentVariable('UV_PYTHON_INSTALL_DIR', App + '\python');
+  SetEnvironmentVariable('UV_CACHE_DIR', App + '\cache\uv');
+  SetEnvironmentVariable('UV_PYTHON_PREFERENCE', 'only-managed');
+  { Python's output in UTF-8, as Inno reads it (else the code page's: the Cyrillic lost) }
+  SetEnvironmentVariable('PYTHONIOENCODING', 'utf-8');
+  WizardForm.ProgressGauge.Style := npbstMarquee;
+  Name := 'Скачиваю Python и библиотеки (0,6–2,5 ГБ, несколько минут)…';
+  Params := 'run --no-project --python 3.13 "' + App + '\setup\install.py" --root "' + App + '" --archive "' + App +
+    '\setup\barrens-voice-{#AppVersion}.zip"';
+  SetupFailed := not RunStep(Name, App + '\uv.exe', Params, App);
+  { the NVIDIA driver too old for CUDA (install.py stopped before any library): update it - the best the mod gets,
+    the default - or go on without CUDA (DirectML: the game may stutter while a line is made); a silent install goes on }
+  if SetupFailed and (LastCode = 3) and (OldDriver <> '') then
+  begin
+    if not WizardSilent and (SuppressibleMsgBox(OldDriver + #13#10#13#10 + 'Обновить драйвер NVIDIA?' + #13#10#13#10 +
+                          'Да — откроется страница драйверов NVIDIA, установка остановится. Обнови драйвер и запусти ' +
+                          'установщик ещё раз.' + #13#10#13#10 + 'Нет — поставлю без CUDA: голоса рас будут, но игра ' +
+                          'может подтормаживать, пока готовится строка.', mbConfirmation, MB_YESNO, IDNO) = IDYES) then
+    begin
+      DriverToUpdate := True;
+      ShellExec('open', 'https://www.nvidia.com/Download/index.aspx', '', '', SW_SHOWNORMAL, ewNoWait, Code);
+    end
+    else
+      SetupFailed := not RunStep(Name, App + '\uv.exe', Params + ' --runtime directml', App);
+  end;
+  if not SetupFailed and not RunStep('Скачиваю модели голосов (около 3 ГБ)…', AppPython, '-m bv --fetch-models',
+                                     AppCompanion) then
+    Notices := Notices + 'Модели голосов не скачались: программа скачает их при первом запуске.' + #13#10#13#10;
+  WizardForm.ProgressGauge.Style := npbstNormal;
+  WizardForm.FilenameLabel.Caption := '';
+  if SetupFailed and not DriverToUpdate then
+    SuppressibleMsgBox(FailedText + #13#10 + 'Журнал установки: ' + ExpandConstant('{log}'), mbError, MB_OK, IDOK)
+  else if Notices <> '' then
+    SuppressibleMsgBox(Trim(Notices), mbInformation, MB_OK, IDOK);
+end;
+
 { the lines of bv --find-games: key, tab, what the box says }
 procedure FindGames;
 var
@@ -141,7 +265,7 @@ begin
   Result := False;
   if PageID = GamesPage.ID then
   begin
-    if WizardSilent then
+    if WizardSilent or SetupFailed then
     begin
       Result := True;
       Exit;
