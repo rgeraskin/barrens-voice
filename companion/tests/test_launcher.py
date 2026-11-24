@@ -1905,6 +1905,104 @@ class InstallerScript(unittest.TestCase):
         self.assertTrue(script.endswith("Stop-Process -Id $_.ProcessId -Force }"), script)
 
 
+class CudaOrDirectML(unittest.TestCase):
+    """The installer's choice of ONNX Runtime's build (install.runtime_for_this_pc): CUDA only where its CUDA 13
+    libraries run - the driver's CUDA version (nvidia-smi's header) and the card's compute capability."""
+
+    @staticmethod
+    def smi(query="NVIDIA GeForce RTX 5070 Ti, 621.01, 12.0", header="| NVIDIA-SMI 621.01   CUDA UMD Version: 13.5 |",
+            fails=False, no_compute_cap=False):
+        import subprocess
+
+        def run(command, **_):
+            if fails:
+                raise OSError("nvidia-smi broken")
+            if no_compute_cap and len(command) > 1 and "compute_cap" in command[1]:     # before 510: all refused
+                return subprocess.CompletedProcess(command, 2, 'Field "compute_cap" is not a valid field to query.', "")
+            out = query if len(command) > 1 else header
+            if out is not None and len(command) > 1 and "compute_cap" not in command[1]:
+                out = "\n".join(", ".join(line.split(", ")[:2]) for line in out.splitlines())
+            return subprocess.CompletedProcess(command, 0 if out is not None else 9, out or "", "")
+        return run
+
+    def test_what_nvidia_smi_says(self):
+        # ("driver", why): a driver update mends it; ("card", why): no driver will
+        from bv import install
+        problem = lambda **kw: install.cuda_problem("nvidia-smi", self.smi(**kw))  # noqa: E731
+        self.assertIsNone(problem())                                               # the test machine's own
+        self.assertIsNone(problem(header="| NVIDIA-SMI 581.15   Driver Version: 581.15   CUDA Version: 13.0 |"))
+        kind, why = problem(query="NVIDIA GeForce RTX 3060, 566.36, 8.6", header="| CUDA Version: 12.7 |")
+        self.assertEqual(kind, "driver")
+        self.assertIn("Драйвер NVIDIA 566.36 поддерживает CUDA 12.7, а голосам рас нужна CUDA 13 — драйвер 580", why)
+        kind, why = problem(query="NVIDIA GeForce GTX 1080, 581.15, 6.1")
+        self.assertEqual(kind, "card")
+        self.assertIn("не работает (нужна GeForce 16, 20 или новее)", why)
+        self.assertIsNone(problem(query="NVIDIA GeForce GTX 1080, 581.15, 6.1\nNVIDIA GeForce RTX 4070, 581.15, 8.9"))
+        self.assertIsNone(problem(query="NVIDIA GeForce RTX 2060, 581.15, [N/A]", header=""))  # by the driver's number
+        self.assertEqual(problem(query="NVIDIA GeForce RTX 2060, 472.12, [N/A]", header="")[0], "driver")
+        self.assertEqual(problem(fails=True), ("driver", "Драйвер NVIDIA не отвечает (nvidia-smi)."))
+        self.assertEqual(problem(query=None)[0], "driver")
+        # a driver that does not know compute_cap: asked again without it, decided by its CUDA version
+        kind, why = problem(query="NVIDIA GeForce GTX 760, 474.44, x", header="| CUDA Version: 11.4 |", no_compute_cap=True)
+        self.assertIn("Драйвер NVIDIA 474.44 поддерживает CUDA 11.4", why)
+        self.assertIsNone(problem(query="NVIDIA GeForce RTX 2060, 581.15, x", header="| CUDA Version: 13.0 |",
+                                  no_compute_cap=True))
+        # the edges: compute capability 7.0 (Volta) is under 7.5; driver 570 under 580; the UMD header decides
+        self.assertEqual(problem(query="Tesla V100, 581.15, 7.0")[0], "card")
+        self.assertIn("Драйвер NVIDIA 570.10", problem(query="NVIDIA GeForce RTX 3060, 570.10, 8.6", header="")[1])
+        self.assertIn("CUDA 12.9", problem(query="NVIDIA GeForce RTX 3060, 621.01, 8.6",
+                                           header="| NVIDIA-SMI 621.01   CUDA UMD Version: 12.9 |")[1])
+
+    def test_the_reason_reaches_the_installer(self):
+        from unittest import mock
+        from bv import install
+        said = []
+        with mock.patch("shutil.which", return_value="nvidia-smi"), \
+                mock.patch.object(install, "cuda_problem", return_value=("card", "GTX 1080: не работает.")):
+            self.assertEqual(install.runtime_for_this_pc(said.append), "directml")
+        self.assertEqual(said, ["BV_NOTICE: GTX 1080: не работает. Ставлю сборку DirectML: голоса рас будут, но игра "
+                                "может подтормаживать."])
+        with mock.patch("shutil.which", return_value="nvidia-smi"), \
+                mock.patch.object(install, "cuda_problem", return_value=("driver", "Драйвер старый.")):
+            self.assertEqual(install.runtime_for_this_pc(said.append), "directml")
+        self.assertTrue(said[-1].endswith("Обнови драйвер NVIDIA и переустанови Barrens Voice — будет CUDA."), said)
+        with mock.patch("shutil.which", return_value="nvidia-smi"), mock.patch.object(install, "cuda_problem", return_value=None):
+            self.assertEqual(install.runtime_for_this_pc(said.append), "cuda")
+        with mock.patch("shutil.which", return_value=None):
+            self.assertEqual(install.runtime_for_this_pc(said.append), "directml")   # no NVIDIA: nothing to say
+        self.assertEqual(len(said), 2)
+
+    def test_an_old_driver_stops_the_installers_first_run(self):
+        # install.py's first run (no --runtime): a driver too old for CUDA is not installed past - BV_DRIVER and exit
+        # code 3, nothing written, for the installer to ask «Обновить драйвер?»; --runtime directml goes on; an old card
+        # goes on with DirectML by itself
+        import contextlib
+        import io
+        import sys
+        from unittest import mock
+        from bv import install
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d) / "BV"
+            argv = ["install.py", "--root", str(root), "--archive", str(Path(d) / "a.zip")]
+            out = io.StringIO()
+            with mock.patch("shutil.which", return_value="nvidia-smi"), \
+                    mock.patch.object(install, "cuda_problem", return_value=("driver", "Драйвер старый.")), \
+                    mock.patch.object(install, "install") as installed, mock.patch.object(sys, "argv", argv), \
+                    contextlib.redirect_stdout(out):
+                self.assertEqual(install.main(), install.DRIVER_EXIT)
+                installed.assert_not_called()
+                self.assertEqual(out.getvalue(), "BV_DRIVER: Драйвер старый.\n")
+                self.assertFalse(root.exists())
+                with mock.patch.object(sys, "argv", argv + ["--runtime", "directml"]):
+                    self.assertEqual(install.main(), 0)
+                self.assertEqual(installed.call_args.args[2], "directml")
+            with mock.patch("shutil.which", return_value="nvidia-smi"), \
+                    mock.patch.object(install, "cuda_problem", return_value=("card", "GTX 1080.")), \
+                    mock.patch.object(install, "install") as installed, mock.patch.object(sys, "argv", argv):
+                self.assertEqual(install.main(), 0)
+                installed.assert_called_once()
+
+
 class UvSyncFails(unittest.TestCase):
     def test_build_raises_on_uv_error(self):
         from unittest import mock
@@ -2024,6 +2122,10 @@ class OldClients(unittest.TestCase):
         # the ready version said without «когда закроешь игру» (the launcher says what it waits for): a release
         # still installs
         self.updater_client("v0_4_0b19", "0.4.0b19", release=None)
+
+    def test_0_6_0_beta1_client_updates_through_its_updater(self):
+        # install.py checks the NVIDIA driver before the CUDA build (cuda_problem): a release still installs
+        self.updater_client("v0_6_0b1", "0.6.0b1", release=None)
 
     def updater_client(self, client: str, current: str, release: str | None = f"v{WORKING}-beta.99"):
         import base64

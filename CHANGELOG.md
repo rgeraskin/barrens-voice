@@ -20,6 +20,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   With `log_details` each race voice line gets «до звука 0.83 с (MME, задержка выхода 120 мс)» under it: from the line's arrival to its first sound, and the output. `audio_wasapi` in config.json (off; not in the launcher's settings) plays through WASAPI's default output in shared mode instead of MME's sound mapper, and opens it for a moment before a line made after 5 s of silence — after the fork sokol-rc/barrens-voice, where that started the first line after a silence in 0.76 s instead of 8.6 s. A stream WASAPI refuses plays through MME; a change of Windows' default output is picked up before the next line.
 
+- The installer takes the CUDA build only where it runs
+
+  The CUDA build's libraries are CUDA 13: they need a driver for CUDA 13 (R580 or newer) and a GeForce 16, 20 or newer. The installer reads both from nvidia-smi (the CUDA version in its header; the driver's number when the header has none) right after Python is downloaded, before the libraries. A driver too old: it asks «Обновить драйвер NVIDIA?» - yes (the default) opens NVIDIA's driver page and stops, to be run again after the update; no installs the DirectML build (the game may stutter while a line is made). A card too old for CUDA 13: the DirectML build, said why. Before, any NVIDIA driver got the CUDA build, and an old one left the race voices off. A driver too old to know the card's compute capability is asked again without it. Updates keep the build an install was made with: an install that got CUDA on an old driver gets DirectML by running the installer again.
+
 ### Changed
 
 - A race voice's line of several sentences starts sooner: its first part plays while the rest is made

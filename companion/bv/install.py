@@ -50,9 +50,65 @@ def runtime_of(root: Path) -> str:
         return runtime_for_this_pc()
 
 
-def runtime_for_this_pc() -> str:
-    """ONNX Runtime's build for the video card: "cuda" with an NVIDIA driver, else "directml"."""
-    return "cuda" if shutil.which("nvidia-smi") else "directml"
+# the CUDA build's libraries are CUDA 13 (uv.lock: nvidia-cuda-runtime 13.x): a driver for CUDA 13 or newer (R580+),
+# and a card CUDA 13 still runs on - Turing (GeForce 16 and 20) and newer, compute capability 7.5
+CUDA_MAJOR, CUDA_DRIVER, COMPUTE = 13, 580, (7, 5)
+NOTICE = "BV_NOTICE: "    # a line the installer shows the player after the step (installer/BarrensVoice.iss)
+DRIVER = "BV_DRIVER: "    # the driver is too old for CUDA: the installer asks to update it (main, DRIVER_EXIT)
+DRIVER_EXIT = 3
+DIRECTML_COST = "голоса рас будут, но игра может подтормаживать."
+
+
+def runtime_for_this_pc(log=None) -> str:
+    """ONNX Runtime's build for the video card: "cuda" with an NVIDIA card and driver the CUDA build runs on, else
+    "directml" - with an NVIDIA card, why not CUDA is said through `log` (a NOTICE line: the installer shows it)."""
+    smi = shutil.which("nvidia-smi")
+    if not smi:
+        return "directml"
+    problem = cuda_problem(smi)
+    if problem is None:
+        return "cuda"
+    kind, why = problem
+    if log is not None:
+        log(NOTICE + why + f" Ставлю сборку DirectML: {DIRECTML_COST}"
+            + (" Обнови драйвер NVIDIA и переустанови Barrens Voice — будет CUDA." if kind == "driver" else ""))
+    return "directml"
+
+
+def cuda_problem(smi: str, run=subprocess.run) -> tuple[str, str] | None:
+    """Why the CUDA build would not run here (None: it would): ("driver", why) - a driver update mends it -, or
+    ("card", why) - no driver will. From nvidia-smi: the CUDA version its driver supports
+    (its header: «CUDA Version: 13.0», newer drivers «CUDA UMD Version: 13.5»; the driver's number when the header has
+    none) and the card's compute capability. A driver before 510 knows no `compute_cap` and refuses the whole query:
+    asked again without it, the card is not held against it (its driver's CUDA version decides)."""
+    def ask(fields: str):
+        return run([smi, f"--query-gpu={fields}", "--format=csv,noheader"], capture_output=True, text=True, timeout=30)
+    try:
+        query = ask("name,driver_version,compute_cap")
+        if query.returncode != 0:
+            query = ask("name,driver_version")
+        header = run([smi], capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        query = header = None
+    if query is None or query.returncode != 0 or not query.stdout.strip():
+        return "driver", "Драйвер NVIDIA не отвечает (nvidia-smi)."
+    cards = [[part.strip() for part in line.split(",")] for line in query.stdout.strip().splitlines()]
+    cards = [c + ["?"] * (3 - len(c)) for c in cards if len(c) >= 2]
+    capable = [c for c in cards if not re.fullmatch(r"\d+\.\d+", c[2])
+               or tuple(int(x) for x in c[2].split(".")) >= COMPUTE]
+    if cards and not capable:
+        return "card", f"{cards[0][0]}: на этой видеокарте CUDA {CUDA_MAJOR} не работает (нужна GeForce 16, 20 или новее)."
+    driver = cards[0][1] if cards else "?"
+    version = re.search(r"CUDA (?:UMD )?Version:\s*(\d+)\.(\d+)", header.stdout if header is not None else "")
+    if version:
+        ok, said = int(version.group(1)) >= CUDA_MAJOR, f"CUDA {version.group(1)}.{version.group(2)}"
+    else:
+        major = re.match(r"\d+", driver)
+        ok, said = (major is None or int(major.group()) >= CUDA_DRIVER), "CUDA старше нужной"
+    if ok:
+        return None
+    return "driver", (f"Драйвер NVIDIA {driver} поддерживает {said}, а голосам рас нужна CUDA {CUDA_MAJOR} — драйвер "
+                      f"{CUDA_DRIVER} или новее.")
 
 
 def unpack(archive: Path, root: Path) -> tuple[str, Path]:
@@ -291,7 +347,7 @@ def install(root: Path, archive: Path, runtime: str | None, uv: Path, log=print)
     """Unpack, build and make current; returns the version."""
     import json
     root.mkdir(parents=True, exist_ok=True)
-    runtime = runtime or runtime_for_this_pc()
+    runtime = runtime or runtime_for_this_pc(log)
     (root / INSTALL_MARK).write_text(json.dumps({"app": "Barrens Voice", "runtime": runtime}) + "\n", encoding="utf-8")
     for sub in ("app", "data", "cache"):
         (root / sub).mkdir(exist_ok=True)
@@ -310,6 +366,12 @@ def main() -> int:
     parser.add_argument("--uv", type=Path, default=None, help="uv.exe (default: next to the install)")
     args = parser.parse_args()
     uv = args.uv or args.root / "uv.exe"
+    if args.runtime is None:                # the installer's first run: a driver too old for CUDA is asked about
+        smi = shutil.which("nvidia-smi")
+        problem = cuda_problem(smi) if smi else None
+        if problem is not None and problem[0] == "driver":
+            print(DRIVER + problem[1], flush=True)   # the installer: «Обновить драйвер?» - or again, --runtime directml
+            return DRIVER_EXIT
     install(args.root, args.archive, args.runtime, uv)
     return 0
 
