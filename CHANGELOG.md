@@ -46,6 +46,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   «хуево» as «хуёво» in every form («хуевый», «хуёвина», «до хуев»): the «ё» list the program restores from has no swear words. «хуева туча» (a lot) stays «х+уева т+уча» in its forms, «хуевато» is «хуев+ато».
 
+  «чекну» (check) as «ч+екну» in every form («чекни», «чекнул»), «чекать» as «ч+екать».
+
 ### Fixed
 
 - A word in capitals that a dictionary stem takes has its ending in lower case too
