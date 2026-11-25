@@ -48,6 +48,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   «чекну» (check) as «ч+екну» in every form («чекни», «чекнул»), «чекать» as «ч+екать».
 
+  «морока» as «мор+ока» in its five forms, not declined («без мороки»): RUAccent took it for «м+орок».
+
+  «т.е.» as «то есть» (glued to the next word too: «т.е.я пас»), «емае» as «ёма+ё», not declined («о емае»).
+
 ### Fixed
 
 - A word in capitals that a dictionary stem takes has its ending in lower case too
