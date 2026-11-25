@@ -27,6 +27,90 @@ WAKE_AFTER = 5.0   # seconds of silence after which the output is woken before a
 
 
 FIRST_WORDS = 4   # a first sentence made on its own only with this many words on each side (first_and_rest)
+PART_SECONDS = 15.0   # the longest speech one F5 call makes (config.json `f5_part_seconds`): see within()
+# where a part too long is cut, best first: sentence ends, then clause marks (a comma, «;», «:», a dash between spaces,
+# the dash kept with the words before it), then any space
+CUTS = (SENTENCE_END, re.compile(r"(?<=[,;:])\s+|(?<=\s[—–-])\s+"), re.compile(r"\s+"))
+# words a piece cut between words should not end on - they lean on the word after them («…и не | ливает»); not «же»,
+# «бы», «ли» - they lean on the word before («сказал бы»)
+LEANING = frozenset("и а но или да не ни в во на с со к ко по за от до из у о об обо при для без под над про через что "
+                    "как чтобы если то and or but the a an to of in on at for with from not".split())
+
+
+def within(text: str, seconds, limit: float) -> list[str]:
+    """`text` cut into pieces of at most `limit` seconds of speech each (`seconds(piece)`, the length F5 would be
+    given), each its own F5 call. F5 makes a line in one go, its reference voice included, and was taught on clips of
+    up to 30 seconds (upstream cuts so that reference and piece are 22 s, utils_infer.chunk_text); the length is
+    capped too (Metadata's max_signal_length, 4096 frames - about 44 seconds with the reference). Cut where a speaker
+    pauses anyway - at sentence ends, else at commas and dashes -, pieces joined back while they fit, so «… & more.
+    PST!» keeps its «PST!» with the words before it; a short sentence before a long one goes with its head
+    («Внимание! Сегодня в восемь…»), not alone; a clause still too long is cut between words into runs of about
+    equal length, not filled up to leave a word or two; a piece without a letter (a lone dash) goes with the one
+    before it, a dash ending a piece (not the last) becomes a comma - a pause F5 knows from its training, as upstream's
+    pieces end."""
+    pieces: list[str] = []
+    for piece in _cut(text.strip(), seconds, limit, 0):
+        if pieces and not any(ch.isalnum() for ch in piece):
+            pieces[-1] = f"{pieces[-1]} {piece}"
+        elif pieces and not any(ch.isalnum() for ch in pieces[-1]):
+            pieces[-1] = f"{pieces[-1]} {piece}"
+        else:
+            pieces.append(piece)
+    return [re.sub(r"[,;:]*\s+[—–-]$", ",", piece) if index < len(pieces) - 1 else piece
+            for index, piece in enumerate(pieces)]
+
+
+def _cut(text: str, seconds, limit: float, level: int) -> list[str]:
+    if seconds(text) <= limit or level == len(CUTS):
+        return [text]
+    units = [unit for unit in CUTS[level].split(text) if unit]
+    if len(units) == 1:
+        return _cut(text, seconds, limit, level + 1)
+    if level == len(CUTS) - 1:
+        return _even(units, seconds, limit)
+    pieces: list[str] = []
+    for unit in units:
+        if pieces and seconds(f"{pieces[-1]} {unit}") <= limit:
+            pieces[-1] = f"{pieces[-1]} {unit}"
+        elif level == 0 and pieces and len(pieces[-1].split()) < FIRST_WORDS and len(
+                joined := _cut(f"{pieces[-1]} {unit}", seconds, limit, level + 1)) <= len(
+                _cut(unit, seconds, limit, level + 1)):     # a short sentence with the next one's head: a call saved
+            pieces[-1:] = joined
+        else:
+            pieces.extend(_cut(unit, seconds, limit, level + 1))
+    return pieces
+
+
+def _even(words: list[str], seconds, limit: float) -> list[str]:
+    """`words` in the fewest runs of about equal length (by bytes, as the estimate counts) that each fit, a run that
+    would end on a LEANING word («и», «не», «в», RUAccent's «чт+обы» too) ending a word or two sooner when both runs
+    still fit; with a word alone over the limit (no count fits: «ахахаха…»), runs filled while they fit, that word on
+    its own."""
+    sizes = [len(word.encode("utf-8")) + 1 for word in words]
+    total = sum(sizes)
+    for runs in range(2, len(words) + 1):
+        bounds, done = [0], 0
+        for index, size in enumerate(sizes[:-1], 1):
+            done += size
+            if done >= total * len(bounds) / runs:
+                bounds.append(index)
+        bounds.append(len(words))
+        for at in range(1, len(bounds) - 1):
+            bound = bounds[at]
+            while (bound - 1 > bounds[at - 1] and words[bound - 1].lower().replace("+", "").strip(",.;:!?…") in LEANING
+                   and seconds(" ".join(words[bound - 1:bounds[at + 1]])) <= limit):
+                bound -= 1
+            bounds[at] = bound
+        pieces = [" ".join(words[a:b]) for a, b in zip(bounds, bounds[1:]) if a < b]
+        if all(seconds(piece) <= limit for piece in pieces):
+            return pieces
+    pieces = [words[0]]
+    for word in words[1:]:
+        if seconds(f"{pieces[-1]} {word}") <= limit:
+            pieces[-1] = f"{pieces[-1]} {word}"
+        else:
+            pieces.append(word)
+    return pieces
 
 
 def first_and_rest(text: str) -> list[str]:
@@ -462,14 +546,17 @@ class F5Speaker:
                stopped=lambda: False):
         """`text` (spoken()) in `slot`'s voice as the game plays it, part by part as each is made - the program's lines
         and the voice lab's test lines alike: the first sentence on its own while the rest is made (`f5_first_sentence`,
-        on), each part's statements and questions made separately (a question with its intonation, `shape`) with GAP
-        between, each take checked for a cut ending (_synth). Yields (index, parts, WAV at full loudness - the player
-        applies the volume -, seconds of sound); a part's tail is GAP when another follows. `stopped()` is asked after
-        each piece: true, and nothing more is made or yielded."""
+        on), a part longer than `f5_part_seconds` cut (within()), each part's statements and questions made separately
+        (a question with its intonation, `shape`) with GAP between, each take checked for a cut ending (_synth). Yields
+        (index, parts, WAV at full loudness - the player applies the volume -, seconds of sound); a part's tail is GAP
+        when another follows. `stopped()` is asked after each piece: true, and nothing more is made or yielded."""
         import numpy as np
         if not any(ch.isalnum() for ch in text):
             return                                  # nothing to say (empty, «???», «)»): no F5 call, whatever the setting
         parts = first_and_rest(text) if self.config.get("f5_first_sentence", True) else [text]
+        ref, limit = self.ref_seconds[slot.id], self.config.get("f5_part_seconds", PART_SECONDS)
+        parts = [piece for part in parts
+                 for piece in within(part, lambda t: self.duration(slot, t, rate, character) - ref, limit)]
         for index, part in enumerate(parts):
             pieces, sr = [], 24000
             for group in sentence_groups(part):

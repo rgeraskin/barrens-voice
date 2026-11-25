@@ -54,6 +54,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- A race voice's long line is made in pieces of up to 15 seconds
+
+  F5 made a line's every part in one go, its reference voice included, and it was taught on clips of up to 30 seconds (upstream cuts at 22 with the reference): a long trade offer came out blurred at its end, at 6 and at 8 steps - its length the likely cause, not yet checked by ear. A part longer than `f5_part_seconds` (config.json, 15 seconds, at least 5) is now cut where a speaker pauses - at sentence ends, else at commas and dashes, between words into runs of about equal length only for a clause still too long, not after «и», «не», «в» -, each piece made on its own with a short pause between; a short sentence before a long one goes with its head; a dash ending a piece is read as a comma; the next piece is made while one plays.
+
 - A word in capitals that a dictionary stem takes has its ending in lower case too
 
   «ХУЕВО» was «хуёвО», «БУРГЕРЫ» «б+ургерЫ» - a capital inside a word: the stem's replacement is lower case, the ending was kept as typed.

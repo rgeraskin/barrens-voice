@@ -46,6 +46,7 @@ DEFAULT_CONFIG = {
     "f5_steps": 10,
     # the first sentence of a line plays while the rest is made (f5engine.first_and_rest); a test, out of the launcher
     "f5_first_sentence": True,
+    "f5_part_seconds": 15.0,
     # slow voices drawn toward the bank's faster quarter (quantile) by this share, at most this many
     # times faster; each character's own tempo within this share either way (f5engine.line_seconds)
     "voice_pace_quantile": 0.25,
@@ -197,9 +198,10 @@ class ConfigError(Exception):
 
 # the least a number setting may be: a queue of 0 lines, a poll every 0 s would break the reading; a pace
 # limit of 0 divides by zero (and under 1 would slow voices down), a quantile under 0 picks no voice of the
-# bank, a thread count under 1 is ONNX Runtime's "all of them" or an error
+# bank, a thread count under 1 is ONNX Runtime's "all of them" or an error, an F5 piece under 5 s is a call a word
 LEAST = {"max_queue": 1, "poll_interval": 0.01, "capture_height": 1, "voice_pace_limit": 1.0,
-         "voice_pace_quantile": 0.0, "onnx_threads": 1}
+         "voice_pace_quantile": 0.0, "onnx_threads": 1,
+         "f5_part_seconds": 5.0}
 
 
 def settle_numbers(config: dict, log) -> None:

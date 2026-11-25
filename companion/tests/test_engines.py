@@ -375,6 +375,56 @@ class F5SpeakerLoad(unittest.TestCase):
             else:
                 self.assertEqual(played, [line.received])
                 self.assertEqual(tails, [f5engine.TAIL])
+        # a line longer than f5_part_seconds: cut at its commas, each piece its own part, the gap between
+        tails.clear()
+        made.clear()
+        played.clear()
+        with tempfile.TemporaryDirectory() as d:
+            speaker, _ = self.speaker(Path(d), [self.voice(Path(d))], Onnx(), Player())
+            speaker.config.update(f5_first_sentence=False, f5_part_seconds=4)
+            speaker.duration = lambda slot, text, rate, character="": speaker.ref_seconds[slot.id] + len(text.split())
+            loop = threading.Thread(target=speaker._synth_loop)
+            loop.start()
+            self.assertTrue(speaker.ready.wait(5))
+            line = Line("say", "Громмаш", "Orc", "2", "", "", "раз два три, четыре пять шесть, семь", 100, "f5")
+            speaker.say(line)
+            speaker.lines.put(None)
+            loop.join(5)
+        self.assertEqual([len(text.split()) for text in made[1:]], [3, 4])
+        self.assertTrue(made[1].endswith(","), made)
+        self.assertEqual(played, [line.received, None])
+        self.assertEqual(tails, [f5engine.GAP, f5engine.TAIL])
+        # the estimate at the line's speed and for its sender: 6 words at 200 % fit 3 s for Громмаш - one piece; at
+        # 100 %, or for another name (three times slower here), they would be cut
+        made.clear()
+        with tempfile.TemporaryDirectory() as d:
+            speaker, _ = self.speaker(Path(d), [self.voice(Path(d))], Onnx(), Player())
+            speaker.config.update(f5_first_sentence=False, f5_part_seconds=3)
+            speaker.duration = lambda slot, text, rate, character="": (
+                speaker.ref_seconds[slot.id] + len(text.split()) * 100 / rate * (1 if character == "Громмаш" else 3))
+            loop = threading.Thread(target=speaker._synth_loop)
+            loop.start()
+            self.assertTrue(speaker.ready.wait(5))
+            speaker.say(Line("say", "Громмаш", "Orc", "2", "", "", "раз два три, четыре пять шесть", 200, "f5"))
+            speaker.lines.put(None)
+            loop.join(5)
+        self.assertEqual(len(made[1:]), 1, made)
+        # and with the first sentence on (the default): the rest, the long one, cut too
+        tails.clear()
+        made.clear()
+        with tempfile.TemporaryDirectory() as d:
+            speaker, _ = self.speaker(Path(d), [self.voice(Path(d))], Onnx(), Player())
+            speaker.config.update(f5_part_seconds=4)
+            speaker.duration = lambda slot, text, rate, character="": speaker.ref_seconds[slot.id] + len(text.split())
+            loop = threading.Thread(target=speaker._synth_loop)
+            loop.start()
+            self.assertTrue(speaker.ready.wait(5))
+            speaker.say(Line("say", "Громмаш", "Orc", "2", "", "", "Всем привет в чате. раз два три, четыре пять шесть, семь",
+                             100, "f5"))
+            speaker.lines.put(None)
+            loop.join(5)
+        self.assertEqual([len(text.split()) for text in made[1:]], [4, 3, 4])
+        self.assertEqual(tails, [f5engine.GAP, f5engine.GAP, f5engine.TAIL])
         cut = f5engine.first_and_rest
         self.assertEqual(cut("Один."), ["Один."])
         self.assertEqual(cut("Раз! Два. Три?"), ["Раз! Два.", "Три?"])             # where the groups part anyway
@@ -391,6 +441,73 @@ class F5SpeakerLoad(unittest.TestCase):
         self.assertEqual(cut(""), [])                                              # nothing to say: no F5 call
         self.assertEqual(cut("   "), [])
         self.assertEqual(cut(")."), [])
+
+    def test_a_long_part_is_cut_where_a_speaker_pauses(self):
+        # within(): at most `limit` seconds a piece - sentence ends first, then commas and dashes, a word gap last;
+        # pieces joined back while they fit
+        from bv.f5engine import within
+
+        def words(text):
+            return len(text.split())          # a second a word
+
+        def words_or_long(text):
+            return sum(9 if len(word) > 10 else 1 for word in text.split())
+        self.assertEqual(within("раз два три", words, 4), ["раз два три"])
+        self.assertEqual(within("один два три. четыре пять шесть. семь", words, 4),
+                         ["один два три.", "четыре пять шесть. семь"])
+        self.assertEqual(within("a1 a2 a3, b1 b2 b3, c1 c2 c3. Иду", words, 4),
+                         ["a1 a2 a3,", "b1 b2 b3,", "c1 c2 c3. Иду"])
+        # a dash ending a piece becomes a comma; the line's own end keeps it
+        self.assertEqual(within("раз два три — четыре пять шесть", words, 4), ["раз два три,", "четыре пять шесть"])
+        self.assertEqual(within("а б, в г. д е, ж з", words, 4), ["а б, в г.", "д е, ж з"])       # sentence ends first
+        self.assertEqual(within("а; б в г: д е", words, 3), ["а;", "б в г:", "д е"])
+        self.assertEqual(within("а б: в г д е ж", words, 4), ["а б:", "в г д", "е ж"])
+        self.assertEqual(within("раз два три - четыре пять шесть", words, 4), ["раз два три,", "четыре пять шесть"])
+        self.assertTrue(within("раз два три четыре пять —", words, 3)[-1].endswith(" —"))
+        # a cut between words not after «и», «не», «в»: the words leaning on the next go with it
+        self.assertEqual(within("раз два и три четыре пять", words, 3), ["раз два", "и три четыре", "пять"])
+        self.assertEqual(within("знает тактику и не ливает после", words, 4), ["знает тактику", "и не ливает после"])
+        self.assertEqual(within("иду в данж", words, 2), ["иду", "в данж"])
+        self.assertEqual(within("раз два три и не четыре пять", words, 4), ["раз два три", "и не четыре пять"])
+        self.assertEqual(within("раз два И три четыре пять", words, 3), ["раз два", "И три четыре", "пять"])
+        self.assertEqual(within("wts меч and щит кольцо", words, 3), ["wts меч", "and щит кольцо"])
+        self.assertEqual(within("раз два чт+обы три четыре пять", words, 3), ["раз два", "чт+обы три четыре", "пять"])
+        self.assertEqual(within("он сказал же что придёт", words, 3), ["он сказал же", "что придёт"])   # leans back
+        self.assertEqual(within("раз два, — три четыре пять", words, 3), ["раз два,", "три четыре пять"])
+        self.assertEqual(within("и в на с", words, 2), ["и в", "на с"])              # nothing else to cut at: as it was
+        pieces = within("— — раз два три четыре пять", words, 3)            # a first piece without a letter too
+        self.assertEqual(" ".join(pieces), "— — раз два три четыре пять")
+        self.assertTrue(all(any(ch.isalnum() for ch in piece) for piece in pieces), pieces)
+        # even runs by bytes, as the estimate counts - not by letters or words
+        self.assertEqual(within("ааааа ббббб abc def ghi jkl", lambda t: len(t.encode()), 30),
+                         ["ааааа ббббб", "abc def ghi jkl"])
+        # a word alone over the limit: on its own, the words around it in runs that fit - not a call a word
+        self.assertEqual(within("го в данж " + "ха" * 20 + " кто со мной", words_or_long, 4),
+                         ["го в данж", "ха" * 20, "кто со мной"])
+        self.assertEqual(within("аб вг ддддддддд", lambda t: len(t.encode()), 9), ["аб вг", "ддддддддд"])
+        # only a short sentence (under four words) goes with the next one's head
+        self.assertEqual(within("раз два три четыре! a1 a2, b1 b2, c1 c2, d1 d2", words, 6),
+                         ["раз два три четыре!", "a1 a2, b1 b2, c1 c2,", "d1 d2"])
+        self.assertEqual(within("раз два три — —", words, 4), ["раз два три — —"])       # no piece without a letter
+        # a short sentence goes with the head of a long one after it, not alone
+        self.assertEqual(within("Внимание! раз два, три четыре, пять шесть", words, 4),
+                         ["Внимание! раз два,", "три четыре, пять шесть"])
+        self.assertEqual(within("пять-шесть семь-восемь девять-десять", words, 2), ["пять-шесть семь-восемь",
+                                                                                     "девять-десять"])
+        self.assertEqual(within("1 2 3 4 5 6 7 8 9", words, 4), ["1 2 3", "4 5 6", "7 8 9"])     # even, no lone «9»
+        self.assertEqual(within("1 2 3 4 5", words, 4), ["1 2 3", "4 5"])
+        self.assertEqual(within("слово", words, 0), ["слово"])                 # nothing left to cut: as it is
+        line = ("LFW Enchanting: boots плюс восемь процентов run or плюс семь AGI/STA, all пять neck enchants, bracers "
+                "плюс шестнадцать SP, gloves плюс пятнадцать STR, cloak плюс пять AGI & more. PST!")
+        pieces = within(line, words, 12)
+        self.assertEqual(" ".join(pieces), line)
+        self.assertTrue(all(words(piece) <= 12 for piece in pieces), pieces)
+        self.assertTrue(pieces[-1].endswith("& more. PST!"), pieces)          # «PST!» with the words before it
+        from bv import __main__, f5engine
+        self.assertEqual((__main__.DEFAULT_CONFIG["f5_part_seconds"], f5engine.PART_SECONDS), (15.0, 15.0))
+        config = {**__main__.DEFAULT_CONFIG, "f5_part_seconds": 0}
+        __main__.settle_numbers(config, lambda message: None)
+        self.assertEqual(config["f5_part_seconds"], 5.0)               # not a call a word
 
     def test_f5_steps_from_the_settings(self):
         # f5_steps (the launcher's «Голоса рас»): 10 the shipped model (the cache's other files gone); 8 or 6 the
