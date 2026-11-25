@@ -38,6 +38,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Stresses: RUAccent reads a line in lower case
+
+  RUAccent looks a homograph up in its table as written, and the table is in lower case: a word with a capital missed its context model and got one default stress («Прид+ержите моё пиво», «Посл+е пары банов», «Аллея Чест+и», «Песни В+ойны», «Кат+я»). Now it reads as the same word typed in lower case. On 2125 chat lines from the log, 14 words came out better and 4 worse; of those, «Степи» (the zone, so a real steppe too: «в широкой степи») and «Леса Ночной Песни» are now in the dictionary, with the other names from the game's tables RUAccent misreads in lower case («Глуб+ины Чёрной горы», «Келебрас Пр+оклятый», «Остров+а Эха», «Пол+я Великанов», «Пл+ети»), and «БРД» got its «Глуб+ины». The marks go back onto the text as written, so the speech gets the same letters.
+
 - A race voice's line of several sentences starts sooner: its first part plays while the rest is made
 
   `f5_first_sentence` in config.json (on; not in the launcher's settings). The line is cut where it is made in parts anyway (a question after statements), else after its first sentence only when it and the rest have four words each: every extra piece costs F5 nearly a short line's work, so «привет) го в данж» stays whole. A short pause after the first part. `false`: the line made whole and played as one, as in 0.5.0.

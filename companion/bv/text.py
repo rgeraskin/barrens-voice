@@ -808,7 +808,11 @@ class Accentor:
         keep_koziev(getattr(model, "module_path", None), before=False)
 
     def accent(self, text: str) -> str:
-        """`text` with "+" before each stressed vowel; words marked by the dictionary kept."""
+        """`text` with "+" before each stressed vowel; words marked by the dictionary kept. RUAccent gets the line in
+        lower case: it looks a homograph up in its table as written, keyed in lower case, so a word with a capital
+        missed its context model and got the table's one default («Прид+ержите», «Посл+е», «Чест+и», «К+ому»; on
+        2125 chat lines 14 words better in lower case, 4 worse). A capital word now reads as the same word typed in
+        lower case. The marks go back onto the text as written (merge_marks matches the words by lowered letters)."""
         if not self.enabled or not CYRILLIC.search(text):
             return text
         self.load()
@@ -816,7 +820,7 @@ class Accentor:
             return text
         try:
             with self.lock:
-                accented = self.model.process_all(text.replace("+", ""))
+                accented = self.model.process_all(text.replace("+", "").lower())
         except Exception as e:  # noqa: BLE001 - never lose a line over stress marks
             self.log(f"RUAccent: {e}")
             return text
