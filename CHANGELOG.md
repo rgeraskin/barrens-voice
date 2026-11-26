@@ -16,9 +16,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   After installing, a page «Аддон в игры» lists the World of Warcraft clients found (Forever and retail, found as the launcher finds them), each with its folder and the addon there, every box ticked (retail's marked «ритейл мало тестировался»). Next installs the addon into the ticked ones; one that fails is said, with the launcher's «установить аддон» to try again. No game found, or a silent install: no page.
 
-- The log says how soon a line was heard, and `audio_wasapi` to try WASAPI
+- The log says how soon a line was heard
 
-  With `log_details` each race voice line gets «до звука 0.83 с (MME, задержка выхода 120 мс)» under it: from the line's arrival to its first sound, and the output. `audio_wasapi` in config.json (off; not in the launcher's settings) plays through WASAPI's default output in shared mode instead of MME's sound mapper, and opens it for a moment before a line made after 5 s of silence — after the fork sokol-rc/barrens-voice, where that started the first line after a silence in 0.76 s instead of 8.6 s. A stream WASAPI refuses plays through MME; a change of Windows' default output is picked up before the next line.
+  With `log_details` each race voice line gets «до звука 0.83 с (MME, задержка выхода 120 мс)» under it: from the line's arrival to its first sound, and the output. The sound stays on MME's sound mapper: WASAPI, tried in the betas (`audio_wasapi`), brought no gain to be seen in the logs and did not follow Windows' default output; it is gone (docs/adr/0010).
 
 - The installer takes the CUDA build only where it runs
 

@@ -2175,20 +2175,20 @@ class LiveVolume(unittest.TestCase):
         self.assertEqual(audio.StreamOut(sd).device, 1)
         self.assertIsNone(audio.StreamOut(self.FakeSD()).device)                     # no MME: the default device
 
-    def test_wasapi_when_asked_and_mme_when_it_refuses(self):
-        # config.json audio_wasapi (off by default): WASAPI's default output, shared, Windows converting the rate; a
-        # stream it refuses plays through MME; wake() opens and stops it silently. The log names what played
+    def test_always_mme(self):
+        # MME's sound mapper plays every line - WASAPI is gone (docs/adr/0010: it did not follow Windows' default output);
+        # the log names what played. config.json's old audio_wasapi does nothing
         import threading
         from bv import audio
         from bv.__main__ import DEFAULT_CONFIG
-        self.assertIs(DEFAULT_CONFIG["audio_wasapi"], False)
+        self.assertNotIn("audio_wasapi", DEFAULT_CONFIG)
         self.assertIs(DEFAULT_CONFIG["f5_first_sentence"], True)
         base = self.FakeSD
 
         class SD(base):
-            def __init__(self, refuse=False):
+            def __init__(self):
                 super().__init__()
-                self.opened, self.refuse = [], refuse
+                self.opened = []
 
             def query_hostapis(self, i=None):
                 apis = [{"name": "MME", "devices": [0, 1]}, {"name": "Windows WASAPI", "devices": [5],
@@ -2198,75 +2198,17 @@ class LiveVolume(unittest.TestCase):
             def query_devices(self, i):
                 return {"max_output_channels": 2}
 
-            def WasapiSettings(self, auto_convert):
-                return ("wasapi", auto_convert)
-
             def OutputStream(self, samplerate, channels, dtype, blocksize, callback, finished_callback=None,
                              device=None, extra_settings=None):
                 self.opened.append((device, extra_settings))
-                if extra_settings and self.refuse:
-                    raise OSError("format refused")
-                return base.OutputStream(self, samplerate, channels, dtype, blocksize or 256, callback,
+                return base.OutputStream(self, samplerate, channels, dtype, blocksize, callback,
                                          finished_callback or (lambda: None), device)
-        data = audio.wav(b"\0\1" * 800, 8000)
         sd = SD()
-        out = audio.StreamOut(sd, wasapi=True)
-        out.play(data, lambda: 1.0, threading.Event(), 0.1)
-        self.assertEqual(sd.opened, [(5, ("wasapi", True))])
-        self.assertEqual(out.api, "WASAPI")
-        self.assertIsNotNone(out.first_block)
-        sd.aborted = False
-        out.wake()
-        self.assertEqual(sd.opened[-1], (5, ("wasapi", True)))
-        sd = SD(refuse=True)
-        out = audio.StreamOut(sd, wasapi=True)
-        out.play(data, lambda: 1.0, threading.Event(), 0.1)
-        self.assertEqual(sd.opened, [(5, ("wasapi", True)), (0, None)])
-        self.assertEqual(out.api, "MME")
-        sd = SD()
-        audio.StreamOut(sd).play(data, lambda: 1.0, threading.Event(), 0.1)    # not asked: MME, as before
+        out = audio.StreamOut(sd)
+        out.play(audio.wav(b"\0\1" * 800, 8000), lambda: 1.0, threading.Event(), 0.1)
         self.assertEqual(sd.opened, [(0, None)])
-
-        class Unstarted(SD):                    # WASAPI opens the stream but will not start it: MME plays the line
-            def OutputStream(self, *a, **k):
-                stream = SD.OutputStream(self, *a, **k)
-                if k.get("extra_settings"):
-                    def refuse():
-                        raise OSError("AUDCLNT_E_DEVICE_INVALIDATED")
-                    stream.start = refuse
-                return stream
-        sd = Unstarted()
-        out = audio.StreamOut(sd, wasapi=True)
-        out.play(data, lambda: 1.0, threading.Event(), 0.1)
-        self.assertEqual(sd.opened, [(5, ("wasapi", True)), (0, None)])
         self.assertEqual(out.api, "MME")
-        self.assertTrue(sd.blocks)
-
-    def test_the_player_wakes_the_output_on_its_own_thread(self):
-        # Player.wake(): the player's thread calls the output's wake() in its turn (PortAudio on one thread); a wake
-        # that fails is said once, the lines go on
-        import threading
-        import time
-        from bv import audio
-        logged, threads = [], []
-
-        class Out:
-            first_block = None
-
-            def wake(self, rate):
-                threads.append(threading.current_thread().name)
-                raise OSError("CO_E_NOTINITIALIZED")
-
-            def play(self, data, level, stopped, length):
-                pass
-        p = audio.Player(8, log=logged.append, out=Out())
-        p.start()
-        p.wake()
-        p.wake()
-        p.play(marked_line(b"A", 0.01))
-        time.sleep(0.3)
-        self.assertEqual(threads, ["player", "player"])
-        self.assertEqual(logged, ["    WASAPI перед строкой не открылся: CO_E_NOTINITIALIZED"])
+        self.assertIsNotNone(out.first_block)
 
     def test_the_first_sound_is_logged_from_the_lines_arrival(self):
         import time

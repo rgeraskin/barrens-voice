@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import io
 import queue
-import sys
 import threading
 import time
 import wave
@@ -116,52 +115,20 @@ class StreamOut:
     again and the line goes on from where it stopped; only a second failure is the caller's (Player: said, the next
     line tries again).
 
-    `wasapi` (config.json `audio_wasapi`, to compare by ear and by the log): WASAPI's default output in shared mode
-    instead, Windows' own sound path without MME's layer over it (its buffer: tens of milliseconds, not a hundred and
-    more), Windows converting the rate. PortAudio knows WASAPI's default device as it was when it started, so a line
-    finding Windows' default output changed reads the list again first; a stream WASAPI refuses plays through MME.
-    And wake(): a moment of WASAPI before a line is made after a silence - the fork sokol-rc/barrens-voice measured the
-    first line after a silence start in 0.76 s instead of 8.6 s so (docs/tts-live-wow.md there; why, not known)."""
+    MME, not WASAPI (docs/adr/0010): a line playing moves to Windows' new default output by itself, WASAPI's stayed on
+    the old one; MME's 213 ms of output latency are little next to the synthesis."""
 
     BLOCK = 1024    # frames a block: ~46 ms at 22 kHz, a volume change heard within it
     STALL = 2.0     # seconds without a block: the device is gone
     FIRST_STALL = 5.0   # ... before a stream's first block (a device waking up: a headset switched on)
 
-    def __init__(self, sd=None, wasapi: bool = False):
+    def __init__(self, sd=None):
         if sd is None:
             import sounddevice as sd
-        self.sd = sd
-        self.wasapi = wasapi             # PortAudio lives on one thread, the player's (wake() included: Player.wake)
+        self.sd = sd                     # PortAudio lives on one thread, the player's
         self.device = self.mapper()
-        self.shared, self.preferred = self.wasapi_output(), preferred_output() if wasapi else None
         self.first_block = None          # the last line's first block (monotonic), for the log's «до звука»
         self.api, self.latency = "MME", 0.0   # what played it, and its stream's output latency (seconds)
-
-    def wasapi_output(self):
-        """WASAPI's default output's index in PortAudio's list (None: not asked for, or no WASAPI)."""
-        if not self.wasapi:
-            return None
-        try:
-            return next(h["default_output_device"] for h in self.sd.query_hostapis()
-                        if h["name"] == "Windows WASAPI" and h["default_output_device"] >= 0)
-        except Exception:  # noqa: BLE001 - no WASAPI (not Windows): MME
-            return None
-
-    def wake(self, rate: int = 24000) -> None:
-        """A moment of WASAPI's output, silent, before a line is made after a silence (the class's text); nothing
-        without WASAPI. On the player's thread (Player.wake): PortAudio opens streams on the thread COM was started on
-        for it. A failure is the caller's to say."""
-        if self.shared is None:
-            return
-        def silence(out, frames, _time, _status):
-            out.fill(0)
-        stream = self.sd.OutputStream(device=self.shared, samplerate=rate, channels=1, dtype="float32", blocksize=0,
-                                      callback=silence, extra_settings=self.sd.WasapiSettings(auto_convert=True))
-        try:
-            stream.start()
-            stream.stop()
-        finally:
-            stream.close()
 
     def mapper(self):
         """Windows' sound mapper's index in PortAudio's list (None: the default device - not Windows, no MME)."""
@@ -187,7 +154,6 @@ class StreamOut:
             except Exception as e:
                 raise StreamBroken(f"PortAudio не запустился: {e}") from e
         self.device = self.mapper()
-        self.shared, self.preferred = self.wasapi_output(), preferred_output() if self.wasapi else None
 
     def play(self, data: bytes, level, stopped: threading.Event, length: float) -> None:
         """Until the line ends or `stopped` is set (a stop or a pause cuts it). `length`: the outputs' interface (a fake
@@ -195,8 +161,6 @@ class StreamOut:
         samples, rate = samples_of(data)
         state = {"pos": 0}
         self.first_block = None
-        if self.wasapi and self.preferred != preferred_output():   # Windows' default output changed: the list again
-            self.reopen()
         for attempt in (1, 2):
             try:
                 if self._stream(samples, rate, state, level, stopped):
@@ -236,16 +200,7 @@ class StreamOut:
                 raise sd.CallbackStop
         stream = self._open(rate, callback, done.set)
         try:
-            try:
-                stream.start()
-            except Exception:
-                if self.api != "WASAPI":
-                    raise
-                stream.close()                      # WASAPI opened it but would not start it: MME plays the line
-                stream = None                       # (not closed twice should MME's open fail)
-                done.clear()                        # WASAPI's thread may have said «finished» on its error
-                stream = self._open(rate, callback, done.set, mme=True)
-                stream.start()
+            stream.start()
             beat["at"] = time.monotonic()          # the first block comes a buffer after the start: no stall before it
             while not done.wait(0.02):
                 if stopped.is_set():
@@ -257,53 +212,23 @@ class StreamOut:
                     return False
             return state["pos"] >= len(samples)     # finished before the end: the device went away
         finally:
-            if stream is not None:
-                stream.close()
+            stream.close()
 
-
-    def _open(self, rate, callback, finished, mme: bool = False):
-        """The line's stream: WASAPI's when asked for and it opens (`mme`: not), else MME's (self.api says which)."""
+    def _open(self, rate, callback, finished):
+        """The line's stream, MME's (self.latency: its output latency, for the log)."""
         sd = self.sd
-        if self.shared is not None and not mme:
-            try:
-                stream = sd.OutputStream(device=self.shared, samplerate=rate, channels=1, dtype="float32", blocksize=0,
-                                         callback=callback, finished_callback=finished,
-                                         extra_settings=sd.WasapiSettings(auto_convert=True))
-                self.api, self.latency = "WASAPI", float(getattr(stream, "latency", 0.0) or 0.0)
-                return stream
-            except Exception:  # noqa: BLE001 - this format or device refused: MME plays it
-                pass
         stream = sd.OutputStream(device=self.device, samplerate=rate, channels=1, dtype="float32",
                                  blocksize=self.BLOCK, callback=callback, finished_callback=finished)
         self.api, self.latency = "MME", float(getattr(stream, "latency", 0.0) or 0.0)
         return stream
 
 
-def preferred_output() -> int | None:
-    """Windows' default output now, as MME numbers it (waveOutMessage WAVE_MAPPER DRVM_MAPPER_PREFERRED_GET, mmddk.h);
-    None off Windows or unknown. Only compared with itself: has the default output changed?"""
-    if sys.platform != "win32":
-        return None
-    import ctypes
-    device, flags = ctypes.c_uint32(), ctypes.c_uint32()
-    try:
-        status = ctypes.windll.winmm.waveOutMessage(ctypes.c_void_p(0xFFFFFFFF), 0x2015, ctypes.byref(device),
-                                                    ctypes.byref(flags))
-    except (AttributeError, OSError):
-        return None
-    return device.value if status == 0 else None
-
-
-WAKE = object()      # Player.items: a wake() of the output, not a line
-
-
 class Player(threading.Thread):
     """The lines in turn, through an output (`out`: the stream, StreamOut; the tests give a fake). The lines come made at
     full loudness (the engines' own evening-out only); the volume the addon asks is applied as they play."""
 
-    def __init__(self, max_queue: int = 8, log=None, out=None, gain: float = 1.0, wasapi: bool = False):
+    def __init__(self, max_queue: int = 8, log=None, out=None, gain: float = 1.0):
         super().__init__(daemon=True, name="player")
-        self.wasapi = wasapi         # config.json `audio_wasapi`: the stream's (StreamOut)
         self.items: queue.Queue = queue.Queue()
         self.max_queue = max_queue
         self.generation = 0
@@ -322,7 +247,6 @@ class Player(threading.Thread):
         # in their order, and read by the output for every block of the line playing; before the first frame,
         # config.json's own (the program's notices at its start)
         self.gain = gain
-        self.wake_failed = False     # a wake() that failed: said once
 
     def set_gain(self, gain: float) -> None:
         """The volume asked now: the line playing follows at once (the stream), the next ones are played so too."""
@@ -387,7 +311,7 @@ class Player(threading.Thread):
         """The stream, opened at the first line (and again after it could not be: no device then, one now)."""
         if self.out is None:
             try:
-                self.out = StreamOut(wasapi=self.wasapi)
+                self.out = StreamOut()
             except Exception as e:  # noqa: BLE001 - no PortAudio, no device: said, the next line tries again
                 self._silent(f"не открылось звуковое устройство: {e}")
         return self.out
@@ -396,22 +320,6 @@ class Player(threading.Thread):
         """At the start: a tenth of a second of silence through the output, so a device that does not open is said now
         (the log; the launcher's yellow line), before the voices are ready, not at the first line."""
         self.play(wav(b"\0\0" * 2400, 24000, tail=0))
-
-    def wake(self, rate: int = 24000) -> None:
-        """Before a line is made after a silence: the output's wake() (StreamOut: WASAPI's, when asked for), done by the
-        player's thread in its turn - PortAudio stays on one thread, and the synthesis goes on at once."""
-        self.items.put((self.generation, WAKE, rate))
-
-    def _wake(self, rate: int) -> None:
-        wake = getattr(self._output(), "wake", None)
-        if wake is None:
-            return
-        try:
-            wake(rate)
-        except Exception as e:  # noqa: BLE001 - only a help to the next line: said once
-            if not self.wake_failed:
-                self.wake_failed = True
-                self.log(f"    WASAPI перед строкой не открылся: {e}")
 
     def _silent(self, why: str) -> None:
         if not self.silent:
@@ -423,9 +331,6 @@ class Player(threading.Thread):
             item, self.again = self.again, None
             if item is None:
                 item = self.items.get()
-            if item[1] is WAKE:
-                self._wake(item[2])
-                continue
             try:
                 self._play(item)
             except StreamBroken as e:

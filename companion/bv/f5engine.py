@@ -23,7 +23,6 @@ from .text import Accentor, numbers_to_words
 
 SENTENCE_END = re.compile(r"(?<=[.!?…])\s+")
 GAP = 0.15   # seconds between sentence groups made separately
-WAKE_AFTER = 5.0   # seconds of silence after which the output is woken before a line is made (audio_wasapi)
 
 
 FIRST_WORDS = 4   # a first sentence made on its own only with this many words on each side (first_and_rest)
@@ -618,8 +617,6 @@ class F5Speaker:
             if self.config.get("log_details") and text != line.text:
                 groups = sentence_groups(text)
                 self.log(f"    к синтезу: {text}" + (f"  ({len(groups)} части)" if len(groups) > 1 else ""))
-            if self.config.get("audio_wasapi") and self.player.quiet_for() >= WAKE_AFTER:
-                self.player.wake(getattr(self.onnx, "out_rate", 24000))
             started = time.perf_counter()
             received = line.received if self.config.get("log_details") else None
             try:
