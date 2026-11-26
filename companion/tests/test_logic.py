@@ -888,6 +888,10 @@ class Pipeline(unittest.TestCase):
                     "с хуевой тучей": "с х+уевой т+учей", "в хуевой туче": "в х+уевой т+уче",
                     "хуеву тучу": "х+уеву т+учу", "хуевато": "хуев+ато", "хуевая туча": "хуёвая туча"})
 
+    def test_use(self):
+        self.check({"усе": "всё", "ну усе, я спать": "ну всё, я спать", "за усе спасибо": "за всё спасибо",
+                    "Усе пропало": "всё пропало", "усек": "усёк", "усеять": "усеять"})
+
     def test_tier(self):
         # an armour set's tier: «тэ один», not «тодин»; a word on its own only
         # spelt in the rule: a digit left would agree with the next word («т2 сет» - «тэ второй сет»)
