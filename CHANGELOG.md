@@ -56,6 +56,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   «т.е.» as «то есть» (glued to the next word too: «т.е.я пас»), «емае» as «ёма+ё», not declined («о емае»).
 
+  «т1», «t2» (an armour set's tier, 0 to 21: retail's go that far) as «тэ один», «тэ два» - they were «тодин»; a word on its own only, not «5т1». The number is spelt by the rule, so it does not agree with the next word («т2 сет» is «тэ два сет», not «тэ второй сет»).
+
 ### Fixed
 
 - A race voice's long line is made in pieces of up to 15 seconds
