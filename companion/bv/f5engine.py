@@ -432,7 +432,7 @@ class F5Speaker:
         paces = sorted(self.pace(s) for s in slots if s.shift == 0 and s.speech)
         quantile = self.config.get("voice_pace_quantile", 0.25)
         self.target_pace = paces[min(len(paces) - 1, int(len(paces) * quantile))] if paces else 0.0
-        self._synth(first, "Проверка.", 100)   # warm-up: the first call is slow
+        self._synth(first, "Проверка.", 100, say=False)   # warm-up: the first call is slow; its ending not logged
         self.log(f"F5-TTS готов на {self.device}")
 
     def _load_onnx(self) -> None:
@@ -512,7 +512,7 @@ class F5Speaker:
         return ref + line_seconds(self.pace(slot), self.target_pace, len(text.encode("utf-8")), rate, character,
                                   self.config)
 
-    def _synth(self, slot, text: str, rate: int, character: str = ""):
+    def _synth(self, slot, text: str, rate: int, character: str = "", say: bool = True):
         """The line in `slot`'s voice. F5 fits the speech into the length it is given, and sometimes
         the last syllable does not fit. A take whose speech runs to its very end (`silence_after`
         under CUT_TAIL: one line in eight, most of them whole) is made once more with a quarter
@@ -527,7 +527,7 @@ class F5Speaker:
             self.ref_audio[ref_file] = resample(data.mean(axis=1), sr_in, self.onnx.in_rate)
         for attempt in range(2):
             wav, sr = self.onnx.synth(self.ref_audio[ref_file], ref_text, text, total)
-            if attempt or silence_after(wav, sr) >= CUT_TAIL or self._whole(wav, sr, text):
+            if attempt or silence_after(wav, sr) >= CUT_TAIL or self._whole(wav, sr, text, say):
                 break
             total = ref + (total - ref) * 1.25
         return wav, sr
@@ -569,9 +569,14 @@ class F5Speaker:
             last = index == len(parts) - 1
             yield index, len(parts), wav_bytes(wav, sr, 1.0, gain_db, tail=TAIL if last else GAP), len(wav) / sr
 
-    def _whole(self, wav, sr: int, text: str) -> bool:
-        """Whether Whisper hears the take's last word (no Whisper: assumed cut, made again)."""
+    def _whole(self, wav, sr: int, text: str, say: bool = True) -> bool:
+        """Whether Whisper hears the take's last word (no Whisper: assumed cut, made again). With `log_details` the log
+        says so either way - also without Whisper, so the logs tell how often a take is made again; `say` off for the
+        warm-up take, under no chat line."""
+        say = say and self.config.get("log_details")
         if self.checker is None:
+            if say:
+                self.log("    конец впритык, ещё раз длиннее (без Whisper)")
             return False
         try:
             heard = self.checker.transcribe(wav, sr)
@@ -579,7 +584,7 @@ class F5Speaker:
             self.log(f"    Whisper: {e}")
             return False
         whole = ending_heard(text, heard)
-        if self.config.get("log_details"):
+        if say:
             self.log(f"    конец {'цел' if whole else 'обрезан, ещё раз длиннее'} (Whisper: «{heard.strip()}»)")
         return whole
 

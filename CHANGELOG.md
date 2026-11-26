@@ -18,7 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - The log says how soon a line was heard
 
-  With `log_details` each race voice line gets «до звука 0.83 с (MME, задержка выхода 120 мс)» under it: from the line's arrival to its first sound, and the output. The sound stays on MME's sound mapper: WASAPI, tried in the betas (`audio_wasapi`), brought no gain to be seen in the logs and did not follow Windows' default output; it is gone (docs/adr/0010).
+  With `log_details` each race voice line gets «до звука 0.83 с (MME, задержка выхода 120 мс)» under it: from the line's arrival to its first sound, and the output. A take made again for an ending too near its end is said without Whisper too («конец впритык, ещё раз длиннее (без Whisper)»), so the logs tell how often that is. The sound stays on MME's sound mapper: WASAPI, tried in the betas (`audio_wasapi`), brought no gain to be seen in the logs and did not follow Windows' default output; it is gone (docs/adr/0010).
 
 - The installer takes the CUDA build only where it runs
 

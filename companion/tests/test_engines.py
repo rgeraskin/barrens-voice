@@ -275,6 +275,53 @@ class F5SpeakerLoad(unittest.TestCase):
             config["character_tempo"] = 0
             self.assertAlmostEqual(speaker.duration(slot, text, 100), expected)   # its own pace: not drawn
 
+    def test_a_take_to_its_very_end_is_made_again_and_the_log_says_so(self):
+        # f5_end_check "silence" (the default, no Whisper): a take whose speech runs to its end is made once more,
+        # longer; with log_details the log says so, so the logs tell how often it happens
+        import tempfile
+
+        import numpy as np
+        totals, quiet_after = [], [0, 1]          # each take in turn: seconds of quiet after its speech (the last held)
+
+        class Onnx:
+            in_rate = 24000
+
+            def synth(self, ref_audio, ref_text, text, total):
+                totals.append(total)
+                wav = np.full(24000, 0.5, dtype="float32")
+                quiet = quiet_after.pop(0) if len(quiet_after) > 1 else quiet_after[0]
+                if quiet:
+                    wav[-4800:] = 0
+                return wav, 24000
+        with tempfile.TemporaryDirectory() as d:
+            slot = self.voice(Path(d))
+            speaker, logged = self.speaker(Path(d), [slot], Onnx())
+            speaker.config["log_details"] = True
+            speaker._load()                                             # the warm-up: a take to its end, then quiet
+            self.assertFalse([m for m in logged if "конец" in m], logged)   # made again, but under no chat line: not said
+            logged.clear()
+            totals.clear()
+            quiet_after[:] = [0, 1]
+            speaker._synth(slot, "Привет всем", 100)
+            self.assertEqual(len(totals), 2)
+            self.assertGreater(totals[1], totals[0])                    # made again, longer
+            self.assertEqual(logged, ["    конец впритык, ещё раз длиннее (без Whisper)"])
+            logged.clear()
+            totals.clear()
+            speaker._synth(slot, "Привет всем", 100)                    # quiet after it: once, nothing said
+            self.assertEqual((len(totals), logged), (1, []))
+            speaker.config["log_details"] = False
+            quiet_after[:] = [0, 1]
+            speaker._synth(slot, "Привет всем", 100)                    # made again, but the short log says nothing
+            self.assertEqual(logged, [])
+            # with Whisper: its verdict said for a chat line's take, not for one with `say` off (the warm-up)
+            speaker.config["log_details"] = True
+            speaker.checker = types.SimpleNamespace(transcribe=lambda wav, sr: "Привет всем")
+            self.assertTrue(speaker._whole(np.zeros(10, dtype="float32"), 24000, "Привет всем", say=False))
+            self.assertEqual(logged, [])
+            self.assertTrue(speaker._whole(np.zeros(10, dtype="float32"), 24000, "Привет всем"))
+            self.assertEqual(logged, ["    конец цел (Whisper: «Привет всем»)"])
+
     def test_a_line_from_the_queue_to_the_player(self):
         import tempfile
 
