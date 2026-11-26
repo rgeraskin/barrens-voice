@@ -60,6 +60,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   «усе» as «всё», not declined («за усе спасибо»).
 
+  A Latin «c» after a number reads as the Cyrillic «с» does: silver («50c», «50 c», «2g50c»), seconds after a cooldown or a cast, after «через» and before «кд» («кд 5c»), and copper after a silver amount, the Cyrillic «м» too («2g 50s 30c», «50с 30м» - «тридцать меди») - «50c» sounded «пятьдесят си». Rules of their own before the «с» ones, so those keep their keys.
+
 ### Fixed
 
 - A race voice's long line is made in pieces of up to 15 seconds
