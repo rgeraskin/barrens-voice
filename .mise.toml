@@ -15,6 +15,11 @@ python.uv_venv_auto = "create|source"
 description = "All tests: Python (with the optional libraries) and Lua"
 depends = ["test-py", "test-lua"]
 
+[tasks.test-quiet]
+description = "All tests but those that open the launcher's windows (BV_TEST_WINDOWS=0): nothing takes the focus"
+env = { BV_TEST_WINDOWS = "0" }
+run = "mise run test"
+
 [tasks.test-py]
 description = "Python tests; the protocol test runs the addon's encoder with luajit"
 run = "uv run --locked python -m unittest discover -s companion/tests"

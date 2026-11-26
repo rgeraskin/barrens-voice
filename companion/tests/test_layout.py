@@ -8,6 +8,7 @@ Run alone, it also writes what failed: `python -m unittest test_layout` from com
 from __future__ import annotations
 
 import itertools
+import os
 import sys
 import unittest
 from pathlib import Path
@@ -16,10 +17,13 @@ from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+# BV_TEST_WINDOWS=0 (`mise run test-quiet`): no Tk windows - on a desktop they take the focus and fly over the screen
+NO_WINDOWS = os.environ.get("BV_TEST_WINDOWS") == "0"
 try:
     import tkinter as tk
-    _root = tk.Tk()
-    _root.withdraw()
+    _root = None if NO_WINDOWS else tk.Tk()
+    if _root is not None:
+        _root.withdraw()
 except Exception:  # noqa: BLE001 - no display (a headless Linux box): nothing to measure
     _root = None
 
@@ -142,7 +146,7 @@ UPDATES = [None,
 STATUSES = ["", "downloading", "preparing", "ready", "error"]
 
 
-@unittest.skipIf(_root is None, "no display for Tk")
+@unittest.skipIf(_root is None, "no display for Tk, or BV_TEST_WINDOWS=0")
 class Layout(unittest.TestCase):
     def make(self, scale=1.0, config=None, install=None, problem=None):
         """The window as it opens (a Toplevel of the hidden root); `install`: an install's folder (the updater's

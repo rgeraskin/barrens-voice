@@ -1371,6 +1371,8 @@ class Wrap(unittest.TestCase):
 
     def test_wrap(self):
         import tkinter as tk
+        if os.environ.get("BV_TEST_WINDOWS") == "0":   # `mise run test-quiet`: no window to take the focus
+            self.skipTest("BV_TEST_WINDOWS=0")
         try:
             root = tk.Tk()
         except tk.TclError:

@@ -168,6 +168,7 @@
 
 - `mise run test` — все тесты: Python (с numpy, pymorphy3, num2words — ни один не пропускается) и Lua;
 - `mise run test-py`, `mise run test-lua` — по отдельности;
+- `mise run test-quiet` — все, кроме тестов, которые открывают окна лаунчера (`BV_TEST_WINDOWS=0`): на рабочем столе такие окна перехватывают фокус. Окна проверяются в `mise run test` и в CI;
 - `mise run stats` — сколько людей пользуются: скачивания установщика, архива и манифеста каждого выпуска на GitHub (своей телеметрии нет, словарь с `raw.githubusercontent.com` не считается);
 - `mise run icon` — перерисовать значок аддона `Icon.tga`, значок программы `icon.ico`, смайлик `Media/smile.tga`, `tools/icon_preview.png` и логотип проектов на CurseForge и Wago `docs/images/logo.png` (400 × 400, PNG);
 - `mise run voices-table` — пересобрать `companion/bv/game_voices.json` из общего списка файлов игры (`tools/game_voices.py`; список скачивается в `tools/.cache/`);
