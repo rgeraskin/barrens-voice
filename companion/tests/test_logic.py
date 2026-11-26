@@ -2205,14 +2205,19 @@ class LiveVolume(unittest.TestCase):
         p = audio.Player(8, log=logged.append, out=fake)
         p.start()
         p.check()
-        time.sleep(0.3)
+        deadline = time.monotonic() + 5                 # the player's thread in its time: a loaded machine is slower
+        while not played and time.monotonic() < deadline:
+            time.sleep(0.02)
         self.assertEqual(played, [b"\0"])
         self.assertEqual(logged, [])
         with mock.patch.object(audio, "StreamOut", side_effect=OSError("PortAudio: no device")):
             p = audio.Player(8, log=logged.append)
             p.start()
             p.check()
-            time.sleep(0.3)
+            deadline = time.monotonic() + 5             # inside the patch: the thread opens the output after check()
+            while not logged and time.monotonic() < deadline:
+                time.sleep(0.02)
+            time.sleep(0.1)                             # and nothing more said after the first word
         self.assertEqual(len(logged), 1, logged)
         self.assertTrue(logged[0].startswith("звук не играет: не открылось звуковое устройство"), logged)
 
