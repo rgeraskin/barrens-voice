@@ -471,7 +471,7 @@ class F5Speaker:
         self.device = f"{self.card} (ONNX Runtime, {self.onnx.steps} шагов)"
 
     def fewer_steps(self, models: Path):
-        """config.json `f5_steps` (the launcher's «Голоса рас: 10 / 8 / 6 шагов»): the Transformer rewritten for that
+        """config.json `f5_steps` (the launcher's «Голоса рас: Качество · Баланс · Скорость»): the Transformer rewritten for that
         many steps (f5_schedule: made once into the cache's f5-steps, then reused; another number's file there is
         removed - 660 MB each) and the number; None for the shipped 10 (the folder removed) - and for a number or a
         model f5_schedule does not know, or a rewrite that fails at all (memory, a broken file), said in the log."""

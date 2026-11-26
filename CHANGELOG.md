@@ -32,9 +32,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
   A tenth of a second of silence through the output when the program starts: a device that does not open is said then (the log, the launcher's yellow line), not at the first chat line.
 
-- «Голоса рас: 10 шагов / 8 / 6 — быстрее» in the launcher's settings
+- «Голоса рас: Качество · Баланс · Скорость» in the launcher's settings
 
-  F5's steps a line (`f5_steps`, 10 by default). 8 and 6 are the same model with its step tables put on a coarser grid (after the fork sokol-rc/barrens-voice): a line is made about a fifth (8) or half again (6) sooner and the video card is freed sooner, which the game feels most with DirectML. By ear nearly the same; at 6 a stress was heard on the wrong syllable now and then (the dictionary's too) or a syllable blurred - the cause not checked yet. The rewritten model is made at the first choice (a couple of seconds) and kept in the cache, about 660 MB: another number replaces it, 10 removes it; a rewrite that fails falls back to 10, said in the log. Each choice's hint says what it brings. The program gets the `onnx` package for it.
+  F5's steps a line (`f5_steps`): 10 (Качество, the default), 8 (Баланс) or 6 (Скорость), the number in each choice's hint. 8 and 6 are the same model with its step tables put on a coarser grid (after the fork sokol-rc/barrens-voice): a line is made about a fifth (8) or half again (6) sooner and the video card is freed sooner, which the game feels most with DirectML. By ear nearly the same; at 6 a stress was heard on the wrong syllable now and then (the dictionary's too) or a syllable blurred - the cause not checked yet. The rewritten model is made at the first choice (a couple of seconds) and kept in the cache, about 660 MB: another number replaces it, 10 removes it; a rewrite that fails falls back to 10, said in the log. Each choice's hint says what it brings. The program gets the `onnx` package for it.
 
 ### Changed
 

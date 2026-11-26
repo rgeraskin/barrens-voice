@@ -475,10 +475,10 @@ class Layout(unittest.TestCase):
         a.settings_win.destroy()
 
     def test_the_steps_choice_is_saved(self):
-        # «Голоса рас: 10 шагов / 8 / 6 — быстрее»: one of three, the one clicked saved as f5_steps
+        # «Голоса рас: Качество · Баланс · Скорость» (10, 8, 6 steps): one of three, the one clicked saved as f5_steps
         from bv.launcher import model, paint
         a = self.make(config={"f5_steps": 10})
-        actions, checks, written = {}, {}, []
+        actions, checks, drawn, written = {}, {}, {}, []
         real_button, real_check = paint.Painter.button, paint.Painter.check
 
         def button(p, x0, y0, x1, y1, text, tag, action=None, **k):
@@ -486,12 +486,16 @@ class Layout(unittest.TestCase):
             return real_button(p, x0, y0, x1, y1, text, tag, action, **k)
 
         def check(p, x, y, text, on, tag, action, **k):
-            checks[tag] = (on, action)
+            checks[tag], drawn[tag] = (on, action), (text, k.get("tip") or "")
             return real_check(p, x, y, text, on, tag, action, **k)
         with mock.patch.object(paint.Painter, "button", button), mock.patch.object(paint.Painter, "check", check), \
                 mock.patch.object(model, "update_config", lambda **kw: written.append(kw) or kw):
             a.open_settings()
             self.assertEqual([checks[f"steps{n}"][0] for n in (10, 8, 6)], [True, False, False])
+            # the label says what a choice gives, its hint the number of steps: «Качество» is 10, never 6
+            self.assertEqual([drawn[f"steps{n}"][0] for n in (10, 8, 6)], ["Качество", "Баланс", "Скорость"])
+            for n in (10, 8, 6):
+                self.assertIn(f"{n} шагов", drawn[f"steps{n}"][1])
             checks["steps6"][1]()
             self.assertEqual([checks[f"steps{n}"][0] for n in (10, 8, 6)], [False, False, True])
             actions["save"]()
