@@ -1,11 +1,17 @@
 """The launcher's logic without its window: games and addon, versions, settings, state lines."""
 import os
 import json
+import sys
 import tempfile
 import unittest
 from types import SimpleNamespace
 from pathlib import Path
 import tomllib
+
+# run alone too (`python -m unittest companion/tests/test_launcher.py`): the companion's bv and the tests' compat copies
+for _path in (Path(__file__).resolve().parents[1], Path(__file__).resolve().parent):
+    if str(_path) not in sys.path:
+        sys.path.insert(0, str(_path))
 
 # the version in work (pyproject.toml's): a release build's tag must name it
 WORKING = tomllib.loads((Path(__file__).resolve().parents[2] / "pyproject.toml").read_text(encoding="utf-8"))[
