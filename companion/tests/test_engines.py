@@ -322,6 +322,45 @@ class F5SpeakerLoad(unittest.TestCase):
             self.assertTrue(speaker._whole(np.zeros(10, dtype="float32"), 24000, "Привет всем"))
             self.assertEqual(logged, ["    конец цел (Whisper: «Привет всем»)"])
 
+    def test_the_text_for_f5_is_logged_even_unchanged(self):
+        # with log_details every line says «к синтезу», a line F5 gets as typed too: the verdicts under it are its own
+        # (tools/f5_endings.py pairs them by it)
+        import tempfile
+
+        import numpy as np
+
+        class Onnx:
+            in_rate = 24000
+
+            def synth(self, ref_audio, ref_text, text, total):
+                return np.concatenate([np.full(2400, 0.3, dtype="float32"), np.zeros(4800, dtype="float32")]), 24000
+
+        class Player:
+            generation = 0
+
+            def play(self, data, generation, received=None):
+                pass
+        with tempfile.TemporaryDirectory() as d:
+            speaker, logged = self.speaker(Path(d), [self.voice(Path(d))], Onnx(), Player())
+            speaker.config["log_details"] = True
+            loop = threading.Thread(target=speaker._synth_loop)
+            loop.start()
+            self.assertTrue(speaker.ready.wait(5))
+            speaker.say(Line("say", "Громмаш", "Orc", "2", "", "", "Привет всем!", 100, "f5"))   # no «о»: unchanged
+            speaker.lines.put(None)
+            loop.join(5)
+        self.assertIn("    к синтезу: Привет всем!", logged)
+        with tempfile.TemporaryDirectory() as d:                    # the short log: no «к синтезу»
+            speaker, logged = self.speaker(Path(d), [self.voice(Path(d))], Onnx(), Player())
+            speaker.config["log_details"] = False
+            loop = threading.Thread(target=speaker._synth_loop)
+            loop.start()
+            self.assertTrue(speaker.ready.wait(5))
+            speaker.say(Line("say", "Громмаш", "Orc", "2", "", "", "Привет всем!", 100, "f5"))
+            speaker.lines.put(None)
+            loop.join(5)
+        self.assertFalse([m for m in logged if "к синтезу" in m], logged)
+
     def test_a_line_from_the_queue_to_the_player(self):
         import tempfile
 

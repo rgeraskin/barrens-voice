@@ -619,7 +619,7 @@ class F5Speaker:
             if slot is None:
                 continue
             text = self.spoken(line.text)
-            if self.config.get("log_details") and text != line.text:
+            if self.config.get("log_details"):     # always: a verdict below belongs to the last «к синтезу» (f5_endings)
                 groups = sentence_groups(text)
                 self.log(f"    к синтезу: {text}" + (f"  ({len(groups)} части)" if len(groups) > 1 else ""))
             started = time.perf_counter()
